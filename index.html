@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Defaults -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Title -->
+    <title>CoPilot</title>
+
+    <!-- Tab Icon -->
+    <link rel="icon" href="./logo-light.png" />
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="./styles/styles.css" />
+    <link rel="stylesheet" href="./styles/divider.css" />
+    <link rel="stylesheet" href="./styles/notes.css" />
+
+    <!-- Favicon -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+    />
+
+    <!-- Full Calendar -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+
+    <!-- Xenova Draggable -->
+    <script src="./scripts/draggable.min.js"></script>
+
+    <!-- Resize Description Box -->
+    <script>
+      function autoGrow(element) {
+        element.style.height = "5px"; // Temporarily shrink to get the scroll height
+        var maxHeight = 50; // Maximum height for 2 lines (adjust as needed)
+        element.style.height = Math.max(Math.min(element.scrollHeight, maxHeight) + 2, 40) + "px";
+      }
+    </script>
+
+    <!-- Google Integration -->
+    <script src="./scripts/google-integration.js"></script>
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
+    <!-- CKEditor -->
+    <!-- <script src="https://cdn.ckeditor.com/ckeditor5/40.1.0/decoupled-document/ckeditor.js"></script> -->
+  </head>
+
+  <!-- Entire App -->
+  <body>
+    <!-- Tasks Pane -->
+    <div class="left-pane">
+      <!-- Top Half -->
+      <div class="top">
+        <!-- Tasks Header -->
+        <!-- <div class="header"> -->
+        <!-- Logo -->
+        <!-- <img src="./logo.png" alt="company logo" id="logo">
+          <h3>Tasks and Calendar</h3>
+        </div> -->
+
+        <!-- WEATHER > ALPHA ONLY FOR TESTING: TESTING PAUSED -->
+
+        <!-- Tasks Input -->
+        <div class="input-group">
+          <input type="text" placeholder="Enter a new task..." id="new-task-input" />
+          <button type="button" id="add-task-btn">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+
+        <div class="taskstitle">
+          <h3>Tasks</h3>
+        </div>
+
+        <!-- Placeholder for Show/Hide completed tasks button -->
+        <div id="toggle-completed-tasks-placeholder"></div>
+
+        <!-- Tasks List -->
+        <ul class="list-group" id="todo-list">
+          <!-- Tasks will be dynamically added here -->
+          <p style="text-align: center">
+            Your tasks will appear here <br />
+            once you add them
+          </p>
+        </ul>
+
+        <div class="calendars">
+          <div class="calendars-header">
+            <h3>Calendars</h3>
+            <div>
+              <span class="material-symbols-outlined" id="add-calendar-btn">Add</span>
+              <span class="material-symbols-outlined" id="collapse-calendars-btn">expand_less</span>
+            </div>
+          </div>
+          <div id="calendars-list"></div>
+        </div>
+      </div>
+
+      <!-- Bottom Half -->
+      <div class="bottom">
+        <!-- Settings -->
+        <div class="settings" id="settings-btn">
+          <span class="material-symbols-outlined">settings</span>
+          <h3>Settings</h3>
+        </div>
+        <div class="dashai">
+          <h5>Powered by <span style="color: #00ffaa">DASH AI</span></h5>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="divider">
+      <div class="divider-handle" id="draggable-divider"></div>
+    </div>
+
+    <!-- Calendar Pane -->
+    <div class="right-pane" id="right-pane">
+      <div id="calendar"></div>
+
+      <!-- Event Modal -->
+      <div id="event-modal" class="modal">
+        <div class="modal-content" id="modal-content">
+          <div class="header">
+            <h2 id="event-title-modal"></h2>
+            <span class="close-button material-symbols-outlined">close</span>
+          </div>
+          <form id="event-form">
+            <input type="text" id="event-title" placeholder="Event Title" required />
+            <select id="calendar-dropdown"></select>
+            <input type="date" id="event-date" required />
+            <div id="event-form-time-wrapper">
+              <input type="time" id="event-start-time" required />
+              <h4 class="spacer">to</h4>
+              <input type="time" id="event-end-time" required />
+            </div>
+            <textarea id="event-description" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
+            <input type="text" id="event-location" placeholder="Location" />
+            <div id="autocomplete-container"></div>
+            <button type="submit" id="save-event">Save Event</button>
+            <button type="button" id="delete-event" style="display: none">Delete Event</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Event Details Pop-Up -->
+      <div id="event-details" class="modal">
+        <div class="modal-content" id="event-details-modal-content">
+          <div class="header">
+            <div class="event-details-title-wrapper">
+              <span id="event-details-title-icon"></span>
+              <h3 id="event-details-title"></h3>
+            </div>
+            <div id="event-details-btns">
+              <button id="edit-event-btn">
+                <span class="material-symbols-outlined">edit</span>
+              </button>
+              <button id="delete-event-btn">
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+              <button id="close-event-btn">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          </div>
+          <div id="event-details-body">
+            <!-- Event details will go here -->
+            <p id="event-details-date"></p>
+            <p id="event-details-time"></p>
+            <div class="event-details-wrapper" id="event-details-notes-wrapper">
+              <h4 id="event-details-notes-header">
+                <span class="material-symbols-outlined">description</span>
+              </h4>
+              <p id="event-details-notes">Take meeting notes</p>
+            </div>
+            <div class="event-details-wrapper" id="event-details-description-wrapper">
+              <h4 id="event-details-description-header">
+                <span class="material-symbols-outlined">notes</span>
+              </h4>
+              <p id="event-details-description"></p>
+            </div>
+            <div class="event-details-wrapper" id="event-details-location-wrapper">
+              <h4 id="event-details-location-header">
+                <span class="material-symbols-outlined">location_on</span>
+              </h4>
+              <a href="" target="_blank" id="event-details-location"></a>
+            </div>
+            <div class="event-details-wrapper" id="event-details-calendar-wrapper">
+              <h4 id="event-details-calendar-header">
+                <span class="material-symbols-outlined">calendar_today</span>
+              </h4>
+              <p id="event-details-calendar"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div class="document-editor__container">
+        <div class="document-editor" id="document-editor">
+          <div class="document-editor__toolbar"></div>
+          <div class="document-editor__editable-container">
+            <div class="document-editor__editable" id="editor"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Settings Pop-Up -->
+    <div class="settings-container draggable">
+      <!-- Header -->
+      <h1>Settings</h1>
+
+      <!-- Dash AI Setting -->
+      <!-- <div class="toggle-container">
+        <label class="toggle-switch">
+          <input type="checkbox" checked id="dash-ai-scheduling" />
+          <span class="switch"></span>
+        </label>
+        <div class="toggle-label">
+          <span>Dash AI Scheduling</span>
+          <small>Automatically schedule your tasks with AI.</small>
+        </div>
+      </div> -->
+
+      <!-- Auto Reschedule Tasks Setting -->
+      <!-- <div class="toggle-container">
+        <label class="toggle-switch">
+          <input type="checkbox" checked id="auto-reschedule-tasks" />
+          <span class="switch"></span>
+        </label>
+        <div class="toggle-label">
+          <span>Auto Reschedule Tasks</span>
+          <small>Reschedule tasks if not completed on time.</small>
+        </div>
+      </div>
+
+      <!-- Dark Mode Setting -->
+      
+      <div class="toggle-container">
+        <label class="toggle-switch">
+          <input type="checkbox" checked id="dark-mode" />
+          <span class="switch"></span>
+        </label>
+        <div class="toggle-label">
+          <span>Dark Mode</span>
+          <small>Our favorite mode, the correct mode ;)</small>
+        </div>
+      </div>
+
+      <!-- Google Integration Setting -->
+      <button id="authorize-button" onclick="handleAuthClick()">
+        <h3>
+          <span class="material-symbols-outlined">download</span>
+          Import from Google Calendar
+        </h3>
+      </button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./scripts/script.js"></script>
+    <script src="./scripts/calendar.js"></script>
+    <script src="./scripts/calendars.js"></script>
+    <script src="./scripts/scheduleTask.js"></script>
+    <script src="./scripts/location-autocomplete.js"></script>
+    <script src="./scripts/divider.js"></script>
+    <script src="./scripts/drag.js"></script>
+    <script src="./scripts/search-bar.js"></script>
+    <script src="./ckeditor5-40.1.0/build/ckeditor.js"></script>
+    <script src="./scripts/editor.js"></script>
+
+    <!-- TODO GOOGLE INTEGRATION -->
+  </body>
+</html>

@@ -1,0 +1,24 @@
+.divider {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-direction: column;
+    height: 100%;
+    width: 10px;
+    background: black;
+    margin-left: -10px;
+}
+
+.divider-handle {
+    width: 5px;
+    height: 0;
+    border-radius: 100px;
+    background: black;
+    cursor: ew-resize; /* Cursor indicates the element can be dragged */
+    transition: all 0.1s ease-in;
+}
+
+.divider:hover .divider-handle {
+    height: 80px;
+    background: white;
+}

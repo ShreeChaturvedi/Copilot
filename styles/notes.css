@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Quicksand:wght@300;400;500;600;700&family=Roboto:wght@400;700&display=swap');
+
+/* Root styles */
+:root {
+    --ck-color-focus-border: var(--ck-color-base-border);
+}
+
+/* Simply holds the entire editor and positions it relative to the entire page */
+.document-editor__container {
+    position: absolute;
+    inset: 0;
+    background-color: var(--ck-color-base-background);
+    z-index: 2000;
+    display: none;
+}
+
+.document-editor__container.show {
+    display: block;
+}
+
+.document-editor {
+    /* Set vertical boundaries for the document editor. */
+    max-height: 100vh;
+
+    /* This element is a flex container for easier rendering. */
+    display: flex;
+    flex-flow: column nowrap;
+}
+
+.document-editor__toolbar {
+    /* Make sure the toolbar container is always above the editable. */
+    z-index: 1;
+
+    /* Create the illusion of the toolbar floating over the editable. */
+    box-shadow: 0 0 8px hsla( 0,0%,0%,.25 );
+
+    /* Use the CKEditor CSS variables to keep the UI consistent. */
+    border-bottom: 1px solid var(--ck-color-toolbar-border);
+}
+
+/* Adjust the look of the toolbar inside the container. */
+.document-editor__toolbar .ck-toolbar {
+    border: 0;
+    border-radius: 0;
+}
+
+.document-editor__toolbar .ck-toolbar__items {
+    /* Center the toolbar items horizontally. */
+    display: flex;
+    justify-content: flex-start;
+}
+
+/* Make the editable container look like the inside of a native word processor application. */
+.document-editor__editable-container {
+    padding: calc( 2 * var(--ck-spacing-large) );
+    background: var(--ck-color-base-foreground);
+
+    /* Make it possible to scroll the "page" of the edited content. */
+    overflow-y: scroll;
+    /* hide the scrollbar */
+}
+
+#editor {
+    /* Set the dimensions of the "page". */
+    max-width: 8.5in;
+    max-height: 11in;
+
+    width: calc(70vw - 100px);
+    height: calc(11 / 8.5 * (70vw - 100px));
+
+    /* Keep the "page" off the boundaries of the container. */
+    padding: 1cm 2cm 2cm;
+
+    border: 1px solid var(--ck-color-base-border);
+    border-radius: var(--ck-border-radius);
+    background: white;
+
+    /* The "page" should cast a slight shadow (3D illusion). */
+    box-shadow: 0 0 5px hsla( 0,0%,0%,.1 );
+
+    /* Center the "page". */
+    margin: 0 auto;
+
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+/* No outline on focus of page */
+#editor:focus {
+    box-shadow: 0 0 10px hsla( 0,0%,0%,.25 );
+}
+
+/* Set the default font for the "page" of the content. */
+.document-editor .ck-content,
+.document-editor .ck-heading-dropdown .ck-list .ck-button__label {
+    font-family: 'Times New Roman', sans-serif;
+}
+
+
+#close-editor {
+    /* Use google's material icons */
+    font-family: 'Material Symbols Outlined';
+    font-size: 20px;
+    min-width: 30px;
+    height: 30px;
+    margin: auto 10px;
+    border-radius: var(--ck-border-radius);
+    text-align: center;
+    line-height: 30px;
+}
+
+#close-editor:hover {
+    background-color: rgb(240, 240, 240);
+}

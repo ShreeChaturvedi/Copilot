@@ -1,0 +1,1106 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Quicksand:wght@400;700&family=Roboto:wght@400;700&display=swap");
+
+/* Basic Reset */
+* {
+  font-family: "Quicksand", sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: none;
+}
+
+:root {
+  /* Custom Variables */
+  --black: #000;
+  --white: #fff;
+  --fsub: #373737;
+  --bsub: #ddd;
+}
+
+body,
+html {
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--white);
+  position: relative;
+}
+
+body {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+a {
+  text-decoration: none;
+  color: black;
+}
+
+a:hover {
+  text-decoration: none;
+  color: #009d4f;
+}
+
+h3 {
+  font-weight: 700;
+}
+
+.left-pane {
+  height: 100%;
+  width: 30%;
+  min-width: 300px;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+
+  justify-content: space-between;
+  background-color: black;
+  padding: 10px;
+}
+
+.left-pane * {
+  color: var(--white);
+}
+
+.top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  height: 90%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.header * {
+  display: inline-block;
+}
+
+.input-group {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 0 10px;
+  color: var(--white);
+}
+
+.input-group input {
+  width: 100%;
+  min-width: 10rem;
+  padding: 0.5rem;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--white);
+  background: var(--fsub);
+}
+
+.input-group input::placeholder {
+  color: white;
+}
+
+.input-group button {
+  width: 50px;
+  border-radius: 0.2rem;
+  outline: none;
+  font-weight: 700;
+  background: var(--fsub);
+  color: var(--white);
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 4px 4px 0;
+}
+
+.input-group button:hover {
+  background: white;
+}
+
+.input-group button:hover span {
+  color: black;
+}
+
+.taskstitle > h3 {
+  font-weight: 700;
+  margin-left: 20px;
+  margin-bottom: 20px;
+  margin-top: 20px;
+  height: 60%;
+}
+
+.task-card {
+  width: 95%;
+  padding: 5px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: opacity 0.5s ease-in-out;
+  margin-left: auto; /* align to right of flex */
+}
+
+.task-label-wrapper {
+  margin-left: 10px;
+  width: 100%;
+  position: relative;
+}
+
+.task-label {
+  text-align: left;
+  width: 100%;
+  background: black;
+  outline: none;
+  border: none;
+  font-size: 16px;
+}
+
+.task-label:hover {
+  /* make cursor text input */
+  cursor: text;
+}
+
+.task-label-underline {
+  display: block;
+  position: absolute;
+  bottom: -2px;
+  width: 0;
+  height: 1px;
+  border-radius: 100px;
+  background-color: #00ffaa;
+}
+
+.task-label:focus + .task-label-underline {
+  width: 100%;
+  transition: width 0.2s ease-in-out;
+}
+
+.task-delete-btn,
+.calendar-delete-btn {
+  background: black;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.task-card:hover .task-delete-btn,
+.calendar-card:hover .calendar-delete-btn {
+  opacity: 1;
+}
+
+.task-delete-btn:hover span,
+.calendar-delete-btn:hover span {
+  color: rgb(255, 60, 60);
+}
+
+/* Style adjustments for the list-group to remove default padding and style of list */
+.list-group {
+  height: 60%;
+  list-style-type: none;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-y: scroll;
+}
+
+.list-group > p {
+  margin: auto 0;
+}
+
+.toggle-completed-tasks {
+  color: var(--bsub);
+  cursor: pointer;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.toggle-completed-tasks:hover {
+  color: #00ffaa;
+}
+
+.task-card.completed .task-label {
+  text-decoration: line-through;
+}
+
+#toggle-completed-tasks-placeholder {
+  margin-top: -10px;
+  margin-left: 20px;
+}
+
+/* Styles for the custom checkbox */
+.task-checkbox {
+  display: none; /* Hide the default checkbox */
+}
+
+.custom-checkbox {
+  position: relative;
+  padding-left: 25px; /* Space for custom checkbox */
+  cursor: pointer;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.custom-checkbox:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--white);
+  background-color: var(--fsub);
+  border-radius: 100px;
+  outline: none;
+}
+
+.task-checkbox:checked + .custom-checkbox:before {
+  content: "✔";
+  font-size: 14px;
+  color: black;
+  text-align: center;
+  line-height: 16px;
+  background-color: #00ffaa; /* Checkmark color */
+  border-color: #00ffaa; /* Border color */
+}
+
+/* Styles for completed task label */
+.task-completed {
+  text-decoration: line-through; /* Crosses out the text of completed task but make the line green */
+  text-decoration-color: #00ffaa;
+  color: var(--bsub); /* Grey out the text */
+}
+
+.right-pane {
+  height: 100vh;
+  width: 70%;
+  display: flex;
+  flex-direction: column;
+  padding-top: 10px;
+  background: white;
+  position: relative;
+}
+
+#calendar {
+  width: 100%;
+}
+
+.calendar-event {
+  /* This will ensure text doesn't overflow */
+  overflow: hidden;
+  border: 1px solid #333; /* Optional: adds a border around the event block */
+  border-radius: 4px; /* Optional: rounds the corners of the event block */
+  /* Add any other styles you want for your event blocks */
+  background: #303030;
+}
+
+.event-time-bar {
+  text-align: left;
+  font-size: 10px; /* Adjust as needed */
+  font-weight: 600;
+  background: black;
+}
+
+.event-name {
+  text-align: left;
+  font-size: 11px; /* Adjust as needed */
+  font-weight: 400;
+}
+
+img[alt="company logo"] {
+  width: 120px;
+  height: 60px;
+}
+
+.settings {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings span {
+  margin-right: 5px;
+}
+
+.settings:hover * {
+  color: #00ffaa;
+  cursor: pointer;
+}
+
+.settings-container {
+  z-index: 1100;
+  max-width: 600px;
+  margin: 50px auto;
+  padding: 20px 40px;
+  background: var(--background-color);
+  border-radius: 5px;
+  position: absolute;
+  top: 50% - 300px;
+  left: 800px;
+  background: var(--black);
+  color: var(--white);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  display: none;
+}
+
+#settings-btn {
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-container.hidden {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.toggle-container {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 30px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 30px;
+}
+
+.switch:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 6px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .switch {
+  background-color: #01cc66;
+}
+
+input:focus + .switch {
+  box-shadow: 0 0 1px #01cc66;
+}
+
+input:checked + .switch:before {
+  transform: translateX(26px);
+}
+
+.toggle-label {
+  margin-left: 10px;
+}
+
+.toggle-label span {
+  display: block;
+  font-weight: bold;
+}
+
+.toggle-label small {
+  display: block;
+  font-size: 0.8em;
+  margin-top: 4px;
+}
+
+.bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashai {
+  margin-top: 10px;
+}
+
+/* Full Calendar Styles */
+
+.modal {
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: 25% auto;
+  padding: 20px;
+  width: 50%;
+  min-width: 300px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-content .header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.close-button {
+  color: #aaa;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#event-form {
+  width: 100%;
+  position: relative;
+}
+
+#event-form-time-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#event-form-time-wrapper .spacer {
+  margin: 0 10px;
+}
+
+#event-form input,
+#event-form textarea,
+#event-form button {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid black;
+}
+
+#event-description {
+  overflow-y: hidden; /* Hide scrollbar initially */
+  resize: none; /* Disable manual resize */
+  height: 40px;
+}
+
+#event-form input:focus,
+#event-form textarea:focus {
+  outline: none;
+  border: 2px solid black;
+}
+
+#save-event {
+  background: #fff;
+  font-weight: bold;
+}
+
+#save-event:hover {
+  cursor: pointer;
+  filter: invert();
+}
+
+#delete-event:hover {
+  cursor: pointer;
+  background: #c62424;
+  border-color: #c62424;
+  color: white;
+}
+
+#delete-event {
+  font-weight: bold;
+  background: #ff8888;
+}
+
+/** Event Details Modal **/
+
+#event-details .modal-content {
+  width: 40%;
+  max-height: 50%;
+  overflow-y: scroll;
+}
+
+.event-details-title-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 60%;
+}
+
+#event-details-title {
+  text-align: left;
+  text-wrap: nowrap;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+}
+
+#event-details-title-icon {
+  margin-right: 10px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+#event-details #event-details-btns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 30%;
+}
+
+#event-details #event-details-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-direction: column;
+}
+
+#event-details #event-details-body {
+  width: 100%;
+}
+
+#event-details #event-details-body > * {
+  text-align: left;
+  margin-top: 20px;
+}
+
+#event-details #event-details-body #event-details-time {
+  margin-top: 10px;
+}
+
+#edit-event-btn,
+#delete-event-btn,
+#close-event-btn {
+  background: white;
+  color: #aaa;
+  font-weight: bold;
+  border: none;
+}
+
+#edit-event-btn:hover,
+#close-event-btn:hover {
+  cursor: pointer;
+  color: black;
+}
+
+#delete-event-btn:hover {
+  cursor: pointer;
+  color: rgb(255, 0, 0);
+}
+
+#event-details-description {
+  flex-grow: 1;
+  white-space: wrap;
+  overflow-wrap: anywhere;
+}
+
+.event-details-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.event-details-wrapper span {
+  margin-right: 10px;
+  font-size: 20px;
+}
+
+#event-details-notes {
+  color: rgb(0, 109, 204);
+  font-weight: 600;
+}
+
+#event-details-notes:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+#authorize-button {
+  outline: none;
+  border: 2px solid white;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: black;
+  color: white;
+  transition: all 0.1s ease-in-out;
+  margin: 10px auto;
+}
+
+#authorize-button:hover {
+  background: white;
+  color: black;
+  cursor: pointer;
+}
+
+#authorize-button h3 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+#authorize-button span {
+  margin-right: 10px;
+}
+
+.fc-header-toolbar.fc-toolbar.fc-toolbar-ltr {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+/* Change background color of buttons */
+.fc .fc-button-primary,
+.fc .fc-button-primary {
+  background-color: #000; /* New background color */
+  border-color: #000; /* New border color */
+}
+
+/* Change text color of buttons */
+.fc .fc-button-primary {
+  background-color: #000;
+}
+
+/* Change button colors on hover */
+.fc .fc-button-primary:hover {
+  background-color: #008458; /* Darker background color on hover */
+  border-color: #00764f; /* Darker border color on hover */
+}
+
+/* Change button colors when active/focused (clicked on) */
+.fc .fc-button-primary:active,
+.fc .fc-button-primary:focus {
+  background-color: #007951; /* Even darker background color when active/focused */
+  border-color: #00754e; /* Even darker border color when active/focused */
+}
+
+/* Style the Now Indicator line */
+.fc .fc-timegrid-now-indicator-line {
+  background: red; /* Change to the color you want */
+  height: 2px; /* Set the thickness of the line */
+}
+
+/* Style the Now Indicator arrow (if applicable) */
+.fc .fc-now-indicator-arrow {
+  border-color: red; /* Change to the color you want */
+}
+
+.fc-event-title {
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.fc-timegrid-event .fc-event-time {
+  font-size: 0.8em;
+}
+
+.fc-timegrid-slot-label {
+  font-weight: bold;
+  font-size: 0.8em;
+}
+
+.fc-timegrid-axis {
+  opacity: 0;
+}
+
+.fc-event-mirror {
+  border: 2px solid black;
+  background-image: repeating-linear-gradient(
+    45deg,
+    /* Angle of the lines */ #000000,
+    /* Color of the lines */ #000000 2px,
+    /* Start of transparent space, adjust for line thickness */ white 2px,
+    white 10px /* End of transparent space, adjust for line spacing */
+  );
+}
+
+.fc-event-mirror .fc-event-time,
+.fc-event-mirror .fc-event-title {
+  color: black;
+  background: white;
+  width: fit-content;
+  font-weight: bold;
+}
+
+.fc-list-event-title {
+  width: 100%;
+}
+
+.fc-list-event-title:hover {
+  cursor: pointer;
+}
+
+.fc-button.fc-button-primary {
+  background: white;
+  color: black;
+  border: none;
+  background: var(--bsub);
+  transition: all 0.1s ease-in-out;
+  font-weight: 600;
+}
+
+.fc-button.fc-button-primary:hover {
+  background: black;
+  color: white;
+}
+
+.fc-button.fc-button-primary:focus {
+  background: white;
+  color: black;
+}
+
+.fc-toolbar-chunk {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.fc-today-button.fc-button.fc-button-primary {
+  background: var(--bsub);
+  color: black;
+  text-transform: capitalize;
+}
+
+.fc-today-button.fc-button.fc-button-primary:hover {
+  background: black;
+  color: white;
+}
+
+.fc-next-button.fc-button.fc-button-primary,
+.fc-prev-button.fc-button.fc-button-primary,
+.fc-today-button.fc-button.fc-button-primary {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 3px;
+}
+
+.fc-next-button.fc-button.fc-button-primary:focus,
+.fc-prev-button.fc-button.fc-button-primary:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fc-next-button.fc-button.fc-button-primary:hover,
+.fc-prev-button.fc-button.fc-button-primary:hover {
+  background: black;
+  color: white;
+}
+
+.fc-searchBar-button.fc-button.fc-button-primary {
+  border: none;
+  padding: 0;
+  outline: none;
+  background: white;
+}
+
+.fc-searchBar-button.fc-button.fc-button-primary:active {
+  background: white;
+}
+
+.fc-searchBar-button.fc-button.fc-button-primary:focus {
+  outline: none;
+}
+
+.fc-timeGridWeek-button.fc-button.fc-button-primary.fc-button-active,
+.fc-timeGridDay-button.fc-button.fc-button-primary.fc-button-active,
+.fc-dayGridMonth-button.fc-button.fc-button-primary.fc-button-active,
+.fc-listWeek-button.fc-button.fc-button-primary.fc-button-active {
+  background: gray;
+}
+
+.fc-timeGridWeek-button.fc-button.fc-button-primary,
+.fc-timeGridDay-button.fc-button.fc-button-primary,
+.fc-dayGridMonth-button.fc-button.fc-button-primary,
+.fc-listWeek-button.fc-button.fc-button-primary {
+  width: 80px;
+  margin-right: 3px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: capitalize;
+}
+
+.fc-timeGridWeek-button.fc-button.fc-button-primary.fc-button-active:focus,
+.fc-timeGridDay-button.fc-button.fc-button-primary.fc-button-active:focus,
+.fc-dayGridMonth-button.fc-button.fc-button-primary.fc-button-active:focus,
+.fc-listWeek-button.fc-button.fc-button-primary.fc-button-active:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Maps autocomplte box */
+
+#autocomplete-container {
+  position: absolute;
+  z-index: 2000;
+  border: 2px solid black;
+  border-radius: 0 0 4px 4px;
+  border-top: none;
+  background-color: white;
+  width: 100%; /* Adjust the width as necessary */
+  display: none;
+  margin-top: -13px;
+}
+
+.autocomplete-item {
+  width: 100%;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: left;
+  color: #797979;
+}
+
+.autocomplete-item span:first-child {
+  margin-right: 10px;
+}
+
+.autocomplete-item span:last-child {
+  font-size: 0.8em;
+}
+
+.autocomplete-item:hover {
+  background-color: #e9e9e9;
+  color: black;
+}
+
+/* Calendars List Styles */
+
+.calendars {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 95%;
+  margin-left: auto;
+  overflow-y: hidden;
+}
+
+.calendars-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.calendars-header > div:hover {
+  cursor: pointer;
+}
+
+#calendars-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-height: 30vh;
+  margin-left: 10px;
+  margin-top: 10px;
+  overflow-y: scroll;
+  transition: all 0.2s ease-in-out;
+}
+
+#calendars-list.collapsed {
+  max-height: 0;
+}
+
+#calendars-list label {
+  overflow-x: hidden;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
+}
+
+#collapse-calendars-btn,
+#add-calendar-btn {
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+#add-calendar-btn {
+  margin-right: 10px;
+}
+
+#collapse-calendars-btn:hover,
+#add-calendar-btn:hover {
+  color: #00ffaa;
+}
+
+#collapse-calendars-btn.collapsed {
+  transform: rotate(180deg);
+}
+
+#calendars-list .calendar-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: 95%;
+}
+
+#calendars-list .calendar-card input {
+  margin-right: 10px;
+}
+
+#calendars-list .calendar-card label {
+  font-size: 0.8em;
+}
+
+/* Style for the hidden actual checkbox */
+.calendar-checkbox {
+  display: none; /* Hide the checkbox */
+}
+
+/* Style for the custom checkbox label */
+.custom-calendar-checkbox {
+  padding: 5px;
+  margin-right: 10px;
+  cursor: pointer;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 4px; /* Rounded corners */
+  background-color: black; /* Initial background color */
+  color: white; /* Text color */
+  font-size: 16px; /* Larger text */
+  line-height: 20px; /* Align text vertically */
+  vertical-align: middle;
+}
+
+.calendar-delete-btn {
+  margin-left: auto;
+  height: 24px;
+  width: 24px;
+}
+
+.calendar-delete-btn span {
+  font-size: 20px;
+}
+
+/* SEARCH BAR */
+
+.searchBar-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+}
+
+.searchBar-input-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100%;
+  padding: 5px;
+  width: 220px; /* Adjust width as needed */
+  outline: none;
+  border-radius: 4px 0 0 4px;
+  background-color: var(--bsub);
+}
+
+.searchBar-input-wrapper input {
+  background-color: var(--bsub);
+}
+
+.searchBar-input-wrapper input::placeholder {
+  color: black;
+}
+
+.searchBar-input-wrapper span {
+  margin-right: 5px;
+  color: black;
+  font-size: 20px;
+}
+
+.searchBar-input-wrapper:hover span {
+  color: black;
+}
+
+#mySearchBar {
+  font-size: 1rem;
+  flex-grow: 1;
+  border: none;
+  outline: none;
+}
+
+#clearSearch {
+  height: 100%;
+  width: 30px;
+  background-color: var(--bsub);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 4px 4px 0;
+  transition: all 0.1s ease-in-out;
+}
+
+#clearSearch span {
+  font-size: 20px;
+}
+
+#clearSearch:hover {
+  background-color: black;
+  color: white;
+}
