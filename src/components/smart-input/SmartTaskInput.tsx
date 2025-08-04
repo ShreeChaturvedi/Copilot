@@ -20,6 +20,7 @@ import { OverlayHighlightedInput } from './components/OverlayHighlightedInput';
 import { FlexInputGroup } from './components/FlexInputGroup';
 import { HighlightedInputField } from './components/HighlightedInputField';
 import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
+import { VoiceInputButton } from './components/VoiceInputButton';
 import { ParsedTags } from './components/ParsedTags';
 import { useTextParser } from './hooks/useTextParser';
 import { TaskGroup } from '../tasks/TaskInput';
@@ -92,6 +93,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   parsingOptions = {},
 }) => {
   const [inputText, setInputText] = useState('');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
 
   // Initialize text parser
   const {
@@ -125,6 +127,28 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   // Handle input change
   const handleInputChange = useCallback((value: string) => {
     setInputText(value);
+  }, []);
+
+  // Handle voice transcript (final results)
+  const handleVoiceTranscript = useCallback((transcript: string) => {
+    console.log('Received voice transcript:', transcript);
+    
+    // Use functional update to avoid dependency on inputText
+    setInputText(prevText => {
+      const currentText = prevText.trim();
+      const newText = currentText 
+        ? `${currentText} ${transcript}` 
+        : transcript;
+      console.log('Updated input text to:', newText);
+      return newText;
+    });
+    
+    setVoiceTranscript('');
+  }, []);
+
+  // Handle interim voice transcript (real-time feedback)
+  const handleInterimTranscript = useCallback((interim: string) => {
+    setVoiceTranscript(interim);
   }, []);
 
   // Handle form submission
@@ -164,6 +188,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
       
       // Clear input and parsing state
       setInputText('');
+      setVoiceTranscript('');
       clear();
     }
   }, [inputText, enableSmartParsing, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
@@ -278,6 +303,21 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
     </div>
   );
 
+  // Right controls for enhanced layout (voice input + submit button)
+  const rightControls = useEnhancedLayout ? (
+    <>
+      {/* Voice Input Button - positioned to the left of submit button */}
+      <VoiceInputButton
+        onTranscriptChange={handleVoiceTranscript}
+        onInterimTranscript={handleInterimTranscript}
+        disabled={disabled}
+        continuous={false} // Use non-continuous mode to avoid multiple permission requests
+        size="sm"
+      />
+      {submitButton}
+    </>
+  ) : submitButton;
+
   return (
     <div className={cn('space-y-2', className)}>
       {/* Enhanced Claude AI-style layout */}
@@ -294,9 +334,10 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             showConfidence={showConfidence}
             enableSmartParsing={enableSmartParsing}
             leftControls={taskGroupSelector}
-            rightControls={submitButton}
+            rightControls={rightControls}
             minHeight="120px"
             maxHeight="300px"
+            voiceTranscript={voiceTranscript}
           />
         </form>
       ) : /* Main input form using new FlexInputGroup architecture */

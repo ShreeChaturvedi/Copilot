@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
-import { ArrowUp, Plus, Paperclip, Mic } from 'lucide-react';
+import { ArrowUp, Plus, Paperclip } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -26,6 +26,7 @@ import { SmartTaskData } from './SmartTaskInput';
 import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
 import { SmartParsingToggle } from './components/SmartParsingToggle';
 import { TaskGroupCombobox } from './components/TaskGroupCombobox';
+import { VoiceInputButton } from './components/VoiceInputButton';
 import { TaskGroup } from '../tasks/TaskInput';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +63,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [inputText, setInputText] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
 
   // Initialize text parser
   const {
@@ -93,6 +95,23 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Handle input change
   const handleInputChange = useCallback((value: string) => {
     setInputText(value);
+  }, []);
+
+  // Handle voice transcript (final results)
+  const handleVoiceTranscript = useCallback((transcript: string) => {
+    // Append voice transcript to existing input text
+    const currentText = inputText.trim();
+    const newText = currentText 
+      ? `${currentText} ${transcript}` 
+      : transcript;
+    
+    setInputText(newText);
+    setVoiceTranscript('');
+  }, [inputText]);
+
+  // Handle interim voice transcript (real-time feedback)
+  const handleInterimTranscript = useCallback((interim: string) => {
+    setVoiceTranscript(interim);
   }, []);
 
   // Handle form submission
@@ -129,6 +148,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       
       // Clear input and parsing state
       setInputText('');
+      setVoiceTranscript('');
       clear();
     }
   }, [inputText, enableSmartParsing, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
@@ -203,22 +223,13 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       )}
       
       {/* Voice Input Button - moved to right side next to send button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            disabled={disabled}
-          >
-            <Mic className="w-4 h-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Voice input</p>
-        </TooltipContent>
-      </Tooltip>
+      <VoiceInputButton
+        onTranscriptChange={handleVoiceTranscript}
+        onInterimTranscript={handleInterimTranscript}
+        disabled={disabled}
+        continuous={false} // Use non-continuous mode to avoid multiple permission requests
+        size="sm"
+      />
       
       <Button
         type="submit"
@@ -252,6 +263,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           rightControls={rightControls}
           minHeight="60px"
           maxHeight="150px"
+          voiceTranscript={voiceTranscript}
         />
       </form>
 

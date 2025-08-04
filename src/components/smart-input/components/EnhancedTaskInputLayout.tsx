@@ -45,6 +45,8 @@ export interface EnhancedTaskInputLayoutProps {
   leftControls?: React.ReactNode;
   /** Right side controls (submit button, etc.) */
   rightControls?: React.ReactNode;
+  /** Interim voice transcript for real-time feedback */
+  voiceTranscript?: string;
 }
 
 /**
@@ -76,6 +78,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   maxHeight = '150px', // Reduced max height as well
   leftControls,
   rightControls,
+  voiceTranscript = '',
 }) => {
   // Controls layout - left and right groups
   const controls = (
@@ -106,62 +109,73 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
       disabled={disabled}
       showFocusStates={true}
     >
-      {enableSmartParsing ? (
-        <HighlightedTextareaField
-          value={value}
-          onChange={onChange}
-          tags={tags}
-          placeholder={placeholder}
-          disabled={disabled}
-          onKeyPress={onKeyPress}
-          onBlur={onBlur}
-          onFocus={onFocus}
-          confidence={confidence}
-          showConfidence={showConfidence}
-          minHeight={minHeight}
-          maxHeight={maxHeight}
-        />
-      ) : (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyPress={onKeyPress}
-          onBlur={onBlur}
-          onFocus={onFocus}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={cn(
-            // Base textarea styles - natural sizing instead of h-full
-            'w-full border-none outline-none bg-transparent resize-none',
-            // Typography - EXACT match with HighlightedTextareaField
-            'text-base md:text-sm leading-relaxed',
-            // Placeholder styling
-            'placeholder:text-muted-foreground',
-            // Focus styles handled by parent EnhancedLayoutWrapper
-            'focus:outline-none',
-            // Disabled state
-            disabled && 'cursor-not-allowed',
-            // Remove default padding - container handles spacing
-            'p-0',
-            // Ensure consistent font properties
-            'font-[inherit]',
-          )}
-          style={{
-            // Set minimum and maximum heights
-            minHeight,
-            maxHeight,
-            // Prevent horizontal scrolling
-            overflowX: 'hidden',
-            overflowY: 'auto',
-            // Ensure exact font matching
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-            lineHeight: 'inherit',
-            letterSpacing: 'inherit',
-          }}
-          aria-label="Task input"
-        />
-      )}
+      <div className="relative">
+        {enableSmartParsing ? (
+          <HighlightedTextareaField
+            value={value}
+            onChange={onChange}
+            tags={tags}
+            placeholder={placeholder}
+            disabled={disabled}
+            onKeyPress={onKeyPress}
+            onBlur={onBlur}
+            onFocus={onFocus}
+            confidence={confidence}
+            showConfidence={showConfidence}
+            minHeight={minHeight}
+            maxHeight={maxHeight}
+          />
+        ) : (
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyPress={onKeyPress}
+            onBlur={onBlur}
+            onFocus={onFocus}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={cn(
+              // Base textarea styles - natural sizing instead of h-full
+              'w-full border-none outline-none bg-transparent resize-none',
+              // Typography - EXACT match with HighlightedTextareaField
+              'text-base md:text-sm leading-relaxed',
+              // Placeholder styling
+              'placeholder:text-muted-foreground',
+              // Focus styles handled by parent EnhancedLayoutWrapper
+              'focus:outline-none',
+              // Disabled state
+              disabled && 'cursor-not-allowed',
+              // Remove default padding - container handles spacing
+              'p-0',
+              // Ensure consistent font properties
+              'font-[inherit]',
+            )}
+            style={{
+              // Set minimum and maximum heights
+              minHeight,
+              maxHeight,
+              // Prevent horizontal scrolling
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              // Ensure exact font matching
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              letterSpacing: 'inherit',
+            }}
+            aria-label="Task input"
+          />
+        )}
+        
+        {/* Voice transcript overlay for interim results */}
+        {voiceTranscript && (
+          <div className="absolute bottom-2 right-2 z-20">
+            <div className="bg-primary/10 border border-primary/20 rounded-md px-2 py-1 text-xs text-primary animate-pulse">
+              <span className="opacity-70">🎤</span> {voiceTranscript}
+            </div>
+          </div>
+        )}
+      </div>
     </EnhancedLayoutWrapper>
   );
 };

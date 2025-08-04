@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FolderOpen, List, MoreVertical } from 'lucide-react';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
-import { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { TaskList } from '@/components/tasks/TaskList';
 import { Button } from '@/components/ui/Button';
 import { useUIStore, type TaskGrouping } from '@/stores/uiStore';
-import { useTasks } from '@/hooks/useTasks';
+import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { cn } from '@/lib/utils';
 
 interface TaskFocusPaneProps {
@@ -17,121 +16,27 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({
 }) => {
   const { dragState, taskGrouping, taskViewMode, setTaskGrouping, setTaskViewMode } = useUIStore();
 
-  // Real task data from existing hooks
+  // Task management with task operations enabled
   const {
-    data: tasks = [],
-    isLoading: tasksLoading,
+    tasks,
+    tasksLoading,
     addTask,
-    updateTask,
-    deleteTask,
-    scheduleTask
-  } = useTasks();
-
-  // Task groups state (using same structure as LeftPane)
-  const [taskGroups, setTaskGroups] = useState([
-    {
-      id: 'default',
-      name: 'Tasks',
-      iconId: 'CheckSquare',
-      color: '#3b82f6',
-      description: 'Default task group'
-    }
-  ]);
-  const [activeTaskGroupId, setActiveTaskGroupId] = useState('default');
-  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
-
-  // Task management handlers (same as LeftPane)
-  const handleAddTask = (title: string, _groupId?: string, smartData?: SmartTaskData) => {
-    addTask.mutate({
-      title,
-      priority: smartData?.priority,
-      scheduledDate: smartData?.scheduledDate,
-      tags: smartData?.tags?.map(tag => ({
-        id: tag.id,
-        type: tag.type,
-        value: tag.value,
-        displayText: tag.displayText,
-        iconName: tag.iconName,
-        color: tag.color,
-      })),
-      parsedMetadata: smartData ? {
-        originalInput: smartData.originalInput,
-        cleanTitle: smartData.title,
-      } : undefined,
-    });
-  };
-
-  const handleToggleTask = (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-      updateTask.mutate({
-        id,
-        updates: { completed: !task.completed }
-      });
-    }
-  };
-
-  const handleEditTask = (id: string, title: string) => {
-    updateTask.mutate({
-      id,
-      updates: { title }
-    });
-  };
-
-  const handleDeleteTask = (id: string) => {
-    deleteTask.mutate(id);
-  };
-
-  const handleScheduleTask = (id: string) => {
-    scheduleTask.mutate(id);
-  };
-
-  const handleRemoveTag = (taskId: string, tagId: string) => {
-    updateTask.mutate({
-      id: taskId,
-      updates: {
-        tags: tasks.find(t => t.id === taskId)?.tags?.filter(tag => tag.id !== tagId) || []
-      }
-    });
-  };
-
-  // Task group handlers
-  const handleCreateTaskGroup = (data: { name: string; description: string; iconId: string; color: string }) => {
-    const newTaskGroup = {
-      id: `group-${Date.now()}`,
-      name: data.name,
-      iconId: data.iconId,
-      color: data.color,
-      description: data.description
-    };
-    setTaskGroups(prev => [...prev, newTaskGroup]);
-    setActiveTaskGroupId(newTaskGroup.id);
-    setShowCreateTaskDialog(false);
-  };
-
-  const handleSelectTaskGroup = (groupId: string) => {
-    setActiveTaskGroupId(groupId);
-  };
-
-  const handleUpdateTaskGroupIcon = (groupId: string, iconId: string) => {
-    setTaskGroups(prev => prev.map(group =>
-      group.id === groupId ? { ...group, iconId } : group
-    ));
-  };
-
-  const handleUpdateTaskGroupColor = (groupId: string, color: string) => {
-    setTaskGroups(prev => prev.map(group =>
-      group.id === groupId ? { ...group, color } : group
-    ));
-  };
-
-  const handleDeleteTaskGroup = (groupId: string) => {
-    if (groupId === 'default') return;
-    setTaskGroups(prev => prev.filter(group => group.id !== groupId));
-    if (groupId === activeTaskGroupId) {
-      setActiveTaskGroupId('default');
-    }
-  };
+    handleAddTask,
+    handleToggleTask,
+    handleEditTask,
+    handleDeleteTask,
+    handleScheduleTask,
+    handleRemoveTag,
+    taskGroups,
+    activeTaskGroupId,
+    showCreateTaskDialog,
+    setShowCreateTaskDialog,
+    handleCreateTaskGroup,
+    handleSelectTaskGroup,
+    handleUpdateTaskGroupIcon,
+    handleUpdateTaskGroupColor,
+    handleDeleteTaskGroup,
+  } = useTaskManagement({ includeTaskOperations: true });
 
   return (
     <div 

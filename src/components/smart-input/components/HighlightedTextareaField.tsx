@@ -226,7 +226,7 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
   }, [highlightedHTML, syncScroll]);
 
   return (
-    <div className="relative flex-1">
+    <div className="relative">
       {/* Real textarea element - handles all interaction */}
       <textarea
         ref={textareaRef}
