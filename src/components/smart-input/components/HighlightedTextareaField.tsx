@@ -1,28 +1,10 @@
-/**
- * HighlightedTextareaField - Multi-line textarea with highlighting overlay
- * 
- * Extends the HighlightedInputField concept to work with textarea elements
- * for the enhanced Claude AI-style layout. Maintains all highlighting
- * functionality while supporting multi-line input.
- * 
- * Key differences from HighlightedInputField:
- * - Uses textarea instead of input
- * - Handles multi-line text and line breaks
- * - Supports vertical scrolling
- * - Auto-resizing based on content
- */
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ParsedTag } from '@/types';
 import { cn } from '@/lib/utils';
 
 export interface HighlightedTextareaFieldProps {
-  /** Current input value (actual text to be changed) */
+  /** Current input value */
   value: string;
-  /** Display value (input + interim transcript for display) */
-  displayValue?: string;
-  /** Interim transcript for styling */
-  interimTranscript?: string;
   /** Whether recording is active */
   isRecording?: boolean;
   /** Change handler */
@@ -51,16 +33,8 @@ export interface HighlightedTextareaFieldProps {
   maxHeight?: string;
 }
 
-/**
- * Textarea field with highlighting overlay for multi-line input
- * 
- * Maintains the same highlighting approach as HighlightedInputField but
- * adapted for textarea with proper multi-line support and auto-resizing.
- */
 export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> = ({
   value,
-  displayValue,
-  interimTranscript = '',
   isRecording = false,
   onChange,
   tags,
@@ -79,13 +53,10 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
   const overlayRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
-  // Sync scroll position between textarea and overlay
   const syncScroll = useCallback(() => {
     const textarea = textareaRef.current;
     const overlay = overlayRef.current;
-    
     if (textarea && overlay) {
-      // Use requestAnimationFrame for smooth synchronization
       requestAnimationFrame(() => {
         overlay.scrollTop = textarea.scrollTop;
         overlay.scrollLeft = textarea.scrollLeft;
@@ -93,79 +64,44 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     }
   }, []);
 
-  // Auto-resize textarea based on content
   const autoResize = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea) {
-      // Reset height to auto to get the correct scrollHeight
       textarea.style.height = 'auto';
-      
-      // Calculate the new height based on content
       const newHeight = Math.min(
         Math.max(textarea.scrollHeight, parseInt(minHeight)),
         parseInt(maxHeight)
       );
-      
       textarea.style.height = `${newHeight}px`;
-      
-      // Sync the overlay height
       if (overlayRef.current) {
         overlayRef.current.style.height = `${newHeight}px`;
       }
     }
   }, [minHeight, maxHeight]);
 
-  // Set up scroll synchronization and auto-resize
   useEffect(() => {
     const textarea = textareaRef.current;
-    
     if (textarea) {
-      // Sync on all relevant events
       const scrollEvents = ['scroll', 'input', 'focus', 'keydown', 'keyup'];
       const resizeEvents = ['input', 'focus', 'blur'];
-      
-      scrollEvents.forEach(event => {
-        textarea.addEventListener(event, syncScroll);
-      });
-      
-      resizeEvents.forEach(event => {
-        textarea.addEventListener(event, autoResize);
-      });
-      
-      // Initial sync and resize
+      scrollEvents.forEach(event => textarea.addEventListener(event, syncScroll));
+      resizeEvents.forEach(event => textarea.addEventListener(event, autoResize));
       syncScroll();
       autoResize();
-      
       return () => {
-        scrollEvents.forEach(event => {
-          textarea.removeEventListener(event, syncScroll);
-        });
-        resizeEvents.forEach(event => {
-          textarea.removeEventListener(event, autoResize);
-        });
+        scrollEvents.forEach(event => textarea.removeEventListener(event, syncScroll));
+        resizeEvents.forEach(event => textarea.removeEventListener(event, autoResize));
       };
     }
   }, [syncScroll, autoResize]);
 
-  // Auto-resize when value or displayValue changes externally
   useEffect(() => {
     autoResize();
-  }, [value, displayValue, autoResize]);
+  }, [value, autoResize]);
 
-  // Generate highlighted HTML for multi-line text
   const highlightedHTML = useMemo(() => {
-    // Use displayValue if provided, otherwise fall back to value
-    const textToDisplay = displayValue || value;
-    
-    if (!textToDisplay || tags.length === 0) {
-      // If we have interim transcript, style it differently
-      if (interimTranscript && value !== textToDisplay) {
-        const inputText = value || '';
-        const interimPart = textToDisplay.substring(inputText.length);
-        return escapeHtml(inputText).replace(/\n/g, '<br>') + 
-               `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(interimPart)}</span>`.replace(/\n/g, '<br>');
-      }
-      return escapeHtml(textToDisplay || '').replace(/\n/g, '<br>');
+    if (!value || tags.length === 0) {
+      return escapeHtml(value || '').replace(/\n/g, '<br>');
     }
 
     const sortedTags = [...tags].sort((a, b) => a.startIndex - b.startIndex);
@@ -173,47 +109,21 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     let lastIndex = 0;
 
     for (const tag of sortedTags) {
-      // Add text before the tag
       if (tag.startIndex > lastIndex) {
-        const beforeText = textToDisplay.substring(lastIndex, tag.startIndex);
-        html += escapeHtml(beforeText).replace(/\n/g, '<br>');
+        html += escapeHtml(value.substring(lastIndex, tag.startIndex)).replace(/\n/g, '<br>');
       }
-
-      // Add highlighted tag with precise styling
-      const tagText = textToDisplay.substring(tag.startIndex, tag.endIndex);
+      const tagText = value.substring(tag.startIndex, tag.endIndex);
       const color = tag.color || '#3b82f6';
-      
-      // Use span with exact styling to match TaskItem badges
-      html += `<span class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</span>`;
-      
+      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; color: inherit;">${escapeHtml(tagText)}</mark>`;
       lastIndex = tag.endIndex;
     }
 
-    // Add remaining text (including interim transcript)
-    if (lastIndex < textToDisplay.length) {
-      const remainingText = textToDisplay.substring(lastIndex);
-      
-      // If this includes interim transcript, style it differently
-      if (interimTranscript && value !== textToDisplay && lastIndex >= value.length) {
-        // This is purely interim transcript
-        html += `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(remainingText)}</span>`.replace(/\n/g, '<br>');
-      } else if (interimTranscript && value !== textToDisplay && lastIndex < value.length) {
-        // Mixed: some regular text, some interim
-        const regularPartEnd = Math.min(value.length, textToDisplay.length);
-        if (lastIndex < regularPartEnd) {
-          html += escapeHtml(textToDisplay.substring(lastIndex, regularPartEnd)).replace(/\n/g, '<br>');
-        }
-        if (regularPartEnd < textToDisplay.length) {
-          const interimPart = textToDisplay.substring(regularPartEnd);
-          html += `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(interimPart)}</span>`.replace(/\n/g, '<br>');
-        }
-      } else {
-        html += escapeHtml(remainingText).replace(/\n/g, '<br>');
-      }
+    if (lastIndex < value.length) {
+      html += escapeHtml(value.substring(lastIndex)).replace(/\n/g, '<br>');
     }
 
     return html;
-  }, [value, displayValue, interimTranscript, tags]);
+  }, [value, tags]);
 
   // Handle textarea changes
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {

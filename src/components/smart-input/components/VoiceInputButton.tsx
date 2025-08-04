@@ -277,8 +277,10 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
+          type="button"
           variant={isListening ? "default" : "ghost"}
           size="sm"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={toggleListening}
           disabled={disabled}
           className={cn(

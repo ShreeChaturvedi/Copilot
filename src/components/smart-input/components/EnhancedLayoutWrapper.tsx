@@ -45,7 +45,6 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
   children,
   controls,
   className,
-  minHeight = '60px', // Reduced from 120px to ~2-3 lines
   disabled = false,
   showFocusStates = true,
 }) => {

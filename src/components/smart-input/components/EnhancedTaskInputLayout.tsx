@@ -1,11 +1,3 @@
-/**
- * EnhancedTaskInputLayout - Integrates EnhancedLayoutWrapper with SmartTaskInput
- * 
- * This component takes the existing SmartTaskInput props and renders them
- * using the enhanced Claude AI layout pattern. It transforms the horizontal
- * FlexInputGroup layout into a vertical card-based layout with textarea.
- */
-
 import React from 'react';
 import { EnhancedLayoutWrapper } from './EnhancedLayoutWrapper';
 import { HighlightedTextareaField } from './HighlightedTextareaField';
@@ -13,12 +5,8 @@ import { ParsedTag } from '@/types';
 import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputLayoutProps {
-  /** Display value (input + interim transcript) */
+  /** The value of the input field */
   value: string;
-  /** Actual input value (without interim transcript) */
-  inputValue: string;
-  /** Interim transcript for styling */
-  interimTranscript?: string;
   /** Change handler */
   onChange: (value: string) => void;
   /** Parsed tags for highlighting */
@@ -55,22 +43,8 @@ export interface EnhancedTaskInputLayoutProps {
   filePreview?: React.ReactNode;
 }
 
-/**
- * Enhanced task input layout using Claude AI pattern
- * 
- * Structure:
- * <EnhancedLayoutWrapper>
- *   <HighlightedTextareaField /> // Multi-line input with highlighting
- *   <controls>
- *     <leftControls /> // Task selector, file upload, voice, toggle
- *     <rightControls /> // Submit button
- *   </controls>
- * </EnhancedLayoutWrapper>
- */
 export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
   value,
-  inputValue,
-  interimTranscript = '',
   onChange,
   tags,
   placeholder = 'Enter a new task...',
@@ -82,29 +56,19 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   confidence = 1,
   showConfidence = false,
   enableSmartParsing = true,
-  minHeight = '60px', // Reduced to ~2-3 lines
-  maxHeight = '150px', // Reduced max height as well
+  minHeight = '60px',
+  maxHeight = '150px',
   leftControls,
   rightControls,
   isRecording = false,
   filePreview,
 }) => {
-  // Controls layout - left and right groups
   const controls = (
     <>
-      {/* Left side controls */}
-      <div className={cn(
-        'flex items-center gap-2',
-        disabled && 'pointer-events-none opacity-50'
-      )}>
+      <div className={cn('flex items-center gap-2', disabled && 'pointer-events-none opacity-50')}>
         {leftControls}
       </div>
-
-      {/* Right side controls */}
-      <div className={cn(
-        'flex items-center gap-2',
-        disabled && 'pointer-events-none opacity-50'
-      )}>
+      <div className={cn('flex items-center gap-2', disabled && 'pointer-events-none opacity-50')}>
         {rightControls}
       </div>
     </>
@@ -119,20 +83,15 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
       showFocusStates={true}
     >
       <div className="space-y-2">
-        {/* File Preview Area */}
         {filePreview && (
           <div className="border-b border-border/50 pb-2">
             {filePreview}
           </div>
         )}
-        
-        {/* Input Area */}
         <div className="relative">
         {enableSmartParsing ? (
           <HighlightedTextareaField
-            value={inputValue}
-            displayValue={value}
-            interimTranscript={interimTranscript}
+            value={value}
             onChange={onChange}
             tags={tags}
             placeholder={placeholder}
@@ -148,7 +107,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
           />
         ) : (
           <textarea
-            value={inputValue}
+            value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyPress={onKeyPress}
             onBlur={onBlur}
@@ -156,44 +115,30 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              // Base textarea styles - natural sizing instead of h-full
               'w-full border-none outline-none bg-transparent resize-none',
-              // Typography - EXACT match with HighlightedTextareaField
               'text-base md:text-sm leading-relaxed',
-              // Placeholder styling
               'placeholder:text-muted-foreground',
-              // Focus styles handled by parent EnhancedLayoutWrapper
               'focus:outline-none',
-              // Disabled state
               disabled && 'cursor-not-allowed',
-              // Remove default padding - container handles spacing
               'p-0',
-              // Ensure consistent font properties
               'font-[inherit]',
             )}
             style={{
-              // Set minimum and maximum heights
               minHeight,
               maxHeight,
-              // Prevent horizontal scrolling
               overflowX: 'hidden',
               overflowY: 'auto',
-              // Ensure exact font matching
               fontFamily: 'inherit',
               fontSize: 'inherit',
               lineHeight: 'inherit',
               letterSpacing: 'inherit',
-              // Blue blinking cursor when recording
               caretColor: isRecording ? '#3b82f6' : 'inherit',
             }}
             aria-label="Task input"
           />
         )}
-        
         </div>
       </div>
     </EnhancedLayoutWrapper>
   );
 };
-
-export default EnhancedTaskInputLayout;
