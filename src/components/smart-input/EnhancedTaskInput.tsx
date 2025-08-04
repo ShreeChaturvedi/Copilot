@@ -74,7 +74,8 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [inputText, setInputText] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Initialize text parser
@@ -118,12 +119,22 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         ? `${currentText} ${transcript}` 
         : transcript;
     });
-    setVoiceTranscript('');
+    // Clear interim transcript when final result is received
+    setInterimTranscript('');
   }, []);
 
   // Handle interim voice transcript (real-time feedback)
   const handleInterimTranscript = useCallback((interim: string) => {
-    setVoiceTranscript(interim);
+    setInterimTranscript(interim);
+  }, []);
+
+  // Handle recording state changes
+  const handleRecordingStateChange = useCallback((recording: boolean) => {
+    setIsRecording(recording);
+    if (!recording) {
+      // Clear interim transcript when recording stops
+      setInterimTranscript('');
+    }
   }, []);
 
   // Handle file uploads
@@ -200,7 +211,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       
       // Clear input and parsing state
       setInputText('');
-      setVoiceTranscript('');
+      setInterimTranscript('');
       setUploadedFiles([]);
       clear();
     }
@@ -217,7 +228,10 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Get the icon component for the active task group
   const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
 
-  // Check if we have content to submit
+  // Combine input text with interim transcript for display
+  const displayText = inputText + (interimTranscript ? ` ${interimTranscript}` : '');
+  
+  // Check if we have content to submit (only finalized text, not interim)
   const hasContent = inputText.trim().length > 0;
   const showTags = smartParsingEnabled && tags.length > 0 && hasContent;
   
@@ -282,6 +296,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       <VoiceInputButton
         onTranscriptChange={handleVoiceTranscript}
         onInterimTranscript={handleInterimTranscript}
+        onRecordingStateChange={handleRecordingStateChange}
         disabled={disabled}
         continuous={false} // Use non-continuous mode for single task input
         size="sm"
@@ -304,7 +319,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     <div className={cn('max-w-2xl mx-auto', className)}>
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         <EnhancedTaskInputLayout
-          value={inputText}
+          value={displayText}
+          inputValue={inputText}
+          interimTranscript={interimTranscript}
           onChange={(value) => setInputText(value)}
           tags={tags}
           placeholder={placeholder}
@@ -319,7 +336,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           rightControls={rightControls}
           minHeight="60px"
           maxHeight="150px"
-          voiceTranscript={voiceTranscript}
+          isRecording={isRecording}
           filePreview={filePreview}
         />
       </form>

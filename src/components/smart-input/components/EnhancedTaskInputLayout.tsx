@@ -13,8 +13,12 @@ import { ParsedTag } from '@/types';
 import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputLayoutProps {
-  /** Current input value */
+  /** Display value (input + interim transcript) */
   value: string;
+  /** Actual input value (without interim transcript) */
+  inputValue: string;
+  /** Interim transcript for styling */
+  interimTranscript?: string;
   /** Change handler */
   onChange: (value: string) => void;
   /** Parsed tags for highlighting */
@@ -45,8 +49,8 @@ export interface EnhancedTaskInputLayoutProps {
   leftControls?: React.ReactNode;
   /** Right side controls (submit button, etc.) */
   rightControls?: React.ReactNode;
-  /** Interim voice transcript for real-time feedback */
-  voiceTranscript?: string;
+  /** Whether recording is active */
+  isRecording?: boolean;
   /** File previews to display above the input */
   filePreview?: React.ReactNode;
 }
@@ -65,6 +69,8 @@ export interface EnhancedTaskInputLayoutProps {
  */
 export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
   value,
+  inputValue,
+  interimTranscript = '',
   onChange,
   tags,
   placeholder = 'Enter a new task...',
@@ -80,7 +86,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   maxHeight = '150px', // Reduced max height as well
   leftControls,
   rightControls,
-  voiceTranscript = '',
+  isRecording = false,
   filePreview,
 }) => {
   // Controls layout - left and right groups
@@ -124,7 +130,9 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
         <div className="relative">
         {enableSmartParsing ? (
           <HighlightedTextareaField
-            value={value}
+            value={inputValue}
+            displayValue={value}
+            interimTranscript={interimTranscript}
             onChange={onChange}
             tags={tags}
             placeholder={placeholder}
@@ -136,10 +144,11 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
             showConfidence={showConfidence}
             minHeight={minHeight}
             maxHeight={maxHeight}
+            isRecording={isRecording}
           />
         ) : (
           <textarea
-            value={value}
+            value={inputValue}
             onChange={(e) => onChange(e.target.value)}
             onKeyPress={onKeyPress}
             onBlur={onBlur}
@@ -174,19 +183,13 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
               fontSize: 'inherit',
               lineHeight: 'inherit',
               letterSpacing: 'inherit',
+              // Blue blinking cursor when recording
+              caretColor: isRecording ? '#3b82f6' : 'inherit',
             }}
             aria-label="Task input"
           />
         )}
         
-        {/* Voice transcript overlay for interim results */}
-        {voiceTranscript && (
-          <div className="absolute bottom-2 right-2 z-20">
-            <div className="bg-primary/10 border border-primary/20 rounded-md px-2 py-1 text-xs text-primary animate-pulse">
-              <span className="opacity-70">🎤</span> {voiceTranscript}
-            </div>
-          </div>
-        )}
         </div>
       </div>
     </EnhancedLayoutWrapper>

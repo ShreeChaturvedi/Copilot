@@ -39,6 +39,8 @@ export interface VoiceInputButtonProps {
   onTranscriptChange?: (transcript: string) => void;
   /** Callback when interim transcript is updated (real-time feedback) */
   onInterimTranscript?: (interim: string) => void;
+  /** Callback when recording state changes */
+  onRecordingStateChange?: (isRecording: boolean) => void;
   /** Whether the component is disabled */
   disabled?: boolean;
   /** Whether to enable continuous recognition (default: false to avoid permission issues) */
@@ -73,6 +75,7 @@ const getSpeechRecognition = (): typeof SpeechRecognition | null => {
 export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   onTranscriptChange,
   onInterimTranscript,
+  onRecordingStateChange,
   disabled = false,
   continuous = false, // Default to false to avoid multiple permission requests
   className,
@@ -88,6 +91,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   // Use refs to avoid stale closure issues with callbacks
   const onTranscriptChangeRef = useRef(onTranscriptChange);
   const onInterimTranscriptRef = useRef(onInterimTranscript);
+  const onRecordingStateChangeRef = useRef(onRecordingStateChange);
 
   // Keep refs updated with current callbacks
   useEffect(() => {
@@ -97,6 +101,10 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   useEffect(() => {
     onInterimTranscriptRef.current = onInterimTranscript;
   }, [onInterimTranscript]);
+
+  useEffect(() => {
+    onRecordingStateChangeRef.current = onRecordingStateChange;
+  }, [onRecordingStateChange]);
 
   // Check browser support on mount
   useEffect(() => {
@@ -149,11 +157,13 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       setIsListening(true);
       setError(null);
       setPermissionDenied(false);
+      onRecordingStateChangeRef.current?.(true);
     };
 
     // Handle end event
     recognition.onend = () => {
       setIsListening(false);
+      onRecordingStateChangeRef.current?.(false);
     };
 
     // Handle errors
@@ -183,6 +193,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       }
       
       setIsListening(false);
+      onRecordingStateChangeRef.current?.(false);
     };
 
     return recognition;

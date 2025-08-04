@@ -31,6 +31,7 @@ describe('EnhancedTaskInputLayout Integration', () => {
     render(
       <EnhancedTaskInputLayout
         value="high priority task"
+        inputValue="high priority task"
         onChange={onChange}
         tags={mockTags}
         enableSmartParsing={true}
@@ -48,6 +49,7 @@ describe('EnhancedTaskInputLayout Integration', () => {
     render(
       <EnhancedTaskInputLayout
         value="plain task"
+        inputValue="plain task"
         onChange={onChange}
         tags={[]}
         enableSmartParsing={false}

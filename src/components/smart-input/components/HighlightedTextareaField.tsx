@@ -17,8 +17,14 @@ import { ParsedTag } from '@/types';
 import { cn } from '@/lib/utils';
 
 export interface HighlightedTextareaFieldProps {
-  /** Current input value */
+  /** Current input value (actual text to be changed) */
   value: string;
+  /** Display value (input + interim transcript for display) */
+  displayValue?: string;
+  /** Interim transcript for styling */
+  interimTranscript?: string;
+  /** Whether recording is active */
+  isRecording?: boolean;
   /** Change handler */
   onChange: (value: string) => void;
   /** Parsed tags for highlighting */
@@ -53,6 +59,9 @@ export interface HighlightedTextareaFieldProps {
  */
 export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> = ({
   value,
+  displayValue,
+  interimTranscript = '',
+  isRecording = false,
   onChange,
   tags,
   placeholder = '',
@@ -138,15 +147,25 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     }
   }, [syncScroll, autoResize]);
 
-  // Auto-resize when value changes externally
+  // Auto-resize when value or displayValue changes externally
   useEffect(() => {
     autoResize();
-  }, [value, autoResize]);
+  }, [value, displayValue, autoResize]);
 
   // Generate highlighted HTML for multi-line text
   const highlightedHTML = useMemo(() => {
-    if (!value || tags.length === 0) {
-      return escapeHtml(value || '').replace(/\n/g, '<br>');
+    // Use displayValue if provided, otherwise fall back to value
+    const textToDisplay = displayValue || value;
+    
+    if (!textToDisplay || tags.length === 0) {
+      // If we have interim transcript, style it differently
+      if (interimTranscript && value !== textToDisplay) {
+        const inputText = value || '';
+        const interimPart = textToDisplay.substring(inputText.length);
+        return escapeHtml(inputText).replace(/\n/g, '<br>') + 
+               `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(interimPart)}</span>`.replace(/\n/g, '<br>');
+      }
+      return escapeHtml(textToDisplay || '').replace(/\n/g, '<br>');
     }
 
     const sortedTags = [...tags].sort((a, b) => a.startIndex - b.startIndex);
@@ -156,12 +175,12 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     for (const tag of sortedTags) {
       // Add text before the tag
       if (tag.startIndex > lastIndex) {
-        const beforeText = value.substring(lastIndex, tag.startIndex);
+        const beforeText = textToDisplay.substring(lastIndex, tag.startIndex);
         html += escapeHtml(beforeText).replace(/\n/g, '<br>');
       }
 
       // Add highlighted tag with precise styling
-      const tagText = value.substring(tag.startIndex, tag.endIndex);
+      const tagText = textToDisplay.substring(tag.startIndex, tag.endIndex);
       const color = tag.color || '#3b82f6';
       
       // Use span with exact styling to match TaskItem badges
@@ -170,14 +189,31 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
       lastIndex = tag.endIndex;
     }
 
-    // Add remaining text
-    if (lastIndex < value.length) {
-      const remainingText = value.substring(lastIndex);
-      html += escapeHtml(remainingText).replace(/\n/g, '<br>');
+    // Add remaining text (including interim transcript)
+    if (lastIndex < textToDisplay.length) {
+      const remainingText = textToDisplay.substring(lastIndex);
+      
+      // If this includes interim transcript, style it differently
+      if (interimTranscript && value !== textToDisplay && lastIndex >= value.length) {
+        // This is purely interim transcript
+        html += `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(remainingText)}</span>`.replace(/\n/g, '<br>');
+      } else if (interimTranscript && value !== textToDisplay && lastIndex < value.length) {
+        // Mixed: some regular text, some interim
+        const regularPartEnd = Math.min(value.length, textToDisplay.length);
+        if (lastIndex < regularPartEnd) {
+          html += escapeHtml(textToDisplay.substring(lastIndex, regularPartEnd)).replace(/\n/g, '<br>');
+        }
+        if (regularPartEnd < textToDisplay.length) {
+          const interimPart = textToDisplay.substring(regularPartEnd);
+          html += `<span style="color: #3b82f6; opacity: 0.7; font-style: italic;">${escapeHtml(interimPart)}</span>`.replace(/\n/g, '<br>');
+        }
+      } else {
+        html += escapeHtml(remainingText).replace(/\n/g, '<br>');
+      }
     }
 
     return html;
-  }, [value, tags]);
+  }, [value, displayValue, interimTranscript, tags]);
 
   // Handle textarea changes
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -257,8 +293,8 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
           className
         )}
         style={{
-          // Ensure caret is visible
-          caretColor: isFocused ? 'var(--foreground)' : 'transparent',
+          // Blue cursor when recording, otherwise normal
+          caretColor: isRecording ? '#3b82f6' : (isFocused ? 'var(--foreground)' : 'transparent'),
           // Perfect font matching for overlay alignment
           fontFamily: 'inherit',
           fontSize: 'inherit',
