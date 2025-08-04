@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Gemini-added ignores
+.kiro/
+.shree/
+CLAUDE.md
+screenshots/
+test-scroll.html
+*.tsbuildinfo

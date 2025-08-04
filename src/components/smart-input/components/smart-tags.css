@@ -1,0 +1,289 @@
+/**
+ * Smart tag highlighting styles - Overlay and Inline variants
+ */
+
+/* ContentEditable Input Styles */
+.inline-highlighted-input {
+  outline: none !important;
+  white-space: nowrap;
+  overflow-x: auto;
+  cursor: text;
+  /* Hide scrollbar while maintaining scroll functionality */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  /* Ensure consistent line height and vertical centering */
+  line-height: 1.5;
+  /* Smooth scrolling for long text */
+  scroll-behavior: smooth;
+  /* Simple flex layout - parent container handles padding constraints */
+  display: flex;
+  align-items: center;
+  /* Ensure proper box model */
+  box-sizing: border-box;
+  /* Fill parent container completely */
+  width: 100%;
+  height: 100%;
+}
+
+/* Hide scrollbar for WebKit browsers */
+.inline-highlighted-input::-webkit-scrollbar {
+  display: none;
+}
+
+.inline-highlighted-input:focus {
+  outline: none !important;
+}
+
+/* Placeholder support for contentEditable */
+.inline-highlighted-input[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: rgb(from var(--muted-foreground) r g b / 0.6);
+  pointer-events: none;
+}
+
+/* Inline highlighting spans */
+.smart-highlight-inline {
+  display: inline;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  /* Fallback colors for older browsers */
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  /* CSS custom property for dynamic colors - modern browsers */
+  background-color: rgb(from var(--tag-color, #3b82f6) r g b / 0.1);
+  border: 1px solid rgb(from var(--tag-color, #3b82f6) r g b / 0.3);
+}
+
+.smart-highlight-inline:hover {
+  /* Fallback */
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  /* Modern browsers */
+  background-color: rgb(from var(--tag-color, #3b82f6) r g b / 0.15);
+  border-color: rgb(from var(--tag-color, #3b82f6) r g b / 0.4);
+}
+
+/* Tag type specific inline styles for fallback */
+.smart-highlight-inline.tag-date {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.smart-highlight-inline.tag-priority {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.smart-highlight-inline.tag-location {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.smart-highlight-inline.tag-person {
+  background-color: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.smart-highlight-inline.tag-label,
+.smart-highlight-inline.tag-project {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Overlay highlighting spans - for proper overlay technique */
+.inline-highlight-span {
+  display: inline;
+  font-weight: 500;
+  border-radius: 2px;
+  padding: 1px 2px;
+  transition: all 0.2s ease-in-out;
+  /* Fallback colors for older browsers */
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  /* CSS custom property for dynamic colors - modern browsers */
+  background-color: rgb(from var(--tag-color, #3b82f6) r g b / 0.1);
+  border: 1px solid rgb(from var(--tag-color, #3b82f6) r g b / 0.3);
+}
+
+/* Mobile touch optimization */
+@media (hover: none) and (pointer: coarse) {
+  .inline-highlighted-input {
+    /* Larger touch targets on mobile */
+    min-height: 44px;
+    /* Prevent zoom on iOS */
+    font-size: 16px;
+  }
+}
+
+/* Base smart tag styles (for overlay version - legacy) */
+.smart-tag {
+  position: relative;
+  border-radius: 4px;
+  padding: 1px 2px;
+  font-weight: 500;
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.1), 
+    rgba(59, 130, 246, 0.2)
+  );
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Tag type specific styles */
+.smart-tag.tag-date {
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.1), 
+    rgba(59, 130, 246, 0.2)
+  );
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.smart-tag.tag-time {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.1), 
+    rgba(16, 185, 129, 0.2)
+  );
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.smart-tag.tag-priority {
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.1), 
+    rgba(239, 68, 68, 0.2)
+  );
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.smart-tag.tag-location {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.1), 
+    rgba(16, 185, 129, 0.2)
+  );
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.smart-tag.tag-person {
+  background: linear-gradient(135deg, 
+    rgba(139, 92, 246, 0.1), 
+    rgba(139, 92, 246, 0.2)
+  );
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.smart-tag.tag-label {
+  background: linear-gradient(135deg, 
+    rgba(245, 158, 11, 0.1), 
+    rgba(245, 158, 11, 0.2)
+  );
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.smart-tag.tag-project {
+  background: linear-gradient(135deg, 
+    rgba(245, 158, 11, 0.1), 
+    rgba(245, 158, 11, 0.2)
+  );
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Confidence level styles */
+.smart-tag.confidence-high {
+  opacity: 1;
+  border-width: 2px;
+}
+
+.smart-tag.confidence-medium {
+  opacity: 0.85;
+  border-width: 1px;
+  border-style: dashed;
+}
+
+.smart-tag.confidence-low {
+  opacity: 0.7;
+  border-width: 1px;
+  border-style: dotted;
+}
+
+/* Hover effects */
+.smart-tag:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Animation for new tags */
+@keyframes tag-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.smart-tag {
+  animation: tag-appear 0.2s ease-out;
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .smart-tag {
+    background: linear-gradient(135deg, 
+      rgba(59, 130, 246, 0.15), 
+      rgba(59, 130, 246, 0.25)
+    );
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+
+  .smart-tag.tag-date {
+    background: linear-gradient(135deg, 
+      rgba(59, 130, 246, 0.15), 
+      rgba(59, 130, 246, 0.25)
+    );
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+
+  .smart-tag.tag-time {
+    background: linear-gradient(135deg, 
+      rgba(16, 185, 129, 0.15), 
+      rgba(16, 185, 129, 0.25)
+    );
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+
+  .smart-tag.tag-priority {
+    background: linear-gradient(135deg, 
+      rgba(239, 68, 68, 0.15), 
+      rgba(239, 68, 68, 0.25)
+    );
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+
+  .smart-tag.tag-location {
+    background: linear-gradient(135deg, 
+      rgba(16, 185, 129, 0.15), 
+      rgba(16, 185, 129, 0.25)
+    );
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+
+  .smart-tag.tag-person {
+    background: linear-gradient(135deg, 
+      rgba(139, 92, 246, 0.15), 
+      rgba(139, 92, 246, 0.25)
+    );
+    border-color: rgba(139, 92, 246, 0.4);
+  }
+
+  .smart-tag.tag-label,
+  .smart-tag.tag-project {
+    background: linear-gradient(135deg, 
+      rgba(245, 158, 11, 0.15), 
+      rgba(245, 158, 11, 0.25)
+    );
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+}
