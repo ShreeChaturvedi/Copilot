@@ -281,7 +281,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     acceptedFiles.forEach((file) => {
       const typeInfo = getFileTypeInfo(file);
       if (file.size > typeInfo.maxSize) {
-        errors.push(`${file.name} is too large (max ${formatFileSize(typeInfo.maxSize)})`);
+        errors.push(`Maximum upload file size is 10MB`);
       }
     });
 

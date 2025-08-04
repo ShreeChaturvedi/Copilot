@@ -14,19 +14,21 @@
  * - All controls contained within the bordered area
  */
 
-import React, { useState, useCallback, useRef } from 'react';
-import { ArrowUp, Plus, Paperclip } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { ArrowUp } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useTextParser } from './hooks/useTextParser';
 import { SmartTaskData } from './SmartTaskInput';
 import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
 import { SmartParsingToggle } from './components/SmartParsingToggle';
 import { TaskGroupCombobox } from './components/TaskGroupCombobox';
 import { VoiceInputButton } from './components/VoiceInputButton';
+import { FileUploadButton } from './components/FileUploadButton';
+import { CompactFilePreview } from './components/CompactFilePreview';
+import { UploadedFile } from './components/FileUploadZone';
 import { TaskGroup } from '../tasks/TaskInput';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +44,12 @@ export interface EnhancedTaskInputProps {
   showConfidence?: boolean;
   maxDisplayTags?: number;
   placeholder?: string;
+  /** Callback when files are attached */
+  onFilesAdded?: (files: UploadedFile[]) => void;
+  /** Maximum number of files allowed */
+  maxFiles?: number;
+  /** Whether file upload is enabled */
+  enableFileUpload?: boolean;
 }
 
 /**
@@ -58,12 +66,16 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   enableSmartParsing = true,
   showConfidence = false,
   maxDisplayTags = 5,
-  placeholder = "What would you like to work on?"
+  placeholder = "What would you like to work on?",
+  onFilesAdded,
+  maxFiles = 5,
+  enableFileUpload = true
 }) => {
   const [inputText, setInputText] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
   const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Initialize text parser
   const {
@@ -99,20 +111,60 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Handle voice transcript (final results)
   const handleVoiceTranscript = useCallback((transcript: string) => {
-    // Append voice transcript to existing input text
-    const currentText = inputText.trim();
-    const newText = currentText 
-      ? `${currentText} ${transcript}` 
-      : transcript;
-    
-    setInputText(newText);
+    // Use functional update to avoid stale closure issues
+    setInputText(prev => {
+      const currentText = prev.trim();
+      return currentText 
+        ? `${currentText} ${transcript}` 
+        : transcript;
+    });
     setVoiceTranscript('');
-  }, [inputText]);
+  }, []);
 
   // Handle interim voice transcript (real-time feedback)
   const handleInterimTranscript = useCallback((interim: string) => {
     setVoiceTranscript(interim);
   }, []);
+
+  // Handle file uploads
+  const handleFilesAdded = useCallback((files: File[]) => {
+    const newUploadedFiles: UploadedFile[] = files.map(file => ({
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      file,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      status: 'completed' as const,
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+    }));
+
+    setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
+    
+    // Notify parent component if callback provided
+    if (onFilesAdded) {
+      onFilesAdded([...uploadedFiles, ...newUploadedFiles]);
+    }
+  }, [uploadedFiles, onFilesAdded]);
+
+  // Handle file removal
+  const handleFileRemove = useCallback((fileId: string) => {
+    setUploadedFiles(prev => {
+      const updated = prev.filter(file => file.id !== fileId);
+      
+      // Clean up object URLs for removed image previews
+      const removedFile = prev.find(file => file.id === fileId);
+      if (removedFile?.preview) {
+        URL.revokeObjectURL(removedFile.preview);
+      }
+      
+      // Notify parent component if callback provided
+      if (onFilesAdded) {
+        onFilesAdded(updated);
+      }
+      
+      return updated;
+    });
+  }, [onFilesAdded]);
 
   // Handle form submission
   const handleSubmit = useCallback((e?: React.FormEvent) => {
@@ -149,9 +201,10 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       // Clear input and parsing state
       setInputText('');
       setVoiceTranscript('');
+      setUploadedFiles([]);
       clear();
     }
-  }, [inputText, enableSmartParsing, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
+  }, [inputText, smartParsingEnabled, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
 
   // Handle key press
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -167,6 +220,15 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Check if we have content to submit
   const hasContent = inputText.trim().length > 0;
   const showTags = smartParsingEnabled && tags.length > 0 && hasContent;
+  
+  // File preview component
+  const filePreview = uploadedFiles.length > 0 ? (
+    <CompactFilePreview
+      files={uploadedFiles}
+      onFileRemove={handleFileRemove}
+      disabled={disabled}
+    />
+  ) : null;
 
   // Task Group Selector using Combobox
   const taskGroupSelector = (
@@ -184,23 +246,17 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     <>
       {taskGroupSelector}
       
-      {/* File Attachment Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            disabled={disabled}
-          >
-            <Paperclip className="w-4 h-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Attach files</p>
-        </TooltipContent>
-      </Tooltip>
+      {/* File Upload Button */}
+      {enableFileUpload && (
+        <FileUploadButton
+          files={uploadedFiles}
+          onFilesAdded={handleFilesAdded}
+          onFileRemove={handleFileRemove}
+          maxFiles={maxFiles}
+          disabled={disabled}
+          size="sm"
+        />
+      )}
 
       {/* Smart Parsing Toggle */}
       <SmartParsingToggle
@@ -227,7 +283,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         onTranscriptChange={handleVoiceTranscript}
         onInterimTranscript={handleInterimTranscript}
         disabled={disabled}
-        continuous={false} // Use non-continuous mode to avoid multiple permission requests
+        continuous={false} // Use non-continuous mode for single task input
         size="sm"
       />
       
@@ -264,6 +320,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           minHeight="60px"
           maxHeight="150px"
           voiceTranscript={voiceTranscript}
+          filePreview={filePreview}
         />
       </form>
 

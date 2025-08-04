@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { Brain } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,7 @@ export interface SmartParsingToggleProps {
  * Smart parsing toggle component using shadcn Toggle
  * 
  * Features:
- * - Uses Brain icon from Lucide
+ * - Uses Tag icon from Lucide
  * - Shows "Autotag" label when toggle is pressed (on state)
  * - Calendar green color system with subtle border and transparency
  * - Theme responsive (light/dark mode support)
@@ -45,24 +45,28 @@ export const SmartParsingToggle: React.FC<SmartParsingToggleProps> = ({
       disabled={disabled}
       size="sm"
       className={cn(
-        // Base styling
+        // Base styling - same as file upload button
         'h-8 px-2 text-muted-foreground hover:text-foreground',
-        // Off state - default shadcn styling
+        // Always have a border to prevent layout shift
+        'border',
+        // Ghost button hover background (same as file upload button)
+        'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+        // Off state - transparent background and border
         'data-[state=off]:bg-transparent data-[state=off]:border-transparent',
-        // On state - calendar green with subtle border and transparency
+        // On state - calendar green with visible border and transparency
         'data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.15)] data-[state=on]:text-foreground',
-        'data-[state=on]:border data-[state=on]:border-[oklch(0.7_0.15_140)]',
+        'data-[state=on]:border-[oklch(0.7_0.15_140)]',
         // Dark mode adjustments
         'dark:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.1)]',
         'dark:data-[state=on]:border-[oklch(0.7_0.15_140)]',
-        // Hover states
+        // Hover states for on state
         'hover:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.2)]',
         'dark:hover:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.15)]',
         className
       )}
       aria-label={pressed ? 'Disable smart parsing' : 'Enable smart parsing'}
     >
-      <Brain className="w-4 h-4" />
+      <Tag className="w-4 h-4" />
       {pressed && (
         <span className="text-xs font-medium ml-1">Autotag</span>
       )}

@@ -26,6 +26,12 @@ declare global {
     webkitSpeechRecognition: typeof SpeechRecognition;
     SpeechRecognition: typeof SpeechRecognition;
   }
+  
+  // Add missing Web Speech API types
+  interface SpeechRecognitionErrorEvent extends Event {
+    error: string;
+    message?: string;
+  }
 }
 
 export interface VoiceInputButtonProps {
@@ -78,7 +84,19 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [permissionDenied, setPermissionDenied] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const finalTranscriptRef = useRef<string>('');
+  
+  // Use refs to avoid stale closure issues with callbacks
+  const onTranscriptChangeRef = useRef(onTranscriptChange);
+  const onInterimTranscriptRef = useRef(onInterimTranscript);
+
+  // Keep refs updated with current callbacks
+  useEffect(() => {
+    onTranscriptChangeRef.current = onTranscriptChange;
+  }, [onTranscriptChange]);
+  
+  useEffect(() => {
+    onInterimTranscriptRef.current = onInterimTranscript;
+  }, [onInterimTranscript]);
 
   // Check browser support on mount
   useEffect(() => {
@@ -92,9 +110,9 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 
     const recognition = new SpeechRecognitionConstructor();
     
-    // Configure recognition settings
-    recognition.continuous = continuous;
-    recognition.interimResults = true;
+    // Configure recognition settings for optimal task input
+    recognition.continuous = false; // Stop after silence for single task input
+    recognition.interimResults = true; // Show real-time feedback
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
 
@@ -115,41 +133,31 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         }
       }
 
-      // Send final results immediately - don't accumulate, let parent handle
+      // Send final results immediately
       if (finalTranscript) {
-        console.log('Final transcript:', finalTranscript);
-        onTranscriptChange?.(finalTranscript);
+        onTranscriptChangeRef.current?.(finalTranscript);
       }
 
       // Send interim results for real-time feedback
-      if (interimTranscript && onInterimTranscript) {
-        console.log('Interim transcript:', interimTranscript);
-        onInterimTranscript(interimTranscript);
+      if (interimTranscript) {
+        onInterimTranscriptRef.current?.(interimTranscript);
       }
     };
 
     // Handle start event
     recognition.onstart = () => {
-      console.log('Speech recognition started');
       setIsListening(true);
       setError(null);
       setPermissionDenied(false);
-      finalTranscriptRef.current = '';
     };
 
     // Handle end event
     recognition.onend = () => {
-      console.log('Speech recognition ended');
       setIsListening(false);
-      
-      // Don't automatically restart - let user control when to start/stop
-      // This prevents the multiple permission requests issue
     };
 
     // Handle errors
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
-      
       switch (event.error) {
         case 'not-allowed':
           setPermissionDenied(true);
@@ -157,7 +165,6 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
           break;
         case 'no-speech':
           // Don't show error for no speech - this is normal
-          console.log('No speech detected');
           break;
         case 'audio-capture':
           setError('No microphone found. Please check your microphone connection.');
@@ -170,7 +177,6 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
           break;
         case 'aborted':
           // Don't show error for aborted - user stopped it
-          console.log('Speech recognition aborted');
           break;
         default:
           setError(`Speech recognition error: ${event.error}`);
@@ -180,14 +186,13 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     };
 
     return recognition;
-  }, [continuous, onTranscriptChange, onInterimTranscript, error, permissionDenied]);
+  }, []);
 
   // Start listening
-  const startListening = useCallback(async () => {
+  const startListening = useCallback(() => {
     if (!isSupported || disabled) return;
 
     try {
-      // Initialize and start recognition directly - let the browser handle permissions
       const recognition = initializeSpeechRecognition();
       if (!recognition) {
         setError('Failed to initialize speech recognition');
@@ -196,31 +201,20 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 
       recognitionRef.current = recognition;
       recognition.start();
-      
     } catch (err) {
       console.error('Failed to start speech recognition:', err);
-      if (err instanceof Error) {
-        setError('Failed to start voice input. Please try again.');
-      }
+      setError('Failed to start voice input. Please try again.');
     }
   }, [isSupported, disabled, initializeSpeechRecognition]);
 
   // Stop listening
   const stopListening = useCallback(() => {
-    console.log('Stopping speech recognition');
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
     setIsListening(false);
-    
-    // Send any accumulated transcript when stopping
-    if (finalTranscriptRef.current && onTranscriptChange) {
-      console.log('Sending final accumulated transcript:', finalTranscriptRef.current);
-      onTranscriptChange(finalTranscriptRef.current);
-      finalTranscriptRef.current = '';
-    }
-  }, [onTranscriptChange]);
+  }, []);
 
   // Toggle listening
   const toggleListening = useCallback(() => {

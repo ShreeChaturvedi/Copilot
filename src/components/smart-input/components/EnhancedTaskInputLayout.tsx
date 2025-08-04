@@ -47,6 +47,8 @@ export interface EnhancedTaskInputLayoutProps {
   rightControls?: React.ReactNode;
   /** Interim voice transcript for real-time feedback */
   voiceTranscript?: string;
+  /** File previews to display above the input */
+  filePreview?: React.ReactNode;
 }
 
 /**
@@ -79,6 +81,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   leftControls,
   rightControls,
   voiceTranscript = '',
+  filePreview,
 }) => {
   // Controls layout - left and right groups
   const controls = (
@@ -109,7 +112,16 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
       disabled={disabled}
       showFocusStates={true}
     >
-      <div className="relative">
+      <div className="space-y-2">
+        {/* File Preview Area */}
+        {filePreview && (
+          <div className="border-b border-border/50 pb-2">
+            {filePreview}
+          </div>
+        )}
+        
+        {/* Input Area */}
+        <div className="relative">
         {enableSmartParsing ? (
           <HighlightedTextareaField
             value={value}
@@ -175,6 +187,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
             </div>
           </div>
         )}
+        </div>
       </div>
     </EnhancedLayoutWrapper>
   );
