@@ -29,7 +29,6 @@ const SIDEBAR_WIDTH = "20rem"
 const SIDEBAR_WIDTH_MOBILE = "22rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
-const SIDEBAR_ANIMATION_DURATION_MS = 5000
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -721,5 +720,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  // eslint-disable-next-line react-refresh/only-export-components
   useSidebar,
 }

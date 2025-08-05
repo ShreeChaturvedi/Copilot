@@ -212,6 +212,8 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
           lineHeight: 'inherit',
           letterSpacing: 'inherit',
         }}
+        id="smart-task-input"
+        name="smart-task-input"
         aria-label="Smart task input with highlighting"
       />
 

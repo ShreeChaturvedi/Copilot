@@ -226,7 +226,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   }, []);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
+  const ActiveGroupIcon = LucideIcons[activeTaskGroup.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
 
   // Check if we have any content to show
   const hasValidContent = inputText.trim().length > 0;
@@ -251,7 +251,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
         {taskGroups.map((group) => {
-          const GroupIcon = (LucideIcons as any)[group.iconId] || (LucideIcons as any)['CheckSquare'];
+          const GroupIcon = LucideIcons[group.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
           return (
             <DropdownMenuItem
               key={group.id}
@@ -362,6 +362,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             ) : (
               <input
                 type="text"
+                id="smart-task-input-fallback"
+                name="smart-task-input-fallback"
                 placeholder="Enter a new task..."
                 value={inputText}
                 onChange={(e) => handleInputChange(e.target.value)}
@@ -400,7 +402,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
               {taskGroups.map((group) => {
-                const GroupIcon = (LucideIcons as any)[group.iconId] || (LucideIcons as any)['CheckSquare'];
+                const GroupIcon = LucideIcons[group.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
                 return (
                   <DropdownMenuItem
                     key={group.id}
@@ -469,6 +471,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           ) : (
             <input
               type="text"
+              id="legacy-task-input"
+              name="legacy-task-input"
               placeholder="Enter a new task..."
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTasks } from './useTasks';
 import { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
+import { Task } from '@/types';
+import { UseMutationResult } from '@tanstack/react-query';
 
 export interface TaskGroup {
   id: string;
@@ -17,9 +19,9 @@ export interface UseTaskManagementOptions {
 
 interface TaskManagementWithOperations {
   // Task operations
-  tasks: any[];
+  tasks: Task[];
   tasksLoading: boolean;
-  addTask: any;
+  addTask: UseMutationResult<Task, Error, any>;
   handleAddTask: (title: string, _groupId?: string, smartData?: SmartTaskData) => void;
   handleToggleTask: (id: string) => void;
   handleEditTask: (id: string, title: string) => void;

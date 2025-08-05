@@ -72,7 +72,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   enableFileUpload = true
 }) => {
   const [inputText, setInputText] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -80,7 +79,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Initialize text parser
   const {
-    isLoading,
     error,
     tags,
     confidence,
@@ -104,11 +102,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Get current active task group
   const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) || 
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
-
-  // Handle input change
-  const handleInputChange = useCallback((value: string) => {
-    setInputText(value);
-  }, []);
 
   // Handle voice transcript (final results)
   const handleVoiceTranscript = useCallback((transcript: string) => {
@@ -216,9 +209,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       handleSubmit();
     }
   }, [handleSubmit]);
-
-  // Get the icon component for the active task group
-  const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
 
   // Check if we have content to submit (only finalized text, not interim)
   const hasContent = inputText.trim().length > 0;

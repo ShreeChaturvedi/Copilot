@@ -28,7 +28,7 @@ beforeEach(() => {
   // Mock Intl.DateTimeFormat to return consistent timezone
   vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => ({
     resolvedOptions: () => ({ timeZone: mockTimezone }),
-  } as any));
+  } as Intl.DateTimeFormat));
 });
 
 describe('Date Utilities', () => {

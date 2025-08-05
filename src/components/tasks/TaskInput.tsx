@@ -125,6 +125,8 @@ export const TaskInput: React.FC<TaskInputProps> = ({
 
       <Input
         type="text"
+        id="task-input"
+        name="task-input"
         placeholder="Enter a new task..."
         value={title}
         onChange={(e) => setTitle(e.target.value)}

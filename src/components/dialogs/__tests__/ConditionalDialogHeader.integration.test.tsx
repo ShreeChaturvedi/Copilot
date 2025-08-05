@@ -4,9 +4,9 @@ import { ConditionalDialogHeader } from '../ConditionalDialogHeader'
 
 // Mock the UI components to avoid complex dependencies
 vi.mock('@/components/ui/tabs', () => ({
-  Tabs: ({ children, ...props }: any) => <div data-testid="tabs" {...props}>{children}</div>,
-  TabsList: ({ children, ...props }: any) => <div data-testid="tabs-list" {...props}>{children}</div>,
-  TabsTrigger: ({ children, value, ...props }: any) => (
+  Tabs: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div data-testid="tabs" {...props}>{children}</div>,
+  TabsList: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div data-testid="tabs-list" {...props}>{children}</div>,
+  TabsTrigger: ({ children, value, ...props }: { children: React.ReactNode; value: string; [key: string]: unknown }) => (
     <button data-testid={`tab-${value}`} data-state={props.value === value ? 'active' : 'inactive'} {...props}>
       {children}
     </button>
@@ -14,7 +14,7 @@ vi.mock('@/components/ui/tabs', () => ({
 }))
 
 vi.mock('@/components/ui/Button', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  Button: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <button {...props}>{children}</button>,
 }))
 
 vi.mock('lucide-react', () => ({

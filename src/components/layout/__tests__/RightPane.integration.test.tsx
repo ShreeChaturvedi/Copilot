@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock the FullCalendar component to avoid complex setup
 vi.mock('@fullcalendar/react', () => ({
-  default: vi.fn(({ ref, ...props }) => (
+  default: vi.fn((props) => (
     <div data-testid="fullcalendar" {...props}>
       FullCalendar Mock
     </div>

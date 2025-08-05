@@ -1,6 +1,5 @@
 import React from 'react';
 import { SidebarSeparator } from '@/components/ui/sidebar';
-import { type ViewMode } from '@/components/ui/ViewToggle';
 import { EventOverview } from '@/components/calendar/EventOverview';
 import { CalendarList } from '@/components/calendar/CalendarList';
 import { TaskGroupList } from '@/components/tasks/TaskGroupList';
@@ -37,7 +36,7 @@ export const CalendarSummaryPane: React.FC<CalendarSummaryPaneProps> = ({
     handleSelectTaskGroup,
   } = useTaskManagement({ includeTaskOperations: false });
 
-  const handleViewToggle = (_view: ViewMode) => {
+  const handleViewToggle = () => {
     // View toggle handled by BaseSidebarPane
   };
 

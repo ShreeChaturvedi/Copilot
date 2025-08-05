@@ -78,7 +78,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     onOpenChange(false);
   };
 
-  const SelectedIconComponent = (LucideIcons as any)[selectedIcon];
+  const SelectedIconComponent = LucideIcons[selectedIcon as keyof typeof LucideIcons] as React.ComponentType<{ className?: string }>;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

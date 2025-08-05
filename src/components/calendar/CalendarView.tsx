@@ -51,21 +51,18 @@ export const CalendarView = ({
   onEventCreate,
   height = '100%',
   currentView: externalCurrentView,
-  onViewChange: externalOnViewChange,
-  onTodayClick,
   onPrevClick,
   onNextClick,
   calendarRef: externalCalendarRef,
 }: CalendarViewProps) => {
   const internalCalendarRef = useRef<FullCalendar>(null);
-  const [internalCurrentView, setInternalCurrentView] = useState<CalendarViewType>('timeGridWeek');
-  const [isLoading, setIsLoading] = useState(false);
+  const [internalCurrentView] = useState<CalendarViewType>('timeGridWeek');
+  const [isLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Use external refs and state if provided, otherwise use internal ones
   const calendarRef = externalCalendarRef ?? internalCalendarRef;
   const currentView = externalCurrentView ?? internalCurrentView;
-  const setCurrentView = externalOnViewChange ?? setInternalCurrentView;
 
   // Handle responsive behavior
   useEffect(() => {
@@ -132,7 +129,7 @@ export const CalendarView = ({
   const combinedRef = useRef<HTMLDivElement>(null);
 
   // Handle external drag and drop from tasks  
-  const handleEventReceive = useCallback((info: any) => {
+  const handleEventReceive = useCallback((info: { event: { start: Date | null; extendedProps: { isFromTask?: boolean; originalTask?: { title: string } }; remove: () => void } }) => {
     // Get the drop date/time from FullCalendar
     const dropDate = info.event.start;
     const eventData = info.event.extendedProps;

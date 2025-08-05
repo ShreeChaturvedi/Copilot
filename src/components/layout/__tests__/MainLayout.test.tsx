@@ -35,7 +35,7 @@ describe('MainLayout', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useUIStore as any).mockReturnValue(mockUIStore);
+    (useUIStore as ReturnType<typeof vi.fn>).mockReturnValue(mockUIStore);
   });
 
   it('renders all main layout components', () => {

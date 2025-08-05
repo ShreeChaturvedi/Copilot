@@ -66,7 +66,7 @@ const filterTasks = (tasks: Task[], filters: TaskFilters): Task[] => {
 /**
  * Comprehensive hook for task management - matches LeftPane expectations
  */
-export const useTasks = (filters: TaskFilters = {}) => {
+export const useTasks = (_filters: TaskFilters = {}) => {
   const queryClient = useQueryClient();
   
   // Main query for tasks data

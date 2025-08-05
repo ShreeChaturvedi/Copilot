@@ -234,7 +234,6 @@ describe('CalendarView', () => {
   });
 
   it('responds to theme changes correctly', async () => {
-    const user = userEvent.setup();
     
     render(
       <TestWrapper>

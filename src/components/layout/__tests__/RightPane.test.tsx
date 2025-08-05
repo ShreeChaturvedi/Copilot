@@ -7,7 +7,7 @@ import { ThemeProvider } from '../../providers';
 
 // Mock the CalendarView component
 vi.mock('../../calendar', () => ({
-  CalendarView: ({ onEventClick, onEventCreate }: any) => (
+  CalendarView: ({ onEventClick, onEventCreate }: { onEventClick?: (event: { id: string; title: string }) => void; onEventCreate?: (event: object) => void }) => (
     <div data-testid="calendar-view">
       <button 
         data-testid="mock-event-click"

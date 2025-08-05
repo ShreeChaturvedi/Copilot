@@ -421,7 +421,7 @@ export const getStorageInfo = (): { used: number; available: number } => {
   
   try {
     for (const key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
         used += localStorage[key].length + key.length;
       }
     }

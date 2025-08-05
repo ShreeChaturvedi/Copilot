@@ -133,7 +133,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         draggable.destroy();
       };
     }
-  }, [task.id, task.completed, isEditing]);
+  }, [task.id, task.completed, task.title, isEditing, groupColor, task]);
 
   return (
     <div 
@@ -162,6 +162,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             <input
               ref={inputRef}
               type="text"
+              id={`task-edit-${task.id}`}
+              name={`task-edit-${task.id}`}
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={handleEditSave}

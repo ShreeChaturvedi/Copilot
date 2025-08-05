@@ -351,6 +351,7 @@ export const InlineHighlightedInput: React.FC<InlineHighlightedInputProps> = ({
             disabled && 'cursor-not-allowed opacity-50'
           )}
           data-placeholder={!value ? placeholder : undefined}
+          id="inline-highlighted-input"
           role="textbox"
           aria-label="Smart task input with highlighting"
           aria-multiline="false"

@@ -50,46 +50,6 @@ interface EventFormData {
   calendarName: string
 }
 
-interface ValidationResult {
-  isValid: boolean
-  errors: string[]
-}
-
-// Validation utility for date ranges and multi-day event constraints
-const validateEventFormData = (data: EventFormData): ValidationResult => {
-  const errors: string[] = []
-  
-  if (!data.title.trim()) {
-    errors.push('Event title is required')
-  }
-  
-  if (!data.calendarName) {
-    errors.push('Calendar selection is required')
-  }
-  
-  if (!data.startDate) {
-    errors.push('Start date is required')
-  }
-  
-  if (data.allDay) {
-    if (!data.endDate) {
-      errors.push('End date is required for all-day events')
-    } else if (data.startDate && data.endDate < data.startDate) {
-      errors.push('End date cannot be before start date')
-    }
-  } else {
-    if (!data.startTime || !data.endTime) {
-      errors.push('Start and end times are required')
-    } else if (data.startTime >= data.endTime) {
-      errors.push('End time must be after start time')
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
-}
 
 function CustomDateInput({ value, onChange, className }: {
   value: string

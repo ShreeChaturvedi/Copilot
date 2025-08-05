@@ -63,7 +63,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       <div className="max-h-64 overflow-y-auto border rounded-md">
         <div className="grid grid-cols-6 gap-1 p-2">
           {filteredIcons.map((iconName) => {
-            const IconComponent = (LucideIcons as any)[iconName];
+            const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }>;
             if (!IconComponent) return null;
 
             return (

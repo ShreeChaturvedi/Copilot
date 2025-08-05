@@ -38,8 +38,6 @@ function EventDisplayDialogContent({
 }) {
   const { data: calendars = [] } = useCalendars()
 
-  const [isDeleting, setIsDeleting] = React.useState(false)
-
   const calendar = React.useMemo(() => {
     if (!event) return null
     return calendars.find(cal => cal.name === event.calendarName) || null
@@ -63,14 +61,6 @@ function EventDisplayDialogContent({
       }
     }
   }, [])
-
-  const handleEdit = React.useCallback(() => {
-    if (event && onEdit) {
-      onEdit(event)
-      onClose()
-    }
-  }, [event, onEdit, onClose])
-
 
   const dateTimeInfo = formatDateTime(new Date(event.start), new Date(event.end), event.allDay)
 
@@ -181,16 +171,16 @@ export function EventDisplayDialog({
   const deleteEventMutation = useDeleteEvent()
   const [isDeleting, setIsDeleting] = React.useState(false)
 
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     onOpenChange(false)
-  }
+  }, [onOpenChange])
 
   const handleEdit = React.useCallback(() => {
     if (event && onEdit) {
       onEdit(event)
       handleClose()
     }
-  }, [event, onEdit])
+  }, [event, onEdit, handleClose])
 
   const handleDelete = React.useCallback(async () => {
     if (!event) return
@@ -205,7 +195,7 @@ export function EventDisplayDialog({
     } finally {
       setIsDeleting(false)
     }
-  }, [event, deleteEventMutation])
+  }, [event, deleteEventMutation, handleClose])
 
   const togglePeekMode = React.useCallback(() => {
     setPeekMode(peekMode === 'center' ? 'right' : 'center')

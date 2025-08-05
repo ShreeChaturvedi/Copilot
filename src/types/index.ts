@@ -70,7 +70,7 @@ export interface TaskTag {
   /** Type of tag */
   type: 'date' | 'time' | 'priority' | 'location' | 'person' | 'label' | 'project';
   /** Parsed value (typed based on tag type) */
-  value: any;
+  value: string | Date | 'low' | 'medium' | 'high';
   /** Display text for the tag */
   displayText: string;
   /** Lucide icon name for the tag */

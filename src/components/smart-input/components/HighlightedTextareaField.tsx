@@ -217,6 +217,8 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
           overflowX: 'hidden',
           overflowY: 'auto',
         }}
+        id="highlighted-textarea-input"
+        name="highlighted-textarea-input"
         aria-label="Smart task input with highlighting"
       />
 

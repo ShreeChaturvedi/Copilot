@@ -141,7 +141,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   }, [activeTasks, completedTasks, showCompleted]);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
+  const ActiveGroupIcon = LucideIcons[activeTaskGroup.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
 
   const handleCreateTaskGroup = (data: { name: string; description: string; iconId: string; color: string }) => {
     onCreateTaskGroup?.(data);

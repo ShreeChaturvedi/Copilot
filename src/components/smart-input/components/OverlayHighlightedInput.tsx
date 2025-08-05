@@ -192,6 +192,8 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
           lineHeight: 'inherit',
           letterSpacing: 'inherit',
         }}
+        id="overlay-task-input"
+        name="overlay-task-input"
         aria-label="Smart task input with highlighting"
       />
 

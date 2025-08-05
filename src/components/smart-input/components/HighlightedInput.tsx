@@ -156,6 +156,8 @@ export const HighlightedInput: React.FC<HighlightedInputProps> = ({
           className,
           tags.length > 0 && 'bg-transparent relative z-10'
         )}
+        id="highlighted-task-input"
+        name="highlighted-task-input"
         aria-label="Smart task input with highlighting"
       />
 
