@@ -17,6 +17,15 @@ export type ViewMode = 'calendar' | 'task';
 export type TaskGrouping = 'taskList' | 'dueDate' | 'priority';
 export type TaskViewMode = 'folder' | 'list';
 export type DropZone = 'today' | 'tomorrow' | 'thisWeek' | 'nextWeek' | 'later';
+export type SortBy = 'title' | 'dueDate' | 'priority' | 'createdAt';
+export type SortOrder = 'asc' | 'desc';
+
+export interface TaskPaneConfig {
+  id: string;
+  grouping: TaskGrouping;
+  filterValue?: string; // for specific task list, due date range, or priority
+  showCompleted: boolean;
+}
 
 interface DragState {
   isDragging: boolean;
@@ -30,23 +39,30 @@ interface UIState {
   eventDetailsModalOpen: boolean;
   settingsModalOpen: boolean;
   notesEditorOpen: boolean;
-  
+
   // Current selections
   selectedEvent: CalendarEvent | null;
-  
+
   // Layout preferences
   leftPaneWidth: number;
   showCompletedTasks: boolean;
   peekMode: 'center' | 'right';
-  
+
   // View management
   currentView: ViewMode;
   taskGrouping: TaskGrouping;
   taskViewMode: TaskViewMode;
-  
+
+  // Multi-pane task management
+  taskPanes: TaskPaneConfig[];
+  maxTaskPanes: number;
+  globalShowCompleted: boolean;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+
   // Drag & drop state
   dragState: DragState;
-  
+
   // Actions
   openEventModal: (event?: CalendarEvent) => void;
   closeEventModal: () => void;
@@ -59,13 +75,21 @@ interface UIState {
   setLeftPaneWidth: (width: number) => void;
   setShowCompletedTasks: (show: boolean) => void;
   setPeekMode: (mode: 'center' | 'right') => void;
-  
+
   // New view management actions
   setCurrentView: (view: ViewMode) => void;
   setTaskGrouping: (grouping: TaskGrouping) => void;
   setTaskViewMode: (mode: TaskViewMode) => void;
   setDragState: (state: Partial<DragState>) => void;
-  
+
+  // Multi-pane management actions
+  addTaskPane: (config?: Partial<TaskPaneConfig>) => void;
+  removeTaskPane: (paneId: string) => void;
+  updateTaskPane: (paneId: string, updates: Partial<TaskPaneConfig>) => void;
+  setGlobalShowCompleted: (show: boolean) => void;
+  setSortBy: (sort: SortBy) => void;
+  setSortOrder: (order: SortOrder) => void;
+
   resetUI: () => void;
 }
 
@@ -81,6 +105,17 @@ const initialState = {
   currentView: 'calendar' as ViewMode,
   taskGrouping: 'taskList' as TaskGrouping,
   taskViewMode: 'list' as TaskViewMode,
+  taskPanes: [
+    {
+      id: 'pane-1',
+      grouping: 'taskList' as TaskGrouping,
+      showCompleted: false,
+    },
+  ] as TaskPaneConfig[],
+  maxTaskPanes: 3,
+  globalShowCompleted: false,
+  sortBy: 'createdAt' as SortBy,
+  sortOrder: 'desc' as SortOrder,
   dragState: {
     isDragging: false,
     taskId: null,
@@ -92,116 +127,155 @@ export const useUIStore = create<UIState>()(
   devtools(
     (set) => ({
       ...initialState,
-      
-      openEventModal: (event) => set(
-        { 
-          eventModalOpen: true, 
-          selectedEvent: event || null 
-        },
-        false,
-        'openEventModal'
-      ),
-      
-      closeEventModal: () => set(
-        { 
-          eventModalOpen: false, 
-          selectedEvent: null 
-        },
-        false,
-        'closeEventModal'
-      ),
-      
-      openEventDetailsModal: (event) => set(
-        { 
-          eventDetailsModalOpen: true, 
-          selectedEvent: event 
-        },
-        false,
-        'openEventDetailsModal'
-      ),
-      
-      closeEventDetailsModal: () => set(
-        { 
-          eventDetailsModalOpen: false, 
-          selectedEvent: null 
-        },
-        false,
-        'closeEventDetailsModal'
-      ),
-      
-      openSettingsModal: () => set(
-        { settingsModalOpen: true },
-        false,
-        'openSettingsModal'
-      ),
-      
-      closeSettingsModal: () => set(
-        { settingsModalOpen: false },
-        false,
-        'closeSettingsModal'
-      ),
-      
-      toggleNotesEditor: () => set(
-        (state) => ({ notesEditorOpen: !state.notesEditorOpen }),
-        false,
-        'toggleNotesEditor'
-      ),
-      
-      setSelectedEvent: (event) => set(
-        { selectedEvent: event },
-        false,
-        'setSelectedEvent'
-      ),
-      
-      setLeftPaneWidth: (width) => set(
-        { leftPaneWidth: Math.max(200, Math.min(600, width)) },
-        false,
-        'setLeftPaneWidth'
-      ),
-      
-      setShowCompletedTasks: (show) => set(
-        { showCompletedTasks: show },
-        false,
-        'setShowCompletedTasks'
-      ),
-      
-      setPeekMode: (mode) => set(
-        { peekMode: mode },
-        false,
-        'setPeekMode'
-      ),
-      
-      setCurrentView: (view) => set(
-        { currentView: view },
-        false,
-        'setCurrentView'
-      ),
-      
-      setTaskGrouping: (grouping) => set(
-        { taskGrouping: grouping },
-        false,
-        'setTaskGrouping'
-      ),
-      
-      setTaskViewMode: (mode) => set(
-        { taskViewMode: mode },
-        false,
-        'setTaskViewMode'
-      ),
-      
-      setDragState: (state) => set(
-        (currentState) => ({
-          dragState: { ...currentState.dragState, ...state }
-        }),
-        false,
-        'setDragState'
-      ),
-      
-      resetUI: () => set(
-        initialState,
-        false,
-        'resetUI'
-      ),
+
+      openEventModal: (event) =>
+        set(
+          {
+            eventModalOpen: true,
+            selectedEvent: event || null,
+          },
+          false,
+          'openEventModal'
+        ),
+
+      closeEventModal: () =>
+        set(
+          {
+            eventModalOpen: false,
+            selectedEvent: null,
+          },
+          false,
+          'closeEventModal'
+        ),
+
+      openEventDetailsModal: (event) =>
+        set(
+          {
+            eventDetailsModalOpen: true,
+            selectedEvent: event,
+          },
+          false,
+          'openEventDetailsModal'
+        ),
+
+      closeEventDetailsModal: () =>
+        set(
+          {
+            eventDetailsModalOpen: false,
+            selectedEvent: null,
+          },
+          false,
+          'closeEventDetailsModal'
+        ),
+
+      openSettingsModal: () =>
+        set({ settingsModalOpen: true }, false, 'openSettingsModal'),
+
+      closeSettingsModal: () =>
+        set({ settingsModalOpen: false }, false, 'closeSettingsModal'),
+
+      toggleNotesEditor: () =>
+        set(
+          (state) => ({ notesEditorOpen: !state.notesEditorOpen }),
+          false,
+          'toggleNotesEditor'
+        ),
+
+      setSelectedEvent: (event) =>
+        set({ selectedEvent: event }, false, 'setSelectedEvent'),
+
+      setLeftPaneWidth: (width) =>
+        set(
+          { leftPaneWidth: Math.max(200, Math.min(600, width)) },
+          false,
+          'setLeftPaneWidth'
+        ),
+
+      setShowCompletedTasks: (show) =>
+        set({ showCompletedTasks: show }, false, 'setShowCompletedTasks'),
+
+      setPeekMode: (mode) => set({ peekMode: mode }, false, 'setPeekMode'),
+
+      setCurrentView: (view) =>
+        set({ currentView: view }, false, 'setCurrentView'),
+
+      setTaskGrouping: (grouping) =>
+        set({ taskGrouping: grouping }, false, 'setTaskGrouping'),
+
+      setTaskViewMode: (mode) =>
+        set({ taskViewMode: mode }, false, 'setTaskViewMode'),
+
+      setDragState: (state) =>
+        set(
+          (currentState) => ({
+            dragState: { ...currentState.dragState, ...state },
+          }),
+          false,
+          'setDragState'
+        ),
+
+      // Multi-pane management actions
+      addTaskPane: (config) =>
+        set(
+          (state) => {
+            if (state.taskPanes.length >= state.maxTaskPanes) return state;
+
+            const newPane: TaskPaneConfig = {
+              id: `pane-${Date.now()}`,
+              grouping: config?.grouping || 'taskList',
+              filterValue: config?.filterValue,
+              showCompleted: config?.showCompleted ?? state.globalShowCompleted,
+            };
+
+            return {
+              taskPanes: [...state.taskPanes, newPane],
+            };
+          },
+          false,
+          'addTaskPane'
+        ),
+
+      removeTaskPane: (paneId) =>
+        set(
+          (state) => ({
+            taskPanes:
+              state.taskPanes.length > 1
+                ? state.taskPanes.filter((pane) => pane.id !== paneId)
+                : state.taskPanes,
+          }),
+          false,
+          'removeTaskPane'
+        ),
+
+      updateTaskPane: (paneId, updates) =>
+        set(
+          (state) => ({
+            taskPanes: state.taskPanes.map((pane) =>
+              pane.id === paneId ? { ...pane, ...updates } : pane
+            ),
+          }),
+          false,
+          'updateTaskPane'
+        ),
+
+      setGlobalShowCompleted: (show) =>
+        set(
+          (state) => ({
+            globalShowCompleted: show,
+            taskPanes: state.taskPanes.map((pane) => ({
+              ...pane,
+              showCompleted: show,
+            })),
+          }),
+          false,
+          'setGlobalShowCompleted'
+        ),
+
+      setSortBy: (sort) => set({ sortBy: sort }, false, 'setSortBy'),
+
+      setSortOrder: (order) => set({ sortOrder: order }, false, 'setSortOrder'),
+
+      resetUI: () => set(initialState, false, 'resetUI'),
     }),
     {
       name: 'ui-store',

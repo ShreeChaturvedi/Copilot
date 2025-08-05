@@ -68,7 +68,14 @@ export interface TaskTag {
   /** Unique identifier for the tag */
   id: string;
   /** Type of tag */
-  type: 'date' | 'time' | 'priority' | 'location' | 'person' | 'label' | 'project';
+  type:
+    | 'date'
+    | 'time'
+    | 'priority'
+    | 'location'
+    | 'person'
+    | 'label'
+    | 'project';
   /** Parsed value (typed based on tag type) */
   value: string | Date | 'low' | 'medium' | 'high';
   /** Display text for the tag */
@@ -371,4 +378,46 @@ export interface VoiceAttachment {
   recordedAt: Date;
   /** Optional waveform data for visualization */
   waveformData?: number[];
+}
+
+/**
+ * Task folder representation for folder view
+ */
+export interface TaskFolder {
+  /** Unique identifier for the task folder */
+  id: string;
+  /** Display name of the folder */
+  name: string;
+  /** Color associated with the folder */
+  color: string;
+  /** Icon identifier (lucide icon name) */
+  iconId: string;
+  /** Total number of tasks in the folder */
+  taskCount: number;
+  /** Number of completed tasks in the folder */
+  completedCount: number;
+  /** Preview tasks for hover display */
+  tasks: Task[];
+  /** Optional description */
+  description?: string;
+}
+
+/**
+ * Task pane data for multi-pane view
+ */
+export interface TaskPaneData {
+  /** Unique identifier for the pane */
+  id: string;
+  /** Display title for the pane */
+  title: string;
+  /** Filtered tasks for this pane */
+  tasks: Task[];
+  /** Grouping method used for this pane */
+  grouping: 'taskList' | 'dueDate' | 'priority';
+  /** Filter value applied to this pane */
+  filterValue?: string;
+  /** Whether this pane has no tasks */
+  isEmpty: boolean;
+  /** Whether to show completed tasks in this pane */
+  showCompleted: boolean;
 }
