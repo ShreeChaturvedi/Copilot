@@ -25,10 +25,12 @@ export interface ColorPickerProps {
 export const ColorPicker: React.FC<ColorPickerProps> = ({
   value,
   onChange,
-  recentColors: _recentColors = [],
+  recentColors = [],
   onRecentColorAdd,
-  className
+  className,
 }) => {
+  // Note: recentColors functionality not yet implemented
+  void recentColors;
   const [inputValue, setInputValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [committedColor, setCommittedColor] = useState(value);
@@ -38,23 +40,24 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   // Detect theme changes
   useEffect(() => {
     const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark') || 
-                    window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark =
+        document.documentElement.classList.contains('dark') ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
       setIsDarkMode(isDark);
     };
-    
+
     checkTheme();
-    
+
     // Listen for theme changes
     const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { 
-      attributes: true, 
-      attributeFilter: ['class'] 
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
     });
-    
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', checkTheme);
-    
+
     return () => {
       observer.disconnect();
       mediaQuery.removeEventListener('change', checkTheme);
@@ -69,32 +72,41 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     }
   }, [value, isOpen]);
 
-  const handleColorChange = useCallback((color: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setInputValue(color);
-    setCommittedColor(color);
-    // Don't call onChange while popup is open to prevent re-renders
-  }, []);
-
-  const handleCustomColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    const color = e.target.value;
-    setInputValue(color);
-    // Update committed color for valid hex, but don't call onChange yet
-    if (color.match(/^#[0-9A-Fa-f]{6}$/)) {
+  const handleColorChange = useCallback(
+    (color: string, e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      setInputValue(color);
       setCommittedColor(color);
-    }
-  }, []);
+      // Don't call onChange while popup is open to prevent re-renders
+    },
+    []
+  );
+
+  const handleCustomColorChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      const color = e.target.value;
+      setInputValue(color);
+      // Update committed color for valid hex, but don't call onChange yet
+      if (color.match(/^#[0-9A-Fa-f]{6}$/)) {
+        setCommittedColor(color);
+      }
+    },
+    []
+  );
 
   // Handle popup close and commit the color
-  const handlePopoverOpenChange = useCallback((open: boolean) => {
-    setIsOpen(open);
-    if (!open && committedColor !== value) {
-      // Only call onChange when popup closes and color has changed
-      onChange(committedColor);
-      onRecentColorAdd?.(committedColor);
-    }
-  }, [committedColor, value, onChange, onRecentColorAdd]);
+  const handlePopoverOpenChange = useCallback(
+    (open: boolean) => {
+      setIsOpen(open);
+      if (!open && committedColor !== value) {
+        // Only call onChange when popup closes and color has changed
+        onChange(committedColor);
+        onRecentColorAdd?.(committedColor);
+      }
+    },
+    [committedColor, value, onChange, onRecentColorAdd]
+  );
 
   // Create proper OKLCH color wheel for trigger button with theme responsiveness
   const multicolorGradient = `conic-gradient(in oklch from 0deg, 
@@ -106,7 +118,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     oklch(0.55 0.2 300), 
     oklch(0.55 0.2 360)
   )`;
-  
+
   const multicolorGradientDark = `conic-gradient(in oklch from 0deg, 
     oklch(0.75 0.2 0), 
     oklch(0.75 0.2 60), 
@@ -122,15 +134,19 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       <PopoverTrigger asChild>
         <button
           className={`w-3 h-3 rounded-full border border-border hover:scale-110 transition-transform ${className}`}
-          style={{ background: isDarkMode ? multicolorGradientDark : multicolorGradient }}
+          style={{
+            background: isDarkMode
+              ? multicolorGradientDark
+              : multicolorGradient,
+          }}
           aria-label="Pick custom color"
           onClick={(e) => {
             e.stopPropagation();
           }}
         />
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-auto p-0" 
+      <PopoverContent
+        className="w-auto p-0"
         align="start"
         side="right"
         sideOffset={10}
@@ -146,7 +162,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         onFocusOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <div 
+        <div
           className="p-4 space-y-4"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
@@ -166,12 +182,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               </Button>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {COLOR_PRESETS.map(color => (
+              {COLOR_PRESETS.map((color) => (
                 <button
                   key={color}
                   onClick={(e) => handleColorChange(color, e)}
                   className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
-                    committedColor === color ? 'border-foreground' : 'border-transparent'
+                    committedColor === color
+                      ? 'border-foreground'
+                      : 'border-transparent'
                   }`}
                   style={{ backgroundColor: color }}
                   aria-label={`Select color ${color}`}

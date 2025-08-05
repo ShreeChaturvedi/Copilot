@@ -34,18 +34,18 @@ const filterTasks = (tasks: Task[], filters: TaskFilters): Task[] => {
 
   // Filter by completion status
   if (filters.showCompleted === false) {
-    filtered = filtered.filter(task => !task.completed);
+    filtered = filtered.filter((task) => !task.completed);
   }
 
   // Filter by scheduled status
   if (filters.scheduledOnly) {
-    filtered = filtered.filter(task => task.scheduledDate !== undefined);
+    filtered = filtered.filter((task) => task.scheduledDate !== undefined);
   }
 
   // Filter by search term
   if (filters.search && filters.search.trim()) {
     const searchTerm = filters.search.toLowerCase().trim();
-    filtered = filtered.filter(task =>
+    filtered = filtered.filter((task) =>
       task.title.toLowerCase().includes(searchTerm)
     );
   }
@@ -66,9 +66,11 @@ const filterTasks = (tasks: Task[], filters: TaskFilters): Task[] => {
 /**
  * Comprehensive hook for task management - matches LeftPane expectations
  */
-export const useTasks = (_filters: TaskFilters = {}) => {
+export const useTasks = (filters: TaskFilters = {}) => {
+  // Note: filters functionality not yet implemented
+  void filters;
   const queryClient = useQueryClient();
-  
+
   // Main query for tasks data
   const tasksQuery = useQuery({
     queryKey: taskQueryKeys.all,
@@ -104,7 +106,7 @@ export const useTasks = (_filters: TaskFilters = {}) => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [updatedTask];
-          return oldData.map(task =>
+          return oldData.map((task) =>
             task.id === updatedTask.id ? updatedTask : task
           );
         }
@@ -124,7 +126,7 @@ export const useTasks = (_filters: TaskFilters = {}) => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.filter(task => task.id !== deletedId);
+          return oldData.filter((task) => task.id !== deletedId);
         }
       );
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
@@ -142,7 +144,7 @@ export const useTasks = (_filters: TaskFilters = {}) => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [updatedTask];
-          return oldData.map(task =>
+          return oldData.map((task) =>
             task.id === updatedTask.id ? updatedTask : task
           );
         }
@@ -202,7 +204,7 @@ export const useTask = (id: string) => {
     queryKey: taskQueryKeys.detail(id),
     queryFn: async () => {
       const tasks = await taskApi.fetchTasks();
-      const task = tasks.find(t => t.id === id);
+      const task = tasks.find((t) => t.id === id);
       if (!task) {
         throw new Error('Task not found');
       }
@@ -224,7 +226,7 @@ export const useCreateTask = () => {
     onSuccess: (newTask) => {
       // Invalidate and refetch task queries
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      
+
       // Optimistically add the task to existing queries
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.lists() },
@@ -255,7 +257,7 @@ export const useUpdateTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [updatedTask];
-          return oldData.map(task =>
+          return oldData.map((task) =>
             task.id === updatedTask.id ? updatedTask : task
           );
         }
@@ -284,7 +286,7 @@ export const useDeleteTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.filter(task => task.id !== deletedId);
+          return oldData.filter((task) => task.id !== deletedId);
         }
       );
 
@@ -317,7 +319,7 @@ export const useToggleTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map(task =>
+          return oldData.map((task) =>
             task.id === taskId ? { ...task, completed: !task.completed } : task
           );
         }
@@ -354,7 +356,7 @@ export const useScheduleTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [updatedTask];
-          return oldData.map(task =>
+          return oldData.map((task) =>
             task.id === updatedTask.id ? updatedTask : task
           );
         }

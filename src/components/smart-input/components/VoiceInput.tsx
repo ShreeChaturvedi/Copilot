@@ -1,37 +1,39 @@
 /**
  * VoiceInput - Professional voice input component with speech recognition
- * 
+ *
  * Provides speech-to-text functionality with visual feedback, error handling,
  * and browser compatibility detection. Integrates with Web Speech API
  * through react-speech-recognition.
- * 
+ *
  * Features:
  * - Speech-to-text conversion
  * - Visual recording indicators
  * - Waveform animation during recording
- * - Browser compatibility detection  
+ * - Browser compatibility detection
  * - Noise cancellation indicators
  * - Confidence scoring
  * - Voice command recognition
  * - Auto-punctuation
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Mic, 
-  MicOff, 
-  Square, 
-  AlertCircle, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Mic,
+  MicOff,
+  Square,
+  AlertCircle,
   Volume2,
-  Settings
+  Settings,
 } from 'lucide-react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import SpeechRecognition, {
+  useSpeechRecognition,
+} from 'react-speech-recognition';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Tooltip, 
-  TooltipTrigger, 
-  TooltipContent 
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
 } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -95,15 +97,13 @@ const VoiceWaveform: React.FC<{ isActive: boolean }> = ({ isActive }) => {
           key={i}
           className={cn(
             'w-0.5 bg-primary rounded-full transition-all duration-150',
-            isActive 
-              ? 'h-3 animate-pulse' 
-              : 'h-1',
+            isActive ? 'h-3 animate-pulse' : 'h-1',
             // Stagger the animation
             isActive && `animate-pulse delay-[${i * 100}ms]`
           )}
           style={{
             animationDelay: `${i * 100}ms`,
-            animationDuration: '1s'
+            animationDuration: '1s',
           }}
         />
       ))}
@@ -118,23 +118,23 @@ const VOICE_COMMANDS = [
   {
     command: ['schedule for tomorrow', 'due tomorrow'],
     callback: () => 'tomorrow',
-    description: 'Schedule for tomorrow'
+    description: 'Schedule for tomorrow',
   },
   {
     command: ['high priority', 'urgent'],
     callback: () => 'high priority',
-    description: 'Set high priority'
+    description: 'Set high priority',
   },
   {
     command: ['low priority', 'not urgent'],
-    callback: () => 'low priority', 
-    description: 'Set low priority'
+    callback: () => 'low priority',
+    description: 'Set low priority',
   },
   {
     command: ['next week', 'schedule for next week'],
     callback: () => 'next week',
-    description: 'Schedule for next week'
-  }
+    description: 'Schedule for next week',
+  },
 ];
 
 /**
@@ -149,22 +149,27 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   disabled = false,
   className,
   size = 'default',
-  buttonOnly = false
+  buttonOnly = false,
 }) => {
-  const [autoStopTimer, setAutoStopTimer] = useState<NodeJS.Timeout | null>(null);
+  const [autoStopTimer, setAutoStopTimer] = useState<NodeJS.Timeout | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Default configuration
-  const defaultConfig: VoiceInputConfig = {
-    language: 'en-US',
-    continuous: true,
-    interimResults: true,
-    autoStopTimeout: 5000, // 5 minute max
-    enableCommands: true,
-    showConfidence: false,
-    ...config
-  };
+  // Default configuration - memoized to prevent dependency changes
+  const defaultConfig: VoiceInputConfig = useMemo(
+    () => ({
+      language: 'en-US',
+      continuous: true,
+      interimResults: true,
+      autoStopTimeout: 5000, // 5 minute max
+      enableCommands: true,
+      showConfidence: false,
+      ...config,
+    }),
+    [config]
+  );
 
   // Speech recognition hook
   const {
@@ -172,9 +177,9 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     listening,
     resetTranscript,
     browserSupportsSpeechRecognition,
-    isMicrophoneAvailable
+    isMicrophoneAvailable,
   } = useSpeechRecognition({
-    commands: defaultConfig.enableCommands ? VOICE_COMMANDS : []
+    commands: defaultConfig.enableCommands ? VOICE_COMMANDS : [],
   });
 
   // Update parent component when transcript changes
@@ -184,42 +189,44 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   }, [transcript, onTranscriptChange]);
 
-
   // Auto-stop timer
   useEffect(() => {
     if (listening && defaultConfig.autoStopTimeout) {
       const timer = setTimeout(() => {
         handleStopListening();
       }, defaultConfig.autoStopTimeout);
-      
+
       setAutoStopTimer(timer);
-      
+
       return () => {
         if (timer) clearTimeout(timer);
       };
     }
-  }, [listening, defaultConfig.autoStopTimeout]);
+  }, [listening, defaultConfig.autoStopTimeout, handleStopListening]);
 
   // Start listening
   const handleStartListening = useCallback(async () => {
     try {
       setError(null);
-      
+
       // Check microphone permission
       if (!isMicrophoneAvailable) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop()); // Clean up
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        stream.getTracks().forEach((track) => track.stop()); // Clean up
       }
-      
+
       await SpeechRecognition.startListening({
         continuous: defaultConfig.continuous,
         language: defaultConfig.language,
-        interimResults: defaultConfig.interimResults
+        interimResults: defaultConfig.interimResults,
       });
-      
+
       onStart?.();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start voice input';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to start voice input';
       setError(errorMessage);
       onError?.(errorMessage);
     }
@@ -228,12 +235,12 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   // Stop listening
   const handleStopListening = useCallback(() => {
     SpeechRecognition.stopListening();
-    
+
     if (autoStopTimer) {
       clearTimeout(autoStopTimer);
       setAutoStopTimer(null);
     }
-    
+
     onStop?.();
   }, [autoStopTimer, onStop]);
 
@@ -256,7 +263,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const sizeClasses = {
     sm: 'h-6 w-6',
     default: 'h-8 w-8',
-    lg: 'h-10 w-10'
+    lg: 'h-10 w-10',
   };
 
   // Check browser support
@@ -268,7 +275,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             variant="ghost"
             size="sm"
             disabled
-            className={cn(sizeClasses[size], 'p-0 text-muted-foreground', className)}
+            className={cn(
+              sizeClasses[size],
+              'p-0 text-muted-foreground',
+              className
+            )}
           >
             <MicOff className="w-4 h-4" />
           </Button>
@@ -286,7 +297,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant={listening ? "default" : "ghost"}
+            variant={listening ? 'default' : 'ghost'}
             size="sm"
             onClick={handleToggleListening}
             disabled={disabled}
@@ -318,7 +329,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       <div className="flex items-center gap-2">
         {/* Main Voice Button */}
         <Button
-          variant={listening ? "default" : "ghost"}
+          variant={listening ? 'default' : 'ghost'}
           size="sm"
           onClick={handleToggleListening}
           disabled={disabled}

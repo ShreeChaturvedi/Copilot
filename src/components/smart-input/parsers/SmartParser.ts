@@ -14,9 +14,9 @@ export class SmartParser {
   constructor() {
     // Initialize parsers in priority order (highest priority first)
     this.parsers = [
-      new ChronoDateParser(),     // Priority 10: Dates/times
-      new PriorityParser(),       // Priority 8: Priorities
-      new CompromiseNLPParser(),  // Priority 6: NER and semantic analysis
+      new ChronoDateParser(), // Priority 10: Dates/times
+      new PriorityParser(), // Priority 8: Priorities
+      new CompromiseNLPParser(), // Priority 6: NER and semantic analysis
     ].sort((a, b) => b.priority - a.priority);
   }
 
@@ -104,7 +104,7 @@ export class SmartParser {
 
         if (this.tagsOverlap(tag1, tag2)) {
           // Find existing conflict or create new one
-          let conflict = conflicts.find(c => 
+          let conflict = conflicts.find((c) =>
             this.rangesOverlap(
               { start: c.startIndex, end: c.endIndex },
               { start: tag1.startIndex, end: tag1.endIndex }
@@ -121,16 +121,24 @@ export class SmartParser {
           }
 
           // Add tags to conflict if not already present
-          if (!conflict.tags.some(t => t.id === tag1.id)) {
+          if (!conflict.tags.some((t) => t.id === tag1.id)) {
             conflict.tags.push(tag1);
           }
-          if (!conflict.tags.some(t => t.id === tag2.id)) {
+          if (!conflict.tags.some((t) => t.id === tag2.id)) {
             conflict.tags.push(tag2);
           }
 
           // Update conflict bounds
-          conflict.startIndex = Math.min(conflict.startIndex, tag1.startIndex, tag2.startIndex);
-          conflict.endIndex = Math.max(conflict.endIndex, tag1.endIndex, tag2.endIndex);
+          conflict.startIndex = Math.min(
+            conflict.startIndex,
+            tag1.startIndex,
+            tag2.startIndex
+          );
+          conflict.endIndex = Math.max(
+            conflict.endIndex,
+            tag1.endIndex,
+            tag2.endIndex
+          );
         }
       }
     }
@@ -141,15 +149,18 @@ export class SmartParser {
   /**
    * Resolve conflicts by selecting the best tag for each conflict
    */
-  private resolveConflicts(tags: ParsedTag[], conflicts: Conflict[]): ParsedTag[] {
+  private resolveConflicts(
+    tags: ParsedTag[],
+    conflicts: Conflict[]
+  ): ParsedTag[] {
     const resolvedTags = [...tags];
     const tagsToRemove = new Set<string>();
 
     for (const conflict of conflicts) {
       // Sort conflicting tags by priority and confidence
       const sortedTags = conflict.tags.sort((a, b) => {
-        const parserA = this.parsers.find(p => p.id === a.source);
-        const parserB = this.parsers.find(p => p.id === b.source);
+        const parserA = this.parsers.find((p) => p.id === a.source);
+        const parserB = this.parsers.find((p) => p.id === b.source);
         const priorityA = parserA?.priority || 0;
         const priorityB = parserB?.priority || 0;
 
@@ -173,7 +184,7 @@ export class SmartParser {
     }
 
     // Remove conflicting tags
-    return resolvedTags.filter(tag => !tagsToRemove.has(tag.id));
+    return resolvedTags.filter((tag) => !tagsToRemove.has(tag.id));
   }
 
   /**
@@ -190,16 +201,16 @@ export class SmartParser {
     for (const tag of sortedTags) {
       const before = cleanText.substring(0, tag.startIndex);
       const after = cleanText.substring(tag.endIndex);
-      
+
       // Clean up spacing
       let result = before + after;
-      
+
       // Remove double spaces
       result = result.replace(/\s{2,}/g, ' ');
-      
+
       // Trim whitespace
       result = result.trim();
-      
+
       cleanText = result;
     }
 
@@ -217,9 +228,9 @@ export class SmartParser {
     let weightedSum = 0;
 
     for (const tag of tags) {
-      const parser = this.parsers.find(p => p.id === tag.source);
+      const parser = this.parsers.find((p) => p.id === tag.source);
       const weight = (parser?.priority || 1) * tag.confidence;
-      
+
       weightedSum += weight;
       totalWeight += parser?.priority || 1;
     }
@@ -240,7 +251,10 @@ export class SmartParser {
   /**
    * Check if two ranges overlap
    */
-  private rangesOverlap(range1: { start: number; end: number }, range2: { start: number; end: number }): boolean {
+  private rangesOverlap(
+    range1: { start: number; end: number },
+    range2: { start: number; end: number }
+  ): boolean {
     return range1.start < range2.end && range2.start < range1.end;
   }
 
@@ -256,7 +270,7 @@ export class SmartParser {
    * Remove a parser from the pipeline
    */
   removeParser(parserId: string): void {
-    this.parsers = this.parsers.filter(p => p.id !== parserId);
+    this.parsers = this.parsers.filter((p) => p.id !== parserId);
   }
 
   /**
@@ -269,7 +283,9 @@ export class SmartParser {
   /**
    * Test parsing without side effects (for debugging)
    */
-  async testParse(text: string): Promise<{ parserResults: Array<{ parser: string; tags: ParsedTag[] }> }> {
+  async testParse(
+    text: string
+  ): Promise<{ parserResults: Array<{ parser: string; tags: ParsedTag[] }> }> {
     const results = [];
 
     for (const parser of this.parsers) {
@@ -281,7 +297,7 @@ export class SmartParser {
             tags,
           });
         }
-      } catch (error) {
+      } catch {
         results.push({
           parser: parser.name,
           tags: [],

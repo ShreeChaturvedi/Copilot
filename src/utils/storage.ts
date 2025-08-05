@@ -2,7 +2,14 @@
  * Local storage utility functions with proper TypeScript typing
  */
 
-import type { StorageSchema, Task, CalendarEvent, Calendar, AppSettings, GoogleAuthState } from '../types';
+import type {
+  StorageSchema,
+  Task,
+  CalendarEvent,
+  Calendar,
+  AppSettings,
+  GoogleAuthState,
+} from '../types';
 import { parseISOToDate } from './date';
 
 /**
@@ -66,7 +73,7 @@ export const isStorageAvailable = (): boolean => {
  */
 const safeJsonParse = <T>(value: string | null, fallback: T): T => {
   if (!value) return fallback;
-  
+
   try {
     return JSON.parse(value) as T;
   } catch (error) {
@@ -91,9 +98,9 @@ const safeJsonStringify = (key: string, data: unknown): boolean => {
 /**
  * Convert stored date strings back to Date objects
  */
-const reviveDates = <T extends Record<string, any>>(obj: T, dateFields: (keyof T)[]): T => {
+const reviveDates = <T>(obj: T, dateFields: (keyof T)[]): T => {
   const revived = { ...obj };
-  
+
   for (const field of dateFields) {
     if (revived[field] && typeof revived[field] === 'string') {
       try {
@@ -104,7 +111,7 @@ const reviveDates = <T extends Record<string, any>>(obj: T, dateFields: (keyof T
       }
     }
   }
-  
+
   return revived;
 };
 
@@ -118,9 +125,9 @@ export const taskStorage = {
   getTasks: (): Task[] => {
     const stored = localStorage.getItem(STORAGE_KEYS.TASKS);
     const tasks = safeJsonParse(stored, [] as Task[]);
-    
+
     // Convert date strings back to Date objects
-    return tasks.map(task => 
+    return tasks.map((task) =>
       reviveDates(task, ['createdAt', 'scheduledDate'])
     );
   },
@@ -146,13 +153,13 @@ export const taskStorage = {
    */
   updateTask: (taskId: string, updates: Partial<Task>): boolean => {
     const tasks = taskStorage.getTasks();
-    const index = tasks.findIndex(task => task.id === taskId);
-    
+    const index = tasks.findIndex((task) => task.id === taskId);
+
     if (index === -1) {
       console.warn(`Task with id ${taskId} not found`);
       return false;
     }
-    
+
     tasks[index] = { ...tasks[index], ...updates };
     return taskStorage.saveTasks(tasks);
   },
@@ -162,7 +169,7 @@ export const taskStorage = {
    */
   deleteTask: (taskId: string): boolean => {
     const tasks = taskStorage.getTasks();
-    const filteredTasks = tasks.filter(task => task.id !== taskId);
+    const filteredTasks = tasks.filter((task) => task.id !== taskId);
     return taskStorage.saveTasks(filteredTasks);
   },
 };
@@ -177,11 +184,9 @@ export const eventStorage = {
   getEvents: (): CalendarEvent[] => {
     const stored = localStorage.getItem(STORAGE_KEYS.EVENTS);
     const events = safeJsonParse(stored, [] as CalendarEvent[]);
-    
+
     // Convert date strings back to Date objects
-    return events.map(event => 
-      reviveDates(event, ['start', 'end'])
-    );
+    return events.map((event) => reviveDates(event, ['start', 'end']));
   },
 
   /**
@@ -205,13 +210,13 @@ export const eventStorage = {
    */
   updateEvent: (eventId: string, updates: Partial<CalendarEvent>): boolean => {
     const events = eventStorage.getEvents();
-    const index = events.findIndex(event => event.id === eventId);
-    
+    const index = events.findIndex((event) => event.id === eventId);
+
     if (index === -1) {
       console.warn(`Event with id ${eventId} not found`);
       return false;
     }
-    
+
     events[index] = { ...events[index], ...updates };
     return eventStorage.saveEvents(events);
   },
@@ -221,7 +226,7 @@ export const eventStorage = {
    */
   deleteEvent: (eventId: string): boolean => {
     const events = eventStorage.getEvents();
-    const filteredEvents = events.filter(event => event.id !== eventId);
+    const filteredEvents = events.filter((event) => event.id !== eventId);
     return eventStorage.saveEvents(filteredEvents);
   },
 };
@@ -236,13 +241,13 @@ export const calendarStorage = {
   getCalendars: (): Calendar[] => {
     const stored = localStorage.getItem(STORAGE_KEYS.CALENDARS);
     const calendars = safeJsonParse(stored, DEFAULT_CALENDARS);
-    
+
     // Ensure we always have at least the default calendars
     if (calendars.length === 0) {
       calendarStorage.saveCalendars(DEFAULT_CALENDARS);
       return DEFAULT_CALENDARS;
     }
-    
+
     return calendars;
   },
 
@@ -258,13 +263,13 @@ export const calendarStorage = {
    */
   addCalendar: (calendar: Calendar): boolean => {
     const calendars = calendarStorage.getCalendars();
-    
+
     // Check if calendar name already exists
-    if (calendars.some(cal => cal.name === calendar.name)) {
+    if (calendars.some((cal) => cal.name === calendar.name)) {
       console.warn(`Calendar with name ${calendar.name} already exists`);
       return false;
     }
-    
+
     calendars.push(calendar);
     return calendarStorage.saveCalendars(calendars);
   },
@@ -272,15 +277,18 @@ export const calendarStorage = {
   /**
    * Update an existing calendar
    */
-  updateCalendar: (calendarName: string, updates: Partial<Calendar>): boolean => {
+  updateCalendar: (
+    calendarName: string,
+    updates: Partial<Calendar>
+  ): boolean => {
     const calendars = calendarStorage.getCalendars();
-    const index = calendars.findIndex(cal => cal.name === calendarName);
-    
+    const index = calendars.findIndex((cal) => cal.name === calendarName);
+
     if (index === -1) {
       console.warn(`Calendar with name ${calendarName} not found`);
       return false;
     }
-    
+
     calendars[index] = { ...calendars[index], ...updates };
     return calendarStorage.saveCalendars(calendars);
   },
@@ -288,16 +296,23 @@ export const calendarStorage = {
   /**
    * Delete a calendar (and optionally its events)
    */
-  deleteCalendar: (calendarName: string, deleteEvents: boolean = false): boolean => {
+  deleteCalendar: (
+    calendarName: string,
+    deleteEvents: boolean = false
+  ): boolean => {
     const calendars = calendarStorage.getCalendars();
-    const filteredCalendars = calendars.filter(cal => cal.name !== calendarName);
-    
+    const filteredCalendars = calendars.filter(
+      (cal) => cal.name !== calendarName
+    );
+
     if (deleteEvents) {
       const events = eventStorage.getEvents();
-      const filteredEvents = events.filter(event => event.calendarName !== calendarName);
+      const filteredEvents = events.filter(
+        (event) => event.calendarName !== calendarName
+      );
       eventStorage.saveEvents(filteredEvents);
     }
-    
+
     return calendarStorage.saveCalendars(filteredCalendars);
   },
 };
@@ -368,7 +383,7 @@ export const googleAuthStorage = {
  */
 export const clearAllData = (): boolean => {
   try {
-    Object.values(STORAGE_KEYS).forEach(key => {
+    Object.values(STORAGE_KEYS).forEach((key) => {
       localStorage.removeItem(key);
     });
     return true;
@@ -401,7 +416,7 @@ export const importData = (data: Partial<StorageSchema>): boolean => {
     if (data.calendars) calendarStorage.saveCalendars(data.calendars);
     if (data.settings) settingsStorage.saveSettings(data.settings);
     if (data.googleAuth) googleAuthStorage.saveAuthState(data.googleAuth);
-    
+
     return true;
   } catch (error) {
     console.error('Failed to import data:', error);
@@ -416,9 +431,9 @@ export const getStorageInfo = (): { used: number; available: number } => {
   if (!isStorageAvailable()) {
     return { used: 0, available: 0 };
   }
-  
+
   let used = 0;
-  
+
   try {
     for (const key in localStorage) {
       if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
@@ -428,10 +443,10 @@ export const getStorageInfo = (): { used: number; available: number } => {
   } catch (error) {
     console.warn('Failed to calculate storage usage:', error);
   }
-  
+
   // Most browsers have a 5-10MB limit for localStorage
   const estimated = 5 * 1024 * 1024; // 5MB estimate
-  
+
   return {
     used,
     available: Math.max(0, estimated - used),

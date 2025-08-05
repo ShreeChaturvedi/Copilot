@@ -33,13 +33,13 @@ export interface TaskInputProps {
   disabled?: boolean;
 }
 
-export const TaskInput: React.FC<TaskInputProps> = ({ 
+export const TaskInput: React.FC<TaskInputProps> = ({
   onAddTask,
   taskGroups = [],
   activeTaskGroupId,
   onCreateTaskGroup,
   onSelectTaskGroup,
-  disabled = false 
+  disabled = false,
 }) => {
   const [title, setTitle] = useState('');
 
@@ -49,11 +49,12 @@ export const TaskInput: React.FC<TaskInputProps> = ({
     name: 'Tasks',
     iconId: 'CheckSquare',
     color: '#3b82f6',
-    description: 'Default task group'
+    description: 'Default task group',
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) || 
+  const activeTaskGroup =
+    taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -61,7 +62,8 @@ export const TaskInput: React.FC<TaskInputProps> = ({
     const trimmedTitle = title.trim();
     if (trimmedTitle) {
       // Capitalize first letter
-      const capitalizedTitle = trimmedTitle.charAt(0).toUpperCase() + trimmedTitle.slice(1);
+      const capitalizedTitle =
+        trimmedTitle.charAt(0).toUpperCase() + trimmedTitle.slice(1);
       onAddTask(capitalizedTitle, activeTaskGroup.id);
       setTitle('');
     }
@@ -74,7 +76,11 @@ export const TaskInput: React.FC<TaskInputProps> = ({
   };
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
+  const ActiveGroupIcon =
+    (LucideIcons[
+      activeTaskGroup.iconId as keyof typeof LucideIcons
+    ] as React.ComponentType<{ className?: string; size?: number }>) ||
+    LucideIcons.CheckSquare;
 
   return (
     <form onSubmit={handleSubmit} className="relative">
@@ -88,23 +94,29 @@ export const TaskInput: React.FC<TaskInputProps> = ({
             className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
             aria-label={`Current task group: ${activeTaskGroup.name}`}
           >
-            <ActiveGroupIcon 
-              className="w-4 h-4" 
+            <ActiveGroupIcon
+              className="w-4 h-4"
               style={{ color: activeTaskGroup.color }}
             />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
           {taskGroups.map((group) => {
-            const GroupIcon = (LucideIcons as any)[group.iconId] || (LucideIcons as any)['CheckSquare'];
+            const GroupIcon =
+              (LucideIcons[
+                group.iconId as keyof typeof LucideIcons
+              ] as React.ComponentType<{
+                className?: string;
+                size?: number;
+              }>) || LucideIcons.CheckSquare;
             return (
               <DropdownMenuItem
                 key={group.id}
                 onClick={() => onSelectTaskGroup?.(group.id)}
                 className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
               >
-                <GroupIcon 
-                  className="mr-2 h-4 w-4" 
+                <GroupIcon
+                  className="mr-2 h-4 w-4"
                   style={{ color: group.color }}
                 />
                 <span>{group.name}</span>
@@ -135,7 +147,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
         className="pl-10 pr-10 border-input"
         aria-label="New task input"
       />
-      
+
       <Button
         type="submit"
         disabled={disabled || !title.trim()}

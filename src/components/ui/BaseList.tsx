@@ -1,5 +1,12 @@
 import React, { useState, ReactNode } from 'react';
-import { Plus, ChevronUp, MoreVertical, Settings, Edit, Trash2 } from 'lucide-react';
+import {
+  Plus,
+  ChevronUp,
+  MoreVertical,
+  Settings,
+  Edit,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -64,20 +71,40 @@ export interface BaseListProps<T extends BaseListItem> {
   titleIcon: ReactNode;
   mode: 'checkbox' | 'selection';
   activeItemId?: string; // Only used in selection mode
-  
+
   // Actions
   onToggle?: (item: T) => void; // For checkbox mode (toggle visibility)
   onSelect?: (item: T) => void; // For selection mode (select active)
   onAdd: (name: string, color: string) => void;
   onEdit: (item: T, name: string, color: string) => void;
   onDelete?: (item: T) => void;
-  
+
   // Dialog support
   showCreateDialog?: boolean;
   onShowCreateDialog?: (show: boolean) => void;
-  onCreateDialogSubmit?: (data: { name: string; description: string; iconId: string; color: string }) => void;
-  CreateDialogComponent?: React.ComponentType<any>;
-  
+  onCreateDialogSubmit?: (data: {
+    name: string;
+    description: string;
+    iconId: string;
+    color: string;
+  }) => void;
+  CreateDialogComponent?: React.ComponentType<{
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCreateCalendar?: (data: {
+      name: string;
+      description: string;
+      iconId: string;
+      color: string;
+    }) => void;
+    onSubmit?: (data: {
+      name: string;
+      description: string;
+      iconId: string;
+      color: string;
+    }) => void;
+  }>;
+
   // Styling
   addButtonLabel: string;
   emptyStateText: string;
@@ -105,7 +132,7 @@ export function BaseList<T extends BaseListItem>({
   emptyStateText,
   createFirstItemText,
   deleteDialogTitle,
-  deleteDialogDescription
+  deleteDialogDescription,
 }: BaseListProps<T>) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -140,14 +167,17 @@ export function BaseList<T extends BaseListItem>({
   };
 
   const handleRecentColorAdd = (color: string) => {
-    setRecentColors(prev => {
-      const filtered = prev.filter(c => c !== color);
+    setRecentColors((prev) => {
+      const filtered = prev.filter((c) => c !== color);
       return [color, ...filtered].slice(0, 5);
     });
   };
 
   return (
-    <Collapsible open={!isCollapsed} onOpenChange={(open) => setIsCollapsed(!open)}>
+    <Collapsible
+      open={!isCollapsed}
+      onOpenChange={(open) => setIsCollapsed(!open)}
+    >
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -175,7 +205,9 @@ export function BaseList<T extends BaseListItem>({
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="h-5 w-5 p-0"
               >
-                <div className={`transition-transform duration-200 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}>
+                <div
+                  className={`transition-transform duration-200 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}
+                >
                   <ChevronUp className="w-3 h-3" />
                 </div>
               </Button>
@@ -189,12 +221,18 @@ export function BaseList<T extends BaseListItem>({
             <div
               key={item.id || item.name}
               className="calendar-item"
-              style={{ '--animation-delay': `${index * 50}ms` } as React.CSSProperties}
+              style={
+                {
+                  '--animation-delay': `${index * 50}ms`,
+                } as React.CSSProperties
+              }
             >
               <BaseListItem
                 item={item}
                 mode={mode}
-                isActive={mode === 'selection' ? activeItemId === item.id : false}
+                isActive={
+                  mode === 'selection' ? activeItemId === item.id : false
+                }
                 onToggle={onToggle}
                 onSelect={onSelect}
                 onEdit={onEdit}
@@ -209,7 +247,14 @@ export function BaseList<T extends BaseListItem>({
 
           {/* Inline Add Form */}
           {isAddingItem && (
-            <div className="p-3 border rounded-md space-y-3 calendar-item" style={{ '--animation-delay': `${items.length * 50}ms` } as React.CSSProperties}>
+            <div
+              className="p-3 border rounded-md space-y-3 calendar-item"
+              style={
+                {
+                  '--animation-delay': `${items.length * 50}ms`,
+                } as React.CSSProperties
+              }
+            >
               <Input
                 type="text"
                 placeholder={`${addButtonLabel} name`}
@@ -226,7 +271,7 @@ export function BaseList<T extends BaseListItem>({
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Color:</span>
                 <div className="flex gap-1">
-                  {DEFAULT_COLORS.map(color => (
+                  {DEFAULT_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setSelectedColor(color)}
@@ -252,11 +297,7 @@ export function BaseList<T extends BaseListItem>({
                 >
                   Add {addButtonLabel}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCancelAdd}
-                >
+                <Button variant="outline" size="sm" onClick={handleCancelAdd}>
                   Cancel
                 </Button>
               </div>
@@ -265,7 +306,10 @@ export function BaseList<T extends BaseListItem>({
 
           {/* Empty State */}
           {items.length === 0 && !isAddingItem && (
-            <div className="text-center py-3 text-muted-foreground calendar-item" style={{ '--animation-delay': '0ms' } as React.CSSProperties}>
+            <div
+              className="text-center py-3 text-muted-foreground calendar-item"
+              style={{ '--animation-delay': '0ms' } as React.CSSProperties}
+            >
               <p className="text-xs">{emptyStateText}</p>
               <Button
                 variant="ghost"
@@ -284,8 +328,12 @@ export function BaseList<T extends BaseListItem>({
           <CreateDialogComponent
             open={showCreateDialog}
             onOpenChange={(open) => onShowCreateDialog?.(open)}
-            onCreateCalendar={mode === 'checkbox' ? handleCreateFromDialog : undefined}
-            onCreateTask={mode === 'selection' ? handleCreateFromDialog : undefined}
+            onCreateCalendar={
+              mode === 'checkbox' ? handleCreateFromDialog : undefined
+            }
+            onCreateTask={
+              mode === 'selection' ? handleCreateFromDialog : undefined
+            }
           />
         )}
       </div>
@@ -318,7 +366,7 @@ function BaseListItem<T extends BaseListItem>({
   recentColors,
   onRecentColorAdd,
   deleteDialogTitle,
-  deleteDialogDescription
+  deleteDialogDescription,
 }: BaseListItemProps<T>) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(item.name);
@@ -327,7 +375,10 @@ function BaseListItem<T extends BaseListItem>({
 
   const handleSaveEdit = () => {
     const trimmedName = editName.trim();
-    if (trimmedName && (trimmedName !== item.name || editColor !== item.color)) {
+    if (
+      trimmedName &&
+      (trimmedName !== item.name || editColor !== item.color)
+    ) {
       onEdit(item, trimmedName, editColor);
     }
     setIsEditing(false);
@@ -362,7 +413,7 @@ function BaseListItem<T extends BaseListItem>({
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Color:</span>
           <div className="flex gap-1">
-            {DEFAULT_COLORS.map(color => (
+            {DEFAULT_COLORS.map((color) => (
               <button
                 key={color}
                 onClick={() => setEditColor(color)}
@@ -402,11 +453,13 @@ function BaseListItem<T extends BaseListItem>({
               'data-[state=checked]:bg-current data-[state=checked]:border-current',
               'border-2 rounded-sm flex-shrink-0'
             )}
-            style={{
-              borderColor: item.color,
-              '--tw-border-opacity': '1',
-              color: item.color
-            } as React.CSSProperties}
+            style={
+              {
+                borderColor: item.color,
+                '--tw-border-opacity': '1',
+                color: item.color,
+              } as React.CSSProperties
+            }
             aria-label={`Toggle ${item.name} visibility`}
           />
         ) : (
@@ -417,11 +470,13 @@ function BaseListItem<T extends BaseListItem>({
               'data-[state=checked]:bg-current data-[state=checked]:border-current',
               'border-2 rounded-sm flex-shrink-0'
             )}
-            style={{
-              borderColor: item.color,
-              '--tw-border-opacity': '1',
-              color: item.color
-            } as React.CSSProperties}
+            style={
+              {
+                borderColor: item.color,
+                '--tw-border-opacity': '1',
+                color: item.color,
+              } as React.CSSProperties
+            }
             aria-label={`Select ${item.name}`}
           />
         )}
@@ -433,7 +488,9 @@ function BaseListItem<T extends BaseListItem>({
           <div className="text-sm font-medium truncate">
             {item.name}
             {item.isDefault && (
-              <span className="ml-1 text-xs text-muted-foreground">(default)</span>
+              <span className="ml-1 text-xs text-muted-foreground">
+                (default)
+              </span>
             )}
           </div>
         </div>
@@ -441,11 +498,7 @@ function BaseListItem<T extends BaseListItem>({
         <div className="flex items-center opacity-0 group-hover/calendar:opacity-100 transition-opacity">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 ml-auto"
-              >
+              <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto">
                 <MoreVertical className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -465,7 +518,7 @@ function BaseListItem<T extends BaseListItem>({
                 />
                 <span>Color</span>
                 <DropdownMenuShortcut className="flex gap-1 ml-auto">
-                  {DEFAULT_COLORS.slice(0, 4).map(color => (
+                  {DEFAULT_COLORS.slice(0, 4).map((color) => (
                     <button
                       key={color}
                       onClick={(e) => {

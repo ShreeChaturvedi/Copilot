@@ -1,81 +1,86 @@
-import * as React from "react"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon, Clock as ClockIcon, MapPin, FileText, ArrowRight, AtSign } from "lucide-react"
+import * as React from 'react';
+import { format } from 'date-fns';
+import {
+  Calendar as CalendarIcon,
+  Clock as ClockIcon,
+  MapPin,
+  FileText,
+  ArrowRight,
+  AtSign,
+} from 'lucide-react';
 
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-} from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
-import { IntegratedActionBar } from "./IntegratedActionBar"
+} from '@/components/ui/dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { IntegratedActionBar } from './IntegratedActionBar';
 
-import type { CalendarEvent } from "@/types"
-import { useCalendars } from "@/hooks/useCalendars"
-import { useDeleteEvent } from "@/hooks/useEvents"
-import { useUIStore } from "@/stores/uiStore"
+import type { CalendarEvent } from '@/types';
+import { useCalendars } from '@/hooks/useCalendars';
+import { useDeleteEvent } from '@/hooks/useEvents';
+import { useUIStore } from '@/stores/uiStore';
 
 interface EventDisplayDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  event: CalendarEvent | null
-  onEdit?: (event: CalendarEvent) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  event: CalendarEvent | null;
+  onEdit?: (event: CalendarEvent) => void;
 }
 
-function EventDisplayDialogContent({
-  event,
-  onEdit: _onEdit,
-  onClose: _onClose,
-}: {
-  event: CalendarEvent
-  onEdit?: (event: CalendarEvent) => void
-  onClose: () => void
-}) {
-  const { data: calendars = [] } = useCalendars()
+function EventDisplayDialogContent({ event }: { event: CalendarEvent }) {
+  const { data: calendars = [] } = useCalendars();
 
   const calendar = React.useMemo(() => {
-    if (!event) return null
-    return calendars.find(cal => cal.name === event.calendarName) || null
-  }, [calendars, event])
+    if (!event) return null;
+    return calendars.find((cal) => cal.name === event.calendarName) || null;
+  }, [calendars, event]);
 
-  const formatDateTime = React.useCallback((start: Date, end: Date, allDay?: boolean) => {
-    const startDate = format(start, "MMM dd, yyyy")
-    
-    if (allDay) {
-      const endDate = format(end, "MMM dd, yyyy")
-      return startDate === endDate ? startDate : `${startDate} - ${endDate}`
-    } else {
-      const endDate = format(end, "MMM dd, yyyy")
-      const startTime = format(start, "h:mm a")
-      const endTime = format(end, "h:mm a")
-      
-      if (startDate === endDate) {
-        return { date: startDate, startTime, endTime }
+  const formatDateTime = React.useCallback(
+    (start: Date, end: Date, allDay?: boolean) => {
+      const startDate = format(start, 'MMM dd, yyyy');
+
+      if (allDay) {
+        const endDate = format(end, 'MMM dd, yyyy');
+        return startDate === endDate ? startDate : `${startDate} - ${endDate}`;
       } else {
-        return { text: `${startDate} at ${startTime} - ${endDate} at ${endTime}` }
-      }
-    }
-  }, [])
+        const endDate = format(end, 'MMM dd, yyyy');
+        const startTime = format(start, 'h:mm a');
+        const endTime = format(end, 'h:mm a');
 
-  const dateTimeInfo = formatDateTime(new Date(event.start), new Date(event.end), event.allDay)
+        if (startDate === endDate) {
+          return { date: startDate, startTime, endTime };
+        } else {
+          return {
+            text: `${startDate} at ${startTime} - ${endDate} at ${endTime}`,
+          };
+        }
+      }
+    },
+    []
+  );
+
+  const dateTimeInfo = formatDateTime(
+    new Date(event.start),
+    new Date(event.end),
+    event.allDay
+  );
 
   return (
     <>
       {/* Hidden element to receive initial focus instead of edit button */}
       <div tabIndex={0} className="sr-only" />
-      
+
       {/* Title with Calendar Color and Name */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           {calendar && (
             <div
               className="w-4 h-4 rounded-sm border-2 flex-shrink-0"
-              style={{ 
+              style={{
                 backgroundColor: calendar.color,
                 borderColor: calendar.color,
               }}
@@ -90,7 +95,7 @@ function EventDisplayDialogContent({
             )}
           </h2>
         </div>
-        
+
         {event.allDay && (
           <Badge variant="secondary" className="w-fit">
             All Day
@@ -124,7 +129,11 @@ function EventDisplayDialogContent({
                     <span>{dateTimeInfo.endTime}</span>
                   </>
                 ) : (
-                  <span>{typeof dateTimeInfo === 'object' && 'text' in dateTimeInfo ? dateTimeInfo.text : ''}</span>
+                  <span>
+                    {typeof dateTimeInfo === 'object' && 'text' in dateTimeInfo
+                      ? dateTimeInfo.text
+                      : ''}
+                  </span>
                 )}
               </div>
             )}
@@ -158,7 +167,7 @@ function EventDisplayDialogContent({
         )}
       </div>
     </>
-  )
+  );
 }
 
 export function EventDisplayDialog({
@@ -167,42 +176,42 @@ export function EventDisplayDialog({
   event,
   onEdit,
 }: EventDisplayDialogProps) {
-  const { peekMode, setPeekMode } = useUIStore()
-  const deleteEventMutation = useDeleteEvent()
-  const [isDeleting, setIsDeleting] = React.useState(false)
+  const { peekMode, setPeekMode } = useUIStore();
+  const deleteEventMutation = useDeleteEvent();
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const handleClose = React.useCallback(() => {
-    onOpenChange(false)
-  }, [onOpenChange])
+    onOpenChange(false);
+  }, [onOpenChange]);
 
   const handleEdit = React.useCallback(() => {
     if (event && onEdit) {
-      onEdit(event)
-      handleClose()
+      onEdit(event);
+      handleClose();
     }
-  }, [event, onEdit, handleClose])
+  }, [event, onEdit, handleClose]);
 
   const handleDelete = React.useCallback(async () => {
-    if (!event) return
+    if (!event) return;
 
-    setIsDeleting(true)
-    
+    setIsDeleting(true);
+
     try {
-      await deleteEventMutation.mutateAsync(event.id)
-      handleClose()
+      await deleteEventMutation.mutateAsync(event.id);
+      handleClose();
     } catch (error) {
-      console.error("Failed to delete event:", error)
+      console.error('Failed to delete event:', error);
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
-  }, [event, deleteEventMutation, handleClose])
+  }, [event, deleteEventMutation, handleClose]);
 
   const togglePeekMode = React.useCallback(() => {
-    setPeekMode(peekMode === 'center' ? 'right' : 'center')
-  }, [peekMode, setPeekMode])
+    setPeekMode(peekMode === 'center' ? 'right' : 'center');
+  }, [peekMode, setPeekMode]);
 
   if (!event) {
-    return null
+    return null;
   }
 
   const actionButtons = (
@@ -216,37 +225,35 @@ export function EventDisplayDialog({
         isDeleting={isDeleting}
       />
     </div>
-  )
+  );
 
   if (peekMode === 'right') {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="sm:max-w-sm p-6 [&>button]:hidden">
-          <EventDisplayDialogContent
-            event={event}
-            onEdit={onEdit}
-            onClose={handleClose}
-          />
+        <SheetContent
+          side="right"
+          className="sm:max-w-sm p-6 [&>button]:hidden"
+        >
+          <EventDisplayDialogContent event={event} />
           {actionButtons}
         </SheetContent>
       </Sheet>
-    )
+    );
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" showCloseButton={false}>
+      <DialogContent
+        className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
+        showCloseButton={false}
+      >
         <DialogTitle className="sr-only">{event.title}</DialogTitle>
         <DialogDescription className="sr-only">
           Event details for {event.title} - view, edit, or delete this event
         </DialogDescription>
-        <EventDisplayDialogContent
-          event={event}
-          onEdit={onEdit}
-          onClose={handleClose}
-        />
+        <EventDisplayDialogContent event={event} />
         {actionButtons}
       </DialogContent>
     </Dialog>
-  )
+  );
 }

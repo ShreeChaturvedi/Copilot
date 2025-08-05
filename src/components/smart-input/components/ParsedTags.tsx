@@ -49,7 +49,7 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
   }
 
   return (
-    <div 
+    <div
       className={cn('flex flex-wrap items-center gap-2 mt-2', className)}
       data-testid="parsed-tags"
     >
@@ -92,10 +92,14 @@ const TagBadge: React.FC<TagBadgeProps> = ({
   showConfidence,
 }) => {
   // Get the icon component
-  const IconComponent = (LucideIcons as any)[tag.iconName] || LucideIcons.Tag;
+  const IconComponent =
+    (LucideIcons[
+      tag.iconName as keyof typeof LucideIcons
+    ] as React.ComponentType<{ className?: string; size?: number }>) ||
+    LucideIcons.Tag;
 
   // Get badge variant - using outline for all by default as requested
-  const getBadgeVariant = (): "outline" => {
+  const getBadgeVariant = (): 'outline' => {
     return 'outline';
   };
 
@@ -126,32 +130,31 @@ const TagBadge: React.FC<TagBadgeProps> = ({
       variant={getBadgeVariant()}
       className={cn(
         // Match TaskItem badge styling exactly
-        "text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-colors",
+        'text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-colors',
         // Add click behavior if needed
         onClick && 'cursor-pointer',
         removable && 'pr-1'
       )}
-      style={tag.color ? { 
-        borderColor: `${tag.color}30`, 
-        color: tag.color 
-      } : undefined}
+      style={
+        tag.color
+          ? {
+              borderColor: `${tag.color}30`,
+              color: tag.color,
+            }
+          : undefined
+      }
       onClick={handleClick}
       title={`${tag.type}: ${tag.displayText}${showConfidence ? ` (${Math.round(tag.confidence * 100)}% confidence)` : ''}`}
     >
       {/* Icon */}
-      <IconComponent 
-        className="w-3 h-3" 
-        style={{ color: tag.color }} 
-      />
-      
+      <IconComponent className="w-3 h-3" style={{ color: tag.color }} />
+
       {/* Text */}
-      <span className="text-xs font-medium">
-        {tag.displayText}
-      </span>
+      <span className="text-xs font-medium">{tag.displayText}</span>
 
       {/* Confidence indicator */}
       {showConfidence && (
-        <span 
+        <span
           className={cn('text-xs ml-1', getConfidenceColor(tag.confidence))}
           title={`${Math.round(tag.confidence * 100)}% confidence`}
         >
@@ -165,9 +168,9 @@ const TagBadge: React.FC<TagBadgeProps> = ({
           variant="ghost"
           size="sm"
           className={cn(
-            "h-4 w-4 p-0 ml-1 transition-colors duration-200",
-            "text-muted-foreground/60 hover:text-foreground",
-            "hover:bg-muted/50"
+            'h-4 w-4 p-0 ml-1 transition-colors duration-200',
+            'text-muted-foreground/60 hover:text-foreground',
+            'hover:bg-muted/50'
           )}
           onClick={handleRemove}
           aria-label={`Remove ${tag.displayText} tag`}
@@ -190,20 +193,27 @@ export interface TagStatsProps {
 export const TagStats: React.FC<TagStatsProps> = ({ tags, className }) => {
   if (tags.length === 0) return null;
 
-  const averageConfidence = tags.reduce((sum, tag) => sum + tag.confidence, 0) / tags.length;
-  const tagsByType = tags.reduce((acc, tag) => {
-    acc[tag.type] = (acc[tag.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const averageConfidence =
+    tags.reduce((sum, tag) => sum + tag.confidence, 0) / tags.length;
+  const tagsByType = tags.reduce(
+    (acc, tag) => {
+      acc[tag.type] = (acc[tag.type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   return (
-    <div className={cn('flex items-center gap-4 text-xs text-muted-foreground', className)}>
+    <div
+      className={cn(
+        'flex items-center gap-4 text-xs text-muted-foreground',
+        className
+      )}
+    >
       <span>
         {tags.length} tag{tags.length !== 1 ? 's' : ''} detected
       </span>
-      <span>
-        {Math.round(averageConfidence * 100)}% avg confidence
-      </span>
+      <span>{Math.round(averageConfidence * 100)}% avg confidence</span>
       <div className="flex gap-1">
         {Object.entries(tagsByType).map(([type, count]) => (
           <Badge key={type} variant="outline" className="text-xs px-1 py-0">

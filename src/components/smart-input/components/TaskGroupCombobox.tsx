@@ -1,6 +1,6 @@
 /**
  * TaskGroupCombobox - Shadcn Combobox for task group selection
- * 
+ *
  * Replaces the dropdown menu with a proper shadcn Combobox component
  * while maintaining the same visual appearance with colored icons and titles.
  */
@@ -18,7 +18,11 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { TaskGroup } from '../../tasks/TaskInput';
 
@@ -39,7 +43,7 @@ export interface TaskGroupComboboxProps {
 
 /**
  * Task group combobox component using shadcn Combobox
- * 
+ *
  * Features:
  * - Uses shadcn Command/Popover for better UX
  * - Maintains visual appearance with colored icons and titles
@@ -63,15 +67,20 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     name: 'Tasks',
     iconId: 'CheckSquare',
     color: '#3b82f6',
-    description: 'Default task group'
+    description: 'Default task group',
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) || 
+  const activeTaskGroup =
+    taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = (LucideIcons as any)[activeTaskGroup.iconId] || (LucideIcons as any)['CheckSquare'];
+  const ActiveGroupIcon =
+    (LucideIcons[
+      activeTaskGroup.iconId as keyof typeof LucideIcons
+    ] as React.ComponentType<{ className?: string; size?: number }>) ||
+    LucideIcons.CheckSquare;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -87,8 +96,8 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             className
           )}
         >
-          <ActiveGroupIcon 
-            className="w-4 h-4" 
+          <ActiveGroupIcon
+            className="w-4 h-4"
             style={{ color: activeTaskGroup.color }}
           />
           <span className="text-sm font-medium">{activeTaskGroup.name}</span>
@@ -102,29 +111,40 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             <CommandEmpty>No task groups found.</CommandEmpty>
             <CommandGroup>
               {taskGroups.map((group) => {
-                const GroupIcon = (LucideIcons as any)[group.iconId] || (LucideIcons as any)['CheckSquare'];
+                const GroupIcon =
+                  (LucideIcons[
+                    group.iconId as keyof typeof LucideIcons
+                  ] as React.ComponentType<{
+                    className?: string;
+                    size?: number;
+                  }>) || LucideIcons.CheckSquare;
                 return (
                   <CommandItem
                     key={group.id}
                     value={group.id}
                     onSelect={(currentValue) => {
-                      if (currentValue !== activeTaskGroup.id && onSelectTaskGroup) {
+                      if (
+                        currentValue !== activeTaskGroup.id &&
+                        onSelectTaskGroup
+                      ) {
                         onSelectTaskGroup(currentValue);
                       }
                       setOpen(false);
                     }}
                   >
                     <div className="flex items-center gap-2 flex-1">
-                      <GroupIcon 
-                        className="w-4 h-4" 
+                      <GroupIcon
+                        className="w-4 h-4"
                         style={{ color: group.color }}
                       />
                       <span>{group.name}</span>
                     </div>
                     <Check
                       className={cn(
-                        "ml-auto h-4 w-4",
-                        activeTaskGroup.id === group.id ? "opacity-100" : "opacity-0"
+                        'ml-auto h-4 w-4',
+                        activeTaskGroup.id === group.id
+                          ? 'opacity-100'
+                          : 'opacity-0'
                       )}
                     />
                   </CommandItem>

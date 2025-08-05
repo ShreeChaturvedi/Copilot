@@ -1,12 +1,12 @@
 /**
  * FileUploadZone - Professional drag-and-drop file upload component
- * 
+ *
  * Provides a beautiful, accessible file upload interface with support for
  * multiple file types, drag-and-drop, file validation, and preview generation.
- * 
+ *
  * Features:
  * - Drag-and-drop file upload
- * - File type validation  
+ * - File type validation
  * - File size limits
  * - Preview generation for images
  * - Progress indicators
@@ -14,17 +14,17 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { 
-  Upload, 
-  File, 
-  Image, 
-  FileText, 
-  Music, 
-  Video, 
-  X, 
+import { useDropzone, FileRejection } from 'react-dropzone';
+import {
+  Upload,
+  File,
+  Image,
+  FileText,
+  Music,
+  Video,
+  X,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
@@ -33,45 +33,50 @@ import { cn } from '@/lib/utils';
 /**
  * Supported file types and their configurations
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const FILE_TYPES = {
   IMAGE: {
-    accept: {'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']},
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] },
     maxSize: 5 * 1024 * 1024, // 5MB
     icon: Image,
-    color: 'text-blue-500'
+    color: 'text-blue-500',
   },
   DOCUMENT: {
     accept: {
       'application/pdf': ['.pdf'],
       'text/*': ['.txt', '.md'],
       'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        ['.docx'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
     icon: FileText,
-    color: 'text-green-500'
+    color: 'text-green-500',
   },
   AUDIO: {
-    accept: {'audio/*': ['.mp3', '.wav', '.m4a', '.ogg']},
+    accept: { 'audio/*': ['.mp3', '.wav', '.m4a', '.ogg'] },
     maxSize: 25 * 1024 * 1024, // 25MB
     icon: Music,
-    color: 'text-purple-500'
+    color: 'text-purple-500',
   },
   VIDEO: {
-    accept: {'video/*': ['.mp4', '.mov', '.avi', '.mkv']},
+    accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv'] },
     maxSize: 100 * 1024 * 1024, // 100MB
     icon: Video,
-    color: 'text-red-500'
-  }
+    color: 'text-red-500',
+  },
 } as const;
 
 /**
  * Combined accept object for all file types
  */
-const ALL_ACCEPTED_FILES = Object.values(FILE_TYPES).reduce((acc, type) => ({
-  ...acc,
-  ...type.accept
-}), {});
+const ALL_ACCEPTED_FILES = Object.values(FILE_TYPES).reduce(
+  (acc, type) => ({
+    ...acc,
+    ...type.accept,
+  }),
+  {}
+);
 
 /**
  * File upload data structure
@@ -122,18 +127,18 @@ function getFileTypeInfo(file: File) {
   } else if (type.startsWith('video/')) {
     return FILE_TYPES.VIDEO;
   } else if (
-    type === 'application/pdf' || 
+    type === 'application/pdf' ||
     type.startsWith('text/') ||
     type.includes('document') ||
     ['.doc', '.docx', '.txt', '.md', '.pdf'].includes(`.${extension}`)
   ) {
     return FILE_TYPES.DOCUMENT;
   }
-  
+
   return {
     icon: File,
     color: 'text-gray-500',
-    maxSize: 10 * 1024 * 1024
+    maxSize: 10 * 1024 * 1024,
   };
 }
 
@@ -157,20 +162,28 @@ interface FilePreviewProps {
   compact?: boolean;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({ file, onRemove, compact = false }) => {
+const FilePreview: React.FC<FilePreviewProps> = ({
+  file,
+  onRemove,
+  compact = false,
+}) => {
   const typeInfo = getFileTypeInfo(file.file);
   const IconComponent = typeInfo.icon;
 
   return (
-    <div className={cn(
-      'flex items-center gap-3 p-3 rounded-lg border border-border bg-card',
-      compact ? 'p-2' : 'p-3'
-    )}>
+    <div
+      className={cn(
+        'flex items-center gap-3 p-3 rounded-lg border border-border bg-card',
+        compact ? 'p-2' : 'p-3'
+      )}
+    >
       {/* File Icon or Image Preview */}
-      <div className={cn(
-        'flex-shrink-0 flex items-center justify-center rounded-md bg-muted',
-        compact ? 'w-8 h-8' : 'w-10 h-10'
-      )}>
+      <div
+        className={cn(
+          'flex-shrink-0 flex items-center justify-center rounded-md bg-muted',
+          compact ? 'w-8 h-8' : 'w-10 h-10'
+        )}
+      >
         {file.preview && file.file.type.startsWith('image/') ? (
           <img
             src={file.preview}
@@ -178,29 +191,32 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onRemove, compact = fal
             className="w-full h-full object-cover rounded-md"
           />
         ) : (
-          <IconComponent className={cn(
-            typeInfo.color,
-            compact ? 'w-4 h-4' : 'w-5 h-5'
-          )} />
+          <IconComponent
+            className={cn(typeInfo.color, compact ? 'w-4 h-4' : 'w-5 h-5')}
+          />
         )}
       </div>
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
-        <div className={cn(
-          'font-medium truncate',
-          compact ? 'text-sm' : 'text-sm'
-        )}>
+        <div
+          className={cn(
+            'font-medium truncate',
+            compact ? 'text-sm' : 'text-sm'
+          )}
+        >
           {file.name}
         </div>
         <div className="flex items-center gap-2 mt-1">
-          <span className={cn(
-            'text-muted-foreground',
-            compact ? 'text-xs' : 'text-xs'
-          )}>
+          <span
+            className={cn(
+              'text-muted-foreground',
+              compact ? 'text-xs' : 'text-xs'
+            )}
+          >
             {formatFileSize(file.size)}
           </span>
-          
+
           {/* Status Badge */}
           {file.status === 'uploading' && (
             <Badge variant="outline" className="text-xs">
@@ -219,7 +235,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onRemove, compact = fal
         {file.status === 'uploading' && file.uploadProgress !== undefined && (
           <div className="mt-2">
             <div className="w-full bg-muted rounded-full h-1">
-              <div 
+              <div
                 className="bg-primary h-1 rounded-full transition-all duration-300"
                 style={{ width: `${file.uploadProgress}%` }}
               />
@@ -229,9 +245,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onRemove, compact = fal
 
         {/* Error Message */}
         {file.error && (
-          <div className="text-xs text-destructive mt-1">
-            {file.error}
-          </div>
+          <div className="text-xs text-destructive mt-1">{file.error}</div>
         )}
       </div>
 
@@ -262,61 +276,65 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   maxFiles = 5,
   disabled = false,
   className,
-  compact = false
+  compact = false,
 }) => {
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   // Handle file drop and validation
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
-    // Clear previous errors
-    setUploadErrors([]);
-    const errors: string[] = [];
+  const onDrop = useCallback(
+    (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
+      // Clear previous errors
+      setUploadErrors([]);
+      const errors: string[] = [];
 
-    // Check file count limit
-    if (files.length + acceptedFiles.length > maxFiles) {
-      errors.push(`Maximum ${maxFiles} files allowed`);
-    }
-
-    // Validate each file
-    acceptedFiles.forEach((file) => {
-      const typeInfo = getFileTypeInfo(file);
-      if (file.size > typeInfo.maxSize) {
-        errors.push(`Maximum upload file size is 10MB`);
+      // Check file count limit
+      if (files.length + acceptedFiles.length > maxFiles) {
+        errors.push(`Maximum ${maxFiles} files allowed`);
       }
-    });
 
-    // Handle rejected files
-    rejectedFiles.forEach(({ file, errors: fileErrors }) => {
-      fileErrors.forEach((error: any) => {
-        if (error.code === 'file-too-large') {
-          errors.push(`${file.name} is too large`);
-        } else if (error.code === 'file-invalid-type') {
-          errors.push(`${file.name} is not a supported file type`);
-        } else {
-          errors.push(`Error with ${file.name}: ${error.message}`);
+      // Validate each file
+      acceptedFiles.forEach((file) => {
+        const typeInfo = getFileTypeInfo(file);
+        if (file.size > typeInfo.maxSize) {
+          errors.push(`Maximum upload file size is 10MB`);
         }
       });
+
+      // Handle rejected files
+      rejectedFiles.forEach(({ file, errors: fileErrors }) => {
+        fileErrors.forEach((error: { code: string; message: string }) => {
+          if (error.code === 'file-too-large') {
+            errors.push(`${file.name} is too large`);
+          } else if (error.code === 'file-invalid-type') {
+            errors.push(`${file.name} is not a supported file type`);
+          } else {
+            errors.push(`Error with ${file.name}: ${error.message}`);
+          }
+        });
+      });
+
+      if (errors.length > 0) {
+        setUploadErrors(errors);
+        return;
+      }
+
+      // Add valid files
+      if (acceptedFiles.length > 0) {
+        onFilesAdded(acceptedFiles);
+      }
+    },
+    [files.length, maxFiles, onFilesAdded]
+  );
+
+  const { getRootProps, getInputProps, isDragActive, isDragReject } =
+    useDropzone({
+      onDrop,
+      accept: ALL_ACCEPTED_FILES,
+      maxFiles: maxFiles - files.length,
+      disabled,
+      noClick: false,
+      noKeyboard: false,
     });
-
-    if (errors.length > 0) {
-      setUploadErrors(errors);
-      return;
-    }
-
-    // Add valid files
-    if (acceptedFiles.length > 0) {
-      onFilesAdded(acceptedFiles);
-    }
-  }, [files.length, maxFiles, onFilesAdded]);
-
-  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-    onDrop,
-    accept: ALL_ACCEPTED_FILES,
-    maxFiles: maxFiles - files.length,
-    disabled,
-    noClick: false,
-    noKeyboard: false
-  });
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -332,33 +350,39 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           isDragReject && 'border-destructive bg-destructive/5',
           disabled && 'opacity-50 cursor-not-allowed',
           files.length >= maxFiles && 'opacity-50 cursor-not-allowed',
-          files.length === 0 ? 'border-muted-foreground/25' : 'border-muted-foreground/10'
+          files.length === 0
+            ? 'border-muted-foreground/25'
+            : 'border-muted-foreground/10'
         )}
       >
         <input {...getInputProps()} />
-        
-        <Upload className={cn(
-          'mx-auto text-muted-foreground mb-2',
-          compact ? 'w-6 h-6' : 'w-8 h-8'
-        )} />
-        
+
+        <Upload
+          className={cn(
+            'mx-auto text-muted-foreground mb-2',
+            compact ? 'w-6 h-6' : 'w-8 h-8'
+          )}
+        />
+
         <div className="space-y-1">
-          <p className={cn(
-            'text-muted-foreground',
-            compact ? 'text-sm' : 'text-sm'
-          )}>
-            {isDragActive 
+          <p
+            className={cn(
+              'text-muted-foreground',
+              compact ? 'text-sm' : 'text-sm'
+            )}
+          >
+            {isDragActive
               ? isDragReject
                 ? 'Some files are not supported'
                 : 'Drop files here...'
               : files.length >= maxFiles
                 ? `Maximum ${maxFiles} files reached`
-                : 'Click to upload or drag and drop'
-            }
+                : 'Click to upload or drag and drop'}
           </p>
           {!compact && (
             <p className="text-xs text-muted-foreground">
-              Images, documents, audio, video • Up to {formatFileSize(FILE_TYPES.VIDEO.maxSize)} each
+              Images, documents, audio, video • Up to{' '}
+              {formatFileSize(FILE_TYPES.VIDEO.maxSize)} each
             </p>
           )}
         </div>
@@ -368,7 +392,10 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       {uploadErrors.length > 0 && (
         <div className="space-y-1">
           {uploadErrors.map((error, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+            <div
+              key={index}
+              className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20"
+            >
               <AlertCircle className="h-4 w-4 text-destructive" />
               <span className="text-sm text-destructive">{error}</span>
             </div>

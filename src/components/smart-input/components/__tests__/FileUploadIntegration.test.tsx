@@ -1,64 +1,86 @@
 /**
  * File Upload Integration Test
- * 
+ *
  * Tests the integration between FileUploadButton, CompactFilePreview, and EnhancedTaskInput
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { EnhancedTaskInput } from '../../EnhancedTaskInput';
 
+interface MockDialogProps {
+  children: React.ReactNode;
+  open?: boolean;
+}
+
+interface MockDialogChildProps {
+  children: React.ReactNode;
+}
+
 // Mock the dialog components
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (
+  Dialog: ({ children, open }: MockDialogProps) => (
     <div data-testid="dialog" data-open={open}>
       {children}
     </div>
   ),
-  DialogContent: ({ children }: any) => (
+  DialogContent: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-content">{children}</div>
   ),
-  DialogHeader: ({ children }: any) => (
+  DialogHeader: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-header">{children}</div>
   ),
-  DialogTitle: ({ children }: any) => (
+  DialogTitle: ({ children }: MockDialogChildProps) => (
     <h2 data-testid="dialog-title">{children}</h2>
   ),
-  DialogTrigger: ({ children }: any) => (
+  DialogTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-trigger">{children}</div>
   ),
 }));
 
 // Mock the tooltip components
 vi.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children }: any) => (
+  Tooltip: ({ children }: MockDialogChildProps) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="tooltip-trigger">{children}</div>
   ),
-  TooltipContent: ({ children }: any) => (
+  TooltipContent: ({ children }: MockDialogChildProps) => (
     <div data-testid="tooltip-content">{children}</div>
   ),
 }));
 
 // Mock the FileUploadZone component
 vi.mock('../FileUploadZone', () => ({
-  FileUploadZone: ({ files, onFilesAdded, onFileRemove }: any) => (
+  FileUploadZone: ({
+    files,
+    onFilesAdded,
+    onFileRemove,
+  }: {
+    files: UploadedFile[];
+    onFilesAdded: (files: UploadedFile[]) => void;
+    onFileRemove: (fileId: string) => void;
+  }) => (
     <div data-testid="file-upload-zone">
       <div>Files: {files.length}</div>
       <button
         onClick={() => {
-          const mockFile = new File(['test content'], 'test.txt', { type: 'text/plain' });
+          const mockFile = new File(['test content'], 'test.txt', {
+            type: 'text/plain',
+          });
           onFilesAdded([mockFile]);
         }}
         data-testid="add-file-button"
       >
         Add File
       </button>
-      {files.map((file: any) => (
+      {files.map((file: UploadedFile) => (
         <div key={file.id} data-testid={`file-${file.id}`}>
           {file.name}
-          <button onClick={() => onFileRemove(file.id)} data-testid={`remove-${file.id}`}>
+          <button
+            onClick={() => onFileRemove(file.id)}
+            data-testid={`remove-${file.id}`}
+          >
             Remove
           </button>
         </div>
@@ -111,10 +133,7 @@ describe('File Upload Integration', () => {
 
   it('can disable file upload functionality', () => {
     render(
-      <EnhancedTaskInput
-        onAddTask={mockOnAddTask}
-        enableFileUpload={false}
-      />
+      <EnhancedTaskInput onAddTask={mockOnAddTask} enableFileUpload={false} />
     );
 
     // File upload button should not be present when disabled

@@ -32,7 +32,13 @@ vi.mock('uuid', () => ({
   v4: () => 'test-uuid-123',
 }));
 
-const mockTaskStorage = taskStorage as any;
+const mockTaskStorage = taskStorage as typeof taskStorage & {
+  addTask: ReturnType<typeof vi.fn>;
+  getTasks: ReturnType<typeof vi.fn>;
+  saveTasks: ReturnType<typeof vi.fn>;
+  updateTask: ReturnType<typeof vi.fn>;
+  deleteTask: ReturnType<typeof vi.fn>;
+};
 
 // Test wrapper with QueryClient
 const createWrapper = () => {
@@ -95,25 +101,25 @@ describe('useTasks Hook', () => {
 
     it('should filter out completed tasks when showCompleted is false', async () => {
       const wrapper = createWrapper();
-      const { result } = renderHook(
-        () => useTasks({ showCompleted: false }),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useTasks({ showCompleted: false }), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      const incompleteTasks = result.current.data?.filter(task => !task.completed);
+      const incompleteTasks = result.current.data?.filter(
+        (task) => !task.completed
+      );
       expect(incompleteTasks).toHaveLength(2);
     });
 
     it('should filter tasks by search term', async () => {
       const wrapper = createWrapper();
-      const { result } = renderHook(
-        () => useTasks({ search: 'Task 1' }),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useTasks({ search: 'Task 1' }), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -125,16 +131,17 @@ describe('useTasks Hook', () => {
 
     it('should filter scheduled tasks only', async () => {
       const wrapper = createWrapper();
-      const { result } = renderHook(
-        () => useTasks({ scheduledOnly: true }),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useTasks({ scheduledOnly: true }), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      const scheduledTasks = result.current.data?.filter(task => task.scheduledDate);
+      const scheduledTasks = result.current.data?.filter(
+        (task) => task.scheduledDate
+      );
       expect(scheduledTasks).toHaveLength(1);
     });
   });
@@ -142,7 +149,7 @@ describe('useTasks Hook', () => {
   describe('useCreateTask', () => {
     it('should create a new task successfully', async () => {
       mockTaskStorage.addTask.mockResolvedValue(true);
-      
+
       const wrapper = createWrapper();
       const { result } = renderHook(() => useCreateTask(), { wrapper });
 
@@ -213,7 +220,9 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', { title: 'Updated Task' });
+      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
+        title: 'Updated Task',
+      });
     });
   });
 
@@ -255,7 +264,9 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', { completed: true });
+      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
+        completed: true,
+      });
     });
   });
 
@@ -279,7 +290,9 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', { scheduledDate });
+      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
+        scheduledDate,
+      });
     });
   });
 });
@@ -317,11 +330,12 @@ describe('Task Filtering Logic', () => {
   it('should filter by multiple criteria', async () => {
     const wrapper = createWrapper();
     const { result } = renderHook(
-      () => useTasks({ 
-        showCompleted: false, 
-        search: 'meeting',
-        scheduledOnly: false 
-      }),
+      () =>
+        useTasks({
+          showCompleted: false,
+          search: 'meeting',
+          scheduledOnly: false,
+        }),
       { wrapper }
     );
 
@@ -332,10 +346,12 @@ describe('Task Filtering Logic', () => {
     // Should find both "Important Meeting" and "Meeting preparation"
     // but exclude completed tasks
     expect(result.current.data).toHaveLength(2);
-    expect(result.current.data?.every(task => !task.completed)).toBe(true);
-    expect(result.current.data?.every(task => 
-      task.title.toLowerCase().includes('meeting')
-    )).toBe(true);
+    expect(result.current.data?.every((task) => !task.completed)).toBe(true);
+    expect(
+      result.current.data?.every((task) =>
+        task.title.toLowerCase().includes('meeting')
+      )
+    ).toBe(true);
   });
 
   it('should sort tasks correctly', async () => {
@@ -347,14 +363,16 @@ describe('Task Filtering Logic', () => {
     });
 
     const tasks = result.current.data || [];
-    
+
     // Completed tasks should be at the end
-    const completedIndex = tasks.findIndex(task => task.completed);
-    const incompleteAfterCompleted = tasks.slice(completedIndex + 1).some(task => !task.completed);
+    const completedIndex = tasks.findIndex((task) => task.completed);
+    const incompleteAfterCompleted = tasks
+      .slice(completedIndex + 1)
+      .some((task) => !task.completed);
     expect(incompleteAfterCompleted).toBe(false);
 
     // Among incomplete tasks, newer should come first
-    const incompleteTasks = tasks.filter(task => !task.completed);
+    const incompleteTasks = tasks.filter((task) => !task.completed);
     for (let i = 0; i < incompleteTasks.length - 1; i++) {
       expect(incompleteTasks[i].createdAt.getTime()).toBeGreaterThanOrEqual(
         incompleteTasks[i + 1].createdAt.getTime()

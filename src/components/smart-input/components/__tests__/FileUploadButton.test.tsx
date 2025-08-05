@@ -3,50 +3,73 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FileUploadButton } from '../FileUploadButton';
 import { UploadedFile } from '../FileUploadZone';
 
+interface MockDialogProps {
+  children: React.ReactNode;
+  open?: boolean;
+}
+
+interface MockDialogChildProps {
+  children: React.ReactNode;
+}
+
+interface MockFileUploadZoneProps {
+  files: UploadedFile[];
+  onFilesAdded: (files: UploadedFile[]) => void;
+  onFileRemove: (fileId: string) => void;
+  disabled?: boolean;
+}
+
 // Mock the dialog components
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open, onOpenChange }: any) => (
+  Dialog: ({ children, open }: MockDialogProps) => (
     <div data-testid="dialog" data-open={open}>
       {children}
     </div>
   ),
-  DialogContent: ({ children }: any) => (
+  DialogContent: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-content">{children}</div>
   ),
-  DialogHeader: ({ children }: any) => (
+  DialogHeader: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-header">{children}</div>
   ),
-  DialogTitle: ({ children }: any) => (
+  DialogTitle: ({ children }: MockDialogChildProps) => (
     <h2 data-testid="dialog-title">{children}</h2>
   ),
-  DialogTrigger: ({ children, asChild }: any) => (
+  DialogTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-trigger">{children}</div>
   ),
 }));
 
 // Mock the tooltip components
 vi.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children, asChild }: any) => (
+  Tooltip: ({ children }: MockDialogChildProps) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="tooltip-trigger">{children}</div>
   ),
-  TooltipContent: ({ children }: any) => (
+  TooltipContent: ({ children }: MockDialogChildProps) => (
     <div data-testid="tooltip-content">{children}</div>
   ),
 }));
 
 // Mock the FileUploadZone component
 vi.mock('../FileUploadZone', () => ({
-  FileUploadZone: ({ files, onFilesAdded, onFileRemove, disabled }: any) => (
+  FileUploadZone: ({
+    files,
+    onFilesAdded,
+    onFileRemove,
+    disabled,
+  }: MockFileUploadZoneProps) => (
     <div data-testid="file-upload-zone">
       <div>Files: {files.length}</div>
       <button
-        onClick={() => onFilesAdded([new File(['test'], 'test.txt', { type: 'text/plain' })])}
+        onClick={() =>
+          onFilesAdded([new File(['test'], 'test.txt', { type: 'text/plain' })])
+        }
         disabled={disabled}
       >
         Add File

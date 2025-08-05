@@ -1,6 +1,6 @@
 /**
  * VoiceInputButton Tests
- * 
+ *
  * Tests for the native Web Speech API voice input button component
  */
 
@@ -30,11 +30,11 @@ const mockGetUserMedia = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  
+
   // Mock Web Speech API
   global.window.SpeechRecognition = vi.fn(() => mockSpeechRecognition);
   global.window.webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  
+
   // Mock navigator.mediaDevices.getUserMedia
   Object.defineProperty(global.navigator, 'mediaDevices', {
     value: {
@@ -42,7 +42,7 @@ beforeEach(() => {
     },
     writable: true,
   });
-  
+
   mockGetUserMedia.mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
   });
@@ -51,7 +51,7 @@ beforeEach(() => {
 describe('VoiceInputButton', () => {
   it('renders voice input button when Web Speech API is supported', () => {
     render(<VoiceInputButton />);
-    
+
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();
     expect(button).not.toBeDisabled();
@@ -59,11 +59,13 @@ describe('VoiceInputButton', () => {
 
   it('renders disabled button when Web Speech API is not supported', () => {
     // Remove Web Speech API support
-    delete (global.window as any).SpeechRecognition;
-    delete (global.window as any).webkitSpeechRecognition;
-    
+    delete (global.window as Window & { SpeechRecognition?: unknown })
+      .SpeechRecognition;
+    delete (global.window as Window & { webkitSpeechRecognition?: unknown })
+      .webkitSpeechRecognition;
+
     render(<VoiceInputButton />);
-    
+
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();
     expect(button).toBeDisabled();
@@ -71,39 +73,39 @@ describe('VoiceInputButton', () => {
 
   it('shows microphone icon when not listening', () => {
     render(<VoiceInputButton />);
-    
+
     const micIcon = screen.getByRole('button').querySelector('svg');
     expect(micIcon).toBeInTheDocument();
   });
 
   it('calls onTranscriptChange when provided', () => {
     const mockOnTranscriptChange = vi.fn();
-    
+
     render(<VoiceInputButton onTranscriptChange={mockOnTranscriptChange} />);
-    
+
     // The callback should be set up (we can't easily test the actual speech recognition without complex mocking)
     expect(mockOnTranscriptChange).toBeDefined();
   });
 
   it('calls onInterimTranscript when provided', () => {
     const mockOnInterimTranscript = vi.fn();
-    
+
     render(<VoiceInputButton onInterimTranscript={mockOnInterimTranscript} />);
-    
+
     // The callback should be set up
     expect(mockOnInterimTranscript).toBeDefined();
   });
 
   it('is disabled when disabled prop is true', () => {
     render(<VoiceInputButton disabled={true} />);
-    
+
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
   });
 
   it('applies custom className', () => {
     render(<VoiceInputButton className="custom-class" />);
-    
+
     const button = screen.getByRole('button');
     expect(button).toHaveClass('custom-class');
   });
@@ -124,10 +126,10 @@ describe('VoiceInputButton', () => {
 
   it('has tooltip wrapper structure', () => {
     render(<VoiceInputButton />);
-    
+
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();
-    
+
     // The button should be wrapped in a tooltip trigger
     expect(button.closest('[data-slot="tooltip-trigger"]')).toBeTruthy();
   });

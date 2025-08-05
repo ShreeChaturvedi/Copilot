@@ -3,7 +3,7 @@
  * Manages parsed tags state and provides clean title extraction
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ParseResult, ParsedTag } from '@/types';
 import { SmartParser } from '../parsers/SmartParser';
 
@@ -56,11 +56,7 @@ export function useTextParser(
   text: string,
   options: UseTextParserOptions = {}
 ): UseTextParserResult {
-  const {
-    debounceMs = 100,
-    minLength = 2,
-    enabled = true,
-  } = options;
+  const { debounceMs = 100, minLength = 2, enabled = true } = options;
 
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,40 +65,38 @@ export function useTextParser(
   // Memoize parser instance
   const parser = useMemo(() => getParser(), []);
 
-  // Debounced parsing function
+  // Debounced parsing function - using useRef to maintain timeout across renders
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
   const debouncedParse = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      
-      return (textToParse: string) => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-        
-        timeoutId = setTimeout(async () => {
-          if (!enabled || textToParse.length < minLength) {
-            setParseResult(null);
-            setIsLoading(false);
-            setError(null);
-            return;
-          }
+    (textToParse: string) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
 
-          setIsLoading(true);
+      timeoutRef.current = setTimeout(async () => {
+        if (!enabled || textToParse.length < minLength) {
+          setParseResult(null);
+          setIsLoading(false);
           setError(null);
+          return;
+        }
 
-          try {
-            const result = await parser.parse(textToParse);
-            setParseResult(result);
-          } catch (err) {
-            console.error('Text parsing error:', err);
-            setError(err instanceof Error ? err.message : 'Parsing failed');
-            setParseResult(null);
-          } finally {
-            setIsLoading(false);
-          }
-        }, debounceMs);
-      };
-    })(),
+        setIsLoading(true);
+        setError(null);
+
+        try {
+          const result = await parser.parse(textToParse);
+          setParseResult(result);
+        } catch (err) {
+          console.error('Text parsing error:', err);
+          setError(err instanceof Error ? err.message : 'Parsing failed');
+          setParseResult(null);
+        } finally {
+          setIsLoading(false);
+        }
+      }, debounceMs);
+    },
     [parser, enabled, minLength, debounceMs]
   );
 
@@ -115,12 +109,16 @@ export function useTextParser(
   const triggerParse = useCallback(() => {
     if (enabled && text.length >= minLength) {
       setIsLoading(true);
-      parser.parse(text).then(setParseResult).catch(err => {
-        setError(err instanceof Error ? err.message : 'Parsing failed');
-        setParseResult(null);
-      }).finally(() => {
-        setIsLoading(false);
-      });
+      parser
+        .parse(text)
+        .then(setParseResult)
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'Parsing failed');
+          setParseResult(null);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, [parser, text, enabled, minLength]);
 
@@ -154,7 +152,7 @@ export function useTextParser(
  * Hook for testing parsing without side effects
  */
 export function useTextParserDebug(text: string) {
-  const [debugResult, setDebugResult] = useState<any>(null);
+  const [debugResult, setDebugResult] = useState<ParseResult | null>(null);
   const parser = useMemo(() => getParser(), []);
 
   const testParse = useCallback(async () => {

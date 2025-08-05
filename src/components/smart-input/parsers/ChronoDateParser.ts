@@ -6,6 +6,16 @@ import * as chrono from 'chrono-node';
 import { Parser, ParsedTag } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
+interface ChronoParseComponent {
+  isCertain(component: string): boolean;
+  date(): Date;
+}
+
+interface ChronoParseResult {
+  start: ChronoParseComponent;
+  end?: ChronoParseComponent;
+}
+
 export class ChronoDateParser implements Parser {
   readonly id = 'chrono-date-parser';
   readonly name = 'Date/Time Parser';
@@ -29,9 +39,10 @@ export class ChronoDateParser implements Parser {
     for (const result of results) {
       const startDate = result.start.date();
       const endDate = result.end?.date();
-      
+
       // Determine if this is a date-only or date+time expression
-      const hasTime = result.start.isCertain('hour') || result.start.isCertain('minute');
+      const hasTime =
+        result.start.isCertain('hour') || result.start.isCertain('minute');
       const isDateRange = !!result.end;
 
       // Create date tag
@@ -40,7 +51,7 @@ export class ChronoDateParser implements Parser {
           id: uuidv4(),
           type: hasTime ? 'time' : 'date',
           value: startDate,
-          displayText: this.formatDisplayText(startDate, hasTime, endDate),
+          displayText: this.formatDisplayText(startDate, hasTime),
           iconName: hasTime ? 'Clock' : 'Calendar',
           startIndex: result.index,
           endIndex: result.index + result.text.length,
@@ -53,7 +64,11 @@ export class ChronoDateParser implements Parser {
         tags.push(dateTag);
 
         // If it's a date range, create a separate end date tag
-        if (isDateRange && endDate && endDate.getTime() !== startDate.getTime()) {
+        if (
+          isDateRange &&
+          endDate &&
+          endDate.getTime() !== startDate.getTime()
+        ) {
           const endTag: ParsedTag = {
             id: uuidv4(),
             type: hasTime ? 'time' : 'date',
@@ -79,18 +94,22 @@ export class ChronoDateParser implements Parser {
   /**
    * Calculate confidence score based on Chrono parsing result
    */
-  private calculateConfidence(result: any): number {
+  private calculateConfidence(result: ChronoParseResult): number {
     let confidence = 0.7; // Base confidence
 
     // Increase confidence if more components are certain
     const certainComponents = ['year', 'month', 'day', 'hour', 'minute'].filter(
-      component => result.start.isCertain(component)
+      (component) => result.start.isCertain(component)
     );
 
     confidence += certainComponents.length * 0.05;
 
     // Increase confidence for explicit dates
-    if (result.start.isCertain('year') && result.start.isCertain('month') && result.start.isCertain('day')) {
+    if (
+      result.start.isCertain('year') &&
+      result.start.isCertain('month') &&
+      result.start.isCertain('day')
+    ) {
       confidence += 0.1;
     }
 
@@ -110,33 +129,39 @@ export class ChronoDateParser implements Parser {
   /**
    * Format display text for the tag
    */
-  private formatDisplayText(date: Date, hasTime: boolean, endDate?: Date): string {
+  private formatDisplayText(date: Date, hasTime: boolean): string {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dateOnly = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
 
     // Check for relative dates
     if (dateOnly.getTime() === today.getTime()) {
       return hasTime ? `Today at ${this.formatTime(date)}` : 'Today';
     }
-    
+
     if (dateOnly.getTime() === tomorrow.getTime()) {
       return hasTime ? `Tomorrow at ${this.formatTime(date)}` : 'Tomorrow';
     }
 
     // Check if it's this week
-    const daysDiff = Math.floor((dateOnly.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    const daysDiff = Math.floor(
+      (dateOnly.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)
+    );
     if (daysDiff >= 0 && daysDiff <= 7) {
       const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
       return hasTime ? `${dayName} at ${this.formatTime(date)}` : dayName;
     }
 
     // Format as date
-    const dateStr = date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    const dateStr = date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
     });
 
     return hasTime ? `${dateStr} at ${this.formatTime(date)}` : dateStr;
@@ -149,7 +174,7 @@ export class ChronoDateParser implements Parser {
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   }
 

@@ -1,6 +1,6 @@
 /**
  * SmartTaskInput Voice Integration Tests
- * 
+ *
  * Tests for voice input integration in SmartTaskInput with enhanced layout
  */
 
@@ -30,11 +30,11 @@ const mockGetUserMedia = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  
+
   // Mock Web Speech API
   global.window.SpeechRecognition = vi.fn(() => mockSpeechRecognition);
   global.window.webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  
+
   // Mock navigator.mediaDevices.getUserMedia
   Object.defineProperty(global.navigator, 'mediaDevices', {
     value: {
@@ -42,7 +42,7 @@ beforeEach(() => {
     },
     writable: true,
   });
-  
+
   mockGetUserMedia.mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
   });
@@ -69,7 +69,9 @@ describe('SmartTaskInput Voice Integration', () => {
     expect(buttons.length).toBeGreaterThan(2); // Task group selector, voice input, submit button
 
     // Should have a microphone icon (voice input button)
-    const micIcon = buttons.find(button => button.querySelector('svg[class*="lucide-mic"]'));
+    const micIcon = buttons.find((button) =>
+      button.querySelector('svg[class*="lucide-mic"]')
+    );
     expect(micIcon).toBeTruthy();
   });
 
@@ -84,7 +86,9 @@ describe('SmartTaskInput Voice Integration', () => {
 
     // Should not have voice input button in regular layout
     const buttons = screen.getAllByRole('button');
-    const micIcon = buttons.find(button => button.querySelector('svg[class*="lucide-mic"]'));
+    const micIcon = buttons.find((button) =>
+      button.querySelector('svg[class*="lucide-mic"]')
+    );
     expect(micIcon).toBeFalsy();
   });
 
@@ -98,11 +102,13 @@ describe('SmartTaskInput Voice Integration', () => {
     );
 
     const buttons = screen.getAllByRole('button');
-    
+
     // Find voice input and submit buttons
-    const voiceButton = buttons.find(button => button.querySelector('svg[class*="lucide-mic"]'));
+    const voiceButton = buttons.find((button) =>
+      button.querySelector('svg[class*="lucide-mic"]')
+    );
     const submitButton = screen.getByRole('button', { name: /add task/i });
-    
+
     expect(voiceButton).toBeTruthy();
     expect(submitButton).toBeTruthy();
 
@@ -121,8 +127,10 @@ describe('SmartTaskInput Voice Integration', () => {
     );
 
     const buttons = screen.getAllByRole('button');
-    const voiceButton = buttons.find(button => button.querySelector('svg[class*="lucide-mic"]'));
-    
+    const voiceButton = buttons.find((button) =>
+      button.querySelector('svg[class*="lucide-mic"]')
+    );
+
     if (voiceButton) {
       expect(voiceButton).toBeDisabled();
     }
@@ -130,9 +138,11 @@ describe('SmartTaskInput Voice Integration', () => {
 
   it('shows disabled voice button when Web Speech API is not supported', () => {
     // Remove Web Speech API support
-    delete (global.window as any).SpeechRecognition;
-    delete (global.window as any).webkitSpeechRecognition;
-    
+    delete (global.window as Window & { SpeechRecognition?: unknown })
+      .SpeechRecognition;
+    delete (global.window as Window & { webkitSpeechRecognition?: unknown })
+      .webkitSpeechRecognition;
+
     render(
       <SmartTaskInput
         onAddTask={mockOnAddTask}
@@ -142,11 +152,12 @@ describe('SmartTaskInput Voice Integration', () => {
     );
 
     const buttons = screen.getAllByRole('button');
-    const voiceButton = buttons.find(button => 
-      button.querySelector('svg[class*="lucide-mic"]') || 
-      button.querySelector('svg[class*="lucide-mic-off"]')
+    const voiceButton = buttons.find(
+      (button) =>
+        button.querySelector('svg[class*="lucide-mic"]') ||
+        button.querySelector('svg[class*="lucide-mic-off"]')
     );
-    
+
     if (voiceButton) {
       expect(voiceButton).toBeDisabled();
     }

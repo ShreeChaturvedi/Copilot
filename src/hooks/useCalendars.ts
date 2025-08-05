@@ -4,7 +4,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Calendar } from '../types';
-import { calendarApi, type UpdateCalendarData, DEFAULT_CALENDAR_COLORS } from '../services/api';
+import {
+  calendarApi,
+  type UpdateCalendarData,
+  DEFAULT_CALENDAR_COLORS,
+} from '../services/api';
 
 /**
  * Query keys for calendar-related queries
@@ -12,7 +16,8 @@ import { calendarApi, type UpdateCalendarData, DEFAULT_CALENDAR_COLORS } from '.
 export const calendarQueryKeys = {
   all: ['calendars'] as const,
   lists: () => [...calendarQueryKeys.all, 'list'] as const,
-  list: (filters: CalendarFilters) => [...calendarQueryKeys.lists(), filters] as const,
+  list: (filters: CalendarFilters) =>
+    [...calendarQueryKeys.lists(), filters] as const,
   details: () => [...calendarQueryKeys.all, 'detail'] as const,
   detail: (name: string) => [...calendarQueryKeys.details(), name] as const,
   visible: () => [...calendarQueryKeys.all, 'visible'] as const,
@@ -31,20 +36,24 @@ export { DEFAULT_CALENDAR_COLORS };
 /**
  * Filter calendars based on criteria
  */
-const filterCalendars = (calendars: Calendar[], filters: CalendarFilters): Calendar[] => {
+const filterCalendars = (
+  calendars: Calendar[],
+  filters: CalendarFilters
+): Calendar[] => {
   let filtered = [...calendars];
 
   // Filter by visibility
   if (filters.visibleOnly) {
-    filtered = filtered.filter(calendar => calendar.visible);
+    filtered = filtered.filter((calendar) => calendar.visible);
   }
 
   // Filter by search term
   if (filters.search && filters.search.trim()) {
     const searchTerm = filters.search.toLowerCase().trim();
-    filtered = filtered.filter(calendar =>
-      calendar.name.toLowerCase().includes(searchTerm) ||
-      calendar.description?.toLowerCase().includes(searchTerm)
+    filtered = filtered.filter(
+      (calendar) =>
+        calendar.name.toLowerCase().includes(searchTerm) ||
+        calendar.description?.toLowerCase().includes(searchTerm)
     );
   }
 
@@ -53,7 +62,7 @@ const filterCalendars = (calendars: Calendar[], filters: CalendarFilters): Calen
     // Default calendar goes first
     if (a.isDefault && !b.isDefault) return -1;
     if (!a.isDefault && b.isDefault) return 1;
-    
+
     // Then sort alphabetically by name
     return a.name.localeCompare(b.name);
   });
@@ -64,9 +73,9 @@ const filterCalendars = (calendars: Calendar[], filters: CalendarFilters): Calen
 /**
  * Comprehensive hook for calendar management - matches LeftPane expectations
  */
-export const useCalendars = (_filters: CalendarFilters = {}) => {
+export const useCalendars = () => {
   const queryClient = useQueryClient();
-  
+
   // Main query for calendars data
   const calendarsQuery = useQuery({
     queryKey: calendarQueryKeys.all,
@@ -101,21 +110,28 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
 
   // Update calendar mutation
   const updateCalendar = useMutation({
-    mutationFn: ({ name, updates }: { name: string; updates: Partial<Calendar> }) =>
-      calendarApi.updateCalendar(name, updates),
+    mutationFn: ({
+      name,
+      updates,
+    }: {
+      name: string;
+      updates: Partial<Calendar>;
+    }) => calendarApi.updateCalendar(name, updates),
     onMutate: async ({ name, updates }) => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map(calendar => {
+          return oldData.map((calendar) => {
             if (calendar.name === name) {
               // If setting as default, remove default from others
               if (updates.isDefault) {
-                oldData.forEach(cal => {
+                oldData.forEach((cal) => {
                   if (cal.name !== name) cal.isDefault = false;
                 });
               }
@@ -130,7 +146,10 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
     },
     onError: (error, _variables, context) => {
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to update calendar:', error);
     },
@@ -144,13 +163,15 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
     mutationFn: calendarApi.deleteCalendar,
     onMutate: async (calendarName) => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.filter(calendar => calendar.name !== calendarName);
+          return oldData.filter((calendar) => calendar.name !== calendarName);
         }
       );
 
@@ -158,7 +179,10 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
     },
     onError: (error, _calendarName, context) => {
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to delete calendar:', error);
     },
@@ -173,14 +197,16 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
     mutationFn: calendarApi.toggleCalendarVisibility,
     onMutate: async (calendarName) => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map(calendar =>
-            calendar.name === calendarName 
+          return oldData.map((calendar) =>
+            calendar.name === calendarName
               ? { ...calendar, visible: !calendar.visible }
               : calendar
           );
@@ -191,7 +217,10 @@ export const useCalendars = (_filters: CalendarFilters = {}) => {
     },
     onError: (error, _calendarName, context) => {
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to toggle calendar visibility:', error);
     },
@@ -248,7 +277,7 @@ export const useVisibleCalendars = () => {
     queryKey: calendarQueryKeys.visible(),
     queryFn: async () => {
       const calendars = await calendarApi.fetchCalendars();
-      return calendars.filter(cal => cal.visible);
+      return calendars.filter((cal) => cal.visible);
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
@@ -263,7 +292,7 @@ export const useCalendar = (name: string) => {
     queryKey: calendarQueryKeys.detail(name),
     queryFn: async () => {
       const calendars = await calendarApi.fetchCalendars();
-      const calendar = calendars.find(cal => cal.name === name);
+      const calendar = calendars.find((cal) => cal.name === name);
       if (!calendar) {
         throw new Error('Calendar not found');
       }
@@ -282,7 +311,7 @@ export const useDefaultCalendar = () => {
     queryKey: [...calendarQueryKeys.all, 'default'],
     queryFn: async () => {
       const calendars = await calendarApi.fetchCalendars();
-      const defaultCalendar = calendars.find(cal => cal.isDefault);
+      const defaultCalendar = calendars.find((cal) => cal.isDefault);
       if (!defaultCalendar) {
         // If no default is set, return the first calendar
         return calendars[0] || null;
@@ -304,7 +333,7 @@ export const useCreateCalendar = () => {
     onSuccess: (newCalendar) => {
       // Invalidate and refetch calendar queries
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
-      
+
       // Optimistically add the calendar to existing queries
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.lists() },
@@ -340,18 +369,20 @@ export const useUpdateCalendar = () => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
 
       // Snapshot the previous value
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       // Optimistically update the calendar
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map(calendar => {
+          return oldData.map((calendar) => {
             if (calendar.name === name) {
               // If setting as default, remove default from others
               if (data.isDefault) {
-                oldData.forEach(cal => {
+                oldData.forEach((cal) => {
                   if (cal.name !== name) cal.isDefault = false;
                 });
               }
@@ -367,7 +398,10 @@ export const useUpdateCalendar = () => {
     onError: (error, _variables, context) => {
       // Rollback on error
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to update calendar:', error);
     },
@@ -391,14 +425,16 @@ export const useDeleteCalendar = () => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
 
       // Snapshot the previous value
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       // Optimistically remove the calendar
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.filter(calendar => calendar.name !== calendarName);
+          return oldData.filter((calendar) => calendar.name !== calendarName);
         }
       );
 
@@ -407,7 +443,10 @@ export const useDeleteCalendar = () => {
     onError: (error, _calendarName, context) => {
       // Rollback on error
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to delete calendar:', error);
     },
@@ -433,15 +472,17 @@ export const useToggleCalendarVisibility = () => {
       await queryClient.cancelQueries({ queryKey: calendarQueryKeys.all });
 
       // Snapshot the previous value
-      const previousCalendars = queryClient.getQueryData<Calendar[]>(calendarQueryKeys.all);
+      const previousCalendars = queryClient.getQueryData<Calendar[]>(
+        calendarQueryKeys.all
+      );
 
       // Optimistically toggle visibility
       queryClient.setQueriesData(
         { queryKey: calendarQueryKeys.all },
         (oldData: Calendar[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map(calendar =>
-            calendar.name === calendarName 
+          return oldData.map((calendar) =>
+            calendar.name === calendarName
               ? { ...calendar, visible: !calendar.visible }
               : calendar
           );
@@ -453,7 +494,10 @@ export const useToggleCalendarVisibility = () => {
     onError: (error, _calendarName, context) => {
       // Rollback on error
       if (context?.previousCalendars) {
-        queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
+        queryClient.setQueryData(
+          calendarQueryKeys.all,
+          context.previousCalendars
+        );
       }
       console.error('Failed to toggle calendar visibility:', error);
     },

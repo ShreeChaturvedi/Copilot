@@ -1,10 +1,10 @@
 /**
  * VoiceInputButton - Native Web Speech API voice input component
- * 
+ *
  * Implements voice input functionality using the native Web Speech API
  * (webkitSpeechRecognition/SpeechRecognition) with browser compatibility
  * detection and graceful degradation.
- * 
+ *
  * Features:
  * - Native Web Speech API integration
  * - Browser compatibility detection
@@ -17,7 +17,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Mic, MicOff, Square } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // Extend the Window interface to include webkit speech recognition
@@ -26,7 +30,7 @@ declare global {
     webkitSpeechRecognition: typeof SpeechRecognition;
     SpeechRecognition: typeof SpeechRecognition;
   }
-  
+
   // Add missing Web Speech API types
   interface SpeechRecognitionErrorEvent extends Event {
     error: string;
@@ -77,7 +81,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   onInterimTranscript,
   onRecordingStateChange,
   disabled = false,
-  continuous: _continuous = false, // Default to false to avoid multiple permission requests
+  continuous = false, // Default to false to avoid multiple permission requests
   className,
   size = 'sm',
 }) => {
@@ -85,9 +89,9 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [isSupported, setIsSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  
+
   // Use refs to avoid stale closure issues with callbacks
   const onTranscriptChangeRef = useRef(onTranscriptChange);
   const onInterimTranscriptRef = useRef(onInterimTranscript);
@@ -97,7 +101,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   useEffect(() => {
     onTranscriptChangeRef.current = onTranscriptChange;
   }, [onTranscriptChange]);
-  
+
   useEffect(() => {
     onInterimTranscriptRef.current = onInterimTranscript;
   }, [onInterimTranscript]);
@@ -117,9 +121,9 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     if (!SpeechRecognitionConstructor) return null;
 
     const recognition = new SpeechRecognitionConstructor();
-    
+
     // Configure recognition settings for optimal task input
-    recognition.continuous = false; // Stop after silence for single task input
+    recognition.continuous = continuous; // Use provided continuous setting
     recognition.interimResults = true; // Show real-time feedback
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
@@ -171,16 +175,22 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       switch (event.error) {
         case 'not-allowed':
           setPermissionDenied(true);
-          setError('Microphone access denied. Please allow microphone access and try again.');
+          setError(
+            'Microphone access denied. Please allow microphone access and try again.'
+          );
           break;
         case 'no-speech':
           // Don't show error for no speech - this is normal
           break;
         case 'audio-capture':
-          setError('No microphone found. Please check your microphone connection.');
+          setError(
+            'No microphone found. Please check your microphone connection.'
+          );
           break;
         case 'network':
-          setError('Network error occurred. Please check your internet connection.');
+          setError(
+            'Network error occurred. Please check your internet connection.'
+          );
           break;
         case 'service-not-allowed':
           setError('Speech recognition service not allowed. Please try again.');
@@ -191,13 +201,13 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         default:
           setError(`Speech recognition error: ${event.error}`);
       }
-      
+
       setIsListening(false);
       onRecordingStateChangeRef.current?.(false);
     };
 
     return recognition;
-  }, []);
+  }, [continuous]);
 
   // Start listening
   const startListening = useCallback(() => {
@@ -249,7 +259,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const sizeClasses = {
     sm: 'h-8 w-8',
     default: 'h-10 w-10',
-    lg: 'h-12 w-12'
+    lg: 'h-12 w-12',
   };
 
   // If not supported, show disabled button with tooltip
@@ -261,7 +271,11 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             variant="ghost"
             size="sm"
             disabled
-            className={cn(sizeClasses[size], 'p-0 text-muted-foreground', className)}
+            className={cn(
+              sizeClasses[size],
+              'p-0 text-muted-foreground',
+              className
+            )}
           >
             <MicOff className="w-4 h-4" />
           </Button>
@@ -278,7 +292,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       <TooltipTrigger asChild>
         <Button
           type="button"
-          variant={isListening ? "default" : "ghost"}
+          variant={isListening ? 'default' : 'ghost'}
           size="sm"
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleListening}
@@ -288,7 +302,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             'p-0 transition-all duration-200',
             isListening && [
               'bg-red-500 hover:bg-red-600 text-white',
-              'animate-pulse shadow-lg shadow-red-500/25'
+              'animate-pulse shadow-lg shadow-red-500/25',
             ],
             permissionDenied && 'text-destructive',
             className
