@@ -31,6 +31,10 @@ export interface HighlightedTextareaFieldProps {
   minHeight?: string;
   /** Maximum height before scrolling */
   maxHeight?: string;
+  /** Textarea ID for accessibility */
+  id?: string;
+  /** Textarea name for form compatibility */
+  name?: string;
 }
 
 export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> = ({
@@ -48,6 +52,8 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
   showConfidence = false,
   minHeight = '120px',
   maxHeight = '300px',
+  id,
+  name,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -176,6 +182,8 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
       {/* Real textarea element - handles all interaction */}
       <textarea
         ref={textareaRef}
+        id={id}
+        name={name}
         value={value}
         onChange={handleChange}
         onKeyPress={handleKeyPress}

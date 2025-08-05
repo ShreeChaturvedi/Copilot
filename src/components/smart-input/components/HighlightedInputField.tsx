@@ -40,6 +40,10 @@ export interface HighlightedInputFieldProps {
   confidence?: number;
   /** Whether to show confidence indicators */
   showConfidence?: boolean;
+  /** Input ID for accessibility */
+  id?: string;
+  /** Input name for form compatibility */
+  name?: string;
 }
 
 /**
@@ -63,6 +67,8 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
   onFocus,
   confidence = 1,
   showConfidence = false,
+  id,
+  name,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -181,6 +187,8 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       <input
         ref={inputRef}
         type="text"
+        id={id}
+        name={name}
         value={value}
         onChange={handleChange}
         onKeyPress={handleKeyPress}

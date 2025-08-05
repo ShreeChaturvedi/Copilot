@@ -30,6 +30,10 @@ export interface InlineHighlightedInputProps {
   confidence?: number;
   /** Whether to show confidence indicators */
   showConfidence?: boolean;
+  /** Input ID for accessibility */
+  id?: string;
+  /** Input name for form compatibility */
+  name?: string;
 }
 
 
@@ -48,6 +52,8 @@ export const InlineHighlightedInput: React.FC<InlineHighlightedInputProps> = ({
   onFocus,
   confidence = 1,
   showConfidence = false,
+  id,
+  name,
 }) => {
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
@@ -311,6 +317,8 @@ export const InlineHighlightedInput: React.FC<InlineHighlightedInputProps> = ({
       <input
         ref={hiddenInputRef}
         type="text"
+        id={id}
+        name={name}
         value={value}
         onChange={() => {}} // Controlled by contentEditable
         className="sr-only"

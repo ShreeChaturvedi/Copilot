@@ -91,6 +91,8 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
         <div className="relative">
         {enableSmartParsing ? (
           <HighlightedTextareaField
+            id="enhanced-task-input-textarea"
+            name="enhanced-task-input-textarea"
             value={value}
             onChange={onChange}
             tags={tags}
@@ -107,6 +109,8 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
           />
         ) : (
           <textarea
+            id="enhanced-task-input-textarea-fallback"
+            name="enhanced-task-input-textarea-fallback"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyPress={onKeyPress}

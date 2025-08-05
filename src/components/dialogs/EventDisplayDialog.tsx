@@ -29,8 +29,8 @@ interface EventDisplayDialogProps {
 
 function EventDisplayDialogContent({
   event,
-  onEdit,
-  onClose,
+  onEdit: _onEdit,
+  onClose: _onClose,
 }: {
   event: CalendarEvent
   onEdit?: (event: CalendarEvent) => void

@@ -77,7 +77,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   onInterimTranscript,
   onRecordingStateChange,
   disabled = false,
-  continuous = false, // Default to false to avoid multiple permission requests
+  continuous: _continuous = false, // Default to false to avoid multiple permission requests
   className,
   size = 'sm',
 }) => {

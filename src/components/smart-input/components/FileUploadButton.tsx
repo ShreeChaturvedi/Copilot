@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -55,9 +55,8 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
     onFileRemove(fileId);
   }, [onFileRemove]);
 
-  // Check if we have files or are at max capacity
+  // Check if we have files
   const hasFiles = files.length > 0;
-  const isAtMaxCapacity = files.length >= maxFiles;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

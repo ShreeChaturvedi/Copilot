@@ -350,6 +350,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           >
             {enableSmartParsing ? (
               <HighlightedInputField
+                id="smart-task-input-highlighted"
+                name="smart-task-input-highlighted"
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
