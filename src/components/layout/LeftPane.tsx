@@ -6,8 +6,11 @@ import React from 'react';
 import { SmartTaskInput } from '@/components/smart-input/SmartTaskInput';
 import { TaskList } from '@/components/tasks/TaskList';
 import { CalendarList } from '@/components/calendar/CalendarList';
+import { TaskGroupList } from '@/components/tasks/TaskGroupList';
+import { EventOverview } from '@/components/calendar/EventOverview';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useCalendarManagement } from '@/hooks/useCalendarManagement';
+import { useUIStore } from '@/stores/uiStore';
 import { BaseSidebarPane } from './BaseSidebarPane';
 
 export interface LeftPaneProps {
@@ -15,6 +18,8 @@ export interface LeftPaneProps {
 }
 
 export const LeftPane: React.FC<LeftPaneProps> = ({ className }) => {
+  const { currentView } = useUIStore();
+  
   // Task management with task operations enabled
   const {
     tasks,
@@ -50,8 +55,8 @@ export const LeftPane: React.FC<LeftPaneProps> = ({ className }) => {
 
   const isLoading = tasksLoading || calendarsLoading;
 
-  // Additional header content with Smart Task Input
-  const additionalHeaderContent = (
+  // Additional header content - only show SmartTaskInput in calendar view
+  const additionalHeaderContent = currentView === 'calendar' ? (
     <div className="mt-4">
       <SmartTaskInput
         onAddTask={handleAddTask}
@@ -68,10 +73,10 @@ export const LeftPane: React.FC<LeftPaneProps> = ({ className }) => {
         useFlexInputGroup={true}
       />
     </div>
-  );
+  ) : null;
 
-  // Main content with Task List
-  const mainContent = (
+  // Main content - TaskList in calendar view, EventOverview in task view
+  const mainContent = currentView === 'calendar' ? (
     <TaskList
       tasks={tasks}
       taskGroups={taskGroups}
@@ -89,16 +94,27 @@ export const LeftPane: React.FC<LeftPaneProps> = ({ className }) => {
       showCreateTaskDialog={showCreateTaskDialog}
       onShowCreateTaskDialog={setShowCreateTaskDialog}
     />
+  ) : (
+    <EventOverview maxEvents={7} />
   );
 
-  // Footer content with Calendar List
-  const footerListContent = (
+  // Footer content - CalendarList in calendar view, TaskGroupList in task view
+  const footerListContent = currentView === 'calendar' ? (
     <CalendarList
       calendars={calendars}
       onToggleCalendar={handleToggleCalendar}
       onAddCalendar={handleAddCalendar}
       onEditCalendar={handleEditCalendar}
       onDeleteCalendar={handleDeleteCalendar}
+    />
+  ) : (
+    <TaskGroupList
+      taskGroups={taskGroups}
+      activeTaskGroupId={activeTaskGroupId}
+      onAddTaskGroup={(data) => handleCreateTaskGroup(data.name, data.description || '', data.iconId, data.color)}
+      onEditTaskGroup={(id, updates) => handleUpdateTaskGroupIcon(id, updates.iconId)}
+      onDeleteTaskGroup={handleDeleteTaskGroup}
+      onSelectTaskGroup={handleSelectTaskGroup}
     />
   );
 

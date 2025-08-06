@@ -22,6 +22,8 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
+import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -120,6 +122,20 @@ const SORT_OPTIONS: Array<{
     label: 'Created Date',
     getIcon: (order) =>
       SORT_ICON_MAP.createdAt[order === 'asc' ? 'ascending' : 'descending'],
+  },
+];
+
+// Define view mode options for the SharedToggleButton
+const VIEW_MODE_OPTIONS: ToggleOption<TaskViewMode>[] = [
+  {
+    value: 'folder',
+    label: 'Folder',
+    icon: FolderOpen,
+  },
+  {
+    value: 'list',
+    label: 'List',
+    icon: List,
   },
 ];
 
@@ -310,31 +326,22 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
 
   return (
     <div
-      className={cn('flex items-center justify-between gap-4 py-2', className)}
+      className={cn('flex items-center justify-between gap-4', className)}
     >
-      {/* Left Section - View Mode Toggle */}
+      {/* Left Section - Sidebar Trigger and View Mode Toggle */}
       <div className="flex items-center gap-3">
+        {/* Sidebar Trigger */}
+        <SmoothSidebarTrigger position="rightPane" />
+        
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-          <Button
-            variant={taskViewMode === 'folder' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleViewModeChange('folder')}
-            className="h-8 px-3 text-xs gap-1"
-          >
-            <FolderOpen className="w-3 h-3" />
-            Folder
-          </Button>
-          <Button
-            variant={taskViewMode === 'list' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleViewModeChange('list')}
-            className="h-8 px-3 text-xs gap-1"
-          >
-            <List className="w-3 h-3" />
-            List
-          </Button>
-        </div>
+        <SharedToggleButton
+          currentValue={taskViewMode}
+          options={VIEW_MODE_OPTIONS}
+          onValueChange={handleViewModeChange}
+          size="sm"
+          showLabels={true}
+          showShortLabelsOnMobile={false}
+        />
       </div>
 
       {/* Right Section - Icon-Only Controls */}

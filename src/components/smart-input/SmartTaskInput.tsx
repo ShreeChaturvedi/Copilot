@@ -97,10 +97,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
 
   // Initialize text parser
   const {
-    parseResult,
     isLoading,
     error,
-    cleanTitle,
     tags,
     confidence,
     hasConflicts,
@@ -540,20 +538,6 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
         </div>
       )}
 
-      {/* Debug Info (development only) */}
-      {process.env.NODE_ENV === 'development' && parseResult && (
-        <details className="text-xs text-gray-500 px-1">
-          <summary>Debug Info</summary>
-          <pre className="mt-1 overflow-x-auto">
-            {JSON.stringify({ 
-              cleanTitle, 
-              confidence: Math.round(confidence * 100) + '%',
-              tags: tags.length,
-              conflicts: parseResult.conflicts.length 
-            }, null, 2)}
-          </pre>
-        </details>
-      )}
     </div>
   );
 };

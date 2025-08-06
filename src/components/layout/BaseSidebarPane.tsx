@@ -80,18 +80,16 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
           <AvatarFallback>CO</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
-          <span className="text-sm font-semibold">DASH AI</span>
-          <span className="text-xs text-muted-foreground">Task Manager</span>
+          <span className="text-sm font-semibold">Copilot</span>
         </div>
       </div>
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 relative">
         {/* View Toggle */}
         {showViewToggle && (
           <ViewToggle 
             currentView={currentView}
             onToggle={handleViewToggle}
-            className="scale-90"
           />
         )}
         {/* Smooth toggle button that coordinates with sidebar animations */}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, isToday, isTomorrow, isThisWeek, isAfter, startOfWeek, endOfWeek } from 'date-fns';
+import { format, isToday, isTomorrow, isThisWeek, isAfter } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
 import { useCalendars } from '@/hooks/useCalendars';
@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 
 interface EventOverviewProps {
   maxEvents?: number;
-  showCurrentWeekOnly?: boolean;
   className?: string;
 }
 
@@ -18,21 +17,18 @@ interface GroupedEvents {
 
 export const EventOverview: React.FC<EventOverviewProps> = ({
   maxEvents = 5,
-  showCurrentWeekOnly = true,
   className
 }) => {
   const { data: calendars = [] } = useCalendars();
   const { data: allEvents = [] } = useEvents();
 
-  // Filter events for current week and get visible calendar events only
+  // Filter events to get visible calendar events only
   const visibleCalendarNames = calendars
     .filter(cal => cal.visible)
     .map(cal => cal.name);
 
-  const currentWeekEvents = React.useMemo(() => {
+  const upcomingEvents = React.useMemo(() => {
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
 
     return allEvents
       .filter(event => {
@@ -43,23 +39,18 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
 
         const eventStart = new Date(event.start);
         
-        if (showCurrentWeekOnly) {
-          // Event must be within current week
-          return eventStart >= weekStart && eventStart <= weekEnd;
-        }
-        
-        // Otherwise, show future events
-        return isAfter(eventStart, now);
+        // Show events from today forward
+        return isAfter(eventStart, now) || isToday(eventStart);
       })
       .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
       .slice(0, maxEvents);
-  }, [allEvents, visibleCalendarNames, showCurrentWeekOnly, maxEvents]);
+  }, [allEvents, visibleCalendarNames, maxEvents]);
 
   // Group events by day
   const groupedEvents: GroupedEvents = React.useMemo(() => {
     const groups: GroupedEvents = {};
 
-    currentWeekEvents.forEach(event => {
+    upcomingEvents.forEach(event => {
       const eventDate = new Date(event.start);
       let dayKey: string;
 
@@ -80,7 +71,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
     });
 
     return groups;
-  }, [currentWeekEvents]);
+  }, [upcomingEvents]);
 
   // Get calendar color for an event
   const getEventColor = (calendarName: string) => {
@@ -89,7 +80,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
   };
 
   // If no events, show empty state
-  if (currentWeekEvents.length === 0) {
+  if (upcomingEvents.length === 0) {
     return (
       <div className={cn('space-y-3', className)}>
         <div className="flex items-center gap-2">
@@ -101,26 +92,26 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
         
         <div className="text-center py-4 text-muted-foreground">
           <CalendarIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
-          <p className="text-xs">No events this week</p>
+          <p className="text-xs">No upcoming events</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
-      <div className="flex items-center gap-2">
-        <CalendarIcon className="w-4 h-4 text-sidebar-foreground" />
-        <h3 className="text-sm font-semibold text-sidebar-foreground">
+    <div className={cn('space-y-4', className)}>
+      <div className="flex items-center gap-2 pb-1">
+        <CalendarIcon className="w-4 h-4 text-sidebar-foreground opacity-80" />
+        <h3 className="text-sm font-semibold text-sidebar-foreground tracking-wide">
           Upcoming Events
         </h3>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-4">
         {Object.entries(groupedEvents).map(([dayKey, events]) => (
-          <div key={dayKey}>
-            {/* Day heading */}
-            <div className="text-xs font-medium text-muted-foreground mb-2">
+          <div key={dayKey} className="space-y-2">
+            {/* Day heading with improved styling */}
+            <div className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
               {dayKey}
             </div>
             
@@ -130,31 +121,43 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
                 <div
                   key={event.id}
                   className={cn(
-                    'flex items-center gap-2 py-1 px-2 rounded-sm',
-                    'hover:bg-sidebar-accent/50 transition-colors',
-                    'group cursor-default'
+                    'flex items-center gap-3 py-2 px-3 rounded-md',
+                    'bg-sidebar-accent/60 dark:bg-sidebar-accent/40',
+                    'hover:bg-sidebar-accent/80 dark:hover:bg-sidebar-accent/60',
+                    'shadow-sm hover:shadow-md transition-all duration-200 ease-out',
+                    'group cursor-pointer border border-sidebar-accent-foreground/10',
+                    'hover:border-sidebar-accent-foreground/20'
                   )}
-                  title={`${event.title}${event.description ? `\n${event.description}` : ''}`}
+                  title={`${event.title}${event.description ? `\n${event.description}` : ''}${event.location ? `\n📍 ${event.location}` : ''}`}
                 >
-                  {/* Calendar color indicator */}
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: getEventColor(event.calendarName) }}
-                  />
+                  {/* Calendar color indicator with enhanced styling */}
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                      style={{ backgroundColor: getEventColor(event.calendarName) }}
+                    />
+                  </div>
                   
-                  {/* Event time */}
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                  {/* Event time with better typography */}
+                  <span className="text-xs font-medium text-muted-foreground flex-shrink-0 tracking-wide">
                     {event.allDay ? 'All day' : format(new Date(event.start), 'h:mm a')}
                   </span>
                   
-                  {/* Event title */}
-                  <span className="text-sm truncate flex-1 group-hover:text-sidebar-accent-foreground transition-colors">
+                  {/* Event title with improved hover effects */}
+                  <span className={cn(
+                    'text-sm truncate flex-1 font-medium transition-colors duration-200',
+                    'group-hover:text-sidebar-accent-foreground',
+                    'text-sidebar-foreground/90 group-hover:text-sidebar-foreground'
+                  )}>
                     {event.title}
                   </span>
                   
-                  {/* Optional location indicator */}
+                  {/* Optional location indicator with modern styling */}
                   {event.location && (
-                    <div className="w-1 h-1 bg-muted-foreground/40 rounded-full flex-shrink-0" />
+                    <div className={cn(
+                      'w-1.5 h-1.5 bg-muted-foreground/50 rounded-full flex-shrink-0',
+                      'group-hover:bg-sidebar-accent-foreground/60 transition-colors duration-200'
+                    )} />
                   )}
                 </div>
               ))}
@@ -163,13 +166,24 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
         ))}
         
         {/* Show count if there are more events */}
-        {allEvents.length > maxEvents && (
-          <div className="text-center pt-2">
-            <span className="text-xs text-muted-foreground">
-              +{allEvents.length - maxEvents} more events
-            </span>
-          </div>
-        )}
+        {(() => {
+          const totalUpcomingEvents = allEvents.filter(event => {
+            if (!visibleCalendarNames.includes(event.calendarName)) {
+              return false;
+            }
+            const eventStart = new Date(event.start);
+            const now = new Date();
+            return isAfter(eventStart, now) || isToday(eventStart);
+          }).length;
+          
+          return totalUpcomingEvents > maxEvents && (
+            <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
+              <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+                +{totalUpcomingEvents - maxEvents} more upcoming events
+              </span>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

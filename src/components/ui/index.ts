@@ -33,3 +33,5 @@ export { Combobox, type ComboboxOption } from './combobox';
 export { DateTimeInput } from './datetime-input';
 
 export { ViewToggle, type ViewMode } from './ViewToggle';
+
+export { SharedToggleButton, type SharedToggleButtonProps, type ToggleOption } from './SharedToggleButton';

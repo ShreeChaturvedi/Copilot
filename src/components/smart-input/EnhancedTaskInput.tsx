@@ -75,6 +75,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
   const baseTextRef = useRef('');
 
   // Initialize text parser

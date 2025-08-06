@@ -1,5 +1,4 @@
 import React from 'react';
-import { SidebarSeparator } from '@/components/ui/sidebar';
 import { EventOverview } from '@/components/calendar/EventOverview';
 import { CalendarList } from '@/components/calendar/CalendarList';
 import { TaskGroupList } from '@/components/tasks/TaskGroupList';
@@ -40,47 +39,42 @@ export const CalendarSummaryPane: React.FC<CalendarSummaryPaneProps> = ({
     // View toggle handled by BaseSidebarPane
   };
 
-  // Main content with EventOverview and conditional lists
+  // Main content with EventOverview only
   const mainContent = (
-    <>
-      {/* Event Overview Section */}
-      <EventOverview 
-        maxEvents={5}
-        showCurrentWeekOnly={true}
-      />
+    <EventOverview 
+      maxEvents={7}
+    />
+  );
 
-      <SidebarSeparator className="my-4" />
-
-      {/* Conditional List Section - Task Lists for task view, Calendars for calendar view */}
-      {currentView === 'task' ? (
-        <TaskGroupList
-          taskGroups={taskGroups}
-          activeTaskGroupId={activeTaskGroupId}
-          onAddTaskGroup={handleAddTaskGroup}
-          onEditTaskGroup={handleEditTaskGroup}
-          onDeleteTaskGroup={handleDeleteTaskGroup}
-          onSelectTaskGroup={handleSelectTaskGroup}
-        />
-      ) : (
-        <CalendarList
-          calendars={calendars}
-          onToggleCalendar={handleToggleCalendar}
-          onAddCalendar={handleAddCalendar}
-          onEditCalendar={handleEditCalendar}
-          onDeleteCalendar={handleDeleteCalendar}
-        />
-      )}
-    </>
+  // Footer content with conditional lists
+  const footerListContent = currentView === 'task' ? (
+    <TaskGroupList
+      taskGroups={taskGroups}
+      activeTaskGroupId={activeTaskGroupId}
+      onAddTaskGroup={handleAddTaskGroup}
+      onEditTaskGroup={handleEditTaskGroup}
+      onDeleteTaskGroup={handleDeleteTaskGroup}
+      onSelectTaskGroup={handleSelectTaskGroup}
+    />
+  ) : (
+    <CalendarList
+      calendars={calendars}
+      onToggleCalendar={handleToggleCalendar}
+      onAddCalendar={handleAddCalendar}
+      onEditCalendar={handleEditCalendar}
+      onDeleteCalendar={handleDeleteCalendar}
+    />
   );
 
   return (
     <BaseSidebarPane
       className={className}
       showViewToggle={true}
-      showSidebarTrigger={false}
+      showSidebarTrigger={true}
       mainContent={mainContent}
+      footerListContent={footerListContent}
       onViewToggle={handleViewToggle}
-      useMinimalMode={true}
+      useMinimalMode={false}
     />
   );
 };

@@ -1,9 +1,10 @@
 import { ReactNode, useRef } from 'react';
 import { LeftPane } from './LeftPane';
 import { RightPane } from './RightPane';
-import { TaskFocusLayout } from './TaskFocusLayout';
+import { TaskFocusPane } from './TaskFocusPane';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { useUIStore } from '@/stores/uiStore';
+import { cn } from '@/lib/utils';
 import FullCalendar from '@fullcalendar/react';
 
 interface MainLayoutProps {
@@ -30,25 +31,33 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
 };
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { currentView } = useUIStore();
+  const { currentView, dragState } = useUIStore();
 
-  // If in task view, use the new TaskFocusLayout
-  if (currentView === 'task') {
-    return (
-      <TaskFocusLayout>
-        {children}
-      </TaskFocusLayout>
-    );
-  }
-
-  // Otherwise, use the existing calendar layout
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="h-screen w-screen overflow-hidden bg-background flex" style={{ overscrollBehavior: 'none' }}>
-        {/* LEFT SIDEBAR */}
+      <div 
+        className={cn(
+          'h-screen w-screen overflow-hidden bg-background flex',
+          currentView === 'task' && 'transition-all duration-500 ease-out',
+          dragState?.isDragging && 'select-none'
+        )}
+        data-view={currentView}
+        data-dragging={dragState?.isDragging}
+        style={{ overscrollBehavior: 'none' }}
+      >
+        {/* LEFT SIDEBAR - Always rendered */}
         <LeftPane />
 
-        <MainContent children={children} />
+        {/* MAIN CONTENT - Changes based on view */}
+        {currentView === 'task' ? (
+          /* Task Focus Content */
+          <div className="flex-1 min-w-0 transition-all duration-300 ease-out flex flex-col">
+            <TaskFocusPane />
+          </div>
+        ) : (
+          /* Calendar Content */
+          <MainContent children={children} />
+        )}
       </div>
     </SidebarProvider>
   );

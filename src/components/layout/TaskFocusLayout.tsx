@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { useUIStore } from '@/stores/uiStore';
 import { CalendarSummaryPane } from './CalendarSummaryPane';
 import { TaskFocusPane } from './TaskFocusPane';
@@ -16,35 +17,38 @@ export const TaskFocusLayout: React.FC<TaskFocusLayoutProps> = ({
   const { currentView, dragState } = useUIStore();
 
   return (
-    <div 
-      className={cn(
-        'h-screen flex bg-background',
-        'transition-all duration-500 ease-out',
-        dragState.isDragging && 'select-none',
-        className
-      )}
-      data-view={currentView}
-      data-dragging={dragState.isDragging}
-    >
-      {/* Calendar Summary Pane - Left Side */}
-      <CalendarSummaryPane 
+    <SidebarProvider defaultOpen={true}>
+      <div 
         className={cn(
-          'flex-shrink-0 transition-all duration-300 ease-out',
-          'w-80 border-r border-border'
+          'h-screen w-screen overflow-hidden bg-background flex',
+          'transition-all duration-500 ease-out',
+          dragState.isDragging && 'select-none',
+          className
         )}
-      />
-      
-      {/* Task Focus Pane - Right Side */}
-      <TaskFocusPane 
-        className={cn(
-          'flex-1 min-w-0 transition-all duration-300 ease-out',
-          'flex flex-col'
-        )}
-      />
-      
-      {/* Optional children for modals, overlays, etc. */}
-      {children}
-    </div>
+        data-view={currentView}
+        data-dragging={dragState.isDragging}
+        style={{ overscrollBehavior: 'none' }}
+      >
+        {/* Calendar Summary Pane - Left Side */}
+        <CalendarSummaryPane 
+          className={cn(
+            'flex-shrink-0 transition-all duration-300 ease-out',
+            'border-r border-border'
+          )}
+        />
+        
+        {/* Task Focus Pane - Right Side */}
+        <TaskFocusPane 
+          className={cn(
+            'flex-1 min-w-0 transition-all duration-300 ease-out',
+            'flex flex-col'
+          )}
+        />
+        
+        {/* Optional children for modals, overlays, etc. */}
+        {children}
+      </div>
+    </SidebarProvider>
   );
 };
 
