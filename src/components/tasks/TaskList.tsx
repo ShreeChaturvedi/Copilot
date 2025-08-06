@@ -3,7 +3,14 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, MoreVertical, Settings, Edit, Trash2 } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  Settings,
+  Edit,
+  Trash2,
+} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { TaskItem } from './TaskItem';
 import type { Task } from '@/types';
@@ -61,13 +68,19 @@ export interface TaskListProps {
   onDeleteTask: (id: string) => void;
   onScheduleTask?: (id: string) => void;
   onRemoveTag?: (taskId: string, tagId: string) => void;
-  onCreateTaskGroup?: (data: { name: string; description: string; iconId: string; color: string }) => void;
+  onCreateTaskGroup?: (data: {
+    name: string;
+    description: string;
+    iconId: string;
+    color: string;
+  }) => void;
   onSelectTaskGroup?: (groupId: string) => void;
   onUpdateTaskGroupIcon?: (groupId: string, iconId: string) => void;
   onUpdateTaskGroupColor?: (groupId: string, color: string) => void;
   onDeleteTaskGroup?: (groupId: string) => void;
   showCreateTaskDialog?: boolean;
   onShowCreateTaskDialog?: (show: boolean) => void;
+  hideHeader?: boolean;
 }
 
 const TASK_COLORS = [
@@ -95,7 +108,8 @@ export const TaskList: React.FC<TaskListProps> = ({
   onUpdateTaskGroupColor,
   onDeleteTaskGroup,
   showCreateTaskDialog = false,
-  onShowCreateTaskDialog
+  onShowCreateTaskDialog,
+  hideHeader = false,
 }) => {
   const [showCompleted, setShowCompleted] = useState(false);
   const [isTasksOpen, setIsTasksOpen] = useState(true);
@@ -109,24 +123,26 @@ export const TaskList: React.FC<TaskListProps> = ({
     name: 'Tasks',
     iconId: 'CheckSquare',
     color: '#3b82f6',
-    description: 'Default task group'
+    description: 'Default task group',
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) ||
+  const activeTaskGroup =
+    taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Filter tasks by active task group and separate active/completed with stable references
   const { activeTasks, completedTasks } = useMemo(() => {
     // Filter tasks by active task group
-    const groupTasks = tasks.filter(task =>
-      task.groupId === activeTaskGroupId ||
-      (!task.groupId && activeTaskGroupId === 'default')
+    const groupTasks = tasks.filter(
+      (task) =>
+        task.groupId === activeTaskGroupId ||
+        (!task.groupId && activeTaskGroupId === 'default')
     );
 
     // Use partition to avoid creating new arrays unnecessarily
-    const active = groupTasks.filter(task => !task.completed);
-    const completed = groupTasks.filter(task => task.completed);
+    const active = groupTasks.filter((task) => !task.completed);
+    const completed = groupTasks.filter((task) => task.completed);
 
     return { activeTasks: active, completedTasks: completed };
   }, [tasks, activeTaskGroupId]);
@@ -141,9 +157,18 @@ export const TaskList: React.FC<TaskListProps> = ({
   }, [activeTasks, completedTasks, showCompleted]);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = LucideIcons[activeTaskGroup.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
+  const ActiveGroupIcon =
+    (LucideIcons[
+      activeTaskGroup.iconId as keyof typeof LucideIcons
+    ] as React.ComponentType<{ className?: string; size?: number }>) ||
+    LucideIcons.CheckSquare;
 
-  const handleCreateTaskGroup = (data: { name: string; description: string; iconId: string; color: string }) => {
+  const handleCreateTaskGroup = (data: {
+    name: string;
+    description: string;
+    iconId: string;
+    color: string;
+  }) => {
     onCreateTaskGroup?.(data);
   };
 
@@ -157,8 +182,8 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleRecentColorAdd = (color: string) => {
-    setRecentColors(prev => {
-      const filtered = prev.filter(c => c !== color);
+    setRecentColors((prev) => {
+      const filtered = prev.filter((c) => c !== color);
       return [color, ...filtered].slice(0, 5);
     });
   };
@@ -182,7 +207,9 @@ export const TaskList: React.FC<TaskListProps> = ({
       )}
       <div className="flex justify-between gap-4 pt-1 border-t border-border/50">
         <span>Total</span>
-        <span className="font-mono font-semibold">{activeTasks.length + completedTasks.length}</span>
+        <span className="font-mono font-semibold">
+          {activeTasks.length + completedTasks.length}
+        </span>
       </div>
     </div>
   );
@@ -195,7 +222,7 @@ export const TaskList: React.FC<TaskListProps> = ({
       />
       <span>Color</span>
       <DropdownMenuShortcut className="flex gap-1 ml-auto">
-        {TASK_COLORS.slice(0, 4).map(color => (
+        {TASK_COLORS.slice(0, 4).map((color) => (
           <button
             key={color}
             onClick={(e) => {
@@ -289,12 +316,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              disabled
-            >
+            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled>
               <ChevronDown className="w-3 h-3" />
             </Button>
           </div>
@@ -319,7 +341,9 @@ export const TaskList: React.FC<TaskListProps> = ({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Task List</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{activeTaskGroup.name}"? All tasks within this list will be permanently deleted. This action cannot be undone.
+                Are you sure you want to delete "{activeTaskGroup.name}"? All
+                tasks within this list will be permanently deleted. This action
+                cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -340,91 +364,89 @@ export const TaskList: React.FC<TaskListProps> = ({
   return (
     <div className="space-y-3 mt-4">
       <Collapsible open={isTasksOpen} onOpenChange={setIsTasksOpen}>
-        {/* Tasks Header with Icon and Tooltip */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Icon Picker for Task Group */}
-            <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
-                  aria-label={`Task group icon: ${activeTaskGroup.name}`}
-                >
-                  <ActiveGroupIcon
-                    className="w-4 h-4"
-                    style={{ color: activeTaskGroup.color }}
+        {/* Tasks Header with Icon and Tooltip - Hidden when hideHeader is true */}
+        {!hideHeader && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Icon Picker for Task Group */}
+              <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
+                    aria-label={`Task group icon: ${activeTaskGroup.name}`}
+                  >
+                    <ActiveGroupIcon
+                      className="w-4 h-4"
+                      style={{ color: activeTaskGroup.color }}
+                    />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3" align="start">
+                  <IconPicker
+                    selectedIcon={activeTaskGroup.iconId}
+                    onIconSelect={handleUpdateIcon}
                   />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-3" align="start">
-                <IconPicker
-                  selectedIcon={activeTaskGroup.iconId}
-                  onIconSelect={handleUpdateIcon}
-                />
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
 
-            {/* Task Group Name with Tooltip */}
-            <CursorTooltip
-              content={tooltipContent}
-              containerClassName="inline-block"
-            >
-              <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                {activeTaskGroup.name}
-              </div>
-            </CursorTooltip>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {/* Task Group Management Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ml-auto"
-                >
-                  <MoreVertical className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Edit className="mr-2 h-4 w-4" />
-                  <span>Edit</span>
-                </DropdownMenuItem>
-                <ColorMenuItem />
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 focus:text-destructive focus:bg-destructive/10"
-                >
-                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0"
+              {/* Task Group Name with Tooltip */}
+              <CursorTooltip
+                content={tooltipContent}
+                containerClassName="inline-block"
               >
-                {isTasksOpen ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronRight className="w-3 h-3" />
-                )}
-              </Button>
-            </CollapsibleTrigger>
+                <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
+                  {activeTaskGroup.name}
+                </div>
+              </CursorTooltip>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {/* Task Group Management Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ml-auto"
+                  >
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit</span>
+                  </DropdownMenuItem>
+                  <ColorMenuItem />
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 focus:text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                  {isTasksOpen ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
           </div>
-        </div>
+        )}
 
         <CollapsibleContent className="space-y-2">
           {/* Show/Hide Completed Tasks Switch */}
@@ -447,7 +469,7 @@ export const TaskList: React.FC<TaskListProps> = ({
 
           {/* Tasks List */}
           <div className="space-y-1">
-            {displayedTasks.map(task => (
+            {displayedTasks.map((task) => (
               <TaskItem
                 key={task.id}
                 task={task}
@@ -476,7 +498,9 @@ export const TaskList: React.FC<TaskListProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Task List</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{activeTaskGroup.name}"? All tasks within this list will be permanently deleted. This action cannot be undone.
+              Are you sure you want to delete "{activeTaskGroup.name}"? All
+              tasks within this list will be permanently deleted. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

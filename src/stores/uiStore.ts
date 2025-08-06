@@ -24,6 +24,7 @@ export interface TaskPaneConfig {
   id: string;
   grouping: TaskGrouping;
   filterValue?: string; // for specific task list, due date range, or priority
+  selectedTaskListId: string | null; // specific task list selection for panes
   showCompleted: boolean;
 }
 
@@ -109,6 +110,7 @@ const initialState = {
     {
       id: 'pane-1',
       grouping: 'taskList' as TaskGrouping,
+      selectedTaskListId: null,
       showCompleted: false,
     },
   ] as TaskPaneConfig[],
@@ -224,6 +226,7 @@ export const useUIStore = create<UIState>()(
               id: `pane-${Date.now()}`,
               grouping: config?.grouping || 'taskList',
               filterValue: config?.filterValue,
+              selectedTaskListId: config?.selectedTaskListId || null,
               showCompleted: config?.showCompleted ?? state.globalShowCompleted,
             };
 

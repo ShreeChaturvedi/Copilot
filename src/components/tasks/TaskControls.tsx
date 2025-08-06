@@ -2,28 +2,38 @@
  * TaskControls - Modern task controls with sort, filter, and view options
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
+  ArrowDownUp,
+  ArrowDownAZ,
+  ArrowUpZA,
+  Calendar,
+  CalendarClock,
+  Flag,
+  AlertTriangle,
+  Clock,
+  CalendarPlus,
   Filter,
   FolderOpen,
   List,
   Search,
+  Plus,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/Input';
+import { Toggle } from '@/components/ui/toggle';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -38,20 +48,79 @@ export interface TaskControlsProps {
   className?: string;
   taskCount?: number;
   completedCount?: number;
+  onAddPane?: () => void;
+  canAddPane?: boolean;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 /**
- * Sort options configuration
+ * Sort icon mapping system with contextually appropriate icons
+ */
+const SORT_ICON_MAP: Record<
+  SortBy,
+  {
+    default: React.ComponentType<{ className?: string }>;
+    ascending: React.ComponentType<{ className?: string }>;
+    descending: React.ComponentType<{ className?: string }>;
+  }
+> = {
+  title: {
+    default: ArrowDownAZ,
+    ascending: ArrowDownAZ,
+    descending: ArrowUpZA,
+  },
+  dueDate: {
+    default: Calendar,
+    ascending: Calendar,
+    descending: CalendarClock,
+  },
+  priority: {
+    default: Flag,
+    ascending: Flag,
+    descending: AlertTriangle,
+  },
+  createdAt: {
+    default: Clock,
+    ascending: Clock,
+    descending: CalendarPlus,
+  },
+};
+
+/**
+ * Sort options configuration with specific icons
  */
 const SORT_OPTIONS: Array<{
   value: SortBy;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  getIcon: (
+    sortOrder: SortOrder
+  ) => React.ComponentType<{ className?: string }>;
 }> = [
-  { value: 'title', label: 'Title', icon: ArrowUpDown },
-  { value: 'dueDate', label: 'Due Date', icon: ArrowUpDown },
-  { value: 'priority', label: 'Priority', icon: ArrowUpDown },
-  { value: 'createdAt', label: 'Created Date', icon: ArrowUpDown },
+  {
+    value: 'title',
+    label: 'Title',
+    getIcon: (order) =>
+      SORT_ICON_MAP.title[order === 'asc' ? 'ascending' : 'descending'],
+  },
+  {
+    value: 'dueDate',
+    label: 'Due Date',
+    getIcon: (order) =>
+      SORT_ICON_MAP.dueDate[order === 'asc' ? 'ascending' : 'descending'],
+  },
+  {
+    value: 'priority',
+    label: 'Priority',
+    getIcon: (order) =>
+      SORT_ICON_MAP.priority[order === 'asc' ? 'ascending' : 'descending'],
+  },
+  {
+    value: 'createdAt',
+    label: 'Created Date',
+    getIcon: (order) =>
+      SORT_ICON_MAP.createdAt[order === 'asc' ? 'ascending' : 'descending'],
+  },
 ];
 
 /**
@@ -62,17 +131,147 @@ function getSortIcon(
   currentSort: SortBy,
   sortOrder: SortOrder
 ) {
-  if (sortBy !== currentSort) return ArrowUpDown;
-  return sortOrder === 'asc' ? ArrowUp : ArrowDown;
+  if (sortBy !== currentSort) {
+    return SORT_ICON_MAP[sortBy].default;
+  }
+  return SORT_ICON_MAP[sortBy][
+    sortOrder === 'asc' ? 'ascending' : 'descending'
+  ];
+}
+
+/**
+ * Get main sort button icon - always shows ArrowDownUp
+ */
+function getMainSortIcon() {
+  return ArrowDownUp;
 }
 
 /**
  * Main TaskControls component
  */
+/**
+ * Animated Search Component with Keyboard Shortcuts
+ */
+interface AnimatedSearchProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts effect
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + F to activate search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        handleSearchClick();
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, []);
+
+  const handleSearchClick = () => {
+    setIsExpanded(true);
+    // Focus input after animation completes
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 250);
+  };
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    onChange('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleClose();
+    }
+  };
+
+  return (
+    <div className="relative">
+      <motion.div
+        className="flex items-center"
+        layout
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+      >
+        {/* Search Icon/Button */}
+        <motion.div layout>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={isExpanded ? undefined : handleSearchClick}
+            title={isExpanded ? undefined : 'Search tasks (Ctrl+F)'}
+            aria-label={isExpanded ? undefined : 'Open search input'}
+            aria-expanded={isExpanded}
+          >
+            <Search className="w-3.5 h-3.5" />
+          </Button>
+        </motion.div>
+
+        {/* Expandable Search Input */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: '200px', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="relative overflow-hidden"
+              role="search"
+              aria-label="Task search"
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search tasks..."
+                className="w-full h-7 px-3 pr-8 text-xs bg-background border border-border rounded-md focus:outline-none focus:border-primary focus:ring-0"
+                aria-label="Search tasks by title or content"
+                aria-describedby="search-help"
+              />
+              {/* Screen reader helper text */}
+              <div id="search-help" className="sr-only">
+                Press Escape to close search, or use Ctrl+F to open
+              </div>
+              {/* Close button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-0.5 h-6 w-6 p-0"
+                onClick={handleClose}
+                title="Close search (Escape)"
+                aria-label="Close search input"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+};
+
 export const TaskControls: React.FC<TaskControlsProps> = ({
   className,
   taskCount = 0,
   completedCount = 0,
+  onAddPane,
+  canAddPane = false,
+  searchValue = '',
+  onSearchChange,
 }) => {
   const {
     taskViewMode,
@@ -112,7 +311,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       className={cn('flex items-center justify-between gap-4 py-2', className)}
     >
       {/* Left Section - View Mode Toggle */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {/* View Mode Toggle */}
         <div className="flex items-center gap-1 bg-muted rounded-md p-1">
           <Button
@@ -135,19 +334,6 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
           </Button>
         </div>
 
-        {/* Search Input (Future Enhancement) */}
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-          <Input
-            placeholder="Search tasks..."
-            className="h-8 w-48 pl-7 text-xs"
-            disabled // Disabled for now
-          />
-        </div>
-      </div>
-
-      {/* Right Section - Sort, Filter, Show Completed */}
-      <div className="flex items-center gap-2">
         {/* Task Count Badge */}
         {taskCount > 0 && (
           <Badge variant="secondary" className="text-xs">
@@ -159,85 +345,122 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             )}
           </Badge>
         )}
+      </div>
 
-        {/* Sort Button */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs">
-              {React.createElement(getSortIcon(sortBy, sortBy, sortOrder), {
-                className: 'w-3 h-3',
-              })}
-              Sort
-              {sortBy !== 'createdAt' && (
-                <Badge variant="secondary" className="ml-1 text-xs px-1">
-                  {SORT_OPTIONS.find((opt) => opt.value === sortBy)?.label}
-                </Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              {SORT_OPTIONS.map((option) => {
-                const IconComponent = getSortIcon(
-                  option.value,
-                  sortBy,
-                  sortOrder
-                );
-                const isActive = sortBy === option.value;
+      {/* Right Section - Icon-Only Controls */}
+      <div className="flex items-center gap-1">
+        {/* Grouped Action Buttons */}
+        <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1">
+          {/* Animated Search */}
+          <AnimatedSearch
+            value={searchValue}
+            onChange={onSearchChange || (() => {})}
+          />
 
-                return (
-                  <DropdownMenuItem
-                    key={option.value}
-                    onClick={() => handleSortChange(option.value)}
-                    className={cn(
-                      'gap-2 cursor-pointer',
-                      isActive && 'bg-accent'
-                    )}
-                  >
-                    <IconComponent className="w-4 h-4" />
-                    <span>{option.label}</span>
-                    {isActive && (
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-                      </Badge>
-                    )}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          {/* Sort Button */}
+          <Tooltip>
+            <DropdownMenu>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    {React.createElement(getMainSortIcon(), {
+                      className: 'w-3.5 h-3.5',
+                    })}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuGroup>
+                  {SORT_OPTIONS.map((option) => {
+                    const IconComponent = getSortIcon(
+                      option.value,
+                      sortBy,
+                      sortOrder
+                    );
+                    const isActive = sortBy === option.value;
 
-        {/* Filter Button (Future Enhancement) */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1 text-xs"
-          disabled // Disabled for now
-        >
-          <Filter className="w-3 h-3" />
-          Filter
-        </Button>
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => handleSortChange(option.value)}
+                        className={cn(
+                          'gap-2 cursor-pointer',
+                          isActive && 'bg-accent'
+                        )}
+                      >
+                        <IconComponent className="w-4 h-4" />
+                        <span>{option.label}</span>
+                        {isActive && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-auto text-xs"
+                          >
+                            {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <TooltipContent>
+              <p>Sort tasks</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Filter Button (Future Enhancement) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                disabled // Disabled for now
+              >
+                <Filter className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Filter tasks</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Add Pane Button */}
+          {canAddPane && onAddPane && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={onAddPane}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Add new pane</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
 
         {/* Show Completed Toggle */}
-        <div className="flex items-center gap-2">
-          <Switch
-            id="show-completed-global"
-            checked={globalShowCompleted}
-            onCheckedChange={handleShowCompletedChange}
-            className="scale-75"
-          />
-          <Label
-            htmlFor="show-completed-global"
-            className="text-xs text-muted-foreground cursor-pointer"
+        <div className="flex items-center gap-2 ml-2">
+          <Toggle
+            pressed={globalShowCompleted}
+            onPressedChange={handleShowCompletedChange}
+            className="h-7 px-2 text-xs"
+            title={`${globalShowCompleted ? 'Hide' : 'Show'} completed tasks`}
           >
             Show completed
-            {completedCount > 0 && (
-              <span className="ml-1">({completedCount})</span>
-            )}
-          </Label>
+          </Toggle>
+          {completedCount > 0 && (
+            <Badge variant="outline" className="text-xs h-5">
+              {completedCount}
+            </Badge>
+          )}
         </div>
       </div>
     </div>

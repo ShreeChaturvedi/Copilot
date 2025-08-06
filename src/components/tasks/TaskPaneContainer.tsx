@@ -3,7 +3,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/Select';
+import { TaskGroupCombobox } from '@/components/smart-input/components/TaskGroupCombobox';
 import { TaskList } from './TaskList';
 import { cn } from '@/lib/utils';
 import { Task, TaskPaneData } from '@/types';
@@ -20,6 +20,7 @@ import { useTaskManagement } from '@/hooks/useTaskManagement';
 
 export interface TaskPaneContainerProps {
   className?: string;
+  searchValue?: string;
 }
 
 /**
@@ -30,18 +31,22 @@ function filterTasksForPane(
   paneConfig: TaskPaneConfig,
   taskGroups: Array<{ id: string; name: string }>,
   sortBy: string,
-  sortOrder: string
+  sortOrder: string,
+  searchValue?: string
 ): Task[] {
   let filteredTasks = [...tasks];
 
   // Apply grouping filter
   switch (paneConfig.grouping) {
     case 'taskList': {
-      if (paneConfig.filterValue) {
+      // Use selectedTaskListId if available, otherwise fall back to filterValue
+      const targetTaskListId =
+        paneConfig.selectedTaskListId || paneConfig.filterValue;
+      if (targetTaskListId) {
         filteredTasks = filteredTasks.filter(
           (task) =>
-            task.groupId === paneConfig.filterValue ||
-            (!task.groupId && paneConfig.filterValue === 'default')
+            task.groupId === targetTaskListId ||
+            (!task.groupId && targetTaskListId === 'default')
         );
       }
       break;
@@ -100,6 +105,17 @@ function filterTasksForPane(
     filteredTasks = filteredTasks.filter((task) => !task.completed);
   }
 
+  // Apply search filter
+  if (searchValue && searchValue.trim()) {
+    const searchTerm = searchValue.toLowerCase().trim();
+    filteredTasks = filteredTasks.filter(
+      (task) =>
+        task.title.toLowerCase().includes(searchTerm) ||
+        (task.description &&
+          task.description.toLowerCase().includes(searchTerm))
+    );
+  }
+
   // Apply sorting
   filteredTasks.sort((a, b) => {
     let comparison = 0;
@@ -141,15 +157,18 @@ function filterTasksForPane(
 function getPaneTitle(
   grouping: TaskGrouping,
   filterValue: string | undefined,
+  selectedTaskListId: string | null,
   taskGroups: Array<{ id: string; name: string }>
 ): string {
   switch (grouping) {
-    case 'taskList':
-      if (filterValue) {
-        const group = taskGroups.find((g) => g.id === filterValue);
+    case 'taskList': {
+      const targetTaskListId = selectedTaskListId || filterValue;
+      if (targetTaskListId) {
+        const group = taskGroups.find((g) => g.id === targetTaskListId);
         return group?.name || 'Tasks';
       }
       return 'All Tasks';
+    }
     case 'dueDate':
       switch (filterValue) {
         case 'today':
@@ -193,8 +212,8 @@ interface TaskPaneProps {
   paneData: TaskPaneData;
   canRemove: boolean;
   onRemove: (paneId: string) => void;
-  onUpdateGrouping: (paneId: string, grouping: TaskGrouping) => void;
-  onUpdateFilter: (paneId: string, filterValue: string) => void;
+  taskGroups: Array<{ id: string; name: string }>;
+  onUpdateTaskList: (paneId: string, taskListId: string | null) => void;
 }
 
 const TaskPane: React.FC<TaskPaneProps> = ({
@@ -202,62 +221,40 @@ const TaskPane: React.FC<TaskPaneProps> = ({
   paneData,
   canRemove,
   onRemove,
-  onUpdateGrouping,
-  onUpdateFilter,
+  taskGroups,
+  onUpdateTaskList,
 }) => {
   // Get task management operations
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
 
-  const handleGroupingChange = (value: string) => {
-    onUpdateGrouping(paneConfig.id, value as TaskGrouping);
-  };
-
-  const handleFilterChange = (value: string) => {
-    onUpdateFilter(paneConfig.id, value);
-  };
-
-  // Generate filter options based on grouping
-  const filterOptions = useMemo(() => {
-    switch (paneConfig.grouping) {
-      case 'taskList':
-        return [
-          { value: '', label: 'All Task Lists' },
-          ...taskManagement.taskGroups.map((group) => ({
-            value: group.id,
-            label: group.name,
-          })),
-        ];
-      case 'dueDate':
-        return [
-          { value: '', label: 'All Due Dates' },
-          { value: 'today', label: 'Today' },
-          { value: 'tomorrow', label: 'Tomorrow' },
-          { value: 'this-week', label: 'This Week' },
-          { value: 'next-week', label: 'Next Week' },
-          { value: 'later', label: 'Later' },
-          { value: 'no-date', label: 'No Due Date' },
-        ];
-      case 'priority':
-        return [
-          { value: '', label: 'All Priorities' },
-          { value: 'high', label: 'High Priority' },
-          { value: 'medium', label: 'Medium Priority' },
-          { value: 'low', label: 'Low Priority' },
-          { value: 'none', label: 'No Priority' },
-        ];
-      default:
-        return [];
-    }
-  }, [paneConfig.grouping, taskManagement.taskGroups]);
-
   return (
     <div className="h-full flex flex-col">
-      {/* Pane Header */}
-      <div className="border-b border-border p-4 bg-muted/20">
-        <div className="flex items-center justify-between mb-3">
+      {/* Clean Pane Header */}
+      <div className="border-b border-border px-4 py-2 bg-muted/10">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-sm truncate">{paneData.title}</h3>
-            <Badge variant="secondary" className="text-xs">
+            {/* Task list selector for taskList grouping, plain title for others */}
+            {paneConfig.grouping === 'taskList' ? (
+              <TaskGroupCombobox
+                taskGroups={taskGroups.map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  iconId: 'Folder',
+                  color: '#3b82f6',
+                  description: group.name,
+                }))}
+                activeTaskGroupId={paneConfig.selectedTaskListId || undefined}
+                onSelectTaskGroup={(groupId) =>
+                  onUpdateTaskList(paneConfig.id, groupId)
+                }
+                className="h-auto p-0"
+              />
+            ) : (
+              <h3 className="font-medium text-sm truncate text-muted-foreground">
+                {paneData.title}
+              </h3>
+            )}
+            <Badge variant="outline" className="text-xs h-5">
               {paneData.tasks.length}
             </Badge>
           </div>
@@ -265,41 +262,17 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0"
+              className="h-6 w-6 p-0 opacity-60 hover:opacity-100"
               onClick={() => onRemove(paneConfig.id)}
             >
               <X className="w-3 h-3" />
             </Button>
           )}
         </div>
-
-        {/* Grouping and Filter Controls */}
-        <div className="space-y-2">
-          {/* Grouping Selector */}
-          <Select
-            value={paneConfig.grouping}
-            onChange={(e) => handleGroupingChange(e.target.value)}
-            className="h-8 text-xs"
-            options={[
-              { value: 'taskList', label: 'By Task List' },
-              { value: 'dueDate', label: 'By Due Date' },
-              { value: 'priority', label: 'By Priority' },
-            ]}
-          />
-
-          {/* Filter Selector */}
-          <Select
-            value={paneConfig.filterValue || ''}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="h-8 text-xs"
-            placeholder="Filter..."
-            options={filterOptions}
-          />
-        </div>
       </div>
 
       {/* Pane Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-4">
         {paneData.isEmpty ? (
           <div className="flex items-center justify-center h-32 text-center">
             <div className="text-sm text-muted-foreground">
@@ -323,6 +296,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             onDeleteTaskGroup={taskManagement.handleDeleteTaskGroup}
             showCreateTaskDialog={taskManagement.showCreateTaskDialog}
             onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
+            hideHeader={true}
           />
         )}
       </div>
@@ -335,16 +309,10 @@ const TaskPane: React.FC<TaskPaneProps> = ({
  */
 export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
   className,
+  searchValue,
 }) => {
-  const {
-    taskPanes,
-    maxTaskPanes,
-    sortBy,
-    sortOrder,
-    addTaskPane,
-    removeTaskPane,
-    updateTaskPane,
-  } = useUIStore();
+  const { taskPanes, sortBy, sortOrder, removeTaskPane, updateTaskPane } =
+    useUIStore();
 
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
 
@@ -356,7 +324,8 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
         pane,
         taskManagement.taskGroups,
         sortBy,
-        sortOrder
+        sortOrder,
+        searchValue
       );
 
       return {
@@ -364,6 +333,7 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
         title: getPaneTitle(
           pane.grouping,
           pane.filterValue,
+          pane.selectedTaskListId,
           taskManagement.taskGroups
         ),
         tasks: filteredTasks,
@@ -379,14 +349,10 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
     taskManagement.taskGroups,
     sortBy,
     sortOrder,
+    searchValue,
   ]);
 
   // Handle pane management
-  const handleAddPane = useCallback(() => {
-    if (taskPanes.length < maxTaskPanes) {
-      addTaskPane();
-    }
-  }, [taskPanes.length, maxTaskPanes, addTaskPane]);
 
   const handleRemovePane = useCallback(
     (paneId: string) => {
@@ -395,42 +361,17 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
     [removeTaskPane]
   );
 
-  const handleUpdateGrouping = useCallback(
-    (paneId: string, grouping: TaskGrouping) => {
-      updateTaskPane(paneId, { grouping, filterValue: undefined }); // Reset filter when changing grouping
+  const handleUpdateTaskList = useCallback(
+    (paneId: string, taskListId: string | null) => {
+      updateTaskPane(paneId, { selectedTaskListId: taskListId });
     },
     [updateTaskPane]
   );
 
-  const handleUpdateFilter = useCallback(
-    (paneId: string, filterValue: string) => {
-      updateTaskPane(paneId, { filterValue: filterValue || undefined });
-    },
-    [updateTaskPane]
-  );
-
-  const canAddPane = taskPanes.length < maxTaskPanes;
   const canRemovePane = taskPanes.length > 1;
 
   return (
-    <div className={cn('h-full relative', className)}>
-      {/* Add Pane Button - Fixed position on left */}
-      {canAddPane && (
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn(
-            'absolute left-2 top-1/2 -translate-y-1/2 z-10',
-            'h-12 w-8 p-0 rounded-full',
-            'bg-background/80 backdrop-blur-sm hover:bg-background',
-            'border-border shadow-md'
-          )}
-          onClick={handleAddPane}
-        >
-          <Plus className="w-4 h-4" />
-        </Button>
-      )}
-
+    <div className={cn('h-full', className)}>
       {/* Resizable Panes */}
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {paneData.map((pane, index) => (
@@ -445,14 +386,14 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
                 paneData={pane}
                 canRemove={canRemovePane}
                 onRemove={handleRemovePane}
-                onUpdateGrouping={handleUpdateGrouping}
-                onUpdateFilter={handleUpdateFilter}
+                taskGroups={taskManagement.taskGroups}
+                onUpdateTaskList={handleUpdateTaskList}
               />
             </ResizablePanel>
 
             {/* Resize Handle - Only between panes */}
             {index < paneData.length - 1 && (
-              <ResizableHandle withHandle className="w-2" />
+              <ResizableHandle className="w-1 bg-border hover:bg-border-hover transition-colors" />
             )}
           </React.Fragment>
         ))}

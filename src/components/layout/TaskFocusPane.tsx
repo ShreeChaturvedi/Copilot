@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import { TaskControls } from '@/components/tasks/TaskControls';
 import { TaskFolderGrid } from '@/components/tasks/TaskFolderGrid';
@@ -12,7 +12,15 @@ interface TaskFocusPaneProps {
 }
 
 export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
-  const { dragState, taskViewMode, globalShowCompleted } = useUIStore();
+  const {
+    dragState,
+    taskViewMode,
+    globalShowCompleted,
+    taskPanes,
+    maxTaskPanes,
+    addTaskPane,
+  } = useUIStore();
+  const [searchValue, setSearchValue] = useState('');
 
   // Task management with task operations enabled
   const {
@@ -30,6 +38,15 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const activeTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
 
+  // Add pane functionality
+  const handleAddPane = () => {
+    if (taskPanes.length < maxTaskPanes) {
+      addTaskPane();
+    }
+  };
+
+  const canAddPane = taskPanes.length < maxTaskPanes && taskViewMode === 'list';
+
   return (
     <div
       className={cn(
@@ -44,6 +61,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
         <TaskControls
           taskCount={globalShowCompleted ? tasks.length : activeTasks.length}
           completedCount={completedTasks.length}
+          onAddPane={handleAddPane}
+          canAddPane={canAddPane}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
         />
       </div>
 
@@ -78,7 +99,11 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
 
       {/* Main Task Display Area */}
       <div className="flex-1 overflow-hidden">
-        {taskViewMode === 'folder' ? <TaskFolderGrid /> : <TaskPaneContainer />}
+        {taskViewMode === 'folder' ? (
+          <TaskFolderGrid />
+        ) : (
+          <TaskPaneContainer searchValue={searchValue} />
+        )}
       </div>
 
       {/* Enhanced Input - Bottom Positioned */}

@@ -2,17 +2,17 @@
  * TaskFolderGrid - Folder view for task lists with hover preview
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Folder, Plus } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { TaskFolder, Task } from '@/types';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useUIStore } from '@/stores/uiStore';
+import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 
 export interface TaskFolderGridProps {
   className?: string;
@@ -90,12 +90,10 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
     const hasPreviewTasks = folder.tasks.length > 0;
 
     return (
-      <Card
+      <div
         className={cn(
-          'group relative cursor-pointer transition-all duration-200 ease-out',
-          'hover:shadow-lg hover:scale-105 hover:z-10',
-          'bg-card border-border',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+          'group relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+          'aspect-[4/3]' // Horizontal 4:3 aspect ratio
         )}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
@@ -103,101 +101,187 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
         role="button"
         aria-label={`Open ${folder.name} task list (${folder.taskCount} tasks, ${folder.completedCount} completed)`}
       >
-        <CardContent className="p-6">
-          {/* Folder Icon */}
-          <div className="flex items-center justify-center h-16 mb-4">
-            <IconComponent
-              className="w-12 h-12 transition-colors"
-              style={{ color: folder.color }}
-            />
-          </div>
-
-          {/* Folder Info */}
-          <div className="text-center space-y-2">
-            <h3 className="font-medium text-sm truncate">{folder.name}</h3>
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span>{folder.taskCount} tasks</span>
-              {folder.completedCount > 0 && (
-                <>
-                  <span>•</span>
-                  <span>{folder.completedCount} completed</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Hover Preview Overlay */}
-          {hasPreviewTasks && (
+        {/* True Unified Container - Single element with tab and body integrated */}
+        <div
+          className={cn(
+            'relative h-full transition-all duration-300 ease-out',
+            'group-hover:-translate-y-1 group-hover:scale-105 group-hover:z-20'
+          )}
+        >
+          {/* Integrated Folder with Tab */}
+          <div className="relative h-full">
+            {/* Folder Tab - Part of the main container */}
             <div
               className={cn(
-                'absolute inset-0 bg-background/95 backdrop-blur-sm rounded-lg p-4',
-                'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-                'flex flex-col justify-center'
+                'absolute -top-2 left-4 right-1/3 h-6 rounded-t-lg z-10',
+                'shadow-sm border border-b-0 transition-shadow duration-300'
               )}
+              style={{
+                background: `linear-gradient(to bottom, ${folder.color}15, ${folder.color}08)`,
+                borderColor: `${folder.color}30`,
+              }}
             >
-              <div className="space-y-2">
-                <div className="text-xs font-medium text-center mb-3 truncate">
-                  {folder.name}
-                </div>
-                {folder.tasks.slice(0, 4).map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <Checkbox
-                      checked={task.completed}
-                      className="w-3 h-3 pointer-events-none"
-                      style={
-                        task.completed
-                          ? { accentColor: folder.color }
-                          : undefined
-                      }
-                    />
-                    <span
+              <div className="absolute inset-x-2 top-1">
+                <div
+                  className="w-full h-1 rounded-full opacity-60"
+                  style={{ backgroundColor: folder.color }}
+                />
+              </div>
+            </div>
+
+            {/* Main Folder Body - Seamlessly connected */}
+            <Card
+              className={cn(
+                'relative overflow-hidden border-2 transition-shadow duration-300 ease-out',
+                'bg-card shadow-md group-hover:shadow-xl',
+                'h-full'
+              )}
+              style={{ borderColor: `${folder.color}40` }}
+            >
+              <CardContent className="p-4 h-full flex flex-col relative">
+                {/* Default Folder Content - Hidden on hover */}
+                <div
+                  className={cn(
+                    'flex flex-col h-full transition-opacity duration-300',
+                    'group-hover:opacity-0'
+                  )}
+                >
+                  {/* Folder Icon with Semantic Container */}
+                  <div className="flex items-center justify-center mb-3">
+                    <div
                       className={cn(
-                        'truncate flex-1',
-                        task.completed && 'line-through text-muted-foreground'
+                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                        'transition-all duration-300'
+                      )}
+                      style={{
+                        backgroundColor: `${folder.color}15`,
+                        borderColor: `${folder.color}30`,
+                      }}
+                    >
+                      <IconComponent
+                        className={cn(
+                          'w-6 h-6 transition-all duration-300',
+                          'group-hover:scale-110 drop-shadow-sm'
+                        )}
+                        color={folder.color}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Folder Info with Enhanced Typography */}
+                  <div className="text-center space-y-2 flex-1 flex flex-col justify-center">
+                    <h3
+                      className={cn(
+                        'font-semibold text-sm truncate text-foreground',
+                        'group-hover:text-primary transition-colors'
                       )}
                     >
-                      {task.title}
-                    </span>
-                    {/* Show primary tag if available */}
-                    {task.tags && task.tags.length > 0 && (
+                      {folder.name}
+                    </h3>
+                    <div className="flex items-center justify-center gap-1 text-xs flex-wrap">
                       <Badge
-                        variant="outline"
-                        className="text-xs px-1 py-0 h-4"
+                        variant="secondary"
+                        className="h-4 px-2 text-xs font-medium"
+                        style={{
+                          backgroundColor: `${folder.color}15`,
+                          color: folder.color,
+                          borderColor: `${folder.color}30`,
+                        }}
                       >
-                        {task.tags[0].displayText}
+                        {folder.taskCount} tasks
                       </Badge>
-                    )}
+                      {folder.completedCount > 0 && (
+                        <Badge variant="outline" className="h-4 px-2 text-xs">
+                          {folder.completedCount} done
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                ))}
-                {folder.taskCount > 4 && (
-                  <div className="text-xs text-muted-foreground text-center pt-1">
-                    +{folder.taskCount - 4} more tasks
+                </div>
+
+                {/* Preview Content - Shows on hover */}
+                {hasPreviewTasks && (
+                  <div
+                    className={cn(
+                      'absolute inset-4 flex flex-col justify-center',
+                      'opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                    )}
+                  >
+                    <div className="space-y-1.5">
+                      <div
+                        className="text-xs font-semibold text-center mb-2 truncate"
+                        style={{ color: folder.color }}
+                      >
+                        {folder.name}
+                      </div>
+                      {folder.tasks.slice(0, 3).map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          <div
+                            className={cn(
+                              'w-2 h-2 rounded-full flex-shrink-0',
+                              task.completed ? 'opacity-50' : ''
+                            )}
+                            style={{
+                              backgroundColor: task.completed
+                                ? folder.color
+                                : 'currentColor',
+                            }}
+                          />
+                          <span
+                            className={cn(
+                              'truncate flex-1',
+                              task.completed &&
+                                'line-through text-muted-foreground'
+                            )}
+                          >
+                            {task.title}
+                          </span>
+                          {/* Show primary tag if available */}
+                          {task.tags && task.tags.length > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs px-1 py-0 h-3 text-[10px]"
+                            >
+                              {task.tags[0].displayText}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                      {folder.taskCount > 3 && (
+                        <div className="text-xs text-muted-foreground text-center pt-1 font-medium">
+                          +{folder.taskCount - 3} more tasks
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* Empty state for folders with no tasks */}
-          {!hasPreviewTasks && (
-            <div
-              className={cn(
-                'absolute inset-0 bg-background/95 backdrop-blur-sm rounded-lg p-4',
-                'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-                'flex items-center justify-center'
-              )}
-            >
-              <div className="text-xs text-muted-foreground text-center">
-                <div className="mb-2">No tasks yet</div>
-                <div>Click to add tasks</div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {/* Empty state preview - Shows on hover for empty folders */}
+                {!hasPreviewTasks && (
+                  <div
+                    className={cn(
+                      'absolute inset-4 flex items-center justify-center',
+                      'opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                    )}
+                  >
+                    <div className="text-xs text-center">
+                      <div className="mb-2 font-medium text-muted-foreground">
+                        No tasks yet
+                      </div>
+                      <div className="text-xs" style={{ color: folder.color }}>
+                        Click to add tasks
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     );
   }
 );
@@ -209,6 +293,7 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   className,
 }) => {
   const { globalShowCompleted, setTaskViewMode } = useUIStore();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Get task management data
   const { tasks, taskGroups, handleSelectTaskGroup, handleCreateTaskGroup } =
@@ -229,17 +314,24 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
     [handleSelectTaskGroup, setTaskViewMode]
   );
 
-  // Handle add new folder
+  // Handle add new folder - opens dialog
   const handleAddFolder = useCallback(() => {
-    // This would typically open a create task group dialog
-    // For now, we'll create a default one
-    handleCreateTaskGroup({
-      name: `Task List ${taskGroups.length + 1}`,
-      description: '',
-      iconId: 'Folder',
-      color: '#3b82f6',
-    });
-  }, [handleCreateTaskGroup, taskGroups.length]);
+    setShowCreateDialog(true);
+  }, []);
+
+  // Handle create task list from dialog
+  const handleCreateTaskList = useCallback(
+    (data: {
+      name: string;
+      description: string;
+      iconId: string;
+      color: string;
+    }) => {
+      handleCreateTaskGroup(data);
+      setShowCreateDialog(false);
+    },
+    [handleCreateTaskGroup]
+  );
 
   return (
     <div className={cn('p-6', className)}>
@@ -261,30 +353,82 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
         ))}
 
         {/* Add New Folder Button */}
-        <Card
+        <div
           className={cn(
-            'group cursor-pointer transition-all duration-200 ease-out',
-            'hover:shadow-lg hover:scale-105',
-            'bg-card border-border border-dashed',
-            'flex items-center justify-center min-h-[180px]'
+            'group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+            'aspect-[4/3]' // Horizontal 4:3 aspect ratio
           )}
           onClick={handleAddFolder}
+          tabIndex={0}
+          role="button"
+          aria-label="Create new task list"
         >
-          <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-            {/* Plus Icon */}
-            <div className="flex items-center justify-center h-16 mb-4">
-              <Plus className="w-12 h-12 text-muted-foreground group-hover:text-foreground transition-colors" />
-            </div>
+          {/* True Unified Container - Single element with tab and body integrated */}
+          <div
+            className={cn(
+              'relative h-full transition-all duration-300 ease-out',
+              'group-hover:-translate-y-1 group-hover:scale-105 group-hover:z-10'
+            )}
+          >
+            {/* Integrated Folder with Tab */}
+            <div className="relative h-full">
+              {/* Folder Tab - Part of the main container */}
+              <div
+                className={cn(
+                  'absolute -top-2 left-4 right-1/3 h-6 rounded-t-lg z-10',
+                  'shadow-sm border border-b-0 bg-gradient-to-b from-muted/50 to-muted/30',
+                  'border-dashed border-muted-foreground/30',
+                  'transition-all duration-300 group-hover:shadow-md group-hover:border-primary/40'
+                )}
+              />
 
-            {/* Add Folder Text */}
-            <div className="space-y-2">
-              <h3 className="font-medium text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                New Task List
-              </h3>
-              <p className="text-xs text-muted-foreground">Click to create</p>
+              {/* Main Folder Body - Seamlessly connected */}
+              <Card
+                className={cn(
+                  'relative overflow-hidden border-2 border-dashed transition-shadow duration-300 ease-out',
+                  'bg-gradient-to-br from-muted/20 via-muted/10 to-transparent',
+                  'border-muted-foreground/30 group-hover:border-primary/50',
+                  'shadow-sm group-hover:shadow-lg',
+                  'h-full'
+                )}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
+                  {/* Plus Icon with Semantic Container */}
+                  <div className="flex items-center justify-center mb-3">
+                    <div
+                      className={cn(
+                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                        'bg-primary opacity-5 group-hover:opacity-10 transition-opacity duration-300'
+                      )}
+                    >
+                      <Plus
+                        className={cn(
+                          'w-6 h-6 transition-all duration-300',
+                          'text-muted-foreground group-hover:text-primary group-hover:scale-110'
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Add Folder Text */}
+                  <div className="space-y-2">
+                    <h3
+                      className={cn(
+                        'font-semibold text-sm transition-colors',
+                        'text-muted-foreground group-hover:text-primary'
+                      )}
+                    >
+                      New Task List
+                    </h3>
+                    <p className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                      Click to create
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Empty State */}
@@ -302,6 +446,13 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
           </Button>
         </div>
       )}
+
+      {/* Create Task List Dialog */}
+      <CreateTaskDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onCreateTask={handleCreateTaskList}
+      />
     </div>
   );
 };
