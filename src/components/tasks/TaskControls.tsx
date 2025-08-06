@@ -20,10 +20,10 @@ import {
   Search,
   Plus,
   X,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { Toggle } from '@/components/ui/toggle';
 import {
   Tooltip,
   TooltipContent,
@@ -266,13 +266,15 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
 
 export const TaskControls: React.FC<TaskControlsProps> = ({
   className,
-  taskCount = 0,
+  taskCount = 0, // Keep for interface compatibility but not used in display
   completedCount = 0,
   onAddPane,
   canAddPane = false,
   searchValue = '',
   onSearchChange,
 }) => {
+  // Suppress unused variable warning - taskCount kept for interface compatibility
+  void taskCount;
   const {
     taskViewMode,
     setTaskViewMode,
@@ -333,18 +335,6 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             List
           </Button>
         </div>
-
-        {/* Task Count Badge */}
-        {taskCount > 0 && (
-          <Badge variant="secondary" className="text-xs">
-            {taskCount} tasks
-            {completedCount > 0 && (
-              <span className="ml-1 text-muted-foreground">
-                • {completedCount} completed
-              </span>
-            )}
-          </Badge>
-        )}
       </div>
 
       {/* Right Section - Icon-Only Controls */}
@@ -426,6 +416,55 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             </TooltipContent>
           </Tooltip>
 
+          {/* Show Completed Toggle with Checkmark */}
+          <div className="relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    handleShowCompletedChange(!globalShowCompleted)
+                  }
+                  className={cn(
+                    // Base styling - consistent with other icon buttons
+                    'h-7 w-7 p-0',
+                    // Default state
+                    globalShowCompleted
+                      ? [
+                          // On state - calendar green with visible border and transparency (same as Autotag)
+                          'bg-[oklch(0.7_0.15_140_/_0.15)] text-foreground border border-[oklch(0.7_0.15_140)]',
+                          // Dark mode adjustments
+                          'dark:bg-[oklch(0.7_0.15_140_/_0.1)] dark:border-[oklch(0.7_0.15_140)]',
+                          // Hover states for on state
+                          'hover:bg-[oklch(0.7_0.15_140_/_0.2)] dark:hover:bg-[oklch(0.7_0.15_140_/_0.15)]',
+                        ]
+                      : [
+                          // Off state - default ghost button styling
+                          'text-muted-foreground hover:text-foreground border border-transparent',
+                          'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+                        ]
+                  )}
+                  aria-label={`${globalShowCompleted ? 'Hide' : 'Show'} completed tasks`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{globalShowCompleted ? 'Hide' : 'Show'} completed tasks</p>
+              </TooltipContent>
+            </Tooltip>
+            {/* Superscript completion count using shadcn badge */}
+            {completedCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-medium"
+              >
+                {completedCount > 99 ? '99+' : completedCount}
+              </Badge>
+            )}
+          </div>
+
           {/* Add Pane Button */}
           {canAddPane && onAddPane && (
             <Tooltip>
@@ -443,23 +482,6 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                 <p>Add new pane</p>
               </TooltipContent>
             </Tooltip>
-          )}
-        </div>
-
-        {/* Show Completed Toggle */}
-        <div className="flex items-center gap-2 ml-2">
-          <Toggle
-            pressed={globalShowCompleted}
-            onPressedChange={handleShowCompletedChange}
-            className="h-7 px-2 text-xs"
-            title={`${globalShowCompleted ? 'Hide' : 'Show'} completed tasks`}
-          >
-            Show completed
-          </Toggle>
-          {completedCount > 0 && (
-            <Badge variant="outline" className="text-xs h-5">
-              {completedCount}
-            </Badge>
           )}
         </div>
       </div>

@@ -1,0 +1,28 @@
+/* Defines the custom shape of the folder using a clip-path */
+.folder-shape {
+  position: relative;
+  background-color: var(--card-background, white);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 18px; /* Fallback for browsers that don't support clip-path */
+
+  /* The SVG path defines the folder shape with a tab on the top-left.
+     It's designed for a container with an approximate 4:3 aspect ratio. */
+  clip-path: path(
+    'M18.1,1.5 C10.9,1.5 5.1,7.3 5.1,14.5 L5.1,20.5 L38.5,20.5 C42.1,20.5 45.1,17.5 45.1,13.9 L45.1,10.1 C45.1,5.5 49.4,1.5 54.5,1.5 L142.5,1.5 C150.2,1.5 156.5,7.8 156.5,15.5 L156.5,109.5 C156.5,117.2 150.2,123.5 142.5,123.5 L18.1,123.5 C10.9,123.5 5.1,117.7 5.1,110.5 L5.1,92.5 L5.1,20.5 C5.1,18.5 5.1,14.5 18.1,1.5 Z'
+  );
+}
+
+/* Creates the colored tab indicator on top of the folder */
+.folder-shape::before {
+  content: '';
+  position: absolute;
+  top: 1.5px; /* Position at the very top */
+  left: 12px;
+  width: 30px;
+  height: 5px; /* Height of the indicator line */
+  background-color: var(
+    --folder-tab-color,
+    #6d28d9
+  ); /* Default to purple, can be overridden */
+  border-radius: 2px;
+}

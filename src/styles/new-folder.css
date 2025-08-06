@@ -1,0 +1,125 @@
+/* 
+  New folder design styles adapted from the user-provided snippet.
+  This uses CSS variables to integrate with the existing theme.
+*/
+
+.folder-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 75%; /* 4:3 aspect ratio */
+  cursor: pointer;
+  outline: none;
+}
+
+.folder-wrapper:focus-visible .folder-body {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--ring);
+}
+
+.folder-body {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--card);
+  border-radius: 8px 18px 18px 18px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.08));
+  transition: all 0.2s ease-in-out;
+}
+
+.folder-wrapper.group:hover .folder-body {
+  transform: translateY(-4px);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12));
+}
+
+.folder-body::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0px;
+  width: 45%;
+  max-width: 90px;
+  height: 12px;
+  background: var(--card);
+  border-top-left-radius: 10px;
+  clip-path: path('M 0 0 L 70 0 C 85 1, 80 12, 95 12 L 0 12 z');
+  transition: background-color 0.2s ease-in-out;
+}
+
+.folder-body::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  width: 35%;
+  max-width: 50px;
+  height: 4px;
+  top: -10px;
+  background: var(--folder-color, #7036e9);
+  border-radius: 0 0 3px 3px;
+}
+
+.folder-content {
+  position: absolute;
+  inset: 0;
+  padding: 1.25rem;
+  padding-top: 1.5rem; /* More space at the top */
+}
+
+/* --- HOVER PREVIEW STYLES --- */
+
+.folder-content .default-view {
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.folder-content .preview-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.folder-wrapper.group:hover .default-view {
+  opacity: 0;
+}
+
+.folder-wrapper.group:hover .preview-view {
+  opacity: 1;
+}
+
+/* --- ADD NEW FOLDER STYLES --- */
+
+.add-new-folder {
+  background: transparent;
+  border: 2px dashed var(--border);
+}
+
+.folder-wrapper.group:hover .add-new-folder {
+  border-color: var(--primary);
+  background: hsl(var(--primary) / 0.05);
+}
+
+/* Use a different tab color for the add new button */
+.add-new-folder::after {
+  background: var(--border);
+  transition: background-color 0.2s ease-in-out;
+}
+
+.folder-wrapper.group:hover .add-new-folder::after {
+  background: var(--primary);
+}
+
+/* The tab shape itself should be transparent to match the body */
+.add-new-folder::before {
+  background: transparent;
+}

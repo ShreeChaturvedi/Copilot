@@ -16,8 +16,7 @@ import { TaskItem } from './TaskItem';
 import type { Task } from '@/types';
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+
 import { ColorPicker } from '@/components/ui/color-picker';
 import {
   Collapsible,
@@ -49,6 +48,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { IconPicker } from '@/components/ui/icon-picker';
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
+import { useUIStore } from '@/stores/uiStore';
 
 // Task groups interface
 export interface TaskGroup {
@@ -111,7 +111,8 @@ export const TaskList: React.FC<TaskListProps> = ({
   onShowCreateTaskDialog,
   hideHeader = false,
 }) => {
-  const [showCompleted, setShowCompleted] = useState(false);
+  // Use global show completed state instead of local state
+  const { globalShowCompleted } = useUIStore();
   const [isTasksOpen, setIsTasksOpen] = useState(true);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -149,12 +150,12 @@ export const TaskList: React.FC<TaskListProps> = ({
 
   const displayedTasks = useMemo(() => {
     // Return stable reference when possible
-    if (!showCompleted) {
+    if (!globalShowCompleted) {
       return activeTasks;
     }
     // Only create new array when we actually need to combine them
     return [...activeTasks, ...completedTasks];
-  }, [activeTasks, completedTasks, showCompleted]);
+  }, [activeTasks, completedTasks, globalShowCompleted]);
 
   // Get the icon component for the active task group
   const ActiveGroupIcon =
@@ -449,24 +450,6 @@ export const TaskList: React.FC<TaskListProps> = ({
         )}
 
         <CollapsibleContent className="space-y-2">
-          {/* Show/Hide Completed Tasks Switch */}
-          {completedTasks.length > 0 && (
-            <div className="flex items-center justify-between py-2">
-              <Label
-                htmlFor="show-completed"
-                className="text-xs text-muted-foreground cursor-pointer"
-              >
-                Show completed tasks ({completedTasks.length})
-              </Label>
-              <Switch
-                id="show-completed"
-                checked={showCompleted}
-                onCheckedChange={setShowCompleted}
-                className="scale-75"
-              />
-            </div>
-          )}
-
           {/* Tasks List */}
           <div className="space-y-1">
             {displayedTasks.map((task) => (
