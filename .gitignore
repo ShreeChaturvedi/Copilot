@@ -23,6 +23,27 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Database
+*.db
+*.sqlite
+
+# Monorepo
+packages/*/dist
+packages/*/node_modules
+
+# Prisma
+packages/backend/prisma/migrations/*
+!packages/backend/prisma/migrations/.gitkeep
+
+# Docker
+docker-compose.override.yml
+
 # Gemini-added ignores
 .kiro/
 .shree/

@@ -2,13 +2,19 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/backend" }
   ],
   "compilerOptions": {
     "types": ["vitest/globals", "@testing-library/jest-dom"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./packages/shared/src/*"],
+      "@backend/*": ["./packages/backend/src/*"],
+      "@api/*": ["./api/*"],
+      "@lib/*": ["./lib/*"]
     }
   }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { format, isToday, isTomorrow, isThisWeek, isAfter } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
@@ -15,30 +15,30 @@ interface GroupedEvents {
   [key: string]: CalendarEvent[];
 }
 
-export const EventOverview: React.FC<EventOverviewProps> = ({
+const EventOverviewComponent: React.FC<EventOverviewProps> = ({
   maxEvents = 5,
-  className
+  className,
 }) => {
   const { data: calendars = [] } = useCalendars();
   const { data: allEvents = [] } = useEvents();
 
   // Filter events to get visible calendar events only
   const visibleCalendarNames = calendars
-    .filter(cal => cal.visible)
-    .map(cal => cal.name);
+    .filter((cal) => cal.visible)
+    .map((cal) => cal.name);
 
   const upcomingEvents = React.useMemo(() => {
     const now = new Date();
 
     return allEvents
-      .filter(event => {
+      .filter((event) => {
         // Only show events from visible calendars
         if (!visibleCalendarNames.includes(event.calendarName)) {
           return false;
         }
 
         const eventStart = new Date(event.start);
-        
+
         // Show events from today forward
         return isAfter(eventStart, now) || isToday(eventStart);
       })
@@ -50,7 +50,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
   const groupedEvents: GroupedEvents = React.useMemo(() => {
     const groups: GroupedEvents = {};
 
-    upcomingEvents.forEach(event => {
+    upcomingEvents.forEach((event) => {
       const eventDate = new Date(event.start);
       let dayKey: string;
 
@@ -75,7 +75,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
 
   // Get calendar color for an event
   const getEventColor = (calendarName: string) => {
-    const calendar = calendars.find(cal => cal.name === calendarName);
+    const calendar = calendars.find((cal) => cal.name === calendarName);
     return calendar?.color || '#6366f1';
   };
 
@@ -89,7 +89,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
             Upcoming Events
           </h3>
         </div>
-        
+
         <div className="text-center py-4 text-muted-foreground">
           <CalendarIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
           <p className="text-xs">No upcoming events</p>
@@ -106,7 +106,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
           Upcoming Events
         </h3>
       </div>
-      
+
       <div className="space-y-4">
         {Object.entries(groupedEvents).map(([dayKey, events]) => (
           <div key={dayKey} className="space-y-2">
@@ -114,7 +114,7 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
             <div className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
               {dayKey}
             </div>
-            
+
             {/* Events for this day */}
             <div className="space-y-1">
               {events.map((event) => (
@@ -134,40 +134,48 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
                   <div className="relative flex-shrink-0">
                     <div
                       className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10 dark:ring-white/10"
-                      style={{ backgroundColor: getEventColor(event.calendarName) }}
+                      style={{
+                        backgroundColor: getEventColor(event.calendarName),
+                      }}
                     />
                   </div>
-                  
+
                   {/* Event time with better typography */}
                   <span className="text-xs font-medium text-muted-foreground flex-shrink-0 tracking-wide">
-                    {event.allDay ? 'All day' : format(new Date(event.start), 'h:mm a')}
+                    {event.allDay
+                      ? 'All day'
+                      : format(new Date(event.start), 'h:mm a')}
                   </span>
-                  
+
                   {/* Event title with improved hover effects */}
-                  <span className={cn(
-                    'text-sm truncate flex-1 font-medium transition-colors duration-200',
-                    'group-hover:text-sidebar-accent-foreground',
-                    'text-sidebar-foreground/90 group-hover:text-sidebar-foreground'
-                  )}>
+                  <span
+                    className={cn(
+                      'text-sm truncate flex-1 font-medium transition-colors duration-200',
+                      'group-hover:text-sidebar-accent-foreground',
+                      'text-sidebar-foreground/90 group-hover:text-sidebar-foreground'
+                    )}
+                  >
                     {event.title}
                   </span>
-                  
+
                   {/* Optional location indicator with modern styling */}
                   {event.location && (
-                    <div className={cn(
-                      'w-1.5 h-1.5 bg-muted-foreground/50 rounded-full flex-shrink-0',
-                      'group-hover:bg-sidebar-accent-foreground/60 transition-colors duration-200'
-                    )} />
+                    <div
+                      className={cn(
+                        'w-1.5 h-1.5 bg-muted-foreground/50 rounded-full flex-shrink-0',
+                        'group-hover:bg-sidebar-accent-foreground/60 transition-colors duration-200'
+                      )}
+                    />
                   )}
                 </div>
               ))}
             </div>
           </div>
         ))}
-        
+
         {/* Show count if there are more events */}
         {(() => {
-          const totalUpcomingEvents = allEvents.filter(event => {
+          const totalUpcomingEvents = allEvents.filter((event) => {
             if (!visibleCalendarNames.includes(event.calendarName)) {
               return false;
             }
@@ -175,18 +183,39 @@ export const EventOverview: React.FC<EventOverviewProps> = ({
             const now = new Date();
             return isAfter(eventStart, now) || isToday(eventStart);
           }).length;
-          
-          return totalUpcomingEvents > maxEvents && (
-            <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
-              <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
-                +{totalUpcomingEvents - maxEvents} more upcoming events
-              </span>
-            </div>
+
+          return (
+            totalUpcomingEvents > maxEvents && (
+              <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
+                <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+                  +{totalUpcomingEvents - maxEvents} more upcoming events
+                </span>
+              </div>
+            )
           );
         })()}
       </div>
     </div>
   );
 };
+
+// Custom comparison function for EventOverview
+const EventOverviewMemoComparison = (
+  prevProps: EventOverviewProps,
+  nextProps: EventOverviewProps
+) => {
+  // Compare primitive props
+  if (prevProps.maxEvents !== nextProps.maxEvents) return false;
+  if (prevProps.className !== nextProps.className) return false;
+
+  return true; // Props are equal, skip re-render
+};
+
+// Memoized EventOverview component - relies on TanStack Query cache invalidation
+// for data changes rather than prop changes
+export const EventOverview = memo(
+  EventOverviewComponent,
+  EventOverviewMemoComparison
+);
 
 export default EventOverview;

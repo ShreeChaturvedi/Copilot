@@ -9,3 +9,9 @@ build
 *.lock
 package-lock.json
 yarn.lock
+packages/*/dist
+packages/*/node_modules
+.env
+.env.local
+.env.production
+.env.staging

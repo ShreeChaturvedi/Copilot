@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Calendar } from 'lucide-react';
 import { BaseList, CheckboxModeItem } from '@/components/ui/BaseList';
 import { CreateCalendarDialog } from '@/components/dialogs/CreateCalendarDialog';
@@ -31,12 +31,12 @@ function calendarToBaseItem(calendar: Calendar): CheckboxModeItem {
   };
 }
 
-export const CalendarList: React.FC<CalendarListProps> = ({
+const CalendarListComponent: React.FC<CalendarListProps> = ({
   calendars,
   onToggleCalendar,
   onAddCalendar,
   onEditCalendar,
-  onDeleteCalendar
+  onDeleteCalendar,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
 
@@ -55,9 +55,11 @@ export const CalendarList: React.FC<CalendarListProps> = ({
     onEditCalendar(item.name, name, color);
   };
 
-  const handleDelete = onDeleteCalendar ? (item: CheckboxModeItem) => {
-    onDeleteCalendar(item.name);
-  } : undefined;
+  const handleDelete = onDeleteCalendar
+    ? (item: CheckboxModeItem) => {
+        onDeleteCalendar(item.name);
+      }
+    : undefined;
 
   const handleCreateFromDialog = (data: {
     name: string;
@@ -92,5 +94,25 @@ export const CalendarList: React.FC<CalendarListProps> = ({
     />
   );
 };
+
+// Custom comparison function for CalendarList
+const CalendarListMemoComparison = (
+  prevProps: CalendarListProps,
+  nextProps: CalendarListProps
+) => {
+  // Compare calendars array by reference (most common change)
+  if (prevProps.calendars !== nextProps.calendars) return false;
+
+  // Function props assumed to be stable (will be optimized in LeftPane with useCallback)
+  // We don't compare function props as they should be memoized by the parent
+
+  return true; // Props are equal, skip re-render
+};
+
+// Memoized CalendarList component
+export const CalendarList = memo(
+  CalendarListComponent,
+  CalendarListMemoComparison
+);
 
 export default CalendarList;

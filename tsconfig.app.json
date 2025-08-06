@@ -24,7 +24,10 @@
     /* Path Mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./packages/shared/src/*"],
+      "@api/*": ["./api/*"],
+      "@lib/*": ["./lib/*"]
     }
   },
   "include": ["src"],

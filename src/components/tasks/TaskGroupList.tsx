@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { List } from 'lucide-react';
 import { BaseList, SelectionModeItem } from '@/components/ui/BaseList';
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
@@ -16,8 +16,21 @@ export interface TaskGroupListProps {
   taskGroups: TaskGroup[];
   activeTaskGroupId?: string;
   onSelectTaskGroup: (id: string) => void;
-  onAddTaskGroup: (data: { name: string; iconId: string; color: string; description?: string }) => void;
-  onEditTaskGroup: (id: string, updates: { name: string; iconId: string; color: string; description?: string }) => void;
+  onAddTaskGroup: (data: {
+    name: string;
+    iconId: string;
+    color: string;
+    description?: string;
+  }) => void;
+  onEditTaskGroup: (
+    id: string,
+    updates: {
+      name: string;
+      iconId: string;
+      color: string;
+      description?: string;
+    }
+  ) => void;
   onDeleteTaskGroup?: (id: string) => void;
 }
 
@@ -32,13 +45,13 @@ function taskGroupToBaseItem(taskGroup: TaskGroup): SelectionModeItem {
   };
 }
 
-export const TaskGroupList: React.FC<TaskGroupListProps> = ({
+const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   taskGroups,
   activeTaskGroupId,
   onSelectTaskGroup,
   onAddTaskGroup,
   onEditTaskGroup,
-  onDeleteTaskGroup
+  onDeleteTaskGroup,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
 
@@ -54,25 +67,27 @@ export const TaskGroupList: React.FC<TaskGroupListProps> = ({
       name,
       iconId: 'CheckSquare',
       color,
-      description: ''
+      description: '',
     });
   };
 
   const handleEdit = (item: SelectionModeItem, name: string, color: string) => {
-    const originalTaskGroup = taskGroups.find(tg => tg.id === item.id);
+    const originalTaskGroup = taskGroups.find((tg) => tg.id === item.id);
     if (originalTaskGroup) {
       onEditTaskGroup(item.id, {
         name,
         iconId: originalTaskGroup.iconId,
         color,
-        description: originalTaskGroup.description
+        description: originalTaskGroup.description,
       });
     }
   };
 
-  const handleDelete = onDeleteTaskGroup ? (item: SelectionModeItem) => {
-    onDeleteTaskGroup(item.id);
-  } : undefined;
+  const handleDelete = onDeleteTaskGroup
+    ? (item: SelectionModeItem) => {
+        onDeleteTaskGroup(item.id);
+      }
+    : undefined;
 
   const handleCreateFromDialog = (data: {
     name: string;
@@ -84,7 +99,7 @@ export const TaskGroupList: React.FC<TaskGroupListProps> = ({
       name: data.name,
       iconId: data.iconId,
       color: data.color,
-      description: data.description
+      description: data.description,
     });
   };
 
@@ -113,5 +128,26 @@ export const TaskGroupList: React.FC<TaskGroupListProps> = ({
     />
   );
 };
+
+// Custom comparison function for TaskGroupList
+const TaskGroupListMemoComparison = (
+  prevProps: TaskGroupListProps,
+  nextProps: TaskGroupListProps
+) => {
+  // Compare core data arrays by reference (most common change)
+  if (prevProps.taskGroups !== nextProps.taskGroups) return false;
+  if (prevProps.activeTaskGroupId !== nextProps.activeTaskGroupId) return false;
+
+  // Function props assumed to be stable (will be optimized in LeftPane with useCallback)
+  // We don't compare function props as they should be memoized by the parent
+
+  return true; // Props are equal, skip re-render
+};
+
+// Memoized TaskGroupList component
+export const TaskGroupList = memo(
+  TaskGroupListComponent,
+  TaskGroupListMemoComparison
+);
 
 export default TaskGroupList;

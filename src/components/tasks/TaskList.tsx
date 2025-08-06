@@ -1,8 +1,8 @@
 /**
- * TaskList - Modern professional design
+ * TaskList - Modern professional design with React.memo optimization
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -94,7 +94,7 @@ const TASK_COLORS = [
   '#84cc16', // Lime
 ];
 
-export const TaskList: React.FC<TaskListProps> = ({
+const TaskListComponent: React.FC<TaskListProps> = ({
   tasks,
   taskGroups = [],
   activeTaskGroupId,
@@ -500,5 +500,29 @@ export const TaskList: React.FC<TaskListProps> = ({
     </div>
   );
 };
+
+// Custom comparison function to prevent unnecessary re-renders
+const TaskListMemoComparison = (
+  prevProps: TaskListProps,
+  nextProps: TaskListProps
+) => {
+  // Compare core data arrays by reference and length first (most common changes)
+  if (prevProps.tasks !== nextProps.tasks) return false;
+  if (prevProps.taskGroups !== nextProps.taskGroups) return false;
+
+  // Compare primitive values
+  if (prevProps.activeTaskGroupId !== nextProps.activeTaskGroupId) return false;
+  if (prevProps.showCreateTaskDialog !== nextProps.showCreateTaskDialog)
+    return false;
+  if (prevProps.hideHeader !== nextProps.hideHeader) return false;
+
+  // Function props are assumed to be stable (will be optimized in LeftPane with useCallback)
+  // We don't compare function props as they should be memoized by the parent
+
+  return true; // Props are equal, skip re-render
+};
+
+// Memoized TaskList component
+export const TaskList = memo(TaskListComponent, TaskListMemoComparison);
 
 export default TaskList;
