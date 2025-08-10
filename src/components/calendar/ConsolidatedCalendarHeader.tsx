@@ -232,9 +232,9 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
       className
     )}>
       {/* Three-section layout: Left, Center, Right */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
         {/* Left Section: Sidebar trigger and title */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-3 flex-shrink-0 justify-self-start">
           <SmoothSidebarTrigger position="rightPane" />
           <h2 className="text-lg font-semibold text-foreground">
             {calendarTitle.includes(' ') && (currentView === 'dayGridMonth' || currentView === 'timeGridWeek') ? (
@@ -248,8 +248,8 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
           </h2>
         </div>
         
-        {/* Center Section: View Switcher (dead center) */}
-        <div className="flex justify-center flex-1">
+        {/* Center Section: View Switcher (dead center of header) */}
+        <div className="justify-self-center">
           <ViewSwitcher
             currentView={currentView}
             onViewChange={onViewChange}
@@ -257,7 +257,7 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
         </div>
         
         {/* Right Section: Navigation and New Event */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-3 flex-shrink-0 justify-self-end">
           {/* Calendar Navigation */}
           <div className="flex items-center gap-2">
             <Button

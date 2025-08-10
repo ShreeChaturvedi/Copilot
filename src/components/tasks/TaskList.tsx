@@ -10,11 +10,13 @@ import {
   Settings,
   Edit,
   Trash2,
+  CheckSquare,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { TaskItem } from './TaskItem';
-import type { Task } from '@/types';
+import type { Task } from "@shared/types";
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
+import { groupItemsByDate, getDayKeyOrder, getTimeString, isItemOverdue } from '@/utils/dateGrouping';
 import { Button } from '@/components/ui/Button';
 
 import { ColorPicker } from '@/components/ui/color-picker';
@@ -81,6 +83,8 @@ export interface TaskListProps {
   showCreateTaskDialog?: boolean;
   onShowCreateTaskDialog?: (show: boolean) => void;
   hideHeader?: boolean;
+  calendarMode?: boolean; // New prop for calendar view mode
+  maxTasks?: number; // New prop to limit tasks shown in calendar mode
 }
 
 const TASK_COLORS = [
@@ -110,6 +114,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   showCreateTaskDialog = false,
   onShowCreateTaskDialog,
   hideHeader = false,
+  calendarMode = false,
+  maxTasks = 10,
 }) => {
   // Use global show completed state instead of local state
   const { globalShowCompleted } = useUIStore();
@@ -137,8 +143,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     // Filter tasks by active task group
     const groupTasks = tasks.filter(
       (task) =>
-        task.groupId === activeTaskGroupId ||
-        (!task.groupId && activeTaskGroupId === 'default')
+        activeTaskGroupId === 'all' ||
+        task.taskListId === activeTaskGroupId ||
+        (!task.taskListId && activeTaskGroupId === 'default')
     );
 
     // Use partition to avoid creating new arrays unnecessarily
@@ -156,6 +163,22 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     // Only create new array when we actually need to combine them
     return [...activeTasks, ...completedTasks];
   }, [activeTasks, completedTasks, globalShowCompleted]);
+
+  // Calendar mode: Group tasks by date and limit count
+  const { groupedTasks, totalTaskCount } = useMemo(() => {
+    if (!calendarMode) {
+      return { groupedTasks: null, totalTaskCount: 0 };
+    }
+
+    // In calendar mode, filter to only show active tasks (no completed)
+    const tasksForCalendar = activeTasks.slice(0, maxTasks);
+    const totalCount = activeTasks.length;
+
+    // Group tasks by due date
+    const grouped = groupItemsByDate(tasksForCalendar, (task) => task.dueDate);
+
+    return { groupedTasks: grouped, totalTaskCount: totalCount };
+  }, [calendarMode, activeTasks, maxTasks]);
 
   // Get the icon component for the active task group
   const ActiveGroupIcon =
@@ -245,7 +268,28 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     </DropdownMenuItem>
   );
 
+  // Handle empty state - different for calendar mode
   if (activeTasks.length === 0 && completedTasks.length === 0) {
+    if (calendarMode) {
+      // Calendar mode empty state - similar to EventOverview
+      return (
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-sidebar-foreground" />
+            <h3 className="text-sm font-semibold text-sidebar-foreground">
+              {activeTaskGroupId === 'all' ? 'All Tasks' : 'Upcoming Tasks'}
+            </h3>
+          </div>
+          
+          <div className="text-center py-4 text-muted-foreground">
+            <CheckSquare className="w-6 h-6 mx-auto mb-2 opacity-50" />
+            <p className="text-xs">No upcoming tasks</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Default mode empty state (existing)
     return (
       <div className="space-y-3 mt-4">
         <div className="flex items-center justify-between">
@@ -398,7 +442,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 containerClassName="inline-block"
               >
                 <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                  {activeTaskGroup.name}
+                  {activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name}
                 </div>
               </CursorTooltip>
             </div>
@@ -450,21 +494,64 @@ const TaskListComponent: React.FC<TaskListProps> = ({
         )}
 
         <CollapsibleContent className="space-y-2">
-          {/* Tasks List */}
-          <div className="space-y-1">
-            {displayedTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={onToggleTask}
-                onEdit={onEditTask}
-                onDelete={onDeleteTask}
-                onSchedule={onScheduleTask}
-                onRemoveTag={onRemoveTag}
-                groupColor={activeTaskGroup.color}
-              />
-            ))}
-          </div>
+          {/* Tasks List - Calendar Mode or Default Mode */}
+          {calendarMode && groupedTasks ? (
+            /* Calendar Mode: Date-grouped display like EventOverview */
+            <div className="space-y-4">
+              {getDayKeyOrder(Object.keys(groupedTasks)).map((dayKey) => (
+                <div key={dayKey} className="space-y-2">
+                  {/* Day heading with improved styling */}
+                  <div className={`text-xs font-semibold mb-3 uppercase tracking-wider ${
+                    dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
+                  }`}>
+                    {dayKey}
+                  </div>
+
+                  {/* Tasks for this day */}
+                  <div className="space-y-1">
+                    {groupedTasks[dayKey].map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onToggle={onToggleTask}
+                        onEdit={onEditTask}
+                        onDelete={onDeleteTask}
+                        onSchedule={onScheduleTask}
+                        onRemoveTag={onRemoveTag}
+                        groupColor={activeTaskGroup.color}
+                        calendarMode={true}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Show count if there are more tasks */}
+              {totalTaskCount > maxTasks && (
+                <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
+                  <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+                    +{totalTaskCount - maxTasks} more upcoming tasks
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Default Mode: Standard task list */
+            <div className="space-y-1">
+              {displayedTasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggle={onToggleTask}
+                  onEdit={onEditTask}
+                  onDelete={onDeleteTask}
+                  onSchedule={onScheduleTask}
+                  onRemoveTag={onRemoveTag}
+                  groupColor={activeTaskGroup.color}
+                />
+              ))}
+            </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
 

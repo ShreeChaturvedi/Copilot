@@ -97,7 +97,7 @@ export interface BaseListProps<T extends BaseListItem> {
       iconId: string;
       color: string;
     }) => void;
-    onSubmit?: (data: {
+    onCreateTask?: (data: {
       name: string;
       description: string;
       iconId: string;

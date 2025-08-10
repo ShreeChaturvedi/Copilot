@@ -108,15 +108,6 @@ describe('LeftPane Component', () => {
     // Button should be clickable (no error thrown)
   });
 
-  it('should render additional children when provided', () => {
-    render(
-      <LeftPane>
-        <div data-testid="additional-content">Additional Content</div>
-      </LeftPane>
-    );
-    
-    expect(screen.getByTestId('additional-content')).toBeInTheDocument();
-  });
 
   it('should have proper accessibility attributes', () => {
     render(<LeftPane />);

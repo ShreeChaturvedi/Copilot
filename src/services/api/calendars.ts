@@ -3,7 +3,7 @@
  * Mock implementation that will be replaced with actual API calls
  */
 
-import type { Calendar } from '../../types';
+import type { Calendar } from "@shared/types";
 import { calendarStorage } from '../../utils/storage';
 import { validateCalendar } from '../../utils/validation';
 

@@ -15,7 +15,7 @@ import {
   useScheduleTask,
 } from '../useTasks';
 import { taskStorage } from '../../utils/storage';
-import type { Task } from '../../types';
+import type { Task } from "@shared/types";
 
 // Mock the storage utility
 vi.mock('../../utils/storage', () => ({
@@ -61,6 +61,8 @@ const mockTasks: Task[] = [
     title: 'Test Task 1',
     completed: false,
     createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    userId: 'test-user',
     priority: 'medium',
   },
   {
@@ -68,6 +70,8 @@ const mockTasks: Task[] = [
     title: 'Test Task 2',
     completed: true,
     createdAt: new Date('2024-01-02'),
+    updatedAt: new Date('2024-01-02'),
+    userId: 'test-user',
     scheduledDate: new Date('2024-01-15'),
     priority: 'high',
   },
@@ -76,6 +80,8 @@ const mockTasks: Task[] = [
     title: 'Test Task 3',
     completed: false,
     createdAt: new Date('2024-01-03'),
+    updatedAt: new Date('2024-01-03'),
+    userId: 'test-user',
     priority: 'low',
   },
 ];
@@ -304,6 +310,8 @@ describe('Task Filtering Logic', () => {
       title: 'Important Meeting',
       completed: false,
       createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      userId: 'test-user',
       priority: 'high',
     },
     {
@@ -311,6 +319,8 @@ describe('Task Filtering Logic', () => {
       title: 'Buy groceries',
       completed: true,
       createdAt: new Date('2024-01-02'),
+      updatedAt: new Date('2024-01-02'),
+      userId: 'test-user',
       priority: 'low',
     },
     {
@@ -318,6 +328,8 @@ describe('Task Filtering Logic', () => {
       title: 'Meeting preparation',
       completed: false,
       createdAt: new Date('2024-01-03'),
+      updatedAt: new Date('2024-01-03'),
+      userId: 'test-user',
       scheduledDate: new Date('2024-01-15'),
       priority: 'medium',
     },

@@ -3,7 +3,7 @@
  * Handles patterns like p1, p2, p3, high, low, urgent, critical, etc.
  */
 
-import { Parser, ParsedTag } from '@/types';
+import { Parser, ParsedTag } from "@shared/types";
 import { v4 as uuidv4 } from 'uuid';
 
 export class PriorityParser implements Parser {

@@ -26,11 +26,23 @@ import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 
-import type { CalendarEvent } from "@/types"
+import type { CalendarEvent } from "@shared/types"
 import { useCalendars } from "@/hooks/useCalendars"
 import { useCreateEvent, useUpdateEvent } from "@/hooks/useEvents"
 import { useUIStore } from "@/stores/uiStore"
 import { ConditionalDialogHeader } from "./ConditionalDialogHeader"
+//
+import RecurrenceSection from "./RecurrenceSection"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface EventCreationDialogProps {
   open: boolean
@@ -48,6 +60,8 @@ interface EventFormData {
   description: string
   location: string
   calendarName: string
+  recurrence?: string
+  exceptions?: string[]
 }
 
 
@@ -384,11 +398,27 @@ function EventCreationDialogContent({
       description: initialEventData?.description || "",
       location: initialEventData?.location || "",
       calendarName: initialEventData?.calendarName || defaultCalendar?.name || "",
+      recurrence: initialEventData?.recurrence,
+      exceptions: initialEventData?.exceptions || [],
     }
   })
 
   const [activeTab, setActiveTab] = useState("event")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [scopeDialogOpen, setScopeDialogOpen] = useState(false)
+  const [pendingPayload, setPendingPayload] = useState<null | {
+    start: Date,
+    end: Date,
+    data: {
+      title: string,
+      allDay: boolean,
+      description: string,
+      location: string,
+      calendarName: string,
+      recurrence?: string,
+      exceptions?: string[],
+    }
+  }>(null)
   
   // Ref for the title input to focus it when creating
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -419,6 +449,8 @@ function EventCreationDialogContent({
       description: initialEventData?.description || "",
       location: initialEventData?.location || "",
       calendarName: initialEventData?.calendarName || defaultCalendar?.name || "",
+      recurrence: initialEventData?.recurrence,
+      exceptions: initialEventData?.exceptions || [],
     })
     setActiveTab("event")
   }, [initialEventData, defaultCalendar])
@@ -594,7 +626,26 @@ function EventCreationDialogContent({
     
     try {
       if (isEditing && initialEventData?.id) {
-        // Update existing event
+        // If original event is recurring, show scope dialog AFTER save
+        if (initialEventData?.recurrence) {
+          setPendingPayload({
+            start: startDateTime,
+            end: endDateTime,
+            data: {
+              title: formData.title.trim(),
+              allDay: formData.allDay,
+              description: formData.description.trim(),
+              location: formData.location.trim(),
+              calendarName: formData.calendarName,
+              recurrence: formData.recurrence,
+              exceptions: formData.exceptions,
+            }
+          })
+          setScopeDialogOpen(true)
+          setIsSubmitting(false)
+          return
+        }
+        // Non-recurring: regular update
         await updateEventMutation.mutateAsync({
           id: initialEventData.id,
           data: {
@@ -605,6 +656,8 @@ function EventCreationDialogContent({
             description: formData.description.trim(),
             location: formData.location.trim(),
             calendarName: formData.calendarName,
+            recurrence: formData.recurrence,
+            exceptions: formData.exceptions,
           }
         })
       } else {
@@ -617,6 +670,8 @@ function EventCreationDialogContent({
           description: formData.description.trim(),
           location: formData.location.trim(),
           calendarName: formData.calendarName,
+          recurrence: formData.recurrence,
+          exceptions: formData.exceptions,
         })
       }
 
@@ -751,6 +806,16 @@ function EventCreationDialogContent({
               rows={1}
             />
           </div>
+
+          {/* Recurrence (Repeat) Section */}
+          <RecurrenceSection
+            startDateTime={getStartDateTime()}
+            value={formData.recurrence}
+            onChange={(rrule) => updateFormData('recurrence', rrule || undefined)}
+            onClearExceptions={() => updateFormData('exceptions', [])}
+            exceptions={formData.exceptions || []}
+            showSummary={false}
+          />
         </TabsContent>
 
         <TabsContent value="task" className={`space-y-4 ${isEditing ? 'mt-0' : 'mt-6'}`}>
@@ -776,6 +841,95 @@ function EventCreationDialogContent({
           {isSubmitting ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save" : "Create Event")}
         </Button>
       </div>
+
+      {/* Post-save scope dialog for editing recurring events */}
+      <AlertDialog open={scopeDialogOpen} onOpenChange={setScopeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apply changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is a recurring event. Which events should be updated?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!initialEventData?.id || !pendingPayload) return;
+                // This event: exclude the occurrence, create one-off with changes
+                const iso = new Date(initialEventData.occurrenceInstanceStart || initialEventData.start!).toISOString();
+                const exceptions = Array.from(new Set([...(initialEventData.exceptions || []), iso]));
+                await updateEventMutation.mutateAsync({ id: initialEventData.id as string, data: { exceptions } });
+                await createEventMutation.mutateAsync({
+                  title: pendingPayload.data.title,
+                  start: pendingPayload.start,
+                  end: pendingPayload.end,
+                  allDay: pendingPayload.data.allDay,
+                  description: pendingPayload.data.description,
+                  location: pendingPayload.data.location,
+                  calendarName: pendingPayload.data.calendarName,
+                  color: initialEventData.color,
+                });
+                setScopeDialogOpen(false);
+                onClose();
+              }}
+            >
+              This event
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!initialEventData?.id || !pendingPayload) return;
+                // This and following: clamp rule to UNTIL just before this occurrence, then create follow-up updated rule if needed
+                const { clampRRuleUntil } = await import('@/utils/recurrence');
+                const occStart = new Date(initialEventData.occurrenceInstanceStart || initialEventData.start!);
+                const clamped = clampRRuleUntil(initialEventData.recurrence!, occStart);
+                await updateEventMutation.mutateAsync({ id: initialEventData.id as string, data: { recurrence: clamped } });
+                // Create a new event to represent the updated rule from this point forward if user kept a recurrence.
+                await createEventMutation.mutateAsync({
+                  title: pendingPayload.data.title,
+                  start: pendingPayload.start,
+                  end: pendingPayload.end,
+                  allDay: pendingPayload.data.allDay,
+                  description: pendingPayload.data.description,
+                  location: pendingPayload.data.location,
+                  calendarName: pendingPayload.data.calendarName,
+                  color: initialEventData.color,
+                  recurrence: pendingPayload.data.recurrence,
+                });
+                setScopeDialogOpen(false);
+                onClose();
+              }}
+            >
+              This and following
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={async () => {
+                if (!initialEventData?.id || !pendingPayload) return;
+                // All events: update the master with new values
+                await updateEventMutation.mutateAsync({
+                  id: initialEventData.id as string,
+                  data: {
+                    title: pendingPayload.data.title,
+                    start: pendingPayload.start,
+                    end: pendingPayload.end,
+                    allDay: pendingPayload.data.allDay,
+                    description: pendingPayload.data.description,
+                    location: pendingPayload.data.location,
+                    calendarName: pendingPayload.data.calendarName,
+                    recurrence: pendingPayload.data.recurrence,
+                    exceptions: pendingPayload.data.exceptions,
+                  }
+                });
+                setScopeDialogOpen(false);
+                onClose();
+              }}
+            >
+              All events
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
@@ -794,7 +948,7 @@ export function EventCreationDialog({
   if (peekMode === 'right') {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="sm:max-w-sm p-6 [&>button]:hidden">
+        <SheetContent side="right" className="w-full sm:max-w-md md:max-w-lg p-6 [&>button]:hidden">
           <EventCreationDialogContent
             initialEventData={initialEventData}
             onClose={handleClose}
@@ -806,7 +960,7 @@ export function EventCreationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" showCloseButton={false}>
+      <DialogContent className="sm:max-w-[560px] md:max-w-[640px] max-h-[90vh] overflow-y-auto" showCloseButton={false}>
         <DialogTitle className="sr-only">Create Event</DialogTitle>
         <DialogDescription className="sr-only">
           Create a new event with title, date, time, location, and description

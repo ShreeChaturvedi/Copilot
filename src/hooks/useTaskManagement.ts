@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTasks } from './useTasks';
 import { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
-import { Task, TaskTag } from '@/types';
+import { Task, TaskTag } from '@shared/types';
 import { UseMutationResult } from '@tanstack/react-query';
 
 interface CreateTaskData {
@@ -14,6 +14,12 @@ interface CreateTaskData {
     originalInput: string;
     cleanTitle: string;
   };
+  attachments?: Array<{
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+  }>;
 }
 
 export interface TaskGroup {
@@ -181,8 +187,8 @@ export function useTaskManagement(
     : undefined;
 
   const handleScheduleTask = includeTaskOperations
-    ? (id: string) => {
-        scheduleTask.mutate(id);
+    ? (id: string, scheduledDate: Date) => {
+        scheduleTask.mutate({ id, scheduledDate });
       }
     : undefined;
 

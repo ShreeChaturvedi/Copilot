@@ -10,7 +10,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HighlightedTextareaField } from '../HighlightedTextareaField';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 
 // Mock requestAnimationFrame for testing
 const mockRequestAnimationFrame = vi.fn((callback) => {

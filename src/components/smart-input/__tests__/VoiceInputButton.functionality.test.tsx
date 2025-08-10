@@ -4,6 +4,8 @@
  * Tests for the actual voice input functionality and transcript handling
  */
 
+// @ts-ignore: React needed for JSX in test files
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -13,24 +15,26 @@ import { VoiceInputButton } from '../components/VoiceInputButton';
 const mockSpeechRecognition = {
   start: vi.fn(),
   stop: vi.fn(),
+  abort: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
   continuous: false,
   interimResults: false,
   lang: 'en-US',
   maxAlternatives: 1,
   onstart: null as ((event: Event) => void) | null,
   onend: null as ((event: Event) => void) | null,
-  onresult: null as ((event: SpeechRecognitionEvent) => void) | null,
-  onerror: null as ((event: SpeechRecognitionErrorEvent) => void) | null,
+  onresult: null as ((event: Event) => void) | null,
+  onerror: null as ((event: any) => void) | null,
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   
   // Mock Web Speech API
-  global.window.SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  global.window.webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
   
   // Reset mock functions
   mockSpeechRecognition.start.mockClear();
@@ -76,7 +80,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as SpeechRecognitionEvent;
+    } as unknown as Event;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -119,7 +123,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as SpeechRecognitionEvent;
+    } as unknown as Event;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -162,7 +166,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as SpeechRecognitionEvent;
+    } as unknown as Event;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -185,7 +189,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as SpeechRecognitionEvent;
+    } as unknown as Event;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -231,7 +235,7 @@ describe('VoiceInputButton Functionality', () => {
     // Simulate permission denied error
     const mockErrorEvent = {
       error: 'not-allowed'
-    } as SpeechRecognitionErrorEvent;
+    } as any;
 
     act(() => {
       if (mockSpeechRecognition.onerror) {

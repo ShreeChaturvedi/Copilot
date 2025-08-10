@@ -94,10 +94,9 @@ export const TaskInput: React.FC<TaskInputProps> = ({
             className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
             aria-label={`Current task group: ${activeTaskGroup.name}`}
           >
-            <ActiveGroupIcon
-              className="w-4 h-4"
-              style={{ color: activeTaskGroup.color }}
-            />
+            <span style={{ color: activeTaskGroup.color }}>
+              <ActiveGroupIcon className="w-4 h-4" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
@@ -115,10 +114,9 @@ export const TaskInput: React.FC<TaskInputProps> = ({
                 onClick={() => onSelectTaskGroup?.(group.id)}
                 className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
               >
-                <GroupIcon
-                  className="mr-2 h-4 w-4"
-                  style={{ color: group.color }}
-                />
+                <span className="mr-2" style={{ color: group.color }}>
+                  <GroupIcon className="h-4 w-4" />
+                </span>
                 <span>{group.name}</span>
               </DropdownMenuItem>
             );

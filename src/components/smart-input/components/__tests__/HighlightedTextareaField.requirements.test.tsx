@@ -12,7 +12,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HighlightedTextareaField } from '../HighlightedTextareaField';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 
 describe('HighlightedTextareaField - Requirements Verification', () => {
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
   const createTestTags = (text: string): ParsedTag[] => [
     {
       id: '1',
-      type: 'priority',
+      type: 'priority' as const,
       value: 'high',
       displayText: 'high',
       iconName: 'AlertTriangle',
@@ -45,7 +45,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     },
     {
       id: '2',
-      type: 'date',
+      type: 'date' as const,
       value: new Date('2024-01-15'),
       displayText: 'tomorrow',
       iconName: 'Calendar',

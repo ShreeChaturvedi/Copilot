@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ParseResult, ParsedTag } from '@/types';
+import { ParseResult, ParsedTag } from '@shared/types';
 import { SmartParser } from '../parsers/SmartParser';
 
 export interface UseTextParserOptions {
@@ -66,7 +66,7 @@ export function useTextParser(
   const parser = useMemo(() => getParser(), []);
 
   // Debounced parsing function - using useRef to maintain timeout across renders
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const debouncedParse = useCallback(
     (textToParse: string) => {
@@ -152,7 +152,7 @@ export function useTextParser(
  * Hook for testing parsing without side effects
  */
 export function useTextParserDebug(text: string) {
-  const [debugResult, setDebugResult] = useState<ParseResult | null>(null);
+  const [debugResult, setDebugResult] = useState<{ parserResults: Array<{ parser: string; tags: ParsedTag[] }> } | null>(null);
   const parser = useMemo(() => getParser(), []);
 
   const testParse = useCallback(async () => {

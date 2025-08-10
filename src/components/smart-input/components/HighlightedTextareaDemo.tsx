@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { HighlightedTextareaField } from './HighlightedTextareaField';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 
 export const HighlightedTextareaDemo: React.FC = () => {
   const [value, setValue] = useState(
@@ -18,7 +18,7 @@ export const HighlightedTextareaDemo: React.FC = () => {
   const mockTags: ParsedTag[] = [
     {
       id: '1',
-      type: 'priority',
+      type: 'priority' as const,
       value: 'high',
       displayText: 'high',
       iconName: 'AlertTriangle',
@@ -31,7 +31,7 @@ export const HighlightedTextareaDemo: React.FC = () => {
     },
     {
       id: '2',
-      type: 'date',
+      type: 'date' as const,
       value: new Date('2024-01-15'),
       displayText: 'tomorrow',
       iconName: 'Calendar',
@@ -44,7 +44,7 @@ export const HighlightedTextareaDemo: React.FC = () => {
     },
     {
       id: '3',
-      type: 'time',
+      type: 'time' as const,
       value: '15:00',
       displayText: '3pm',
       iconName: 'Clock',
@@ -57,7 +57,7 @@ export const HighlightedTextareaDemo: React.FC = () => {
     },
     {
       id: '4',
-      type: 'person',
+      type: 'person' as const,
       value: 'john',
       displayText: '@john',
       iconName: 'User',
@@ -70,7 +70,7 @@ export const HighlightedTextareaDemo: React.FC = () => {
     },
     {
       id: '5',
-      type: 'project',
+      type: 'project' as const,
       value: 'project-alpha',
       displayText: '#project-alpha',
       iconName: 'Hash',

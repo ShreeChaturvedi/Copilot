@@ -4,7 +4,6 @@
  * This test creates a demo component to manually test voice input functionality
  */
 
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { SmartTaskInput } from '../SmartTaskInput';
@@ -13,8 +12,10 @@ import { SmartTaskInput } from '../SmartTaskInput';
 const mockSpeechRecognition = {
   start: vi.fn(),
   stop: vi.fn(),
+  abort: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
   continuous: false,
   interimResults: false,
   lang: 'en-US',
@@ -29,8 +30,8 @@ const mockSpeechRecognition = {
 const mockGetUserMedia = vi.fn();
 
 // Set up mocks
-global.window.SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-global.window.webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+(global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
+(global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
 
 Object.defineProperty(global.navigator, 'mediaDevices', {
   value: {
@@ -56,7 +57,6 @@ describe('Voice Input Demo', () => {
           useEnhancedLayout={true}
           enableSmartParsing={true}
           showConfidence={true}
-          placeholder="Try saying: 'Buy groceries tomorrow high priority'"
         />
         <div style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>
           <h3>Features:</h3>

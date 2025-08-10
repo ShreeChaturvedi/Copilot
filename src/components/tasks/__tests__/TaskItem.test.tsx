@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TaskItem } from '../TaskItem';
-import type { Task } from '@/types';
+import type { Task } from "@shared/types";
 
 // Test wrapper with QueryClient
 const createWrapper = () => {
@@ -33,6 +33,8 @@ const mockTask: Task = {
   title: 'Test Task',
   completed: false,
   createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+  userId: 'test-user-1',
 };
 
 const completedTask: Task = {

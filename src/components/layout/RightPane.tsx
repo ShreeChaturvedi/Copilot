@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useState, useRef } from 'react';
 import { CalendarView, ConsolidatedCalendarHeader, CalendarViewType } from '../calendar';
 import { EventCreationDialog, EventDisplayDialog } from '../dialogs';
-import type { CalendarEvent } from '../../types';
+import type { CalendarEvent } from "@shared/types";
 import FullCalendar from '@fullcalendar/react';
 
 interface RightPaneProps {

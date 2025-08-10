@@ -1,11 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap");
+/* Inter as base font per UI requirement */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @import "tw-animate-css";
 
 @import "tailwindcss";
 
 :root {
-  font-family: "Quicksand", system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   line-height: 1.5;
   font-weight: 400;
 
@@ -49,6 +50,13 @@
   --sidebar-ring: oklch(0.705 0.015 286.067);
   --info-popover: color-mix(in srgb, var(--popover) 95%, black 5%);
   --info-popover-foreground: var(--popover-foreground);
+  /* Global scrollbar tokens */
+  --scrollbar-size: 8px;
+  --scrollbar-size-lg: 12px;
+  --scrollbar-track: hsl(var(--muted) / 0.3);
+  --scrollbar-thumb: hsl(var(--muted-foreground) / 0.3);
+  --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.5);
+  --scrollbar-thumb-active: hsl(var(--muted-foreground) / 0.7);
 }
 
 body {
@@ -60,11 +68,18 @@ body {
 
 html {
   overscroll-behavior: none;
+  /* Prevent layout shift when scrollbars appear */
+  scrollbar-gutter: stable both-edges;
 }
 
 /* Allow nested scrolling for specific elements */
 body .time-picker-scroll {
   overscroll-behavior: auto !important;
+}
+
+/* Also stabilize body scrollbars */
+body {
+  scrollbar-gutter: stable both-edges;
 }
 
 h1 {
@@ -160,6 +175,13 @@ h1 {
   --sidebar-ring: oklch(0.552 0.016 285.938);
   --info-popover: color-mix(in srgb, var(--popover) 95%, black 5%);
   --info-popover-foreground: var(--popover-foreground);
+  /* Dark mode scrollbar tokens */
+  --scrollbar-size: 8px;
+  --scrollbar-size-lg: 12px;
+  --scrollbar-track: hsl(var(--muted) / 0.2);
+  --scrollbar-thumb: hsl(var(--muted-foreground) / 0.35);
+  --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.55);
+  --scrollbar-thumb-active: hsl(var(--muted-foreground) / 0.75);
 }
 
 @layer base {
@@ -236,32 +258,48 @@ h1 {
   /* Global scrollbar styling for all elements - external monitor compatible */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  /* Keep action icons visible when dropdown is open */
+  .group-hover\:calendar\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+    opacity: 1 !important;
+  }
+  .group-hover\:task-list\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+    opacity: 1 !important;
+  }
+  .group-hover\:task\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+    opacity: 1 !important;
   }
 
   /* Webkit browsers - Chrome, Safari, Edge */
   *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
   }
 
   *::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.3);
+    background: var(--scrollbar-track);
     border-radius: 4px;
   }
 
   *::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
     border: 1px solid hsl(var(--background));
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: var(--scrollbar-thumb-hover);
   }
 
   *::-webkit-scrollbar-thumb:active {
-    background: hsl(var(--muted-foreground) / 0.7);
+    background: var(--scrollbar-thumb-active);
+  }
+
+  /* Corner where two scrollbars meet */
+  *::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
   }
 
   /* Specific styling for containers that should have more prominent scrollbars */
@@ -271,8 +309,8 @@ h1 {
   }
 
   .scrollbar-styled::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: var(--scrollbar-size-lg);
+    height: var(--scrollbar-size-lg);
   }
 
   .scrollbar-styled::-webkit-scrollbar-track {
@@ -403,4 +441,121 @@ h1 {
     }
   }
 
+}
+
+/* ==========================================
+   Auth Pages: Animated OKLCH Gradient + Frosted Panels + Cursor Glow Border
+   ========================================== */
+@layer components {
+  /* Smoothly animatable custom property for conic-gradient angle */
+  @property --auth-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0turn;
+  }
+  /* Full-page animated background using smooth OKLCH conic gradient overlay */
+  .auth-gradient-bg {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--background);
+    isolation: isolate;
+  }
+  .auth-gradient-bg::before {
+    content: "";
+    position: fixed;
+    inset: -35%;
+    z-index: 0;
+    /* Smooth, continuous hues across the full spectrum in OKLCH */
+    background-image: conic-gradient(
+      in oklch from var(--auth-angle),
+      oklch(0.90 0.12 0) 0deg,
+      oklch(0.90 0.12 60) 60deg,
+      oklch(0.90 0.12 120) 120deg,
+      oklch(0.90 0.12 180) 180deg,
+      oklch(0.90 0.12 240) 240deg,
+      oklch(0.90 0.12 300) 300deg,
+      oklch(0.90 0.12 360) 360deg
+    );
+    filter: blur(120px) saturate(115%);
+    opacity: 0.55;
+    transform: translate3d(0,0,0) scale(1.06);
+    /* Two animations: a very slow, continuous angle rotation; and a subtle breathing scale */
+    animation: auth-angle-rotate 90s linear infinite, auth-breathe 24s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .dark .auth-gradient-bg::before {
+    opacity: 0.35; /* slightly subtler in dark mode */
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .auth-gradient-bg::before {
+      animation: none;
+      transform: none;
+    }
+  }
+
+  /* No explicit dark override: tokens already swap under .dark */
+
+  /* Continuous rotation of the conic gradient's angle (no element rotation, so no corners) */
+  @keyframes auth-angle-rotate {
+    to { --auth-angle: 1turn; }
+  }
+
+  /* Gentle scale breathing */
+  @keyframes auth-breathe {
+    0% { transform: translate3d(0,0,0) scale(1.06); filter: blur(120px) saturate(110%); }
+    50% { transform: translate3d(0,0,0) scale(1.10); filter: blur(120px) saturate(118%); }
+    100% { transform: translate3d(0,0,0) scale(1.06); filter: blur(120px) saturate(110%); }
+  }
+
+  /* Frosted glass panel for light and dark modes */
+  .frosted-panel {
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    background: color-mix(in oklch, var(--card) 65%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+    box-shadow: 0 10px 30px oklch(0 0 0 / 0.12);
+  }
+  .dark .frosted-panel {
+    background: color-mix(in oklch, oklch(0.16 0.02 260) 60%, transparent);
+    border: 1px solid oklch(1 0 0 / 0.10);
+    box-shadow: 0 12px 36px oklch(0 0 0 / 0.45);
+  }
+
+  /* Cursor-following green glow border (border-only effect) */
+  .cursor-glow-border {
+    position: relative;
+    isolation: isolate;
+  }
+  .cursor-glow-border::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px; /* border width */
+    /* Radial gradient in OKLCH centered at cursor position, only visible on border area via mask */
+    background:
+      radial-gradient(
+        in oklch var(--glow-radius, 200px) circle at 
+          var(--glow-x, var(--glow-page-x, 50%)) 
+          var(--glow-y, var(--glow-page-y, 50%)),
+        oklch(0.80 0.19 150 / 0.85) 0%,
+        oklch(0.80 0.19 150 / 0.40) 35%,
+        oklch(0.80 0.19 150 / 0.10) 60%,
+        transparent 70%
+      ) border-box;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.9;
+    transition: opacity 150ms ease;
+    z-index: -1; /* keep it behind button content */
+  }
+  .cursor-glow-border:hover::before { 
+    opacity: 1; 
+    /* On hover, stronger and wider glow all around the button */
+    --glow-radius: 340px;
+  }
 }

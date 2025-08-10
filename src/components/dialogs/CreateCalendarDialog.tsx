@@ -18,12 +18,18 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { IconPicker } from '@/components/ui/icon-picker';
-import { COLOR_PRESETS } from '@/constants/colors';
+import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
 
 export interface CreateCalendarDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateCalendar: (data: {
+  onCreateCalendar?: (data: {
+    name: string;
+    description: string;
+    iconId: string;
+    color: string;
+  }) => void;
+  onCreateTask?: (data: {
     name: string;
     description: string;
     iconId: string;
@@ -34,12 +40,13 @@ export interface CreateCalendarDialogProps {
 export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
   open,
   onOpenChange,
-  onCreateCalendar
+  onCreateCalendar,
+  onCreateTask
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Calendar');
-  const [selectedColor, setSelectedColor] = useState(COLOR_PRESETS[0]);
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Reset form when dialog opens
@@ -64,12 +71,19 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
-    onCreateCalendar({
+    const data = {
       name: trimmedName,
       description: description.trim(),
       iconId: selectedIcon,
       color: selectedColor
-    });
+    };
+
+    // Call whichever callback is provided
+    if (onCreateCalendar) {
+      onCreateCalendar(data);
+    } else if (onCreateTask) {
+      onCreateTask(data);
+    }
 
     onOpenChange(false);
   };
@@ -107,10 +121,9 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
                         style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
                       >
                         {SelectedIconComponent && (
-                          <SelectedIconComponent
-                            className="w-5 h-5"
-                            style={{ color: selectedColor }}
-                          />
+                          <div style={{ color: selectedColor }}>
+                            <SelectedIconComponent className="w-5 h-5" />
+                          </div>
                         )}
                       </Button>
                     </PopoverTrigger>

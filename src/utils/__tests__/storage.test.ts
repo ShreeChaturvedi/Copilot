@@ -18,7 +18,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_CALENDARS,
 } from '../storage';
-import type { Task, CalendarEvent, Calendar, AppSettings, GoogleAuthState } from '../../types';
+import type { Task, CalendarEvent, Calendar, AppSettings, GoogleAuthState } from "@shared/types";
 
 // localStorage is already mocked in setup.ts - no need for custom mock here
 
@@ -48,6 +48,8 @@ describe('Storage Utilities', () => {
       title: 'Test Task',
       completed: false,
       createdAt: new Date('2024-01-15T10:00:00Z'),
+      updatedAt: new Date('2024-01-15T10:00:00Z'),
+      userId: 'test-user',
       scheduledDate: new Date('2024-01-16T10:00:00Z'),
     };
 
@@ -99,6 +101,8 @@ describe('Storage Utilities', () => {
           title: 'New Task',
           completed: false,
           createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'test-user',
         };
         
         const result = taskStorage.addTask(newTask);
@@ -401,6 +405,8 @@ describe('Storage Utilities', () => {
         title: 'Test',
         completed: false,
         createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: 'test-user',
       };
       
       taskStorage.saveTasks([mockTask]);
@@ -420,6 +426,8 @@ describe('Storage Utilities', () => {
         title: 'Imported Task',
         completed: false,
         createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: 'test-user',
       };
       
       const result = importData({ tasks: [mockTask] });

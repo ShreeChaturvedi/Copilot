@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 export interface HighlightedInputFieldProps {
@@ -220,8 +220,6 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
           lineHeight: 'inherit',
           letterSpacing: 'inherit',
         }}
-        id="smart-task-input"
-        name="smart-task-input"
         aria-label="Smart task input with highlighting"
       />
 

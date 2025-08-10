@@ -4,18 +4,13 @@
  */
 
 import nlp from 'compromise';
-import { Parser, ParsedTag } from '@/types';
+import { Parser, ParsedTag } from "@shared/types";
 import { v4 as uuidv4 } from 'uuid';
 
-interface CompromiseDocument {
-  people(): CompromiseMatch[];
-  places(): CompromiseMatch[];
-  organizations(): CompromiseMatch[];
-}
-
-interface CompromiseMatch {
-  text(): string;
-}
+// Using 'any' type for compromise to avoid complex type resolution issues
+// The compromise library has complex nested type definitions that cause conflicts
+type CompromiseDoc = any;
+type CompromiseMatch = any;
 
 export class CompromiseNLPParser implements Parser {
   readonly id = 'compromise-nlp-parser';
@@ -104,7 +99,7 @@ export class CompromiseNLPParser implements Parser {
    * Extract people entities
    */
   private extractPeople(
-    doc: CompromiseDocument,
+    doc: CompromiseDoc,
     text: string,
     tags: ParsedTag[]
   ): void {
@@ -136,7 +131,7 @@ export class CompromiseNLPParser implements Parser {
    * Extract place entities
    */
   private extractPlaces(
-    doc: CompromiseDocument,
+    doc: CompromiseDoc,
     text: string,
     tags: ParsedTag[]
   ): void {
@@ -168,7 +163,7 @@ export class CompromiseNLPParser implements Parser {
    * Extract organization entities
    */
   private extractOrganizations(
-    doc: CompromiseDocument,
+    doc: CompromiseDoc,
     text: string,
     tags: ParsedTag[]
   ): void {
@@ -240,7 +235,7 @@ export class CompromiseNLPParser implements Parser {
   private extractSemanticLabels(text: string, tags: ParsedTag[]): void {
     let bestCategory: string | null = null;
     let bestScore = 0;
-    let bestMatch: RegExpExecArray | null = null;
+    let bestMatch: RegExpMatchArray | null = null;
 
     // Find the category with the highest confidence
     Object.entries(this.taskCategories).forEach(([category, pattern]) => {
@@ -255,26 +250,32 @@ export class CompromiseNLPParser implements Parser {
         if (score > bestScore) {
           bestScore = score;
           bestCategory = category;
-          bestMatch = matches[0] as RegExpMatchArray; // Use first match for position
+          bestMatch = matches[0] as RegExpMatchArray; // Explicit type assertion
         }
       }
     });
 
     // Create semantic label tag
     if (bestCategory && bestMatch) {
-      tags.push({
-        id: uuidv4(),
-        type: 'label',
-        value: bestCategory,
-        displayText: this.formatCategoryDisplayText(bestCategory),
-        iconName: this.getCategoryIcon(bestCategory),
-        startIndex: bestMatch.index!,
-        endIndex: bestMatch.index! + bestMatch[0].length,
-        originalText: bestMatch[0],
-        confidence: Math.min(0.85, 0.5 + bestScore * 0.1),
-        source: this.id,
-        color: this.getCategoryColor(bestCategory),
-      });
+      // Use explicit type casting to avoid TypeScript inference issues
+      const match = bestMatch as any;
+      const matchIndex = match.index;
+      const matchText = match[0];
+      if (typeof matchIndex === 'number' && typeof matchText === 'string') {
+        tags.push({
+          id: uuidv4(),
+          type: 'label',
+          value: bestCategory,
+          displayText: this.formatCategoryDisplayText(bestCategory),
+          iconName: this.getCategoryIcon(bestCategory),
+          startIndex: matchIndex,
+          endIndex: matchIndex + matchText.length,
+          originalText: matchText,
+          confidence: Math.min(0.85, 0.5 + bestScore * 0.1),
+          source: this.id,
+          color: this.getCategoryColor(bestCategory),
+        });
+      }
     }
   }
 

@@ -8,7 +8,6 @@
  * - New list creation
  */
 
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { TaskGroupCombobox } from '../TaskGroupCombobox';

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from '@shared/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -147,7 +147,9 @@ const TagBadge: React.FC<TagBadgeProps> = ({
       title={`${tag.type}: ${tag.displayText}${showConfidence ? ` (${Math.round(tag.confidence * 100)}% confidence)` : ''}`}
     >
       {/* Icon */}
-      <IconComponent className="w-3 h-3" style={{ color: tag.color }} />
+      <div style={{ color: tag.color }}>
+        <IconComponent className="w-3 h-3" />
+      </div>
 
       {/* Text */}
       <span className="text-xs font-medium">{tag.displayText}</span>

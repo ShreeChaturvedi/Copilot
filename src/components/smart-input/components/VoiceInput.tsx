@@ -189,6 +189,18 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   }, [transcript, onTranscriptChange]);
 
+  // Stop listening
+  const handleStopListening = useCallback(() => {
+    SpeechRecognition.stopListening();
+
+    if (autoStopTimer) {
+      clearTimeout(autoStopTimer);
+      setAutoStopTimer(null);
+    }
+
+    onStop?.();
+  }, [autoStopTimer, onStop]);
+
   // Auto-stop timer
   useEffect(() => {
     if (listening && defaultConfig.autoStopTimeout) {
@@ -231,18 +243,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       onError?.(errorMessage);
     }
   }, [defaultConfig, isMicrophoneAvailable, onStart, onError]);
-
-  // Stop listening
-  const handleStopListening = useCallback(() => {
-    SpeechRecognition.stopListening();
-
-    if (autoStopTimer) {
-      clearTimeout(autoStopTimer);
-      setAutoStopTimer(null);
-    }
-
-    onStop?.();
-  }, [autoStopTimer, onStop]);
 
   // Toggle listening
   const handleToggleListening = useCallback(() => {

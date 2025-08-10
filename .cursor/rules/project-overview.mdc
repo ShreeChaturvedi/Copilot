@@ -1,0 +1,295 @@
+---
+alwaysApply: true
+---
+# LLM.md
+
+This file provides guidance to LLMs when working with code in this repository.
+
+## Development Commands
+
+### Core Development (Full Stack)
+- `npm run dev` - Start both frontend and backend in development mode with hot reload
+- `npm run dev:frontend` - Start only the frontend (Vite dev server)
+- `npm run dev:backend` - Start only the backend server
+- `npm run build` - Build all packages for production (shared, frontend, backend)
+- `npm run preview` - Preview production build locally
+
+### Code Quality
+- `npm run lint` - Run ESLint across all workspaces
+- `npm run lint:fix` - Run ESLint with auto-fix across all workspaces
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
+
+### Testing
+- `npm test` - Run tests across all workspaces
+- `npm run test:run` - Run tests once across all workspaces
+- `npm run test:ui` - Run tests with Vitest UI (frontend only)
+- `npm test -- ComponentName` - Run specific test file (e.g., `npm test -- Button`)
+
+### Database & Docker
+- `npm run docker:up` - Start PostgreSQL and Redis containers
+- `npm run docker:down` - Stop and remove containers
+- `npm run docker:logs` - View container logs
+- `npm run db:migrate` - Run database migrations (Prisma)
+- `npm run db:seed` - Seed database with sample data
+- `npm run db:studio` - Open Prisma Studio
+
+### Git Hooks
+- Husky is configured with lint-staged to automatically lint and format staged files on commit
+
+## Architecture Overview
+
+### Monorepo Structure
+This is a full-stack monorepo with npm workspaces:
+```
+react-calendar-app/
+├── src/                    # Frontend React application
+├── packages/
+│   ├── backend/           # Node.js backend with Prisma ORM
+│   └── shared/            # Shared types and utilities
+├── api/                   # Vercel serverless API routes
+├── lib/                   # Backend utilities for API routes
+├── shared/                # Legacy shared utilities (use packages/shared)
+├── scripts/               # Development and setup scripts
+├── docker/                # Docker configuration for local development
+└── screenshots/           # Project documentation screenshots
+```
+
+### Tech Stack
+- **Frontend**: React 19 + TypeScript + Vite
+- **Backend**: Node.js + Express + Prisma ORM
+- **Database**: PostgreSQL (with Redis for caching)
+- **Deployment**: Vercel (serverless functions + static hosting)
+- **Styling**: Tailwind CSS v4 with Radix UI/shadcn components
+- **State Management**: Zustand stores + TanStack Query for server state
+- **Calendar**: FullCalendar with React integration
+- **Testing**: Vitest + Testing Library + jsdom
+- **Authentication**: JWT + Google OAuth
+- **Drag & Drop**: react-dnd with HTML5 backend
+- **Natural Language**: chrono-node (date parsing) + compromise (text analysis)
+- **Voice Features**: react-speech-recognition for voice input
+- **Rich Text**: rangy library for text selection and manipulation
+- **File Handling**: react-dropzone for file uploads and attachments
+
+### Project Structure
+```
+src/                        # Frontend application
+├── components/             # Reusable UI components
+│   ├── auth/              # Authentication components and guards
+│   ├── calendar/          # Calendar-specific components
+│   ├── dialogs/           # Modal dialogs and forms
+│   ├── layout/            # App layout components
+│   ├── providers/         # Context providers
+│   ├── settings/          # User settings and preferences
+│   ├── smart-input/       # NLP-powered input system
+│   ├── tasks/             # Task management components
+│   └── ui/                # Base UI components (Radix-based)
+├── hooks/                 # Custom React hooks with TanStack Query
+├── pages/                 # Route components and page layouts
+├── services/api/          # Frontend API layer for server communication
+├── stores/                # Zustand state stores
+├── types/                 # TypeScript type definitions
+├── utils/                 # Frontend utility functions
+└── lib/                   # Library configurations
+
+packages/backend/           # Backend services
+├── src/
+│   ├── routes/            # Express route handlers
+│   ├── services/          # Business logic and data access
+│   ├── middleware/        # Authentication, validation, error handling
+│   ├── config/            # Environment and database configuration
+│   └── utils/             # Backend utilities
+├── prisma/                # Database schema and migrations
+└── test/                  # Backend tests
+
+packages/shared/            # Shared between frontend and backend
+├── types/                 # Common TypeScript interfaces
+├── validation/            # Zod schemas for API validation
+└── utils/                 # Shared utility functions
+```
+
+### State Management Architecture
+- **Hybrid Approach**: Separates client-side state (Zustand) from server-side state (TanStack Query)
+- **Zustand Stores**: Lightweight client-side state management
+  - `useUIStore` - UI state, modal visibility, active views, multi-pane management, and interactions
+  - `useThemeStore` - Theme management with system preference detection
+  - `useAuthStore` - Google OAuth authentication state and tokens
+- **TanStack Query**: Server state with caching, optimistic updates, and background sync
+  - **Tasks**: `useTasks`, `useCreateTask`, `useUpdateTask`, `useDeleteTask`, etc.
+  - **Events**: `useEvents`, `useCreateEvent`, `useUpdateEvent`, `useDeleteEvent`, etc.
+  - **Calendars**: `useCalendars`, `useCreateCalendar`, `useToggleCalendarVisibility`, etc.
+- **Query Key Management**: Structured query keys for efficient cache invalidation
+- **Optimistic Updates**: Immediate UI updates with automatic rollback on failure
+
+### Data Layer
+- **Local Storage**: Primary data persistence using typed storage schema
+- **API Services**: Abstracted CRUD operations for tasks, events, and calendars
+- **Date Handling**: date-fns for date manipulation, all dates stored in UTC
+
+### Component Architecture
+- **Layout**: Dual-mode layout system (calendar vs task-focused views)
+- **Task Components**:
+  - `TaskFolderGrid`: Grid-based folder view with material UI hover effects
+  - `TaskPaneContainer`: Multi-pane resizable layout with shadcn Resizable
+  - `TaskControls`: Modern control bar with sort, filter, and view toggles
+  - `TaskFocusPane`: Main task-focused layout with bottom-positioned input
+- **Calendar**: FullCalendar integration with custom event rendering
+- **Tasks**: Drag-and-drop task management with scheduling
+- **UI Components**: Radix UI primitives with Tailwind styling and shadcn components
+
+### Key Features
+- **Task-Focused View**: Primary interface with dual-mode task management (folder and list views)
+- **Multi-Pane System**: Resizable 1-3 pane layout with independent filtering and grouping
+- **Folder View**: Material UI-inspired grid with hover previews showing task contents
+- **Enhanced Task Controls**: Modern sort, filter, and view toggle interface
+- **Bottom-Positioned Input**: Chat-interface style enhanced input for better workflow
+- **Authentication System**: JWT-based auth with Google OAuth integration
+- **File Attachments**: Upload and manage file attachments with tasks and events
+- **Advanced Tagging**: Tag management system with merge and cleanup capabilities
+- Multi-calendar support with visibility toggles and color coding
+- Task scheduling and management with drag-and-drop
+- Smart input parsing system with natural language processing
+- Theme switching (light/dark/system)
+- Responsive design with mobile sidebar
+- Real-time conflict detection for event scheduling
+
+### Smart Input Parsing System
+- **Natural Language Processing**: Uses chrono-node and compromise for parsing natural language
+- **Tag System**: Extracts structured data (dates, times, priorities, locations, people) from free text
+- **Conflict Resolution**: Handles overlapping parser detections with confidence scoring
+- **Parser Architecture**: Extensible parser system with priority-based conflict resolution
+- **Real-time Highlighting**: Visual feedback during text input with confidence indicators
+- **Metadata Preservation**: Maintains original input alongside cleaned text for reversibility
+
+### Task-Focused View Architecture
+- **Dual Interface Modes**: Toggle between folder view (grid) and list view (multi-pane)
+- **TaskFolderGrid**: Material UI-inspired folders with hover previews showing top 3-4 tasks
+- **TaskPaneContainer**: 1-3 resizable vertical panes using shadcn Resizable component
+- **Independent Filtering**: Each pane can filter by task list, due date, or priority
+- **TaskControls**: Modern control bar with sort dropdown, filter button, and completion toggle
+- **Enhanced Input Positioning**: Chat-interface style input moved to bottom for better UX
+- **Responsive Grid**: 2-6 folder columns based on screen size with keyboard navigation
+- **Performance Optimized**: React.memo, useCallback, and useMemo for efficient rendering
+
+### Multi-Pane State Management
+- **TaskPaneConfig**: Interface for individual pane configuration (grouping, filters, completion)
+- **Global Controls**: Sort by title/date/priority/created, ascending/descending order
+- **Pane Management**: Add/remove panes with constraints (1-3 maximum)
+- **Synchronized State**: Global completion toggle affects all panes simultaneously
+
+## Development Guidelines
+
+### Import Aliases
+- `@/` - Frontend src imports (configured in Vite and TypeScript)
+- `@shared/` - Shared package imports (for both frontend and backend)
+- `@backend/` - Backend package imports (for API routes and testing)
+- `@api/` - API routes directory
+- `@lib/` - Backend utilities directory
+- Barrel exports are used in major directories (components, hooks, services, stores)
+
+### Component Library Configuration
+- **shadcn/ui**: Configured with `components.json` for CLI component installation
+- **UI Components**: Located in `src/components/ui/` with consistent naming
+- **Component Installation**: Use `npx shadcn@latest add <component-name>` for new components
+- **Radix Primitives**: Underlying accessibility-focused component primitives
+- **Custom Components**: Built on top of shadcn components in other directories
+- **Resizable Layout**: Uses `react-resizable-panels` via shadcn Resizable component
+
+### Type Safety & Data Flow
+- **Shared Types**: Common interfaces in `packages/shared/types/` used by both frontend and backend
+- **API Validation**: Zod schemas in `packages/shared/validation/` for request/response validation
+- **Frontend Types**: Component and UI-specific types in `src/types/`
+- **Database Schema**: Prisma schema in `packages/backend/prisma/schema.prisma`
+- **API Responses**: Generic `ApiResponse<T>` wrapper for consistent API responses
+- **Local Storage**: Type-safe operations with `StorageSchema`
+
+### Testing Setup
+- **Test Runner**: Vitest with jsdom environment and global test utilities
+- **React Testing**: Testing Library for component testing with extended matchers
+- **Global Setup**: `src/test/setup.ts` provides comprehensive test environment setup
+- **Test Organization**: Tests colocated in `__tests__` directories alongside components
+- **Mocking**: Built-in mocks for localStorage, matchMedia, and browser APIs
+- **Test Commands**: 
+  - `npm test -- ComponentName` for specific components
+  - `npm run test:ui` for interactive test interface
+  - Global test utilities available without imports (describe, it, expect, etc.)
+
+### Styling Approach
+- **Tailwind CSS v4**: Latest version with PostCSS integration and Vite plugin
+- **Component Variants**: class-variance-authority for systematic component styling
+- **Design System**: Radix UI primitives with shadcn/ui component library
+- **Custom Theme**: Extended color palette with custom gray shades for better dark mode
+- **Animations**: Custom keyframes for fade-in, slide-in, and collapsible transitions
+- **Dark Mode**: Class-based dark mode with system preference detection
+- **Utility Class**: `cn()` utility for combining Tailwind classes with tailwind-merge
+
+## Code Quality Tools
+- ESLint with React and TypeScript rules across all workspaces
+- Prettier for code formatting
+- Husky + lint-staged for pre-commit hooks
+- TypeScript strict mode enabled
+- Concurrently for running multiple development servers
+
+## Environment Setup
+
+### Prerequisites
+- Node.js 18+ and npm
+- Docker and Docker Compose (for local development)
+- PostgreSQL (via Docker or local installation)
+
+### Local Development Setup
+1. **Install dependencies**: `npm install` (installs for all workspaces)
+2. **Start services**: `npm run docker:up` (PostgreSQL + Redis)
+3. **Run migrations**: `npm run db:migrate`
+4. **Start development**: `npm run dev` (both frontend and backend)
+5. **Environment variables**: Copy `.env.example` to `.env.local` and configure
+6. **Verify setup**: Run `node scripts/verify-setup.js` to check configuration
+
+### Database Management
+- **Prisma ORM**: Database schema and migrations in `packages/backend/prisma/`
+- **Migrations**: `npm run db:migrate` to apply schema changes
+- **Seeding**: `npm run db:seed` to populate with sample data
+- **Studio**: `npm run db:studio` for visual database management
+
+### Deployment Architecture
+- **Vercel**: Primary deployment platform
+- **Frontend**: Static site generation and hosting
+- **Backend**: Serverless functions via `api/` directory
+- **Database**: Production PostgreSQL (PlanetScale/Supabase recommended)
+- **File Storage**: Vercel Blob for file uploads and attachments
+
+## Project Development Notes
+
+### Current Focus
+- React + TypeScript + Tailwind CSS calendar + todo list application
+- **Recent Enhancement**: Task-focused view with dual-mode interface (folder/list views)
+- **Multi-Pane System**: Resizable task management with independent filtering per pane
+- **Material UI Inspiration**: Folder view with hover previews and smooth animations
+
+### Development Constraints
+- Use shadcn components wherever possible
+- Detailed planning and checklist approach
+- Emphasis on:
+  - Well-written code
+  - Avoiding hard-coding
+  - Mobile responsiveness
+  - Implementing proper fixes
+
+## Technical Debt Management
+- Always accumulate and track technical lessons learned during development
+- Commit to continuous improvement and avoiding repeated mistakes
+- Key lessons to remember:
+  - Refactor code immediately when identifying code smells or redundant patterns
+  - Prioritize code readability and maintainability over quick fixes
+  - Regularly review and update architectural decisions
+  - Maintain comprehensive documentation of system design choices
+  - Implement robust error handling and logging mechanisms
+  - Continuously optimize performance and reduce unnecessary complexity
+  - Keep dependencies updated and evaluate their necessity
+  - Balance between writing custom solutions and leveraging existing libraries
+
+# Important Instruction Reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

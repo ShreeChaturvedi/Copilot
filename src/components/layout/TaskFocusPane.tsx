@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
+import type { UploadedFile } from '@/components/smart-input/components/FileUploadZone';
 import { TaskControls } from '@/components/tasks/TaskControls';
 import { TaskFolderGrid } from '@/components/tasks/TaskFolderGrid';
 import { TaskPaneContainer } from '@/components/tasks/TaskPaneContainer';
@@ -33,6 +34,38 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     setShowCreateTaskDialog,
     handleSelectTaskGroup,
   } = useTaskManagement({ includeTaskOperations: true });
+
+  // Wrapper to pass attached files to backend via taskApi
+  const handleAddTaskWithFiles = (
+    title: string,
+    _groupId?: string,
+    smartData?: any,
+    files?: UploadedFile[],
+  ) => {
+    addTask.mutate({
+      title,
+      priority: smartData?.priority,
+      scheduledDate: smartData?.scheduledDate,
+      tags: smartData?.tags?.map((tag: any) => ({
+        id: tag.id,
+        type: tag.type,
+        value: tag.value,
+        displayText: tag.displayText,
+        iconName: tag.iconName,
+        color: tag.color,
+      })),
+      parsedMetadata: smartData ? {
+        originalInput: smartData.originalInput,
+        cleanTitle: smartData.title,
+      } : undefined,
+      attachments: files?.map((f) => ({
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        url: f.preview || '',
+      })),
+    });
+  };
 
   // Calculate task counts for TaskControls
   const activeTasks = tasks.filter((task) => !task.completed);
@@ -110,6 +143,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       <div className="border-t border-border bg-background p-6">
         <EnhancedTaskInput
           onAddTask={handleAddTask}
+          onAddTaskWithFiles={handleAddTaskWithFiles}
           taskGroups={taskGroups}
           activeTaskGroupId={activeTaskGroupId}
           onCreateTaskGroup={() => setShowCreateTaskDialog(true)}

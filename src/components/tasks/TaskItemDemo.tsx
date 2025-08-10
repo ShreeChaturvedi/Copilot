@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { TaskItem } from './TaskItem';
-import type { Task } from '@/types';
+import type { Task } from "@shared/types";
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const demoTask: Task = {
@@ -12,6 +12,8 @@ const demoTask: Task = {
   title: 'Demo Task with AutoScheduling',
   completed: false,
   createdAt: new Date(),
+  updatedAt: new Date(),
+  userId: 'demo-user',
 };
 
 export const TaskItemDemo: React.FC = () => {

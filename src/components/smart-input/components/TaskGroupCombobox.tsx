@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, ChevronsUpDown, Check, List } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
@@ -70,7 +70,10 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     description: 'Default task group',
   };
 
-  // Get current active task group
+  // Whether "All Tasks" is the current selection
+  const isAllSelected = activeTaskGroupId === 'all';
+
+  // Get current active task group for non-all selection
   const activeTaskGroup =
     taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
@@ -96,11 +99,21 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             className
           )}
         >
-          <ActiveGroupIcon
-            className="w-4 h-4"
-            style={{ color: activeTaskGroup.color }}
-          />
-          <span className="text-sm font-medium">{activeTaskGroup.name}</span>
+          {isAllSelected ? (
+            <>
+              <div style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <List className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">All Tasks</span>
+            </>
+          ) : (
+            <>
+              <div style={{ color: `${activeTaskGroup.color} !important` }}>
+                <ActiveGroupIcon className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">{activeTaskGroup.name}</span>
+            </>
+          )}
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -109,6 +122,27 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
           <CommandInput placeholder="Search task groups..." />
           <CommandList>
             <CommandEmpty>No task groups found.</CommandEmpty>
+            {/* All Tasks Option */}
+            <CommandGroup>
+              <CommandItem
+                value="all"
+                onSelect={() => {
+                  if (!isAllSelected) {
+                    onSelectTaskGroup?.('all');
+                  }
+                  setOpen(false);
+                }}
+              >
+                <div className="flex items-center gap-2 flex-1">
+                  <div style={{ color: 'hsl(var(--muted-foreground))' }}>
+                    <List className="w-4 h-4" />
+                  </div>
+                  <span>All Tasks</span>
+                </div>
+                <Check className={cn('ml-auto h-4 w-4', isAllSelected ? 'opacity-100' : 'opacity-0')} />
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
             <CommandGroup>
               {taskGroups.map((group) => {
                 const GroupIcon =
@@ -133,10 +167,9 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                     }}
                   >
                     <div className="flex items-center gap-2 flex-1">
-                      <GroupIcon
-                        className="w-4 h-4"
-                        style={{ color: group.color }}
-                      />
+                      <div style={{ color: `${group.color} !important` }}>
+                        <GroupIcon className="w-4 h-4" />
+                      </div>
                       <span>{group.name}</span>
                     </div>
                     <Check

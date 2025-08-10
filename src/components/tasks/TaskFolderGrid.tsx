@@ -3,7 +3,7 @@ import { Folder, Plus, MoreHorizontal } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { TaskFolder, Task } from '@/types';
+import { TaskFolder, Task } from "@shared/types";
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useUIStore } from '@/stores/uiStore';
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
@@ -27,7 +27,7 @@ function createTaskFolders(
   return taskGroups.map((group) => {
     const groupTasks = tasks.filter(
       (task) =>
-        task.groupId === group.id || (!task.groupId && group.id === 'default')
+        task.taskListId === group.id || (!task.taskListId && group.id === 'default')
     );
     const activeTasks = groupTasks.filter((task) => !task.completed);
     const completedTasks = groupTasks.filter((task) => task.completed);
@@ -45,6 +45,7 @@ function createTaskFolders(
       completedCount: completedTasks.length,
       tasks: previewTasks,
       description: group.description,
+      userId: 'default-user', // TODO: Get actual user ID from context
     };
   });
 }
@@ -89,10 +90,9 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
                   className="p-2 rounded-lg"
                   style={{ backgroundColor: `${folder.color}15` }}
                 >
-                  <IconComponent
-                    className="w-6 h-6"
-                    style={{ color: folder.color }}
-                  />
+                  <span style={{ color: folder.color }}>
+                    <IconComponent className="w-6 h-6" />
+                  </span>
                 </div>
                 <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
               </div>

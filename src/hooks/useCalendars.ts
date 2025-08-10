@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Calendar } from '../types';
+import type { Calendar } from '@shared/types';
 import {
   calendarApi,
   type UpdateCalendarData,
@@ -233,6 +233,7 @@ export const useCalendars = () => {
   return {
     data: calendarsQuery.data || [],
     isLoading: calendarsQuery.isLoading,
+    isSuccess: calendarsQuery.isSuccess,
     error: calendarsQuery.error,
     addCalendar,
     updateCalendar,

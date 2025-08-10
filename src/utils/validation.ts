@@ -2,7 +2,7 @@
  * Form validation utility functions for data integrity
  */
 
-import type { ValidationError } from '../types';
+import type { ValidationError } from '@shared/types';
 import { isValid, parseISO } from 'date-fns';
 
 /**

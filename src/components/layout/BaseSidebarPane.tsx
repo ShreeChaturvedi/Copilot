@@ -1,5 +1,4 @@
 import React, { ReactNode } from 'react';
-import { User, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { 
   Sidebar,
   SidebarHeader, 
@@ -12,14 +11,8 @@ import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import { useUIStore } from '@/stores/uiStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { SmoothSidebarTrigger } from './SmoothSidebarTrigger';
+import { UserDropdown } from './UserDropdown';
 import { cn } from '@/lib/utils';
 
 export interface BaseSidebarPaneProps {
@@ -41,6 +34,9 @@ export interface BaseSidebarPaneProps {
   // Footer content - user profile (can be overridden)
   userProfileContent?: ReactNode;
   
+  // Settings dialog handler
+  onOpenSettings?: (section: 'general' | 'profile' | 'help') => void;
+  
   // Event handlers
   onViewToggle?: (view: ViewMode) => void;
   
@@ -58,6 +54,7 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
   footerListContent,
   userProfileContent,
   onViewToggle,
+  onOpenSettings,
   useMinimalMode = false
 }) => {
   const { currentView, setCurrentView } = useUIStore();
@@ -101,48 +98,7 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
   );
 
   // Default user profile content
-  const defaultUserProfileContent = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors">
-          <Avatar className="size-8">
-            <AvatarImage
-              src="https://ui-avatars.com/api/%22f%22?name=S+C&background=000000&color=ffffff&bold=true&size=512"
-              alt="Shree Chaturvedi"
-            />
-            <AvatarFallback>SC</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-sm font-medium truncate">Shree Chaturvedi</span>
-            <span className="text-xs text-muted-foreground truncate">chaturs@miamioh.edu</span>
-          </div>
-        </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘P</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘,</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <HelpCircle className="mr-2 h-4 w-4" />
-          <span>Help</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘?</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log Out</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘Q</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const defaultUserProfileContent = <UserDropdown onOpenSettings={onOpenSettings} />;
 
   // Minimal mode (for CalendarSummaryPane)
   if (useMinimalMode) {

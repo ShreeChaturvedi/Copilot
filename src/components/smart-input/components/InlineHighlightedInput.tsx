@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 export interface InlineHighlightedInputProps {

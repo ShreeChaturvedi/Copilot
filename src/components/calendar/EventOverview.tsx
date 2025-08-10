@@ -3,7 +3,7 @@ import { format, isToday, isTomorrow, isThisWeek, isAfter } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
 import { useCalendars } from '@/hooks/useCalendars';
-import { type CalendarEvent } from '@/types';
+import { type CalendarEvent } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 interface EventOverviewProps {
@@ -33,7 +33,7 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
     return allEvents
       .filter((event) => {
         // Only show events from visible calendars
-        if (!visibleCalendarNames.includes(event.calendarName)) {
+        if (!visibleCalendarNames.includes(event.calendarName || '')) {
           return false;
         }
 
@@ -135,7 +135,7 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
                     <div
                       className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10 dark:ring-white/10"
                       style={{
-                        backgroundColor: getEventColor(event.calendarName),
+                        backgroundColor: getEventColor(event.calendarName || ''),
                       }}
                     />
                   </div>
@@ -176,7 +176,7 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
         {/* Show count if there are more events */}
         {(() => {
           const totalUpcomingEvents = allEvents.filter((event) => {
-            if (!visibleCalendarNames.includes(event.calendarName)) {
+            if (!visibleCalendarNames.includes(event.calendarName || '')) {
               return false;
             }
             const eventStart = new Date(event.start);

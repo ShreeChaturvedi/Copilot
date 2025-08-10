@@ -3,7 +3,7 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" },
-    { "path": "./packages/shared" },
+    { "path": "./shared" },
     { "path": "./packages/backend" }
   ],
   "compilerOptions": {
@@ -11,7 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./packages/shared/src/*"],
+      "@shared/*": ["./shared/*"],
       "@backend/*": ["./packages/backend/src/*"],
       "@api/*": ["./api/*"],
       "@lib/*": ["./lib/*"]

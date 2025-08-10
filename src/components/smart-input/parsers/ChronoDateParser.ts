@@ -3,7 +3,7 @@
  */
 
 import * as chrono from 'chrono-node';
-import { Parser, ParsedTag } from '@/types';
+import { Parser, ParsedTag } from "@shared/types";
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChronoParseComponent {
@@ -14,6 +14,8 @@ interface ChronoParseComponent {
 interface ChronoParseResult {
   start: ChronoParseComponent;
   end?: ChronoParseComponent;
+  text: string;
+  index: number;
 }
 
 export class ChronoDateParser implements Parser {
@@ -121,6 +123,12 @@ export class ChronoDateParser implements Parser {
     // Decrease confidence for very ambiguous expressions
     if (result.text.length < 3) {
       confidence -= 0.2;
+    }
+
+    // Slightly decrease confidence for past dates (they might be less relevant)
+    const startDate = result.start.date();
+    if (startDate && this.isInPast(startDate)) {
+      confidence -= 0.05;
     }
 
     return Math.max(0.1, Math.min(1.0, confidence));

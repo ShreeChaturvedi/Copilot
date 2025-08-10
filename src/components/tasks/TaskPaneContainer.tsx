@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { TaskGroupCombobox } from '@/components/smart-input/components/TaskGroupCombobox';
 import { TaskList } from './TaskList';
 import { cn } from '@/lib/utils';
-import { Task, TaskPaneData } from '@/types';
+import { Task, TaskPaneData } from "@shared/types";
 import { useUIStore, TaskPaneConfig, TaskGrouping } from '@/stores/uiStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 
@@ -45,8 +45,8 @@ function filterTasksForPane(
       if (targetTaskListId) {
         filteredTasks = filteredTasks.filter(
           (task) =>
-            task.groupId === targetTaskListId ||
-            (!task.groupId && targetTaskListId === 'default')
+            task.taskListId === targetTaskListId ||
+            (!task.taskListId && targetTaskListId === 'default')
         );
       }
       break;
@@ -245,7 +245,10 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                 }))}
                 activeTaskGroupId={paneConfig.selectedTaskListId || undefined}
                 onSelectTaskGroup={(groupId) =>
-                  onUpdateTaskList(paneConfig.id, groupId)
+                  onUpdateTaskList(
+                    paneConfig.id,
+                    groupId === 'all' ? null : groupId
+                  )
                 }
                 className="h-auto p-0"
               />

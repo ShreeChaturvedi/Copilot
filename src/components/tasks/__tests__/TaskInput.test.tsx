@@ -48,9 +48,13 @@ const createWrapper = () => {
 
 const renderTaskInput = (props = {}) => {
   const Wrapper = createWrapper();
+  const defaultProps = {
+    onAddTask: vi.fn(),
+    ...props
+  };
   return render(
     <Wrapper>
-      <TaskInput {...props} />
+      <TaskInput {...defaultProps} />
     </Wrapper>
   );
 };

@@ -6,7 +6,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { HighlightedTextareaField } from '../HighlightedTextareaField';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 
 describe('HighlightedTextareaField', () => {
   const mockTags: ParsedTag[] = [
@@ -14,11 +14,14 @@ describe('HighlightedTextareaField', () => {
       id: '1',
       type: 'priority',
       value: 'high',
-
+      displayText: 'High Priority',
+      iconName: 'AlertCircle',
+      color: '#ef4444',
       startIndex: 0,
       endIndex: 4,
+      originalText: 'high',
       confidence: 0.9,
-      color: '#ef4444'
+      source: 'test-parser'
     }
   ];
 

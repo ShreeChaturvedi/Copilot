@@ -3,8 +3,8 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Task } from '../types';
-import { taskApi, type UpdateTaskData } from '../services/api';
+import type { Task } from '@shared/types';
+import { taskApi, type UpdateTaskData, type CreateTaskData } from '../services/api';
 
 /**
  * Query keys for task-related queries
@@ -75,12 +75,15 @@ export const useTasks = (filters: TaskFilters = {}) => {
   const tasksQuery = useQuery({
     queryKey: taskQueryKeys.all,
     queryFn: taskApi.fetchTasks,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });
 
   // Create task mutation
-  const addTask = useMutation({
+  const addTask = useMutation<Task, Error, CreateTaskData>({
     mutationFn: taskApi.createTask,
     onSuccess: (newTask) => {
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
@@ -138,7 +141,8 @@ export const useTasks = (filters: TaskFilters = {}) => {
 
   // Schedule task mutation
   const scheduleTask = useMutation({
-    mutationFn: taskApi.scheduleTask,
+    mutationFn: (variables: { id: string; scheduledDate: Date }) =>
+      taskApi.scheduleTask(variables.id, variables.scheduledDate),
     onSuccess: (updatedTask) => {
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
@@ -160,6 +164,8 @@ export const useTasks = (filters: TaskFilters = {}) => {
   return {
     data: tasksQuery.data || [],
     isLoading: tasksQuery.isLoading,
+    isSuccess: tasksQuery.isSuccess,
+    isPending: tasksQuery.isPending,
     error: tasksQuery.error,
     addTask,
     updateTask,

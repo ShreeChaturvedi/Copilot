@@ -6,7 +6,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { EnhancedTaskInputLayout } from '../EnhancedTaskInputLayout';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 
 describe('EnhancedTaskInputLayout Integration', () => {
   const mockTags: ParsedTag[] = [
@@ -31,7 +31,6 @@ describe('EnhancedTaskInputLayout Integration', () => {
     render(
       <EnhancedTaskInputLayout
         value="high priority task"
-        inputValue="high priority task"
         onChange={onChange}
         tags={mockTags}
         enableSmartParsing={true}
@@ -49,7 +48,6 @@ describe('EnhancedTaskInputLayout Integration', () => {
     render(
       <EnhancedTaskInputLayout
         value="plain task"
-        inputValue="plain task"
         onChange={onChange}
         tags={[]}
         enableSmartParsing={false}

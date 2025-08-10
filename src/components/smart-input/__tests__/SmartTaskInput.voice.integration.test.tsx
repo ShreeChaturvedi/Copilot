@@ -4,6 +4,8 @@
  * Tests for voice input integration in SmartTaskInput with enhanced layout
  */
 
+// @ts-ignore: React needed for JSX in test files
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -13,8 +15,10 @@ import { SmartTaskInput } from '../SmartTaskInput';
 const mockSpeechRecognition = {
   start: vi.fn(),
   stop: vi.fn(),
+  abort: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
   continuous: false,
   interimResults: false,
   lang: 'en-US',
@@ -32,8 +36,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // Mock Web Speech API
-  global.window.SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  global.window.webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
 
   // Mock navigator.mediaDevices.getUserMedia
   Object.defineProperty(global.navigator, 'mediaDevices', {
@@ -138,10 +142,8 @@ describe('SmartTaskInput Voice Integration', () => {
 
   it('shows disabled voice button when Web Speech API is not supported', () => {
     // Remove Web Speech API support
-    delete (global.window as Window & { SpeechRecognition?: unknown })
-      .SpeechRecognition;
-    delete (global.window as Window & { webkitSpeechRecognition?: unknown })
-      .webkitSpeechRecognition;
+    delete (global.window as any).SpeechRecognition;
+    delete (global.window as any).webkitSpeechRecognition;
 
     render(
       <SmartTaskInput

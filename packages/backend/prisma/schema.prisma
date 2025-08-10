@@ -1,0 +1,205 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication Models
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String? // For email/password auth
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // OAuth fields
+  googleId String? @unique
+
+  // Relationships
+  profile   UserProfile?
+  calendars Calendar[]
+  taskLists TaskList[]
+  tasks     Task[]
+  events    Event[]
+  
+  @@map("users")
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  bio       String?
+  avatarUrl String?
+  timezone  String   @default("UTC")
+  
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_profiles")
+}
+
+// Calendar Models
+model Calendar {
+  id          String   @id @default(cuid())
+  name        String
+  color       String   @default("#3B82F6")
+  description String?
+  isVisible   Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  events Event[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("calendars")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  start       DateTime
+  end         DateTime
+  allDay      Boolean   @default(false)
+  location    String?
+  notes       String?
+  recurrence  String?   // RRULE string
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarId String
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([calendarId])
+  @@index([start, end])
+  @@index([userId, start, end])
+  @@map("events")
+}
+
+// Task Models
+model TaskList {
+  id          String   @id @default(cuid())
+  name        String
+  color       String   @default("#8B5CF6")
+  icon        String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("task_lists")
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  scheduledDate DateTime?
+  priority      Priority  @default(MEDIUM)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Smart parsing metadata
+  originalInput String?
+  cleanTitle    String?
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskListId String
+  taskList   TaskList @relation(fields: [taskListId], references: [id], onDelete: Cascade)
+
+  tags        TaskTag[]
+  attachments Attachment[]
+
+  @@index([userId])
+  @@index([taskListId])
+  @@index([completed])
+  @@index([scheduledDate])
+  @@index([userId, completed])
+  @@index([userId, taskListId, completed])
+  @@index([userId, scheduledDate])
+  @@index([createdAt])
+  @@map("tasks")
+}
+
+model Tag {
+  id    String  @id @default(cuid())
+  name  String  @unique
+  type  TagType
+  color String?
+
+  tasks TaskTag[]
+
+  @@index([type])
+  @@index([name])
+  @@map("tags")
+}
+
+model TaskTag {
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  value       String // Serialized tag value
+  displayText String
+  iconName    String
+
+  @@id([taskId, tagId])
+  @@index([taskId])
+  @@index([tagId])
+  @@map("task_tags")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  fileName  String
+  fileUrl   String
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("attachments")
+}
+
+// Enums
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TagType {
+  DATE
+  TIME
+  PRIORITY
+  LOCATION
+  PERSON
+  LABEL
+  PROJECT
+}

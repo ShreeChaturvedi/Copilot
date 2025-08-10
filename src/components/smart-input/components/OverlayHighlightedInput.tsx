@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 

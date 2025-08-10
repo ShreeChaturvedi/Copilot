@@ -7,3 +7,6 @@ export type { Theme, ResolvedTheme } from './themeStore';
 
 export { useAuthStore } from './authStore';
 export type { GoogleAuthTokens, GoogleUserInfo } from './authStore';
+
+export { useCalendarSettingsStore } from './calendarSettingsStore';
+export type { TimeRangeMode } from './calendarSettingsStore';

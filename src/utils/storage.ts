@@ -9,7 +9,7 @@ import type {
   Calendar,
   AppSettings,
   GoogleAuthState,
-} from '../types';
+} from '@shared/types';
 import { parseISOToDate } from './date';
 
 /**

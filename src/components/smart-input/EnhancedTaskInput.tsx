@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputProps {
   onAddTask: (title: string, groupId?: string, smartData?: SmartTaskData) => void;
+  onAddTaskWithFiles?: (title: string, groupId?: string, smartData?: SmartTaskData, files?: UploadedFile[]) => void;
   taskGroups?: TaskGroup[];
   activeTaskGroupId?: string;
   onCreateTaskGroup?: () => void;
@@ -57,6 +58,7 @@ export interface EnhancedTaskInputProps {
  */
 export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   onAddTask,
+  onAddTaskWithFiles,
   taskGroups = [],
   activeTaskGroupId,
   onCreateTaskGroup,
@@ -75,7 +77,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isFocused, setIsFocused] = useState(false);
+  const [, setIsFocused] = useState(false); // State maintained for potential future focus styling
   const baseTextRef = useRef('');
 
   // Initialize text parser
@@ -125,24 +127,34 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   }, [inputText]);
 
   // Handle file uploads
-  const handleFilesAdded = useCallback((files: File[]) => {
-    const newUploadedFiles: UploadedFile[] = files.map(file => ({
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      status: 'completed' as const,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
-    }));
+  const handleFilesAdded = useCallback(async (files: File[]) => {
+    const readAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
 
-    setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
-    
-    // Notify parent component if callback provided
-    if (onFilesAdded) {
-      onFilesAdded([...uploadedFiles, ...newUploadedFiles]);
-    }
-  }, [uploadedFiles, onFilesAdded]);
+    const newUploadedFiles: UploadedFile[] = await Promise.all(
+      files.map(async (file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: 'completed' as const,
+        // Use data URL for all files so backend can persist a URL immediately
+        preview: await readAsDataUrl(file),
+      }))
+    );
+
+    setUploadedFiles((prev) => {
+      const updated = [...prev, ...newUploadedFiles];
+      // Notify parent component if callback provided
+      if (onFilesAdded) onFilesAdded(updated);
+      return updated;
+    });
+  }, [onFilesAdded]);
 
   // Handle file removal
   const handleFileRemove = useCallback((fileId: string) => {
@@ -151,7 +163,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       
       // Clean up object URLs for removed image previews
       const removedFile = prev.find(file => file.id === fileId);
-      if (removedFile?.preview) {
+      if (removedFile?.preview && removedFile.preview.startsWith('blob:')) {
         URL.revokeObjectURL(removedFile.preview);
       }
       
@@ -193,8 +205,12 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         };
       }
       
-      // Call onAddTask with smart data
-      onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
+      // Prefer file-aware callback if provided
+      if (onAddTaskWithFiles) {
+        onAddTaskWithFiles(capitalizedTitle, activeTaskGroup.id, smartData, uploadedFiles);
+      } else {
+        onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
+      }
       
       // Clear input and parsing state
       setInputText('');

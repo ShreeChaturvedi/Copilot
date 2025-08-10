@@ -24,7 +24,7 @@ import { VoiceInputButton } from './components/VoiceInputButton';
 import { ParsedTags } from './components/ParsedTags';
 import { useTextParser } from './hooks/useTextParser';
 import { TaskGroup } from '../tasks/TaskInput';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 import './components/smart-tags.css';
 
@@ -93,7 +93,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   parsingOptions = {},
 }) => {
   const [inputText, setInputText] = useState('');
-  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [, setVoiceTranscript] = useState(''); // Voice transcript state maintained for potential future use
 
   // Initialize text parser
   const {
@@ -241,10 +241,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           className="h-7 w-7 p-0"
           aria-label={`Current task group: ${activeTaskGroup.name}`}
         >
-          <ActiveGroupIcon 
-            className="w-4 h-4" 
-            style={{ color: activeTaskGroup.color }}
-          />
+          <span style={{ color: activeTaskGroup.color }}>
+            <ActiveGroupIcon className="w-4 h-4" />
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
@@ -256,10 +255,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
               onClick={() => onSelectTaskGroup?.(group.id)}
               className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
             >
-              <GroupIcon 
-                className="mr-2 h-4 w-4" 
-                style={{ color: group.color }}
-              />
+              <span className="mr-2" style={{ color: group.color }}>
+                <GroupIcon className="h-4 w-4" />
+              </span>
               <span>{group.name}</span>
             </DropdownMenuItem>
           );
@@ -335,7 +333,6 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             rightControls={rightControls}
             minHeight="120px"
             maxHeight="300px"
-            voiceTranscript={voiceTranscript}
           />
         </form>
       ) : /* Main input form using new FlexInputGroup architecture */
@@ -394,10 +391,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
                 aria-label={`Current task group: ${activeTaskGroup.name}`}
               >
-                <ActiveGroupIcon 
-                  className="w-4 h-4" 
-                  style={{ color: activeTaskGroup.color }}
-                />
+                <span style={{ color: activeTaskGroup.color }}>
+                  <ActiveGroupIcon className="w-4 h-4" />
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
@@ -409,10 +405,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                     onClick={() => onSelectTaskGroup?.(group.id)}
                     className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
                   >
-                    <GroupIcon 
-                      className="mr-2 h-4 w-4" 
-                      style={{ color: group.color }}
-                    />
+                    <span className="mr-2" style={{ color: group.color }}>
+                      <GroupIcon className="h-4 w-4" />
+                    </span>
                     <span>{group.name}</span>
                   </DropdownMenuItem>
                 );

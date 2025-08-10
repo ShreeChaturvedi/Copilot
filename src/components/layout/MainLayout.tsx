@@ -1,9 +1,13 @@
-import { ReactNode, useRef } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { LeftPane } from './LeftPane';
 import { RightPane } from './RightPane';
 import { TaskFocusPane } from './TaskFocusPane';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { SettingsDialog } from '@/components/settings/SettingsDialog';
 import { useUIStore } from '@/stores/uiStore';
+import { useSettingsDialog } from '@/hooks/useSettingsDialog';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import FullCalendar from '@fullcalendar/react';
 
@@ -32,6 +36,34 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const { currentView, dragState } = useUIStore();
+  const { logout } = useAuthStore();
+  
+  // Settings dialog management
+  const { 
+    isOpen: isSettingsOpen, 
+    currentSection, 
+    openSettings, 
+    closeSettings 
+  } = useSettingsDialog();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onOpenProfile: () => openSettings('profile'),
+    onOpenSettings: () => openSettings('general'),
+    onOpenHelp: () => openSettings('help'),
+    onLogout: () => logout(),
+  });
+
+  // Global event bridge so dropdown can open settings without prop drilling
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ section?: 'general' | 'profile' | 'help' }>;
+      const section = ce.detail?.section ?? 'general';
+      openSettings(section);
+    };
+    window.addEventListener('app:open-settings', handler as EventListener);
+    return () => window.removeEventListener('app:open-settings', handler as EventListener);
+  }, [openSettings]);
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -58,6 +90,13 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           /* Calendar Content */
           <MainContent children={children} />
         )}
+
+        {/* Settings Dialog */}
+        <SettingsDialog
+          open={isSettingsOpen}
+          onOpenChange={closeSettings}
+          defaultSection={currentSection}
+        />
       </div>
     </SidebarProvider>
   );

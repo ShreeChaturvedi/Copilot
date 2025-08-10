@@ -1,7 +1,7 @@
 import React from 'react';
 import { EnhancedLayoutWrapper } from './EnhancedLayoutWrapper';
 import { HighlightedTextareaField } from './HighlightedTextareaField';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputLayoutProps {

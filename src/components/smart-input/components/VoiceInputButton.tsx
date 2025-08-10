@@ -24,19 +24,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
-// Extend the Window interface to include webkit speech recognition
-declare global {
-  interface Window {
-    webkitSpeechRecognition: typeof SpeechRecognition;
-    SpeechRecognition: typeof SpeechRecognition;
-  }
-
-  // Add missing Web Speech API types
-  interface SpeechRecognitionErrorEvent extends Event {
-    error: string;
-    message?: string;
-  }
-}
+// Web Speech API types are defined in src/types/webSpeechAPI.d.ts
 
 export interface VoiceInputButtonProps {
   /** Callback when transcript is updated (final results) */
@@ -68,9 +56,9 @@ const isSpeechRecognitionSupported = (): boolean => {
 /**
  * Get the SpeechRecognition constructor
  */
-const getSpeechRecognition = (): typeof SpeechRecognition | null => {
+const getSpeechRecognition = (): any => {
   if (typeof window === 'undefined') return null;
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 };
 
 /**
@@ -90,7 +78,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   // Use refs to avoid stale closure issues with callbacks
   const onTranscriptChangeRef = useRef(onTranscriptChange);
@@ -129,7 +117,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     recognition.maxAlternatives = 1;
 
     // Handle results (both interim and final)
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       let interimTranscript = '';
       let finalTranscript = '';
 
@@ -171,7 +159,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     };
 
     // Handle errors
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    recognition.onerror = (event: any) => {
       switch (event.error) {
         case 'not-allowed':
           setPermissionDenied(true);

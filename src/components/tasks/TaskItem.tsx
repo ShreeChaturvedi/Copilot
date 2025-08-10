@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Trash2, Clock, Calendar, MoreVertical, Info, MapPin, User, Tag, Flag, X } from 'lucide-react';
+import { Trash2, Clock, Calendar, MoreVertical, Info, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,7 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Task } from '@/types';
+import { Task } from "@shared/types";
+import { useCalendars } from '@/hooks/useCalendars';
 
 export interface TaskItemProps {
   task: Task;
@@ -30,6 +31,7 @@ export interface TaskItemProps {
   onRemoveTag?: (taskId: string, tagId: string) => void;
   groupColor?: string;
   className?: string;
+  calendarMode?: boolean; // Hide tags when in calendar view
 }
 
 // Helper function to get the appropriate icon for each tag type
@@ -60,10 +62,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   onRemoveTag,
   groupColor,
   className,
+  calendarMode = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Calendars must be read via hook at top-level (Rules of Hooks)
+  const { data: calendars = [] } = useCalendars();
 
   const handleToggle = () => {
     onToggle(task.id);
@@ -112,7 +117,10 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   useEffect(() => {
     if (dragElementRef.current && !task.completed && !isEditing) {
       const element = dragElementRef.current;
-      const dragColor = groupColor || '#3788d8';
+      // Prefer current default calendar color; fall back to group color and a safe default
+      const defaultCal = calendars.find((c: any) => c.isDefault) || calendars[0];
+      const defaultCalendarColor = defaultCal?.color;
+      const dragColor = defaultCalendarColor || groupColor || '#3788d8';
       
       const draggable = new Draggable(element, {
         eventData: {
@@ -179,8 +187,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             <div
               onClick={handleEditStart}
               className={cn(
-                'cursor-text text-sm font-medium transition-colors duration-200 truncate',
-                'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border flex items-center',
+                'cursor-text text-sm font-medium transition-colors duration-200',
+                'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border',
+                'truncate overflow-hidden text-ellipsis whitespace-nowrap', // Proper text truncation
                 task.completed && 'line-through text-muted-foreground opacity-60'
               )}
               title={task.title}
@@ -189,68 +198,99 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             </div>
           )}
           
-          <div className="mt-1 flex flex-wrap gap-1">
-            {/* Show scheduled date badge only if no smart date/time tags exist */}
-            {task.scheduledDate && !task.tags?.some(tag => tag.type === 'date' || tag.type === 'time') && (
-              <Badge 
-                variant="outline" 
-                className="text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-colors"
-              >
-                <Calendar className="w-3 h-3" />
-                {task.scheduledDate.toLocaleDateString()}
-              </Badge>
-            )}
-            
-            {/* Show smart tags */}
-            {task.tags?.map((tag) => {
-              const IconComponent = getTagIcon(tag.type);
-              return (
-                <Badge
-                  key={tag.id}
-                  variant="outline"
-                  className={cn(
-                    "text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
-                    onRemoveTag && "cursor-pointer",
-                    tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
-                  )}
-                  style={tag.color ? { 
-                    borderColor: `${tag.color}30`, 
-                    color: tag.color 
-                  } : undefined}
-                  onClick={onRemoveTag ? (e) => {
-                    e.stopPropagation();
-                    onRemoveTag(task.id, tag.id);
-                  } : undefined}
+          {/* Tags - Hidden in calendar mode */}
+          {!calendarMode && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {/* Show scheduled date badge only if no smart date/time tags exist */}
+              {task.scheduledDate && !task.tags?.some(tag => tag.type === 'date' || tag.type === 'time') && (
+                <Badge 
+                  variant="outline" 
+                  className="text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-colors"
                 >
-                  {/* Icon that becomes X on hover - same size, no layout shift */}
-                  <div className="w-3 h-3 relative">
-                    <IconComponent 
-                      className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
-                      style={{ color: tag.color }}
-                    />
-                    {onRemoveTag && (
-                      <X 
-                        className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
+                  <Calendar className="w-3 h-3" />
+                  {task.scheduledDate.toLocaleDateString()}
+                </Badge>
+              )}
+              
+              {/* Show smart tags */}
+              {task.tags?.map((tag) => {
+                const IconComponent = getTagIcon(tag.type);
+                return (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className={cn(
+                      "text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
+                      onRemoveTag && "cursor-pointer",
+                      tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
+                    )}
+                    style={tag.color ? { 
+                      borderColor: `${tag.color}30`, 
+                      color: tag.color 
+                    } : undefined}
+                    onClick={onRemoveTag ? (e) => {
+                      e.stopPropagation();
+                      onRemoveTag(task.id, tag.id);
+                    } : undefined}
+                  >
+                    {/* Icon that becomes X on hover - same size, no layout shift */}
+                    <div className="w-3 h-3 relative">
+                      <IconComponent 
+                        className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
                         style={{ color: tag.color }}
                       />
-                    )}
-                  </div>
-                  {tag.displayText}
+                      {onRemoveTag && (
+                        <X 
+                          className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
+                          style={{ color: tag.color }}
+                        />
+                      )}
+                    </div>
+                    {tag.displayText}
+                  </Badge>
+                );
+              })}
+              
+              {/* Attachments preview (compact) */}
+              {task.attachments && task.attachments.length > 0 && (
+                <div className="flex items-center gap-1 ml-1">
+                  {task.attachments.slice(0, 3).map((att) => {
+                    const isImage = att.type?.startsWith('image/');
+                    const isAudio = att.type?.startsWith('audio/');
+                    const isVideo = att.type?.startsWith('video/');
+                    const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
+                    return (
+                      <Badge
+                        key={att.id}
+                        variant="outline"
+                        className="text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50"
+                        asChild
+                      >
+                        <a href={att.url} target="_blank" rel="noreferrer" title={att.name} onClick={(e)=>e.stopPropagation()}>
+                          <Icon className="w-3 h-3" />
+                          <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
+                        </a>
+                      </Badge>
+                    );
+                  })}
+                  {task.attachments.length > 3 && (
+                    <Badge variant="outline" className="text-xs h-5 px-2">+{task.attachments.length - 3}</Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Show creation date badge only if no scheduled date and no smart tags */}
+              {!task.scheduledDate && (!task.tags || task.tags.length === 0) && (
+                <Badge 
+                  variant="outline" 
+                  className="text-xs h-5 px-2 gap-1"
+                >
+                  <Clock className="w-3 h-3" />
+                  {task.createdAt.toLocaleDateString()}
                 </Badge>
-              );
-            })}
-            
-            {/* Show creation date badge only if no scheduled date and no smart tags */}
-            {!task.scheduledDate && (!task.tags || task.tags.length === 0) && (
-              <Badge 
-                variant="outline" 
-                className="text-xs h-5 px-2 gap-1"
-              >
-                <Clock className="w-3 h-3" />
-                {task.createdAt.toLocaleDateString()}
-              </Badge>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity duration-200 relative">

@@ -4,7 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { CalendarEvent } from '../../types';
+import type { CalendarEvent } from "@shared/types";
 import { eventStorage } from '../../utils/storage';
 import { validateEvent } from '../../utils/validation';
 import { toUTC } from '../../utils/date';
@@ -23,6 +23,7 @@ export interface CreateEventData {
   color?: string;
   allDay?: boolean;
   recurrence?: string;
+  exceptions?: string[];
 }
 
 /**
@@ -39,6 +40,7 @@ export interface UpdateEventData {
   color?: string;
   allDay?: boolean;
   recurrence?: string;
+  exceptions?: string[];
 }
 
 /**
@@ -81,6 +83,7 @@ export const eventApi = {
       color: data.color,
       allDay: data.allDay || false,
       recurrence: data.recurrence,
+      exceptions: data.exceptions ?? [],
     };
 
     await simulateNetworkDelay(250);
@@ -108,7 +111,7 @@ export const eventApi = {
         title: data.title ?? currentEvent.title,
         start: data.start ?? currentEvent.start,
         end: data.end ?? currentEvent.end,
-        calendarName: data.calendarName ?? currentEvent.calendarName,
+        calendarName: data.calendarName ?? currentEvent.calendarName ?? '',
       };
 
       const validationResult = validateEvent(eventDataToValidate);

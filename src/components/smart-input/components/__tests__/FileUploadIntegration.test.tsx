@@ -8,6 +8,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { EnhancedTaskInput } from '../../EnhancedTaskInput';
+import type { UploadedFile } from '../FileUploadZone';
 
 interface MockDialogProps {
   children: React.ReactNode;
@@ -68,7 +69,14 @@ vi.mock('../FileUploadZone', () => ({
           const mockFile = new File(['test content'], 'test.txt', {
             type: 'text/plain',
           });
-          onFilesAdded([mockFile]);
+          onFilesAdded([{
+            id: '1',
+            file: mockFile,
+            name: 'test.txt',
+            size: mockFile.size,
+            type: 'text/plain',
+            status: 'completed' as const
+          }]);
         }}
         data-testid="add-file-button"
       >

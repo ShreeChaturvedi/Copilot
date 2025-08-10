@@ -6,7 +6,6 @@ export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 
 export { Select } from './Select';
-export type { SelectProps, SelectOption } from './Select';
 
 export { CircularCheckbox } from './CircularCheckbox';
 export type { CircularCheckboxProps } from './CircularCheckbox';
@@ -35,3 +34,5 @@ export { DateTimeInput } from './datetime-input';
 export { ViewToggle, type ViewMode } from './ViewToggle';
 
 export { SharedToggleButton, type SharedToggleButtonProps, type ToggleOption } from './SharedToggleButton';
+
+export { RangeSlider, type RangeSliderProps } from './RangeSlider';

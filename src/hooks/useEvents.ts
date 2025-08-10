@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent } from '@shared/types';
 import { eventApi, type UpdateEventData } from '../services/api';
 import { toUTC } from '../utils/date';
 
@@ -41,7 +41,7 @@ const filterEvents = (events: CalendarEvent[], filters: EventFilters): CalendarE
   // Filter by calendar names
   if (filters.calendarNames && filters.calendarNames.length > 0) {
     filtered = filtered.filter(event => 
-      filters.calendarNames!.includes(event.calendarName)
+      filters.calendarNames!.includes(event.calendarName || '')
     );
   }
 

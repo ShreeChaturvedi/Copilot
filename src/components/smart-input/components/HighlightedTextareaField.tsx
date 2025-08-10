@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from '@/types';
+import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 export interface HighlightedTextareaFieldProps {
@@ -225,8 +225,6 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
           overflowX: 'hidden',
           overflowY: 'auto',
         }}
-        id="highlighted-textarea-input"
-        name="highlighted-textarea-input"
         aria-label="Smart task input with highlighting"
       />
 

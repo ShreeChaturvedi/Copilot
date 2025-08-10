@@ -147,6 +147,8 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
         showCreateTaskDialog={showCreateTaskDialog}
         onShowCreateTaskDialog={memoizedSetShowCreateTaskDialog}
+        calendarMode={true}
+        maxTasks={10}
       />
     ) : (
       <EventOverview maxEvents={7} />
@@ -191,13 +193,12 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
       iconId: string;
       color: string;
       description?: string;
-    }) =>
-      handleCreateTaskGroup(
-        data.name,
-        data.description || '',
-        data.iconId,
-        data.color
-      ),
+    }) => handleCreateTaskGroup({
+      name: data.name,
+      description: data.description || '',
+      iconId: data.iconId,
+      color: data.color,
+    }),
     [handleCreateTaskGroup]
   );
   const memoizedHandleEditTaskGroupForList = useCallback(

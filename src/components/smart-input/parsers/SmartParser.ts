@@ -3,7 +3,7 @@
  * Orchestrates all individual parsers and resolves overlapping detections
  */
 
-import { Parser, ParseResult, ParsedTag, Conflict } from '@/types';
+import { Parser, ParseResult, ParsedTag, Conflict } from "@shared/types";
 import { ChronoDateParser } from './ChronoDateParser';
 import { PriorityParser } from './PriorityParser';
 import { CompromiseNLPParser } from './CompromiseNLPParser';

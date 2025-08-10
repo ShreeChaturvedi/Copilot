@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TaskList } from '../TaskList';
 import { taskStorage } from '../../../utils/storage';
-import type { Task } from '../../../types';
+import type { Task } from "@shared/types";
 
 // Mock the storage utility
 vi.mock('../../../utils/storage', () => ({
@@ -48,6 +48,8 @@ const mockTasks: Task[] = [
     title: 'Pending Task 1',
     completed: false,
     createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    userId: 'test-user',
     priority: 'medium',
   },
   {
@@ -55,6 +57,8 @@ const mockTasks: Task[] = [
     title: 'Completed Task',
     completed: true,
     createdAt: new Date('2024-01-02'),
+    updatedAt: new Date('2024-01-02'),
+    userId: 'test-user',
     priority: 'low',
   },
   {
@@ -62,6 +66,8 @@ const mockTasks: Task[] = [
     title: 'Scheduled Task',
     completed: false,
     createdAt: new Date('2024-01-03'),
+    updatedAt: new Date('2024-01-03'),
+    userId: 'test-user',
     scheduledDate: new Date('2024-01-15'),
     priority: 'high',
   },
@@ -70,15 +76,24 @@ const mockTasks: Task[] = [
     title: 'Another Pending Task',
     completed: false,
     createdAt: new Date('2024-01-04'),
+    updatedAt: new Date('2024-01-04'),
+    userId: 'test-user',
     priority: 'medium',
   },
 ];
 
 const renderTaskList = (props = {}) => {
   const Wrapper = createWrapper();
+  const defaultProps = {
+    tasks: [],
+    onToggleTask: vi.fn(),
+    onEditTask: vi.fn(),
+    onDeleteTask: vi.fn(),
+    ...props
+  };
   return render(
     <Wrapper>
-      <TaskList {...props} />
+      <TaskList {...defaultProps} />
     </Wrapper>
   );
 };
@@ -403,9 +418,9 @@ describe('TaskList Component', () => {
 
   describe('Performance', () => {
     it('should not re-render unnecessarily when props are stable', async () => {
-      const onTaskSchedule = vi.fn();
+      const onScheduleTask = vi.fn();
 
-      const { rerender } = renderTaskList({ onTaskSchedule });
+      const { rerender } = renderTaskList({ onScheduleTask });
 
       await waitFor(() => {
         expect(screen.getByText('Pending Task 1')).toBeInTheDocument();
@@ -414,7 +429,13 @@ describe('TaskList Component', () => {
       // Re-render with same props
       rerender(
         <QueryClientProvider client={new QueryClient()}>
-          <TaskList onTaskSchedule={onTaskSchedule} />
+          <TaskList 
+            tasks={[]}
+            onToggleTask={vi.fn()}
+            onEditTask={vi.fn()}
+            onDeleteTask={vi.fn()}
+            onScheduleTask={onScheduleTask} 
+          />
         </QueryClientProvider>
       );
 

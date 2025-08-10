@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FileUploadButton } from '../FileUploadButton';
-import { UploadedFile } from '../FileUploadZone';
+import type { UploadedFile } from '../FileUploadZone';
 
 interface MockDialogProps {
   children: React.ReactNode;
@@ -68,7 +68,14 @@ vi.mock('../FileUploadZone', () => ({
       <div>Files: {files.length}</div>
       <button
         onClick={() =>
-          onFilesAdded([new File(['test'], 'test.txt', { type: 'text/plain' })])
+          onFilesAdded([{
+            id: '1',
+            file: new File(['test'], 'test.txt', { type: 'text/plain' }),
+            name: 'test.txt',
+            size: 100,
+            type: 'text/plain',
+            status: 'completed' as const
+          }])
         }
         disabled={disabled}
       >

@@ -18,12 +18,18 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { IconPicker } from '@/components/ui/icon-picker';
-import { COLOR_PRESETS } from '@/constants/colors';
+import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
 
 export interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateTask: (data: {
+  onCreateTask?: (data: {
+    name: string;
+    description: string;
+    iconId: string;
+    color: string;
+  }) => void;
+  onCreateCalendar?: (data: {
     name: string;
     description: string;
     iconId: string;
@@ -34,12 +40,13 @@ export interface CreateTaskDialogProps {
 export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onOpenChange,
-  onCreateTask
+  onCreateTask,
+  onCreateCalendar: _onCreateCalendar, // eslint-disable-line @typescript-eslint/no-unused-vars
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Home');
-  const [selectedColor, setSelectedColor] = useState(COLOR_PRESETS[0]);
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Reset form when dialog opens
@@ -64,7 +71,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
-    onCreateTask({
+    onCreateTask?.({
       name: trimmedName,
       description: description.trim(),
       iconId: selectedIcon,
@@ -107,10 +114,9 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                         style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
                       >
                         {SelectedIconComponent && (
-                          <SelectedIconComponent 
-                            className="w-5 h-5" 
-                            style={{ color: selectedColor }}
-                          />
+                          <div style={{ color: selectedColor }}>
+                            <SelectedIconComponent className="w-5 h-5" />
+                          </div>
                         )}
                       </Button>
                     </PopoverTrigger>
