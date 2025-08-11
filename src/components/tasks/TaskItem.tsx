@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { useTasks } from '@/hooks/useTasks';
 import { format } from 'date-fns';
-import { DateTimeInput } from '@/components/ui/datetime-input';
+import { CustomTimeInput } from '@/components/dialogs/EventCreationDialog';
 
 export interface TaskItemProps {
   task: Task;
@@ -493,16 +493,10 @@ function DueDateBadge({
             </div>
             {includeTime && (
               <div className="flex items-center gap-2">
-                <DateTimeInput
-                  value={selectedDate ?? undefined}
-                  onChange={(d) => {
-                    if (d) {
-                      const hh = d.getHours().toString().padStart(2, '0');
-                      const mm = d.getMinutes().toString().padStart(2, '0');
-                      handleTimeChange(`${hh}:${mm}`);
-                    }
-                  }}
-                  className="w-[180px]"
+                <CustomTimeInput
+                  value={timeValue}
+                  onChange={(e) => handleTimeChange(e.target.value)}
+                  className="h-8 w-[114px]"
                 />
               </div>
             )}
