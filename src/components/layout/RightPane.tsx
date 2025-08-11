@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useState, useRef } from 'react';
-import { CalendarView, ConsolidatedCalendarHeader, CalendarViewType } from '../calendar';
+import { CalendarView, CalendarViewType } from '../calendar';
 import { lazy, Suspense } from 'react';
+const LazyConsolidatedCalendarHeader = lazy(async () => ({ default: (await import('../calendar/ConsolidatedCalendarHeader')).ConsolidatedCalendarHeader }));
 const LazyEventCreationDialog = lazy(async () => ({ default: (await import('../dialogs/EventCreationDialog')).EventCreationDialog }));
 const LazyEventDisplayDialog = lazy(async () => ({ default: (await import('../dialogs/EventDisplayDialog')).EventDisplayDialog }));
 import type { CalendarEvent } from "@shared/types";
@@ -89,15 +90,17 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden right-pane-container">
       {/* Consolidated Calendar Header */}
-      <ConsolidatedCalendarHeader
-        currentView={currentView}
-        onViewChange={handleViewChange}
-        onTodayClick={handleTodayClick}
-        onPrevClick={handlePrevClick}
-        onNextClick={handleNextClick}
-        onCreateEvent={handleCreateEvent}
-        calendarRef={calendarRef}
-      />
+      <Suspense fallback={null}>
+        <LazyConsolidatedCalendarHeader
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          onTodayClick={handleTodayClick}
+          onPrevClick={handlePrevClick}
+          onNextClick={handleNextClick}
+          onCreateEvent={handleCreateEvent}
+          calendarRef={calendarRef}
+        />
+      </Suspense>
 
       {/* Calendar Content - Full Integration */}
       <div className="flex-1 min-h-0" style={{ overscrollBehavior: 'none' }}>

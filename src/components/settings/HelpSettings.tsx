@@ -15,21 +15,21 @@ export function HelpSettings() {
       description: 'Comprehensive guides and tutorials',
       icon: Book,
       action: 'View Docs',
-      href: 'https://docs.copilot.com',
+      href: 'https://developer.mozilla.org',
     },
     {
       title: 'Contact Support',
       description: 'Get help from our support team',
       icon: Mail,
       action: 'Contact Us',
-      href: 'mailto:support@copilot.com',
+      href: 'mailto:support@example.com',
     },
     {
       title: 'Community',
       description: 'Join our community discussions',
       icon: MessageCircle,
       action: 'Join Community',
-      href: 'https://community.copilot.com',
+      href: 'https://stackoverflow.com',
     },
   ];
 

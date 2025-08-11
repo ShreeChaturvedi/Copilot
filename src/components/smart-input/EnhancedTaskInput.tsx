@@ -16,7 +16,7 @@
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { ArrowUp } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+//
 
 import { Button } from '@/components/ui/Button';
 import { useTextParser } from './hooks/useTextParser';
@@ -230,7 +230,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       clear();
       setDismissedTagSignatures(new Set());
     }
-  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, activeTaskGroup.id, clear]);
+  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear]);
 
   // Handle key press
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -379,7 +379,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       {hasConflicts && smartParsingEnabled && showConfidence && (
         <div className="mt-2 px-1">
           <div className="text-sm text-yellow-600 flex items-center gap-1">
-            <LucideIcons.AlertTriangle className="w-3 h-3" />
+            <span className="w-3 h-3 inline-block rounded-full bg-yellow-500" />
             Some tags may overlap. Using highest confidence matches.
           </div>
         </div>

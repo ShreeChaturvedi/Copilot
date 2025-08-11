@@ -7,7 +7,7 @@ import React from 'react';
 import { ParsedTag } from '@shared/types';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { X } from 'lucide-react';
 
 export interface ParsedTagsProps {
@@ -87,11 +87,7 @@ const TagBadge: React.FC<TagBadgeProps> = ({
   showConfidence,
 }) => {
   // Get the icon component
-  const IconComponent =
-    (LucideIcons[
-      tag.iconName as keyof typeof LucideIcons
-    ] as React.ComponentType<{ className?: string; size?: number }>) ||
-    LucideIcons.Tag;
+  const IconComponent = getIconByName(tag.iconName);
 
   // Get badge variant - using outline for all by default as requested
   const getBadgeVariant = (): 'outline' => {

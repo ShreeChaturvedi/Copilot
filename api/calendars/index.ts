@@ -4,6 +4,7 @@
 import { createCrudHandler } from '../../lib/utils/apiHandler.js';
 import { getAllServices } from '../../lib/services/index.js';
 import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import { UnauthorizedError, ValidationError, InternalServerError } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { CreateCalendarDTO, CalendarFilters } from '../../lib/services/CalendarService';
@@ -15,11 +16,7 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const { isVisible, search, withEventCounts } = req.query;
@@ -53,11 +50,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/calendars error:', error);
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to fetch calendars',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch calendars'));
     }
   },
 
@@ -67,29 +60,27 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const calendarData: CreateCalendarDTO = req.body;
       
       if (!calendarData.name?.trim()) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar name is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'name', message: 'Calendar name is required', code: 'REQUIRED' },
+          ], 'Calendar name is required')
+        );
       }
 
       if (!calendarData.color) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar color is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'color', message: 'Calendar color is required', code: 'REQUIRED' },
+          ], 'Calendar color is required')
+        );
       }
 
       const calendar = await calendarService.create(calendarData, {
@@ -102,18 +93,11 @@ export default createCrudHandler({
       console.error('POST /api/calendars error:', error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to create calendar',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to create calendar'));
     }
   },
 

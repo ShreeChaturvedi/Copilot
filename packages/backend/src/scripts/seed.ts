@@ -1,4 +1,4 @@
-import { PrismaClient, Priority, TagType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -133,12 +133,12 @@ async function main() {
   // Create sample tags
   await prisma.tag.createMany({
     data: [
-      { name: 'urgent', type: TagType.PRIORITY, color: '#EF4444' },
-      { name: 'home', type: TagType.LOCATION, color: '#10B981' },
-      { name: 'office', type: TagType.LOCATION, color: '#3B82F6' },
-      { name: 'meeting', type: TagType.LABEL, color: '#8B5CF6' },
-      { name: 'personal', type: TagType.PROJECT, color: '#F59E0B' },
-      { name: 'work', type: TagType.PROJECT, color: '#EF4444' },
+      { name: 'urgent', type: 'PRIORITY', color: '#EF4444' },
+      { name: 'home', type: 'LOCATION', color: '#10B981' },
+      { name: 'office', type: 'LOCATION', color: '#3B82F6' },
+      { name: 'meeting', type: 'LABEL', color: '#8B5CF6' },
+      { name: 'personal', type: 'PROJECT', color: '#F59E0B' },
+      { name: 'work', type: 'PROJECT', color: '#EF4444' },
     ],
   });
 
@@ -146,10 +146,10 @@ async function main() {
   console.log('✅ Created tags');
 
   // Create sample tasks
-  const sampleTasks = [
+  const sampleTasks: Array<{ title: string; priority: 'LOW' | 'MEDIUM' | 'HIGH'; scheduledDate?: Date; taskListId: string; userId: string; originalInput: string; cleanTitle: string; completed?: boolean; completedAt?: Date }> = [
     {
       title: 'Review project proposal',
-      priority: Priority.HIGH,
+      priority: 'HIGH',
       scheduledDate: tomorrow,
       taskListId: workTasks.id,
       userId: user1.id,
@@ -158,7 +158,7 @@ async function main() {
     },
     {
       title: 'Buy groceries',
-      priority: Priority.MEDIUM,
+      priority: 'MEDIUM',
       scheduledDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2),
       taskListId: personalTasks.id,
       userId: user1.id,
@@ -167,7 +167,7 @@ async function main() {
     },
     {
       title: 'Call dentist for appointment',
-      priority: Priority.LOW,
+      priority: 'LOW',
       taskListId: personalTasks.id,
       userId: user1.id,
       originalInput: 'Call dentist for appointment',
@@ -175,7 +175,7 @@ async function main() {
     },
     {
       title: 'Prepare presentation slides',
-      priority: Priority.HIGH,
+      priority: 'HIGH',
       scheduledDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5),
       taskListId: workTasks.id,
       userId: user1.id,
@@ -184,7 +184,7 @@ async function main() {
     },
     {
       title: 'Complete code review',
-      priority: Priority.MEDIUM,
+      priority: 'MEDIUM',
       completed: true,
       completedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Yesterday
       taskListId: workTasks.id,
@@ -201,7 +201,7 @@ async function main() {
 
     // Add some tags to tasks
     if (taskData.title.includes('project') || taskData.title.includes('presentation')) {
-      const workTag = createdTags.find(tag => tag.name === 'work');
+      const workTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'work');
       if (workTag) {
         await prisma.taskTag.create({
           data: {
@@ -215,8 +215,8 @@ async function main() {
       }
     }
 
-    if (taskData.priority === Priority.HIGH) {
-      const urgentTag = createdTags.find(tag => tag.name === 'urgent');
+    if (taskData.priority === 'HIGH') {
+      const urgentTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'urgent');
       if (urgentTag) {
         await prisma.taskTag.create({
           data: {
@@ -231,7 +231,7 @@ async function main() {
     }
 
     if (taskData.title.includes('groceries') || taskData.title.includes('dentist')) {
-      const personalTag = createdTags.find(tag => tag.name === 'personal');
+      const personalTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'personal');
       if (personalTag) {
         await prisma.taskTag.create({
           data: {
@@ -272,7 +272,7 @@ async function main() {
   await prisma.task.create({
     data: {
       title: 'Plan team building event',
-      priority: Priority.MEDIUM,
+      priority: 'MEDIUM',
       scheduledDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10),
       taskListId: user2TaskList.id,
       userId: user2.id,

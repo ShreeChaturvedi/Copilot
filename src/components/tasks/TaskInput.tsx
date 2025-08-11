@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import {
@@ -76,11 +76,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
   };
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon =
-    (LucideIcons[
-      activeTaskGroup.iconId as keyof typeof LucideIcons
-    ] as React.ComponentType<{ className?: string; size?: number }>) ||
-    LucideIcons.CheckSquare;
+  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
 
   return (
     <form onSubmit={handleSubmit} className="relative">
@@ -101,13 +97,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
           {taskGroups.map((group) => {
-            const GroupIcon =
-              (LucideIcons[
-                group.iconId as keyof typeof LucideIcons
-              ] as React.ComponentType<{
-                className?: string;
-                size?: number;
-              }>) || LucideIcons.CheckSquare;
+            const GroupIcon = getIconByName(group.iconId);
             return (
               <DropdownMenuItem
                 key={group.id}

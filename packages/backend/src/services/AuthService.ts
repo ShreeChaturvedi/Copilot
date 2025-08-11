@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { PrismaClient, User } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { generateTokenPair, TokenPair } from '../utils/jwt.js';
 import { refreshTokenService } from './RefreshTokenService.js';
 
@@ -148,7 +148,7 @@ class AuthService {
   /**
    * Get user by ID
    */
-  async getUserById(userId: string): Promise<User | null> {
+  async getUserById(userId: string) {
     return await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -160,7 +160,7 @@ class AuthService {
   /**
    * Get user by email
    */
-  async getUserByEmail(email: string): Promise<User | null> {
+  async getUserByEmail(email: string) {
     return await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
       include: {

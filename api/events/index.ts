@@ -4,6 +4,7 @@
 import { createCrudHandler } from '../../lib/utils/apiHandler.js';
 import { getAllServices } from '../../lib/services/index.js';
 import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import { UnauthorizedError, ValidationError, InternalServerError } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { CreateEventDTO, EventFilters } from '../../lib/services/EventService';
@@ -15,11 +16,7 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       // Support standardized query params per shared validation (start/end) and maintain backward-compat (startDate/endDate)
@@ -68,11 +65,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/events error:', error);
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to fetch events',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch events'));
     }
   },
 
@@ -82,11 +75,7 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const body = req.body as Partial<CreateEventDTO & { start?: string | Date; end?: string | Date; calendarName?: string }>;
@@ -103,27 +92,30 @@ export default createCrudHandler({
       };
 
       if (!eventData.title) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Event title is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'title', message: 'Event title is required', code: 'REQUIRED' },
+          ], 'Event title is required')
+        );
       }
 
       if (!eventData.start) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Event start time is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'start', message: 'Event start time is required', code: 'REQUIRED' },
+          ], 'Event start time is required')
+        );
       }
 
       if (!eventData.end) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Event end time is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'end', message: 'Event end time is required', code: 'REQUIRED' },
+          ], 'Event end time is required')
+        );
       }
 
       // Allow calendarId to be passed as a calendar name (legacy). Resolve to actual ID if needed.
@@ -144,11 +136,12 @@ export default createCrudHandler({
       }
 
       if (!eventData.calendarId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'calendarId', message: 'Calendar ID is required', code: 'REQUIRED' },
+          ], 'Calendar ID is required')
+        );
       }
 
       const event = await eventService.create(eventData, {
@@ -161,18 +154,11 @@ export default createCrudHandler({
       console.error('POST /api/events error:', error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to create event',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to create event'));
     }
   },
 

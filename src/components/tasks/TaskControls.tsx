@@ -259,7 +259,7 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Search tasks..."
-                className="w-full h-7 px-3 pr-8 text-xs bg-background border border-border rounded-md focus:outline-none focus:border-primary focus:ring-0"
+                className="w-full h-7 px-3 pr-8 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-0 focus:border-border focus-visible:ring-0 focus-visible:outline-none"
                 aria-label="Search tasks by title or content"
                 aria-describedby="search-help"
               />

@@ -1,8 +1,8 @@
 /**
  * TaskList Service - Concrete implementation of BaseService for TaskList operations
  */
-import type { PrismaClient } from '@prisma/client';
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
+import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import type { Prisma } from '@prisma/client';
 
 /**
  * TaskList entity interface extending base
@@ -12,6 +12,8 @@ export interface TaskListEntity extends UserOwnedEntity {
   color: string;
   icon: string | null;
   description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   
   // Relations (optional for different query contexts)
   tasks?: Array<{
@@ -75,8 +77,8 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     return 'TaskList';
   }
 
-  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): Record<string, unknown> {
-    const where: Record<string, unknown> = {};
+  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): Prisma.TaskListWhereInput {
+    const where: Prisma.TaskListWhereInput = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -93,11 +95,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Filter for task lists with active tasks
     if (filters.hasActiveTasks) {
-      where.tasks = {
-        some: {
-          completed: false,
-        },
-      };
+      where.tasks = { some: { completed: false } };
     }
 
     return where;
@@ -190,12 +188,12 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       await this.validateCreate(data, context);
 
-      const createData: Record<string, unknown> = {
+      const createData: Prisma.TaskListCreateInput = {
         name: data.name.trim(),
         color: data.color,
         icon: data.icon || null,
         description: data.description?.trim() || null,
-        userId: context?.userId,
+        user: { connect: { id: context!.userId! } },
       };
 
       const result = await this.getModel().create({
@@ -242,7 +240,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       // If no task lists exist, create a default one
       if (!defaultTaskList) {
-        defaultTaskList = await this.create(
+        const created = await this.create(
           {
             name: 'General',
             color: '#8B5CF6',
@@ -250,6 +248,8 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
           },
           context
         );
+        this.log('getDefault:created', { id: created.id }, context);
+        return this.transformEntity(created);
       }
 
       this.log('getDefault:success', { id: defaultTaskList.id }, context);
@@ -500,7 +500,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
    * Archive task list (soft delete by marking inactive)
    * Note: This would require adding an `isActive` field to the database schema
    */
-  async archive(id: string, context?: ServiceContext): Promise<TaskListEntity> {
+  async archive(): Promise<TaskListEntity> {
     // This is a placeholder for future archiving functionality
     // Would require schema changes to add `isActive` or `archivedAt` fields
     throw new Error('NOT_IMPLEMENTED: Archive functionality not yet implemented');
@@ -510,6 +510,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
    * Get archived task lists
    */
   async getArchived(context?: ServiceContext): Promise<TaskListEntity[]> {
+    void context;
     // Placeholder for archived task lists
     // Would require schema changes
     return [];

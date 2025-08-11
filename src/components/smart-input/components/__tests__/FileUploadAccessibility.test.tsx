@@ -13,40 +13,40 @@ import type { UploadedFile } from '../FileUploadZone';
 
 // Mock dialog components to avoid portal issues in tests
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (
+  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
     <div data-testid="dialog" data-open={open}>
       {children}
     </div>
   ),
-  DialogContent: ({ children, className }: any) => (
+  DialogContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="dialog-content" className={className}>
       {children}
     </div>
   ),
-  DialogDescription: ({ children }: any) => (
+  DialogDescription: ({ children }: { children: React.ReactNode }) => (
     <p data-testid="dialog-description">{children}</p>
   ),
-  DialogHeader: ({ children }: any) => (
+  DialogHeader: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dialog-header">{children}</div>
   ),
-  DialogTitle: ({ children }: any) => (
+  DialogTitle: ({ children }: { children: React.ReactNode }) => (
     <h2 data-testid="dialog-title">{children}</h2>
   ),
-  DialogTrigger: ({ children }: any) => children,
+  DialogTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock tooltip components
 vi.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => children,
-  TooltipContent: ({ children }: any) => (
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="tooltip-content">{children}</div>
   ),
-  TooltipTrigger: ({ children }: any) => children,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock FileUploadZone
 vi.mock('../FileUploadZone', () => ({
-  FileUploadZone: ({ files, onFilesAdded, onFileRemove, maxFiles, disabled }: any) => (
+  FileUploadZone: ({ files, onFilesAdded, onFileRemove, disabled }: { files: UploadedFile[]; onFilesAdded: (files: File[]) => void; onFileRemove: (id: string) => void; disabled?: boolean }) => (
     <div data-testid="file-upload-zone">
       <div>Files: {files.length}</div>
       <button
@@ -55,7 +55,7 @@ vi.mock('../FileUploadZone', () => ({
       >
         Add File
       </button>
-      {files.map((file: any) => (
+      {files.map((file) => (
         <div key={file.id} data-testid={`file-${file.id}`}>
           {file.name}
           <button onClick={() => onFileRemove(file.id)} aria-label={`Remove ${file.name}`}>

@@ -1,9 +1,9 @@
-import { ReactNode, useEffect, useRef } from 'react';
-import { LeftPane } from './LeftPane';
-import { RightPane } from './RightPane';
-import { TaskFocusPane } from './TaskFocusPane';
+import { ReactNode, useEffect, useRef, lazy, Suspense } from 'react';
+const LeftPane = lazy(async () => ({ default: (await import('./LeftPane')).LeftPane }));
+const RightPane = lazy(async () => ({ default: (await import('./RightPane')).RightPane }));
+const TaskFocusPane = lazy(async () => ({ default: (await import('./TaskFocusPane')).TaskFocusPane }));
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { SettingsDialog } from '@/components/settings/SettingsDialog';
+const SettingsDialog = lazy(async () => ({ default: (await import('@/components/settings/SettingsDialog')).SettingsDialog }));
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsDialog } from '@/hooks/useSettingsDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -24,7 +24,9 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
       <div className="flex flex-col flex-1 min-w-0" style={{ overscrollBehavior: 'none' }}>
         {/* RIGHT PANE CONTENT */}
         <div className="flex-1" style={{ overscrollBehavior: 'none' }}>
-          <RightPane calendarRef={calendarRef} />
+          <Suspense fallback={null}>
+            <RightPane calendarRef={calendarRef} />
+          </Suspense>
         </div>
       </div>
 
@@ -78,25 +80,29 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         style={{ overscrollBehavior: 'none' }}
       >
         {/* LEFT SIDEBAR - Always rendered */}
-        <LeftPane />
+        <Suspense fallback={null}>
+          <LeftPane />
+        </Suspense>
 
         {/* MAIN CONTENT - Changes based on view */}
         {currentView === 'task' ? (
-          /* Task Focus Content */
           <div className="flex-1 min-w-0 transition-all duration-300 ease-out flex flex-col">
-            <TaskFocusPane />
+            <Suspense fallback={null}>
+              <TaskFocusPane />
+            </Suspense>
           </div>
         ) : (
-          /* Calendar Content */
           <MainContent children={children} />
         )}
 
         {/* Settings Dialog */}
-        <SettingsDialog
-          open={isSettingsOpen}
-          onOpenChange={closeSettings}
-          defaultSection={currentSection}
-        />
+        <Suspense fallback={null}>
+          <SettingsDialog
+            open={isSettingsOpen}
+            onOpenChange={closeSettings}
+            defaultSection={currentSection}
+          />
+        </Suspense>
       </div>
     </SidebarProvider>
   );

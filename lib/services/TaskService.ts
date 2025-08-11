@@ -1,8 +1,8 @@
 /**
  * Task Service - Concrete implementation of BaseService for Task operations
  */
-import type { PrismaClient, Priority } from '@prisma/client';
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
+import type { Priority, Prisma, TagType } from '@prisma/client';
+import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
 
 /**
  * Task entity interface extending base
@@ -122,8 +122,8 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
     return 'Task';
   }
 
-  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): Record<string, unknown> {
-    const where: Record<string, unknown> = {};
+  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): Prisma.TaskWhereInput {
+    const where: Prisma.TaskWhereInput = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -147,13 +147,14 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
     // Scheduled date filter
     if (filters.scheduledDate) {
-      where.scheduledDate = {};
+      const range: { gte?: Date; lte?: Date } = {};
       if (filters.scheduledDate.from) {
-        where.scheduledDate.gte = filters.scheduledDate.from;
+        range.gte = filters.scheduledDate.from;
       }
       if (filters.scheduledDate.to) {
-        where.scheduledDate.lte = filters.scheduledDate.to;
+        range.lte = filters.scheduledDate.to;
       }
+      where.scheduledDate = range;
     }
 
     // Search filter (title or clean title)
@@ -169,17 +170,15 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       where.tags = {
         some: {
           tag: {
-            name: { in: filters.tags }
-          }
-        }
+            name: { in: filters.tags },
+          },
+        },
       };
     }
 
     // Overdue filter
     if (filters.overdue) {
-      where.scheduledDate = {
-        lt: new Date(),
-      };
+      where.scheduledDate = { lt: new Date() };
       where.completed = false;
     }
 
@@ -338,6 +337,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('create', { data }, context);
 
       await this.validateCreate(data, context);
+      await this.ensureUserExists(context?.userId, 'dev@example.com');
 
       // Get or create default task list if none specified
       let taskListId = data.taskListId;
@@ -346,14 +346,14 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
         taskListId = defaultTaskList.id;
       }
 
-      const createData: Record<string, unknown> = {
+      const createData: Prisma.TaskCreateInput = {
         title: data.title.trim(),
-        taskListId,
-        scheduledDate: data.scheduledDate,
-        priority: data.priority || 'MEDIUM',
-        originalInput: data.originalInput,
-        cleanTitle: data.cleanTitle,
-        userId: context?.userId,
+        taskList: { connect: { id: taskListId! } },
+        scheduledDate: data.scheduledDate ?? null,
+        priority: (data.priority || 'MEDIUM') as Priority,
+        originalInput: data.originalInput ?? null,
+        cleanTitle: data.cleanTitle ?? null,
+        user: { connect: { id: context!.userId! } },
       };
 
       // Create task with tags in transaction
@@ -372,7 +372,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
               where: { name: tagData.name },
               create: {
                 name: tagData.name,
-                type: tagData.type as unknown as string,
+                type: (tagData.type as unknown as TagType),
                 color: tagData.color,
               },
               update: {},
@@ -403,7 +403,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('create:success', { id: result?.id }, context);
       return this.transformEntity(result);
     } catch (error) {
-      this.log('create:error', { error: error.message, data }, context);
+      this.log('create:error', { error: (error as Error).message, data }, context);
       throw error;
     }
   }
@@ -444,7 +444,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('toggleCompletion:success', { id, completed: updatedTask.completed }, context);
       return this.transformEntity(updatedTask);
     } catch (error) {
-      this.log('toggleCompletion:error', { error: error.message, id }, context);
+      this.log('toggleCompletion:error', { error: (error as Error).message, id }, context);
       throw error;
     }
   }
@@ -537,7 +537,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('bulkUpdate:success', { count: updatedTasks.length }, context);
       return updatedTasks.map((task) => this.transformEntity(task));
     } catch (error) {
-      this.log('bulkUpdate:error', { error: error.message, ids, updates }, context);
+      this.log('bulkUpdate:error', { error: (error as Error).message, ids, updates }, context);
       throw error;
     }
   }
@@ -571,7 +571,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
       this.log('bulkDelete:success', { count: ids.length }, context);
     } catch (error) {
-      this.log('bulkDelete:error', { error: error.message, ids }, context);
+      this.log('bulkDelete:error', { error: (error as Error).message, ids }, context);
       throw error;
     }
   }
@@ -649,6 +649,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
    * Get or create default task list for user
    */
   private async getOrCreateDefaultTaskList(userId: string) {
+    await this.ensureUserExists(userId, 'dev@example.com');
     let defaultTaskList = await this.prisma.taskList.findFirst({
       where: { userId, name: 'General' },
     });

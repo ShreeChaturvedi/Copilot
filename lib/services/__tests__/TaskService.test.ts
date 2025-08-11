@@ -34,12 +34,6 @@ const mockPrisma = {
 } as unknown as PrismaClient;
 
 // Test data
-const mockUser = {
-  id: 'user-123',
-  email: 'test@example.com',
-  name: 'Test User',
-};
-
 const mockTaskList = {
   id: 'list-123',
   name: 'General',
@@ -373,7 +367,7 @@ describe('TaskService', () => {
         return await callback(mockTx);
       });
 
-      const result = await taskService.create(dataWithoutTaskList, mockContext);
+      await taskService.create(dataWithoutTaskList, mockContext);
 
       expect(mockPrisma.taskList.findFirst).toHaveBeenCalledWith({
         where: { userId: 'user-123', name: 'General' },
@@ -636,7 +630,7 @@ describe('TaskService', () => {
       startOfWeek.setDate(now.getDate() - now.getDay());
       startOfWeek.setHours(0, 0, 0, 0);
       
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      // startOfMonth implicitly covered by service implementation; omitted in test
 
       // Mock all count queries
       mockPrisma.task.count

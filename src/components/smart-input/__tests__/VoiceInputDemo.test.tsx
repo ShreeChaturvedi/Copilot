@@ -30,8 +30,8 @@ const mockSpeechRecognition = {
 const mockGetUserMedia = vi.fn();
 
 // Set up mocks
-(global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-(global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+(global.window as unknown as Window & { SpeechRecognition: new () => unknown }).SpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
+(global.window as unknown as Window & { webkitSpeechRecognition: new () => unknown }).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
 
 Object.defineProperty(global.navigator, 'mediaDevices', {
   value: {

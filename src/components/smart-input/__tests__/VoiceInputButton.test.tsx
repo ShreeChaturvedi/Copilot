@@ -48,8 +48,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // Mock Web Speech API
-  (global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  (global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as unknown as Window & { SpeechRecognition: new () => unknown }).SpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
+  (global.window as unknown as Window & { webkitSpeechRecognition: new () => unknown }).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
 
   // Mock navigator.mediaDevices.getUserMedia
   Object.defineProperty(global.navigator, 'mediaDevices', {
@@ -75,8 +75,8 @@ describe('VoiceInputButton', () => {
 
   it('renders disabled button when Web Speech API is not supported', () => {
     // Remove Web Speech API support
-    delete (global.window as any).SpeechRecognition;
-    delete (global.window as any).webkitSpeechRecognition;
+    delete (global.window as unknown as Window & { SpeechRecognition?: unknown }).SpeechRecognition;
+    delete (global.window as unknown as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
 
     render(<VoiceInputButton />);
 

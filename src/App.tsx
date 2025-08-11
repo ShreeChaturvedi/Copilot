@@ -1,10 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryProvider, ThemeProvider } from './components/providers';
-import { MainLayout } from './components/layout';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
-import { LoginPage, SignupPage, GoogleCallbackPage } from './pages';
 import { useAuthStore } from './stores/authStore';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
+
+const MainLayout = lazy(async () => ({ default: (await import('./components/layout/MainLayout')).MainLayout }));
+const LoginPage = lazy(async () => ({ default: (await import('./pages/Login')).LoginPage }));
+const SignupPage = lazy(async () => ({ default: (await import('./pages/Signup')).SignupPage }));
+const GoogleCallbackPage = lazy(async () => ({ default: (await import('./pages/GoogleCallback')).GoogleCallbackPage }));
 
 // Development mode toggle component
 const DevAuthToggle = () => {
@@ -178,7 +181,7 @@ function App() {
         <Router>
           {/* Development auth toggle */}
           {showDevToggle && <DevAuthToggle />}
-          
+          <Suspense fallback={null}>
           <Routes>
             {/* Public routes */}
             <Route 
@@ -216,6 +219,7 @@ function App() {
             {/* Redirect to login for unknown routes */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </Router>
       </ThemeProvider>
     </QueryProvider>

@@ -2,7 +2,8 @@
  * Attachment Service - Concrete implementation of BaseService for Attachment operations
  */
 // PrismaClient type is not directly referenced in this file
-import { BaseService, type ServiceContext, type BaseEntity } from './BaseService';
+import { BaseService, type ServiceContext, type BaseEntity } from './BaseService.js';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Attachment entity interface extending base
@@ -13,6 +14,8 @@ export interface AttachmentEntity extends BaseEntity {
   fileType: string;
   fileSize: number;
   taskId: string;
+  createdAt: Date;
+  updatedAt: Date;
   
   // Relations (optional for different query contexts)
   task?: {
@@ -103,9 +106,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     return 'Attachment';
   }
 
-  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): Record<string, unknown> {
+  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): Prisma.AttachmentWhereInput {
     void _context;
-    const where: Record<string, unknown> = {};
+    const where: Prisma.AttachmentWhereInput = {};
 
     // Task filter
     if (filters.taskId) {
@@ -114,9 +117,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
     // Filter by task owner (user)
     if (filters.userId) {
-      where.task = {
-        userId: filters.userId,
-      };
+      where.task = { userId: filters.userId } as Prisma.TaskWhereInput;
     }
 
     // File type filter
@@ -134,13 +135,14 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
     // File size filters
     if (filters.minSize !== undefined || filters.maxSize !== undefined) {
-      where.fileSize = {};
+      const range: { gte?: number; lte?: number } = {};
       if (filters.minSize !== undefined) {
-        where.fileSize.gte = filters.minSize;
+        range.gte = filters.minSize;
       }
       if (filters.maxSize !== undefined) {
-        where.fileSize.lte = filters.maxSize;
+        range.lte = filters.maxSize;
       }
+      where.fileSize = range;
     }
 
     return where;

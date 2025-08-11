@@ -47,21 +47,11 @@ export function requestLogger() {
       ip: getClientIP(req),
     });
 
-    // Override res.end to log response
-    const originalEnd = res.end.bind(res);
-    res.end = function(this: VercelResponse, chunk?: string | Uint8Array, encoding?: BufferEncoding | (() => void), cb?: () => void) {
+    // Log on finish to avoid messing with res.end signature
+    res.once('finish', () => {
       const duration = Date.now() - startTime;
-      
       console.log(`[${new Date().toISOString()}] [${requestId}] Response ${res.statusCode} - ${duration}ms`);
-      
-      // Call original end method with proper signature
-      if (typeof encoding === 'function') {
-        cb = encoding as () => void;
-        originalEnd(chunk, undefined as unknown as BufferEncoding, cb);
-        return;
-      }
-      originalEnd(chunk, encoding as BufferEncoding, cb);
-    };
+    });
 
     next();
   };

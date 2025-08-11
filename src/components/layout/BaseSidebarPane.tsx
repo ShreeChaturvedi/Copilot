@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/sidebar';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import { useUIStore } from '@/stores/uiStore';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { SmoothSidebarTrigger } from './SmoothSidebarTrigger';
 import { UserDropdown } from './UserDropdown';
@@ -64,32 +63,18 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
     onViewToggle?.(view);
   };
 
-  // Default header content (company logo section)
+  // Default header content (controls only, no branding)
   const defaultHeaderContent = (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <Avatar className="size-8">
-          <AvatarImage
-            src="https://img.glyphs.co/img?q=85&w=900&src=aHR0cHM6Ly9zMy5tZWRpYWxvb3QuY29tL2Jsb2ctaW1hZ2VzL0dUR0wtSW1hZ2UtMDMuanBnP210aW1lPTIwMTgxMDE1MTMxNDA1"
-            alt="Company Logo"
-            className="object-cover"
-          />
-          <AvatarFallback>CO</AvatarFallback>
-        </Avatar>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold">Copilot</span>
-        </div>
-      </div>
-      
       <div className="flex items-center gap-2 relative">
-        {/* View Toggle */}
         {showViewToggle && (
-          <ViewToggle 
+          <ViewToggle
             currentView={currentView}
             onToggle={handleViewToggle}
           />
         )}
-        {/* Smooth toggle button that coordinates with sidebar animations */}
+      </div>
+      <div className="flex items-center gap-2">
         {showSidebarTrigger && (
           <SmoothSidebarTrigger position="sidebar" />
         )}

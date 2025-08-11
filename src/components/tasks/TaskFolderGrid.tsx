@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { Folder, Plus, MoreHorizontal } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { TaskFolder, Task } from "@shared/types";
@@ -57,10 +57,7 @@ interface FolderItemProps {
 
 const FolderItem: React.FC<FolderItemProps> = React.memo(
   ({ folder, onClick }) => {
-    const IconComponent =
-      (LucideIcons[
-        folder.iconId as keyof typeof LucideIcons
-      ] as React.ComponentType<{ className?: string }>) || Folder;
+    const IconComponent = getIconByName(folder.iconId, Folder);
     const hasPreviewTasks = folder.tasks.length > 0;
 
     const handleClick = () => onClick(folder.id);

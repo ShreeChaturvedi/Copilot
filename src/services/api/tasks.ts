@@ -172,8 +172,9 @@ export const taskApi = {
         });
         if (!attRes.ok) {
           // Non-fatal: continue
-          // eslint-disable-next-line no-console
-          console.error('Attachment upload failed');
+          if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error('Attachment upload failed');
+          }
         }
       }
       // Refetch single task to include attachments

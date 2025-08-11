@@ -8,6 +8,7 @@ import { TaskPaneContainer } from '@/components/tasks/TaskPaneContainer';
 import { useUIStore } from '@/stores/uiStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { cn } from '@/lib/utils';
+import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 
 interface TaskFocusPaneProps {
   className?: string;
@@ -218,7 +219,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                   handleAddTask(...args);
                   handleHideAddTaskInput();
                 }}
-                onAddTaskWithFiles={(title, groupId, smart, files) => {
+                onAddTaskWithFiles={(title, groupId, smart: SmartTaskData | undefined, files) => {
                   const normalizedSmart = smart
                     ? {
                         priority: smart.priority,
@@ -235,7 +236,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                         title: smart.title,
                       }
                     : undefined;
-                  handleAddTaskWithFiles(title, groupId, normalizedSmart as any, files);
+                  handleAddTaskWithFiles(title, groupId, normalizedSmart, files);
                   handleHideAddTaskInput();
                 }}
                 taskGroups={taskGroups}

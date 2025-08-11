@@ -1,8 +1,8 @@
 /**
  * Event Service - Concrete implementation of BaseService for Event operations
  */
-import type { PrismaClient } from '@prisma/client';
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
+import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Event entity interface extending base
@@ -17,6 +17,8 @@ export interface EventEntity extends UserOwnedEntity {
   notes: string | null;
   recurrence: string | null;
   calendarId: string;
+  createdAt: Date;
+  updatedAt: Date;
   
   // Relations (optional for different query contexts)
   calendar?: {
@@ -92,8 +94,43 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     return 'Event';
   }
 
-  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): Record<string, unknown> {
-    const where: Record<string, unknown> = {};
+  /**
+   * Override create to satisfy required relations (user, calendar)
+   */
+  async create(data: CreateEventDTO, context?: ServiceContext): Promise<EventEntity> {
+    try {
+      this.log('create', { data }, context);
+      await this.validateCreate(data, context);
+      await this.ensureUserExists(context?.userId, 'dev@example.com');
+
+      const createData: Prisma.EventCreateInput = {
+        title: data.title.trim(),
+        start: data.start,
+        end: data.end,
+        description: data.description?.trim() || null,
+        location: data.location?.trim() || null,
+        notes: data.notes?.trim() || null,
+        allDay: data.allDay ?? false,
+        recurrence: data.recurrence || null,
+        user: { connect: { id: context!.userId! } },
+        calendar: { connect: { id: data.calendarId } },
+      };
+
+      const result = await this.getModel().create({
+        data: createData,
+        include: this.buildIncludeClause(),
+      });
+
+      this.log('create:success', { id: result.id }, context);
+      return this.transformEntity(result);
+    } catch (error) {
+      this.log('create:error', { error: (error as Error).message, data }, context);
+      throw error;
+    }
+  }
+
+  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): Prisma.EventWhereInput {
+    const where: Prisma.EventWhereInput = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -112,19 +149,14 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Date range filter
     if (filters.start || filters.end) {
-      where.AND = [];
-      
+      const andClauses: Prisma.EventWhereInput[] = [];
       if (filters.start) {
-        where.AND.push({
-          end: { gte: filters.start },
-        });
+        andClauses.push({ end: { gte: filters.start } });
       }
-      
       if (filters.end) {
-        where.AND.push({
-          start: { lte: filters.end },
-        });
+        andClauses.push({ start: { lte: filters.end } });
       }
+      if (andClauses.length > 0) where.AND = andClauses;
     }
 
     // Search filter
@@ -144,11 +176,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Recurrence filter
     if (filters.hasRecurrence !== undefined) {
-      if (filters.hasRecurrence) {
-        where.recurrence = { not: null };
-      } else {
-        where.recurrence = null;
-      }
+      where.recurrence = filters.hasRecurrence ? { not: null } : null;
     }
 
     return where;

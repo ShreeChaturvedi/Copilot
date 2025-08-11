@@ -12,12 +12,13 @@ import {
   Trash2,
   CheckSquare,
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { TaskItem } from './TaskItem';
 import type { Task } from "@shared/types";
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import { groupItemsByDate, getDayKeyOrder } from '@/utils/dateGrouping';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
 
 import { ColorPicker } from '@/components/ui/color-picker';
 import {
@@ -48,7 +49,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { IconPicker } from '@/components/ui/icon-picker';
+import { lazy, Suspense } from 'react';
+const IconPicker = lazy(async () => ({ default: (await import('@/components/ui/icon-picker')).IconPicker }));
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -165,9 +167,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   }, [activeTasks, completedTasks, globalShowCompleted]);
 
   // Calendar mode: Group tasks by date and limit count
-  const { groupedTasks, totalTaskCount } = useMemo(() => {
+  const { groupedTasks, totalTaskCount, groupedAllTotals } = useMemo(() => {
     if (!calendarMode) {
-      return { groupedTasks: null, totalTaskCount: 0 };
+      return { groupedTasks: null, totalTaskCount: 0, groupedAllTotals: {} as Record<string, number> };
     }
 
     // In calendar mode, filter to only show active tasks (no completed)
@@ -177,15 +179,18 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     // Group tasks by scheduled date (canonical due date for tasks)
     const grouped = groupItemsByDate(tasksForCalendar, (task) => task.scheduledDate ?? null);
 
-    return { groupedTasks: grouped, totalTaskCount: totalCount };
+    // Compute totals across all active tasks (not truncated) for accurate badges
+    const groupedAll = groupItemsByDate(activeTasks, (task) => task.scheduledDate ?? null);
+    const totals = Object.keys(groupedAll).reduce<Record<string, number>>((acc, key) => {
+      acc[key] = groupedAll[key].length;
+      return acc;
+    }, {});
+
+    return { groupedTasks: grouped, totalTaskCount: totalCount, groupedAllTotals: totals };
   }, [calendarMode, activeTasks, maxTasks]);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon =
-    (LucideIcons[
-      activeTaskGroup.iconId as keyof typeof LucideIcons
-    ] as React.ComponentType<{ className?: string; size?: number }>) ||
-    LucideIcons.CheckSquare;
+  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
 
   const handleCreateTaskGroup = (data: {
     name: string;
@@ -309,10 +314,12 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3" align="start">
-                <IconPicker
-                  selectedIcon={activeTaskGroup.iconId}
-                  onIconSelect={handleUpdateIcon}
-                />
+                <Suspense fallback={null}>
+                  <IconPicker
+                    selectedIcon={activeTaskGroup.iconId}
+                    onIconSelect={handleUpdateIcon}
+                  />
+                </Suspense>
               </PopoverContent>
             </Popover>
 
@@ -431,10 +438,12 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3" align="start">
-                  <IconPicker
-                    selectedIcon={activeTaskGroup.iconId}
-                    onIconSelect={handleUpdateIcon}
-                  />
+                  <Suspense fallback={null}>
+                    <IconPicker
+                      selectedIcon={activeTaskGroup.iconId}
+                      onIconSelect={handleUpdateIcon}
+                    />
+                  </Suspense>
                 </PopoverContent>
               </Popover>
 
@@ -503,10 +512,15 @@ const TaskListComponent: React.FC<TaskListProps> = ({
               {getDayKeyOrder(Object.keys(groupedTasks)).map((dayKey) => (
                 <div key={dayKey} className="space-y-2">
                   {/* Day heading with improved styling */}
-                  <div className={`text-xs font-semibold mb-3 uppercase tracking-wider ${
-                    dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
-                  }`}>
-                    {dayKey}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`text-xs font-semibold uppercase tracking-wider ${
+                      dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
+                    }`}>
+                      {dayKey}
+                    </span>
+                    <Badge variant="outline" className="text-xs h-5">
+                      {groupedAllTotals[dayKey] ?? groupedTasks[dayKey].length}
+                    </Badge>
                   </div>
 
                   {/* Tasks for this day */}

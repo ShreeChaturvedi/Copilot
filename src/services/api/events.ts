@@ -85,14 +85,18 @@ export const eventApi = {
     const body = await res.json();
     if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to fetch events');
     const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
-    return items.map((e: Record<string, unknown>) => ({
-      ...e,
-      calendarName: (e as Record<string, any>).calendarName ?? (e as Record<string, any>).calendar?.name,
-      start: new Date(e.start as string),
-      end: new Date(e.end as string),
-      createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
-      updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
-    } as CalendarEvent));
+    return items.map((e: Record<string, unknown>) => {
+      const record = e as Record<string, unknown>;
+      const calendar = record.calendar as Record<string, unknown> | undefined;
+      return {
+        ...(record as object),
+        calendarName: (record.calendarName as string | undefined) ?? (calendar?.name as string | undefined),
+        start: new Date(record.start as string),
+        end: new Date(record.end as string),
+        createdAt: record.createdAt ? new Date(record.createdAt as string) : undefined,
+        updatedAt: record.updatedAt ? new Date(record.updatedAt as string) : undefined,
+      } as CalendarEvent;
+    });
   },
 
   /**
@@ -103,7 +107,7 @@ export const eventApi = {
     if (!validationResult.isValid) throw new Error(validationResult.errors[0].message);
 
     // Try backend first; map calendarName to calendarId isn't available in legacy; leaving as calendarName
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       title: data.title.trim(),
       start: toUTC(data.start).toISOString(),
       end: toUTC(data.end).toISOString(),
@@ -138,7 +142,7 @@ export const eventApi = {
         if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create event');
         const e = body.data as Record<string, unknown>;
         return {
-          ...e,
+          ...(e as object),
           start: new Date(e.start as string),
           end: new Date(e.end as string),
           createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
@@ -175,9 +179,9 @@ export const eventApi = {
   updateEvent: async (id: string, data: UpdateEventData): Promise<CalendarEvent> => {
     // Try backend first
     try {
-      const payload: any = { ...data };
-      if (payload.start) payload.start = toUTC(payload.start).toISOString();
-      if (payload.end) payload.end = toUTC(payload.end).toISOString();
+      const payload: Record<string, unknown> = { ...data };
+      if (payload.start instanceof Date) payload.start = toUTC(payload.start).toISOString();
+      if (payload.end instanceof Date) payload.end = toUTC(payload.end).toISOString();
       const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -188,7 +192,7 @@ export const eventApi = {
         if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update event');
         const e = body.data as Record<string, unknown>;
         return {
-          ...e,
+          ...(e as object),
           start: new Date(e.start as string),
           end: new Date(e.end as string),
           createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
@@ -272,13 +276,17 @@ export const eventApi = {
     const body = await res.json();
     if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to fetch events');
     const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
-    return items.map((e: Record<string, unknown>) => ({
-      ...e,
-      calendarName: (e as Record<string, any>).calendarName ?? (e as Record<string, any>).calendar?.name,
-      start: new Date(e.start as string),
-      end: new Date(e.end as string),
-      createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
-      updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
-    } as CalendarEvent));
+    return items.map((e: Record<string, unknown>) => {
+      const record = e as Record<string, unknown>;
+      const calendar = record.calendar as Record<string, unknown> | undefined;
+      return {
+        ...(record as object),
+        calendarName: (record.calendarName as string | undefined) ?? (calendar?.name as string | undefined),
+        start: new Date(record.start as string),
+        end: new Date(record.end as string),
+        createdAt: record.createdAt ? new Date(record.createdAt as string) : undefined,
+        updatedAt: record.updatedAt ? new Date(record.updatedAt as string) : undefined,
+      } as CalendarEvent;
+    });
   },
 };

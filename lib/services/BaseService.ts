@@ -46,7 +46,7 @@ export abstract class BaseService<
   TEntity extends BaseEntity = BaseEntity,
   TCreateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
   TUpdateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
-  TFilters extends Record<string, unknown> = Record<string, unknown>
+  TFilters extends object = Record<string, unknown>
 > {
   protected readonly config: BaseServiceConfig;
 
@@ -66,17 +66,7 @@ export abstract class BaseService<
    * Get the Prisma model delegate for this service
    * Must be implemented by concrete services
    */
-  protected abstract getModel(): {
-    findMany: (args: unknown) => Promise<TEntity[]>;
-    findUnique: (args: unknown) => Promise<TEntity | null>;
-    count: (args: unknown) => Promise<number>;
-    create: (args: unknown) => Promise<TEntity>;
-    update: (args: unknown) => Promise<TEntity>;
-    delete: (args: unknown) => Promise<TEntity>;
-    createMany?: (args: unknown) => Promise<{ count: number }>;
-    updateMany?: (args: unknown) => Promise<{ count: number }>;
-    deleteMany?: (args: unknown) => Promise<{ count: number }>;
-  };
+  protected abstract getModel(): any;
 
   /**
    * Get the entity name for logging and error messages
@@ -112,18 +102,14 @@ export abstract class BaseService<
    * Validate create data
    * Can be overridden by concrete services
    */
-  protected async validateCreate(data: TCreateDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(_data: TCreateDTO, _context?: ServiceContext): Promise<void> {
     // Override in concrete services for validation
   }
 
   /**
    * Validate update data
    */
-  protected async validateUpdate(
-    id: string,
-    data: TUpdateDTO,
-    context?: ServiceContext
-  ): Promise<void> {
+  protected async validateUpdate(_id: string, _data: TUpdateDTO, _context?: ServiceContext): Promise<void> {
     // Override in concrete services for validation
   }
 
@@ -132,13 +118,13 @@ export abstract class BaseService<
    */
   protected async checkOwnership(id: string, userId: string): Promise<boolean> {
     try {
-      const entity = await this.getModel().findUnique({
+      const entity = await this.getModel().findFirst({
         where: { id },
         select: { userId: true },
       });
 
-      return entity?.userId === userId;
-    } catch (error) {
+      return (entity as { userId?: string } | null)?.userId === userId;
+    } catch {
       return false;
     }
   }
@@ -163,6 +149,27 @@ export abstract class BaseService<
   }
 
   /**
+   * Ensure a user row exists in development to satisfy FK connects
+   */
+  protected async ensureUserExists(userId?: string, emailFallback?: string): Promise<void> {
+    if (!userId) return;
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        await (this.prisma as unknown as { user: { upsert: Function } }).user.upsert({
+          where: { id: userId },
+          update: {},
+          create: {
+            id: userId,
+            email: emailFallback || `${userId}@dev.local`,
+          },
+        });
+      }
+    } catch {
+      // noop in production or if upsert is not available
+    }
+  }
+
+  /**
    * Find all entities with optional filtering
    */
   async findAll(filters: TFilters = {} as TFilters, context?: ServiceContext): Promise<TEntity[]> {
@@ -175,12 +182,11 @@ export abstract class BaseService<
       const entities = await this.getModel().findMany({
         where: whereClause,
         include: includeClause,
-        orderBy: { createdAt: 'desc' },
       });
 
       return entities.map(entity => this.transformEntity(entity));
     } catch (error) {
-      this.log('findAll:error', { error: error.message, filters }, context);
+      this.log('findAll:error', { error: (error as Error).message, filters }, context);
       throw error;
     }
   }
@@ -334,7 +340,6 @@ export abstract class BaseService<
     try {
       const entity = await this.getModel().findUnique({
         where: { id },
-        select: { id: true },
       });
 
       return !!entity;

@@ -1,10 +1,12 @@
 import React, { memo } from 'react';
-import { format, isToday, isTomorrow, isThisWeek, isAfter } from 'date-fns';
+import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
 import { useCalendars } from '@/hooks/useCalendars';
 import { type CalendarEvent } from "@shared/types";
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { groupItemsByDate, filterUpcomingItems } from '@/utils/dateGrouping';
 
 interface EventOverviewProps {
   maxEvents?: number;
@@ -27,51 +29,33 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
     .filter((cal) => cal.visible)
     .map((cal) => cal.name);
 
+  // Compute all upcoming events (not truncated) for accurate totals
+  const upcomingEventsAll = React.useMemo(() => {
+    const visible = allEvents.filter((event) =>
+      visibleCalendarNames.includes(event.calendarName || '')
+    );
+    return filterUpcomingItems(visible, (e: CalendarEvent) => new Date(e.start));
+  }, [allEvents, visibleCalendarNames]);
+
+  // Apply display limit for the overview list
   const upcomingEvents = React.useMemo(() => {
-    const now = new Date();
-
-    return allEvents
-      .filter((event) => {
-        // Only show events from visible calendars
-        if (!visibleCalendarNames.includes(event.calendarName || '')) {
-          return false;
-        }
-
-        const eventStart = new Date(event.start);
-
-        // Show events from today forward
-        return isAfter(eventStart, now) || isToday(eventStart);
-      })
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-      .slice(0, maxEvents);
-  }, [allEvents, visibleCalendarNames, maxEvents]);
+    return upcomingEventsAll.slice(0, maxEvents);
+  }, [upcomingEventsAll, maxEvents]);
 
   // Group events by day
+  // Group displayed events for rendering (preserve chronological insertion order)
   const groupedEvents: GroupedEvents = React.useMemo(() => {
-    const groups: GroupedEvents = {};
-
-    upcomingEvents.forEach((event) => {
-      const eventDate = new Date(event.start);
-      let dayKey: string;
-
-      if (isToday(eventDate)) {
-        dayKey = 'Today';
-      } else if (isTomorrow(eventDate)) {
-        dayKey = 'Tomorrow';
-      } else if (isThisWeek(eventDate, { weekStartsOn: 1 })) {
-        dayKey = format(eventDate, 'EEEE'); // Wednesday, Thursday, etc.
-      } else {
-        dayKey = format(eventDate, 'MMM d'); // Jan 15, etc.
-      }
-
-      if (!groups[dayKey]) {
-        groups[dayKey] = [];
-      }
-      groups[dayKey].push(event);
-    });
-
-    return groups;
+    return groupItemsByDate(upcomingEvents, (e) => new Date(e.start));
   }, [upcomingEvents]);
+
+  // Group all upcoming events to compute accurate totals per day key
+  const groupedEventTotals: Record<string, number> = React.useMemo(() => {
+    const totals = groupItemsByDate(upcomingEventsAll, (e) => new Date(e.start));
+    return Object.keys(totals).reduce<Record<string, number>>((acc, key) => {
+      acc[key] = totals[key].length;
+      return acc;
+    }, {});
+  }, [upcomingEventsAll]);
 
   // Get calendar color for an event
   const getEventColor = (calendarName: string) => {
@@ -111,8 +95,13 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
         {Object.entries(groupedEvents).map(([dayKey, events]) => (
           <div key={dayKey} className="space-y-2">
             {/* Day heading with improved styling */}
-            <div className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-              {dayKey}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {dayKey}
+              </span>
+              <Badge variant="outline" className="text-xs h-5">
+                {groupedEventTotals[dayKey] ?? events.length}
+              </Badge>
             </div>
 
             {/* Events for this day */}
@@ -173,26 +162,13 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
         ))}
 
         {/* Show count if there are more events */}
-        {(() => {
-          const totalUpcomingEvents = allEvents.filter((event) => {
-            if (!visibleCalendarNames.includes(event.calendarName || '')) {
-              return false;
-            }
-            const eventStart = new Date(event.start);
-            const now = new Date();
-            return isAfter(eventStart, now) || isToday(eventStart);
-          }).length;
-
-          return (
-            totalUpcomingEvents > maxEvents && (
-              <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
-                <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
-                  +{totalUpcomingEvents - maxEvents} more upcoming events
-                </span>
-              </div>
-            )
-          );
-        })()}
+        {upcomingEventsAll.length > maxEvents && (
+          <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
+            <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+              +{upcomingEventsAll.length - maxEvents} more upcoming events
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

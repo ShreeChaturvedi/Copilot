@@ -14,8 +14,10 @@ import {
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
-// Keep component-only exports; re-export provider directly to avoid non-component exports in this module
-const Form = FormProvider
+// Wrap FormProvider to keep component-only exports in this module
+const Form: React.FC<React.ComponentProps<typeof FormProvider>> = (props) => {
+  return <FormProvider {...props} />
+}
 
 type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
@@ -154,4 +156,5 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField }

@@ -375,7 +375,7 @@ describe('Task Management Comprehensive Tests', () => {
       for (const scenario of sortingScenarios) {
         mockPrisma.task.findMany.mockResolvedValue([]);
 
-        await taskService.findAll(scenario as any, mockContext);
+        await taskService.findAll(scenario as Parameters<typeof taskService.findAll>[0], mockContext);
 
         expect(mockPrisma.task.findMany).toHaveBeenCalledWith({
           where: { userId: 'user-123' },
@@ -743,7 +743,7 @@ describe('Task Management Comprehensive Tests', () => {
       startOfWeek.setDate(now.getDate() - now.getDay());
       startOfWeek.setHours(0, 0, 0, 0);
       
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      // startOfMonth implicitly covered by service implementation; omitted in test
 
       // Mock all count queries
       mockPrisma.task.count

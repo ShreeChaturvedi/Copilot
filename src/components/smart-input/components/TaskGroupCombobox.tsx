@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Plus, ChevronsUpDown, Check, List } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import {
   Command,
@@ -79,11 +79,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon =
-    (LucideIcons[
-      activeTaskGroup.iconId as keyof typeof LucideIcons
-    ] as React.ComponentType<{ className?: string; size?: number }>) ||
-    LucideIcons.CheckSquare;
+  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -145,13 +141,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             <CommandSeparator />
             <CommandGroup>
               {taskGroups.map((group) => {
-                const GroupIcon =
-                  (LucideIcons[
-                    group.iconId as keyof typeof LucideIcons
-                  ] as React.ComponentType<{
-                    className?: string;
-                    size?: number;
-                  }>) || LucideIcons.CheckSquare;
+                const GroupIcon = getIconByName(group.iconId);
                 return (
                   <CommandItem
                     key={group.id}

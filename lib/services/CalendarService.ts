@@ -1,8 +1,8 @@
 /**
  * Calendar Service - Concrete implementation of BaseService for Calendar operations
  */
-import type { PrismaClient } from '@prisma/client';
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
+import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Calendar entity interface extending base
@@ -13,6 +13,8 @@ export interface CalendarEntity extends UserOwnedEntity {
   description: string | null;
   isVisible: boolean;
   isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
   
   // Relations (optional for different query contexts)
   events?: Array<{
@@ -69,8 +71,8 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     return 'Calendar';
   }
 
-  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): Record<string, unknown> {
-    const where: Record<string, unknown> = {};
+  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): Prisma.CalendarWhereInput {
+    const where: Prisma.CalendarWhereInput = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -184,6 +186,7 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
       this.log('create', { data }, context);
 
       await this.validateCreate(data, context);
+      await this.ensureUserExists(context?.userId, 'dev@example.com');
 
       // Check if this should be the first/default calendar
       let isDefault = data.isDefault || false;
@@ -197,13 +200,13 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const createData: Record<string, unknown> = {
+      const createData: Prisma.CalendarCreateInput = {
         name: data.name.trim(),
         color: data.color,
         description: data.description?.trim() || null,
         isDefault,
         isVisible: true, // New calendars are visible by default
-        userId: context?.userId,
+        user: { connect: { id: context!.userId! } },
       };
 
       // Handle default calendar logic in transaction
@@ -244,20 +247,20 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     try {
       this.log('getDefault', {}, context);
 
-      let defaultCalendar = await this.getModel().findFirst({
+      let defaultCalendar: CalendarEntity | null = (await this.getModel().findFirst({
         where: {
           userId: context.userId,
           isDefault: true,
         },
         include: this.buildIncludeClause(),
-      });
+      })) as unknown as CalendarEntity | null;
 
       // If no default calendar exists, get the first one or create one
       if (!defaultCalendar) {
-        const firstCalendar = await this.getModel().findFirst({
+        const firstCalendar = (await this.getModel().findFirst({
           where: { userId: context.userId },
           include: this.buildIncludeClause(),
-        });
+        })) as unknown as CalendarEntity | null;
 
         if (firstCalendar) {
           // Set first calendar as default
@@ -267,8 +270,8 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
             include: this.buildIncludeClause(),
           });
         } else {
-          // Create a default calendar
-          defaultCalendar = await this.create(
+          // Create a default calendar and return immediately to avoid mixed inferred types
+          const created = await this.create(
             {
               name: 'My Calendar',
               color: '#3B82F6',
@@ -277,6 +280,8 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
             },
             context
           );
+          this.log('getDefault:created', { id: created.id }, context);
+          return this.transformEntity(created);
         }
       }
 

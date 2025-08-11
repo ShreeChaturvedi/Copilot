@@ -9,6 +9,7 @@ import { corsMiddleware } from '../middleware/cors.js';
 import { requestIdMiddleware, requestLogger } from '../middleware/requestId.js';
 import { rateLimitPresets } from '../middleware/rateLimit.js';
 import { validateRequest } from '../middleware/validation.js';
+import type { ValidationConfig } from '../middleware/validation.js';
 import { composeMiddleware } from '../middleware/index.js';
 import { devAuth } from '../middleware/auth.js';
 import { ApiError } from '../types/api.js';
@@ -47,7 +48,7 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
     }
 
     // Add validation if configured
-    const validationConfig: { body?: unknown; query?: unknown } = {};
+    const validationConfig: ValidationConfig = {};
     if (route.validateBody) validationConfig.body = route.validateBody;
     if (route.validateQuery) validationConfig.query = route.validateQuery;
     

@@ -109,7 +109,7 @@ export function GoogleCallbackPage() {
               </div>
               <div className="text-center">
                 <p className="font-medium text-slate-900 dark:text-slate-100">
-                  Welcome to Copilot!
+                  Welcome!
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                   You'll be redirected to your dashboard shortly.

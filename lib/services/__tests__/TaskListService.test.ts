@@ -25,12 +25,6 @@ const mockPrisma = {
 } as unknown as PrismaClient;
 
 // Test data
-const mockUser = {
-  id: 'user-123',
-  email: 'test@example.com',
-  name: 'Test User',
-};
-
 const mockTaskList = {
   id: 'list-123',
   name: 'General',

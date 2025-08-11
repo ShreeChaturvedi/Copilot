@@ -1,14 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState, Suspense } from 'react';
 import { Search, X } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
-// Get all Lucide icons
-const iconNames = Object.keys(LucideIcons).filter(
-  (name) => name !== 'createLucideIcon' && name !== 'default'
-);
+// Use Lucide's dynamic icon imports to code-split each icon.
+// Static import so bundlers can include the small mapping table only.
+// lucide-react exposes a mapping of kebab-case icon names to dynamic imports
+// Types are not exported, so we cast to a safe index signature.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-var-requires
+const dynamicIconImports = require('lucide-react/dynamicIconImports').default as Record<string, () => Promise<{ default: React.ComponentType<any> }>>;
+
+const allIconNames: string[] = Object.keys(dynamicIconImports);
 
 export interface IconPickerProps {
   selectedIcon?: string;
@@ -23,13 +26,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
+  const readyToShow = searchTerm.trim().length >= 2;
   const filteredIcons = useMemo(() => {
-    if (!searchTerm) return iconNames.slice(0, 100); // Show first 100 icons by default
-    
-    return iconNames.filter(name =>
-      name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 50); // Limit search results
-  }, [searchTerm]);
+    if (!readyToShow) return [] as string[];
+    const q = searchTerm.trim().toLowerCase();
+    return allIconNames.filter((name) => name.includes(q)).slice(0, 60);
+  }, [readyToShow, searchTerm]);
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -61,28 +63,33 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 
       {/* Icons Grid */}
       <div className="max-h-64 overflow-y-auto border rounded-md">
+        {!readyToShow ? (
+          <div className="p-6 text-center text-muted-foreground text-sm">Type at least 2 characters to search icons</div>
+        ) : (
         <div className="grid grid-cols-6 gap-1 p-2">
           {filteredIcons.map((iconName) => {
-            const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }>;
-            if (!IconComponent) return null;
-
+            const loader = dynamicIconImports[iconName];
+            if (!loader) return null;
+            const IconLazy = React.lazy(loader);
             return (
-              <Button
-                key={iconName}
-                variant="ghost"
-                size="sm"
-                onClick={() => onIconSelect(iconName)}
-                className={cn(
-                  "h-10 w-10 p-0 hover:bg-accent",
-                  selectedIcon === iconName && "bg-accent border-2 border-primary"
-                )}
-                title={iconName}
-              >
-                <IconComponent className="w-4 h-4" />
-              </Button>
+              <Suspense key={iconName} fallback={<div className="h-10 w-10" />}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onIconSelect(iconName)}
+                  className={cn(
+                    "h-10 w-10 p-0 hover:bg-accent",
+                    selectedIcon === iconName && "bg-accent border-2 border-primary"
+                  )}
+                  title={iconName}
+                >
+                  <IconLazy className="w-4 h-4" />
+                </Button>
+              </Suspense>
             );
           })}
         </div>
+        )}
         
         {filteredIcons.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">

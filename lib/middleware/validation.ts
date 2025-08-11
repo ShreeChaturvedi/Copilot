@@ -26,23 +26,23 @@ export interface ValidationConfig {
 export function validateRequest(config: ValidationConfig) {
   return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
     try {
+      req.validated = req.validated || {};
       // Validate request body
       if (config.body) {
-        req.body = await validateTarget(req.body, config.body, 'body');
+        req.validated.body = await validateTarget(req.body, config.body, 'body');
       }
 
       // Validate query parameters
       if (config.query) {
-        req.query = await validateTarget(req.query, config.query, 'query');
+        req.validated.query = await validateTarget(req.query, config.query, 'query') as unknown;
       }
 
       // Validate route parameters
       if (config.params) {
         // Note: Vercel doesn't provide params directly, they're in query
         // This would be used with a custom router implementation
-        const params = extractParamsFromUrl(req.url || '', req.query as Record<string, unknown>);
-        const validated = await validateTarget(params, config.params, 'params');
-        req.query = { ...req.query, ...validated } as Record<string, unknown>;
+        const params = extractParamsFromUrl(req.url || '', (req.query as unknown as Record<string, unknown>) || {});
+        req.validated.params = await validateTarget(params, config.params, 'params');
       }
 
       next();

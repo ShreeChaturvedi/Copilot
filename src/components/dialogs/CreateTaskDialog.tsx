@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { IconPicker } from '@/components/ui/icon-picker';
+import { lazy, Suspense } from 'react';
+const IconPicker = lazy(async () => ({ default: (await import('@/components/ui/icon-picker')).IconPicker }));
 import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
 
 export interface CreateTaskDialogProps {
@@ -85,7 +86,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     onOpenChange(false);
   };
 
-  const SelectedIconComponent = LucideIcons[selectedIcon as keyof typeof LucideIcons] as React.ComponentType<{ className?: string }>;
+  const SelectedIconComponent = getIconByName(selectedIcon);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,10 +122,12 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-3" align="start">
-                      <IconPicker
-                        selectedIcon={selectedIcon}
-                        onIconSelect={handleIconSelect}
-                      />
+                      <Suspense fallback={null}>
+                        <IconPicker
+                          selectedIcon={selectedIcon}
+                          onIconSelect={handleIconSelect}
+                        />
+                      </Suspense>
                     </PopoverContent>
                   </Popover>
                 </div>

@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -224,7 +224,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   }, []);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = LucideIcons[activeTaskGroup.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
+  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
 
   // Check if we have any content to show
   const hasValidContent = inputText.trim().length > 0;
@@ -247,8 +247,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        {taskGroups.map((group) => {
-          const GroupIcon = LucideIcons[group.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
+          {taskGroups.map((group) => {
+          const GroupIcon = getIconByName(group.iconId);
           return (
             <DropdownMenuItem
               key={group.id}
@@ -397,8 +397,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
-              {taskGroups.map((group) => {
-                const GroupIcon = LucideIcons[group.iconId as keyof typeof LucideIcons] as React.ComponentType<{ className?: string; size?: number }> || LucideIcons.CheckSquare;
+          {taskGroups.map((group) => {
+                const GroupIcon = getIconByName(group.iconId);
                 return (
                   <DropdownMenuItem
                     key={group.id}
@@ -526,9 +526,10 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
       )}
 
       {/* Conflicts Warning */}
-      {hasConflicts && enableSmartParsing && showConfidence && (
+          {hasConflicts && enableSmartParsing && showConfidence && (
         <div className="text-sm text-yellow-600 px-1 flex items-center gap-1">
-          <LucideIcons.AlertTriangle className="w-3 h-3" />
+          {/* Simple marker without importing the full icon set dynamically */}
+          <span className="w-3 h-3 inline-block rounded-full bg-yellow-500" />
           Some tags may overlap. Using highest confidence matches.
         </div>
       )}
