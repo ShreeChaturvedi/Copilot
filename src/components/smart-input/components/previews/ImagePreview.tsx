@@ -105,7 +105,7 @@ const ImagePreviewComponent: React.FC<ImagePreviewProps> = ({
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [file]);
+  }, [file, previewUrl]);
 
   /**
    * Cleanup on unmount

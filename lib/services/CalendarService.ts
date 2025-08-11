@@ -1,7 +1,6 @@
 /**
  * Calendar Service - Concrete implementation of BaseService for Calendar operations
  */
-import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**

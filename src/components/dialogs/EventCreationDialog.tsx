@@ -752,7 +752,7 @@ function EventCreationDialogContent({
     } finally {
       setIsSubmitting(false)
     }
-  }, [isFormValid, formData, createEventMutation, updateEventMutation, isEditing, initialEventData?.id, onClose, getStartDateTime, getEndDateTime])
+  }, [isFormValid, formData, createEventMutation, updateEventMutation, isEditing, initialEventData?.id, initialEventData?.recurrence, onClose, getStartDateTime, getEndDateTime])
 
   const handleCancel = useCallback(() => {
     onClose()

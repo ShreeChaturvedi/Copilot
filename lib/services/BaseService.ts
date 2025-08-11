@@ -112,18 +112,14 @@ export abstract class BaseService<
    * Validate create data
    * Can be overridden by concrete services
    */
-  protected async validateCreate(data: TCreateDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(_data: TCreateDTO, _context?: ServiceContext): Promise<void> {
     // Override in concrete services for validation
   }
 
   /**
    * Validate update data
    */
-  protected async validateUpdate(
-    id: string,
-    data: TUpdateDTO,
-    context?: ServiceContext
-  ): Promise<void> {
+  protected async validateUpdate(_id: string, _data: TUpdateDTO, _context?: ServiceContext): Promise<void> {
     // Override in concrete services for validation
   }
 
@@ -132,13 +128,13 @@ export abstract class BaseService<
    */
   protected async checkOwnership(id: string, userId: string): Promise<boolean> {
     try {
-      const entity = await this.getModel().findUnique({
+      const entity = await this.getModel().findFirst({
         where: { id },
         select: { userId: true },
       });
 
       return entity?.userId === userId;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -175,12 +171,11 @@ export abstract class BaseService<
       const entities = await this.getModel().findMany({
         where: whereClause,
         include: includeClause,
-        orderBy: { createdAt: 'desc' },
       });
 
       return entities.map(entity => this.transformEntity(entity));
     } catch (error) {
-      this.log('findAll:error', { error: error.message, filters }, context);
+      this.log('findAll:error', { error: (error as Error).message, filters }, context);
       throw error;
     }
   }

@@ -65,7 +65,7 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
       const adjusted = Math.max(value, start + step);
       onChange([start, adjusted]);
     }
-  }, [activeThumb, end, max, min, onChange, start, step]);
+  }, [activeThumb, end, onChange, positionToValue, start, step]);
   const onHandlePointerDown = (thumb: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     setActiveThumb(thumb);

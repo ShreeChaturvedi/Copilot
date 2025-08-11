@@ -1,7 +1,6 @@
 /**
  * TaskList Service - Concrete implementation of BaseService for TaskList operations
  */
-import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -500,7 +499,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
    * Archive task list (soft delete by marking inactive)
    * Note: This would require adding an `isActive` field to the database schema
    */
-  async archive(id: string, context?: ServiceContext): Promise<TaskListEntity> {
+  async archive(): Promise<TaskListEntity> {
     // This is a placeholder for future archiving functionality
     // Would require schema changes to add `isActive` or `archivedAt` fields
     throw new Error('NOT_IMPLEMENTED: Archive functionality not yet implemented');
@@ -510,6 +509,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
    * Get archived task lists
    */
   async getArchived(context?: ServiceContext): Promise<TaskListEntity[]> {
+    void context;
     // Placeholder for archived task lists
     // Would require schema changes
     return [];

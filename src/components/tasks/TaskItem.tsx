@@ -151,7 +151,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         draggable.destroy();
       };
     }
-  }, [task.id, task.completed, task.title, isEditing, groupColor, task]);
+  }, [task.id, task.completed, task.title, isEditing, groupColor, task, calendars]);
 
   return (
     <div 

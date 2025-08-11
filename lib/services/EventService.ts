@@ -1,7 +1,6 @@
 /**
  * Event Service - Concrete implementation of BaseService for Event operations
  */
-import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
