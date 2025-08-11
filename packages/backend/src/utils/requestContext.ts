@@ -73,13 +73,15 @@ export function runWithContext<T>(context: RequestContext, fn: () => T): T {
 /**
  * Create request context from Express request
  */
-export function createRequestContext(req: Request): RequestContext {
+type RequestWithUser = Request & { user?: { id: string; email: string }; connection?: { remoteAddress?: string } };
+
+export function createRequestContext(req: RequestWithUser): RequestContext {
   return {
     requestId: generateRequestId(),
     userId: req.user?.id,
     userEmail: req.user?.email,
     startTime: Date.now(),
-    ip: req.ip || req.connection.remoteAddress || 'unknown',
+    ip: req.ip || req.connection?.remoteAddress || 'unknown',
     userAgent: req.get('User-Agent'),
     method: req.method,
     path: req.path

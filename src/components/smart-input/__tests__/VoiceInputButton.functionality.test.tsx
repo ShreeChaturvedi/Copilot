@@ -4,7 +4,7 @@
  * Tests for the actual voice input functionality and transcript handling
  */
 
-// @ts-ignore: React needed for JSX in test files
+// @ts-expect-error React needed for JSX in test files
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
@@ -26,7 +26,7 @@ const mockSpeechRecognition = {
   onstart: null as ((event: Event) => void) | null,
   onend: null as ((event: Event) => void) | null,
   onresult: null as ((event: Event) => void) | null,
-  onerror: null as ((event: any) => void) | null,
+  onerror: null as ((event: { error?: string }) => void) | null,
 };
 
 beforeEach(() => {
@@ -80,7 +80,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as Event;
+    } as unknown as SpeechRecognitionEvent;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -123,7 +123,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as Event;
+    } as unknown as SpeechRecognitionEvent;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {

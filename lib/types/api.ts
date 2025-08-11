@@ -19,13 +19,13 @@ export interface AuthenticatedRequest extends VercelRequest {
 /**
  * Standard API response format
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
-  error?: {
+    error?: {
     code: string;
-    message: string;
-    details?: any;
+      message: string;
+      details?: unknown;
     timestamp: string;
     requestId?: string;
   };
@@ -48,7 +48,7 @@ export class ApiError extends Error {
     public statusCode: number,
     public code: string,
     message: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,7 +59,7 @@ export class ApiError extends Error {
  * Common API error types
  */
 export class ValidationError extends ApiError {
-  constructor(details: any, message = 'Request validation failed') {
+  constructor(details: unknown, message = 'Request validation failed') {
     super(400, 'VALIDATION_ERROR', message, details);
   }
 }

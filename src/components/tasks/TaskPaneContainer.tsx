@@ -29,7 +29,7 @@ export interface TaskPaneContainerProps {
 function filterTasksForPane(
   tasks: Task[],
   paneConfig: TaskPaneConfig,
-  taskGroups: Array<{ id: string; name: string }>,
+  // taskGroups: Array<{ id: string; name: string }>,
   sortBy: string,
   sortOrder: string,
   searchValue?: string
@@ -108,11 +108,8 @@ function filterTasksForPane(
   // Apply search filter
   if (searchValue && searchValue.trim()) {
     const searchTerm = searchValue.toLowerCase().trim();
-    filteredTasks = filteredTasks.filter(
-      (task) =>
-        task.title.toLowerCase().includes(searchTerm) ||
-        (task.description &&
-          task.description.toLowerCase().includes(searchTerm))
+    filteredTasks = filteredTasks.filter((task) =>
+      task.title.toLowerCase().includes(searchTerm)
     );
   }
 
@@ -325,7 +322,7 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
       const filteredTasks = filterTasksForPane(
         taskManagement.tasks,
         pane,
-        taskManagement.taskGroups,
+        // Note: filterTasksForPane signature does not accept taskGroups; they are used in title only
         sortBy,
         sortOrder,
         searchValue

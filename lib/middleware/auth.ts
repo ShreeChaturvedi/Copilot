@@ -3,8 +3,8 @@
  * Full implementation will be completed in task 4.1
  */
 import type { VercelResponse } from '@vercel/node';
-import type { AuthenticatedRequest, Middleware } from '../types/api';
-import { UnauthorizedError } from '../types/api';
+import type { AuthenticatedRequest, Middleware } from '../types/api.js';
+import { UnauthorizedError } from '../types/api.js';
 
 /**
  * JWT authentication middleware (placeholder)
@@ -58,7 +58,7 @@ export function optionalAuth(): Middleware {
           };
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore auth errors for optional auth
     }
     
@@ -67,15 +67,35 @@ export function optionalAuth(): Middleware {
 }
 
 /**
+ * Dev-only auth injection
+ * In development, attach a default user so endpoints can run without full JWT.
+ */
+export function devAuth(): Middleware {
+  return async (req: AuthenticatedRequest, _res: VercelResponse, next: () => void) => {
+    if (process.env.NODE_ENV !== 'production' && !req.user) {
+      req.user = {
+        id: 'dev-user-id',
+        email: 'dev@example.com',
+        name: 'Dev User',
+      };
+    }
+    next();
+  };
+}
+
+/**
  * Role-based authorization middleware (placeholder)
  * Will be implemented if needed in future tasks
  */
-export function requireRole(role: string): Middleware {
-  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
-    if (!req.user) {
+export function requireRole(_role: string): Middleware {
+  return async (_req: AuthenticatedRequest, _res: VercelResponse, next: () => void) => {
+    if (!_req.user) {
       throw new UnauthorizedError('Authentication required');
     }
     
+    // Reference parameter to satisfy linter until roles are implemented
+    void _role;
+
     // TODO: Implement role checking when user roles are added
     // For now, just pass through
     next();

@@ -7,10 +7,13 @@
  */
 
 import React from 'react';
-import { X, File, Image, FileText, Music, Video } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { UploadedFile } from './FileUploadZone';
+import { FilePreviewProvider } from './previews/FilePreviewProvider';
+import { formatFileSize } from '@shared/config/fileTypes';
 import { cn } from '@/lib/utils';
+import { truncateMiddle } from '@shared/utils';
 
 export interface CompactFilePreviewProps {
   /** Files to display */
@@ -23,39 +26,7 @@ export interface CompactFilePreviewProps {
   className?: string;
 }
 
-/**
- * Get file type icon based on file type
- */
-function getFileIcon(file: UploadedFile) {
-  const { type } = file.file;
-  
-  if (type.startsWith('image/')) {
-    return Image;
-  } else if (type.startsWith('audio/')) {
-    return Music;
-  } else if (type.startsWith('video/')) {
-    return Video;
-  } else if (
-    type === 'application/pdf' || 
-    type.startsWith('text/') ||
-    type.includes('document')
-  ) {
-    return FileText;
-  }
-  
-  return File;
-}
 
-/**
- * Format file size for compact display
- */
-function formatCompactFileSize(bytes: number): string {
-  if (bytes === 0) return '0B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
-}
 
 /**
  * Individual compact file item
@@ -66,35 +37,29 @@ interface CompactFileItemProps {
   disabled?: boolean;
 }
 
-const CompactFileItem: React.FC<CompactFileItemProps> = ({ file, onRemove, disabled }) => {
-  const IconComponent = getFileIcon(file);
-  
+const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemove, disabled }) => {
   return (
     <div className={cn(
       'flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/50',
       'hover:bg-muted transition-colors flex-shrink-0',
       disabled && 'opacity-50'
     )}>
-      {/* File Icon or Image Preview */}
-      <div className="flex-shrink-0 flex items-center justify-center w-6 h-6">
-        {file.preview && file.file.type.startsWith('image/') ? (
-          <img
-            src={file.preview}
-            alt={file.name}
-            className="w-full h-full object-cover rounded-sm"
-          />
-        ) : (
-          <IconComponent className="w-4 h-4 text-muted-foreground" />
-        )}
+      {/* Enhanced File Preview */}
+      <div className="flex-shrink-0">
+        <FilePreviewProvider
+          file={file.file}
+          size="sm"
+          className="w-6 h-6"
+        />
       </div>
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate max-w-[120px]">
-          {file.name}
+        <div className="text-xs font-medium max-w-[160px]">
+          {truncateMiddle(file.name, 24)}
         </div>
         <div className="text-xs text-muted-foreground">
-          {formatCompactFileSize(file.size)}
+          {formatFileSize(file.size)}
         </div>
       </div>
 
@@ -113,10 +78,20 @@ const CompactFileItem: React.FC<CompactFileItemProps> = ({ file, onRemove, disab
   );
 };
 
+const CompactFileItem = React.memo(CompactFileItemComponent, (prev, next) => {
+  return (
+    prev.file.id === next.file.id &&
+    prev.file.status === next.file.status &&
+    prev.file.size === next.file.size &&
+    prev.file.name === next.file.name &&
+    prev.disabled === next.disabled
+  );
+});
+
 /**
  * Compact file preview component
  */
-export const CompactFilePreview: React.FC<CompactFilePreviewProps> = ({
+const CompactFilePreviewComponent: React.FC<CompactFilePreviewProps> = ({
   files,
   onFileRemove,
   disabled = false,
@@ -144,5 +119,20 @@ export const CompactFilePreview: React.FC<CompactFilePreviewProps> = ({
     </div>
   );
 };
+
+export const CompactFilePreview = React.memo(CompactFilePreviewComponent, (prev, next) => {
+  if (prev.disabled !== next.disabled || prev.className !== next.className) {
+    return false;
+  }
+  if (prev.files.length !== next.files.length) return false;
+  for (let i = 0; i < prev.files.length; i++) {
+    const a = prev.files[i];
+    const b = next.files[i];
+    if (a.id !== b.id || a.status !== b.status || a.name !== b.name || a.size !== b.size) {
+      return false;
+    }
+  }
+  return true;
+});
 
 export default CompactFilePreview;

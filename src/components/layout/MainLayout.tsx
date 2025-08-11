@@ -9,7 +9,7 @@ import { useSettingsDialog } from '@/hooks/useSettingsDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
-import FullCalendar from '@fullcalendar/react';
+import type FullCalendar from '@fullcalendar/react';
 
 interface MainLayoutProps {
   children?: ReactNode;

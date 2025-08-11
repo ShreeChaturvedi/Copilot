@@ -3,8 +3,8 @@
  */
 import type { VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import type { AuthenticatedRequest } from '../types/api';
-import { ValidationError } from '../types/api';
+import type { AuthenticatedRequest } from '../types/api.js';
+import { ValidationError } from '../types/api.js';
 
 /**
  * Validation target types
@@ -40,8 +40,9 @@ export function validateRequest(config: ValidationConfig) {
       if (config.params) {
         // Note: Vercel doesn't provide params directly, they're in query
         // This would be used with a custom router implementation
-        const params = extractParamsFromUrl(req.url || '', req.query);
-        req.query = { ...req.query, ...await validateTarget(params, config.params, 'params') };
+        const params = extractParamsFromUrl(req.url || '', req.query as Record<string, unknown>);
+        const validated = await validateTarget(params, config.params, 'params');
+        req.query = { ...req.query, ...validated } as Record<string, unknown>;
       }
 
       next();
@@ -66,11 +67,11 @@ export function validateRequest(config: ValidationConfig) {
 /**
  * Validate specific target (body, query, params)
  */
-async function validateTarget(
-  data: any,
-  schema: z.ZodSchema,
+async function validateTarget<Output>(
+  data: unknown,
+  schema: z.ZodSchema<Output>,
   target: ValidationTarget
-): Promise<any> {
+): Promise<Output> {
   try {
     return await schema.parseAsync(data);
   } catch (error) {
@@ -79,7 +80,6 @@ async function validateTarget(
         field: `${target}.${err.path.join('.')}`,
         message: err.message,
         code: err.code,
-        received: err.received,
       }));
 
       throw new ValidationError(
@@ -94,10 +94,10 @@ async function validateTarget(
 /**
  * Extract parameters from URL (for custom routing)
  */
-function extractParamsFromUrl(url: string, query: any): Record<string, any> {
+function extractParamsFromUrl(url: string, query: Record<string, unknown>): Record<string, unknown> {
   // This is a simplified implementation
   // In a real scenario, you'd use a proper router
-  const params: Record<string, any> = {};
+  const params: Record<string, unknown> = {};
   
   // Extract dynamic segments like [id] from the URL
   const urlParts = url.split('/');

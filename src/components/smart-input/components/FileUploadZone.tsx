@@ -15,68 +15,19 @@
 
 import React, { useCallback, useState } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
-import {
-  Upload,
-  File,
-  Image,
-  FileText,
-  Music,
-  Video,
-  X,
-  AlertCircle,
-  CheckCircle,
-} from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
+// import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { truncateMiddle } from '@shared/utils';
+import { ALL_ACCEPTED_FILES, validateFile, formatFileSize as sharedFormatFileSize } from '@shared/config/fileTypes';
+import { FilePreviewProvider } from './previews/FilePreviewProvider';
 
 /**
- * Supported file types and their configurations
+ * File type configurations imported from shared package
+ * This ensures consistency between frontend and backend
  */
-// eslint-disable-next-line react-refresh/only-export-components
-export const FILE_TYPES = {
-  IMAGE: {
-    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] },
-    maxSize: 5 * 1024 * 1024, // 5MB
-    icon: Image,
-    color: 'text-blue-500',
-  },
-  DOCUMENT: {
-    accept: {
-      'application/pdf': ['.pdf'],
-      'text/*': ['.txt', '.md'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        ['.docx'],
-    },
-    maxSize: 10 * 1024 * 1024, // 10MB
-    icon: FileText,
-    color: 'text-green-500',
-  },
-  AUDIO: {
-    accept: { 'audio/*': ['.mp3', '.wav', '.m4a', '.ogg'] },
-    maxSize: 25 * 1024 * 1024, // 25MB
-    icon: Music,
-    color: 'text-purple-500',
-  },
-  VIDEO: {
-    accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv'] },
-    maxSize: 100 * 1024 * 1024, // 100MB
-    icon: Video,
-    color: 'text-red-500',
-  },
-} as const;
-
-/**
- * Combined accept object for all file types
- */
-const ALL_ACCEPTED_FILES = Object.values(FILE_TYPES).reduce(
-  (acc, type) => ({
-    ...acc,
-    ...type.accept,
-  }),
-  {}
-);
 
 /**
  * File upload data structure
@@ -114,44 +65,19 @@ export interface FileUploadZoneProps {
 }
 
 /**
- * Get file type category and icon
+ * Legacy compatibility - use shared getFileDisplayInfo but return old format
+ * TODO: Update consumers to use getFileDisplayInfo directly
  */
-function getFileTypeInfo(file: File) {
-  const { type, name } = file;
-  const extension = name.toLowerCase().split('.').pop() || '';
-
-  if (type.startsWith('image/')) {
-    return FILE_TYPES.IMAGE;
-  } else if (type.startsWith('audio/')) {
-    return FILE_TYPES.AUDIO;
-  } else if (type.startsWith('video/')) {
-    return FILE_TYPES.VIDEO;
-  } else if (
-    type === 'application/pdf' ||
-    type.startsWith('text/') ||
-    type.includes('document') ||
-    ['.doc', '.docx', '.txt', '.md', '.pdf'].includes(`.${extension}`)
-  ) {
-    return FILE_TYPES.DOCUMENT;
-  }
-
-  return {
-    icon: File,
-    color: 'text-gray-500',
-    maxSize: 10 * 1024 * 1024,
-  };
-}
-
-/**
- * Format file size for display
- */
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
+// function getFileTypeInfo(file: File) {
+//   const displayInfo = getFileDisplayInfo(file);
+//   
+//   // Return format compatible with old FilePreview component expectations
+//   return {
+//     icon: File, // Default icon, will be replaced by FilePreviewProvider
+//     color: displayInfo.color,
+//     maxSize: displayInfo.config?.maxSize || 10 * 1024 * 1024,
+//   };
+// }
 
 /**
  * Individual file preview component
@@ -167,9 +93,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   onRemove,
   compact = false,
 }) => {
-  const typeInfo = getFileTypeInfo(file.file);
-  const IconComponent = typeInfo.icon;
-
   return (
     <div
       className={cn(
@@ -177,35 +100,23 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         compact ? 'p-2' : 'p-3'
       )}
     >
-      {/* File Icon or Image Preview */}
-      <div
-        className={cn(
-          'flex-shrink-0 flex items-center justify-center rounded-md bg-muted',
-          compact ? 'w-8 h-8' : 'w-10 h-10'
-        )}
-      >
-        {file.preview && file.file.type.startsWith('image/') ? (
-          <img
-            src={file.preview}
-            alt={file.name}
-            className="w-full h-full object-cover rounded-md"
-          />
-        ) : (
-          <IconComponent
-            className={cn(typeInfo.color, compact ? 'w-4 h-4' : 'w-5 h-5')}
-          />
-        )}
-      </div>
+      {/* Enhanced File Preview */}
+      <FilePreviewProvider
+        file={file.file}
+        size={compact ? 'sm' : 'md'}
+        className="flex-shrink-0"
+      />
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <div
           className={cn(
-            'font-medium truncate',
+            'font-medium cursor-default',
             compact ? 'text-sm' : 'text-sm'
           )}
+          title={file.name}
         >
-          {file.name}
+          {truncateMiddle(file.name, compact ? 28 : 40)}
         </div>
         <div className="flex items-center gap-2 mt-1">
           <span
@@ -214,8 +125,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
               compact ? 'text-xs' : 'text-xs'
             )}
           >
-            {formatFileSize(file.size)}
+            {sharedFormatFileSize(file.size)}
           </span>
+          
+          {/* File Extension Badge */}
+          <Badge variant="outline" className="text-xs">
+            {file.name.split('.').pop()?.toLowerCase() || 'file'}
+          </Badge>
 
           {/* Status Badge */}
           {file.status === 'uploading' && (
@@ -292,11 +208,11 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         errors.push(`Maximum ${maxFiles} files allowed`);
       }
 
-      // Validate each file
+      // Validate each file using shared validation
       acceptedFiles.forEach((file) => {
-        const typeInfo = getFileTypeInfo(file);
-        if (file.size > typeInfo.maxSize) {
-          errors.push(`Maximum upload file size is 10MB`);
+        const validation = validateFile(file);
+        if (!validation.isValid && validation.error) {
+          errors.push(validation.error);
         }
       });
 
@@ -331,8 +247,8 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       onDrop,
       accept: ALL_ACCEPTED_FILES,
       maxFiles: maxFiles - files.length,
-      disabled,
-      noClick: false,
+      disabled: disabled || files.length >= maxFiles,
+      noClick: disabled || files.length >= maxFiles,
       noKeyboard: false,
     });
 
@@ -379,12 +295,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                 ? `Maximum ${maxFiles} files reached`
                 : 'Click to upload or drag and drop'}
           </p>
-          {!compact && (
-            <p className="text-xs text-muted-foreground">
-              Images, documents, audio, video • Up to{' '}
-              {formatFileSize(FILE_TYPES.VIDEO.maxSize)} each
-            </p>
-          )}
+          {/* Secondary hint removed to reduce clutter */}
         </div>
       </div>
 

@@ -21,14 +21,24 @@
   --fc-neutral-bg-color: hsl(var(--background)) !important;
 }
 
+/* Consolidated muted foreground usage */
+.day-header-name,
+.fc-col-header-cell-cushion,
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-timegrid-axis-cushion,
+.fc-list-event-time,
+.fc-popover-close {
+  color: hsl(var(--muted-foreground));
+}
+
 /* ================================
    CALENDAR CONTAINER & LAYOUT
    ================================ */
 
 /* Main calendar container */
 .fc {
-  background-color: hsl(var(--background)) !important;
-  color: hsl(var(--foreground)) !important;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   height: 100% !important;
 }
 
@@ -40,7 +50,7 @@
 }
 
 .fc-scroller {
-  overflow-y: auto !important;
+  overflow-y: auto;
 }
 
 /* ================================
@@ -73,15 +83,19 @@
   gap: 2px;
 }
 
-.day-header-name {
-  font-weight: 600;
+/* Capitalize weekday label strictly in Week and Month views */
+.fc-timeGridWeek-view .day-header-name,
+.fc-dayGridMonth-view .day-header-name {
+  text-transform: uppercase;
+  font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
-  font-size: 0.875rem;
+  opacity: 0.5; /* match AM/PM time label style */
 }
 
-.day-header-number {
+.fc-timeGridWeek-view .day-header-number,
+.fc-dayGridMonth-view .day-header-number {
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 1rem;
   padding: 2px 6px;
   border-radius: 4px;
   min-width: 24px;
@@ -121,13 +135,12 @@
    ================================ */
 
 .fc-col-header-cell {
-  background-color: hsl(var(--muted)) !important;
-  color: hsl(var(--muted-foreground)) !important;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
   font-weight: 600;
 }
 
 .fc-col-header-cell-cushion {
-  color: hsl(var(--muted-foreground));
   text-decoration: none; /* remove underline */
   padding: 8px 4px;
 }
@@ -147,9 +160,7 @@
    DAY GRID CELLS
    ================================ */
 
-.fc-daygrid-day {
-  background-color: hsl(var(--background));
-}
+/* day cells inherit page background */
 
 .fc-daygrid-day-number {
   color: hsl(var(--foreground));
@@ -173,16 +184,11 @@
    TIME GRID
    ================================ */
 
-.fc-timegrid-slot,
-.fc-timegrid-slot-lane,
-.fc-timegrid-slot-minor {
-  background-color: hsl(var(--background)) !important;
-}
+/* timegrid slots inherit page background */
 
 /* Increase specificity and force styles to take effect */
 .fc .fc-timegrid-slot-label-cushion {
   /* Smaller and lower-contrast for time labels; remains theme-aware */
-  color: hsl(var(--muted-foreground));
   /* Do NOT fade the whole container; it would dim children too */
   opacity: 1 !important;
   text-align: right;
@@ -206,7 +212,6 @@
 
 /* All-day axis label styling to match time labels */
 .fc .fc-timegrid-axis-cushion {
-  color: hsl(var(--muted-foreground));
   opacity: 0.65;
   text-transform: uppercase;
   font-weight: 500;
@@ -220,7 +225,6 @@
 
 .fc-timegrid-axis.fc-sticky {
   z-index: 3;
-  background-color: hsl(var(--background));
 }
 
 .fc-timegrid-slot:hover {
@@ -351,9 +355,8 @@
    LIST VIEW
    ================================ */
 
-.fc-list-table {
-  background-color: hsl(var(--background));
-}
+/* Shared list backgrounds */
+/* list table inherits page background */
 
 .fc-list-day-cushion {
   background-color: hsl(var(--muted));
@@ -370,7 +373,6 @@
 }
 
 .fc-list-event-time {
-  color: hsl(var(--muted-foreground));
   font-weight: 500;
 }
 
@@ -385,7 +387,6 @@
 }
 
 .fc-list-empty {
-  background-color: hsl(var(--background));
   color: hsl(var(--muted-foreground));
   text-align: center;
   padding: 2rem;
@@ -446,7 +447,6 @@
 }
 
 .fc-popover-close {
-  color: hsl(var(--muted-foreground));
   background: none;
   border: none;
   font-size: 18px;

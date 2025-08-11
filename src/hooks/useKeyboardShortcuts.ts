@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import type { SettingsSection } from '@/components/settings/SettingsDialog';
 
 interface KeyboardShortcutsOptions {
   onOpenProfile: () => void;

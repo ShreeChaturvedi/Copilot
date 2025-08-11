@@ -1,11 +1,11 @@
 /**
  * Event Conflicts API Route - Check for event conflicts
  */
-import { createMethodHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import { HttpMethod } from '../../lib/types/api';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createMethodHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import { HttpMethod } from '../../lib/types/api.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 
 export default createMethodHandler({
@@ -22,9 +22,11 @@ export default createMethodHandler({
         });
       }
 
-      const { startTime, endTime, excludeEventId } = req.query;
+      const { start, end, startTime, endTime, excludeEventId, calendarId } = req.query as Record<string, string>;
 
-      if (!startTime || !endTime) {
+      const startParam = start || startTime;
+      const endParam = end || endTime;
+      if (!startParam || !endParam) {
         return sendError(res, {
           statusCode: 400,
           code: 'VALIDATION_ERROR',
@@ -33,8 +35,11 @@ export default createMethodHandler({
       }
 
       const conflicts = await eventService.getConflicts(
-        new Date(startTime as string),
-        new Date(endTime as string),
+        {
+          start: new Date(startParam),
+          end: new Date(endParam),
+          calendarId: calendarId as string,
+        },
         excludeEventId as string,
         {
           userId,

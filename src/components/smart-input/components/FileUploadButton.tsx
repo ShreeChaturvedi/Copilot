@@ -9,8 +9,8 @@
 import React, { useState, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { FileUploadZone, UploadedFile } from './FileUploadZone';
 import { cn } from '@/lib/utils';
 
@@ -98,13 +98,13 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
         </TooltipContent>
       </Tooltip>
 
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg lg:max-w-xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Attach Files
           </DialogTitle>
           <DialogDescription>
-            Upload files to attach to your task. Supports images, documents, audio, and video files.
+            Upload files to attach to your task. Supports images, documents (PDF, Word, Excel, PowerPoint), audio, and video files.
           </DialogDescription>
         </DialogHeader>
 

@@ -92,7 +92,7 @@ describe('File Upload Improvements', () => {
     expect(screen.getByText('image.png')).toBeInTheDocument();
     
     // Should show file sizes
-    expect(screen.getByText('1KB')).toBeInTheDocument();
-    expect(screen.getByText('2KB')).toBeInTheDocument();
+    expect(screen.getByText('1 KB')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
   });
 });

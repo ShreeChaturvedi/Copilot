@@ -19,17 +19,22 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "@testing-library/jest-dom", "@types/dom-speech-recognition"],
 
     /* Path Mapping */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./shared/*"],
+      "@shared/*": ["./packages/shared/src/*"],
       "@api/*": ["./api/*"],
       "@lib/*": ["./lib/*"]
     }
   },
   "include": ["src"],
-  "exclude": ["src/test/"]
+  "exclude": [
+    "src/test/",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }

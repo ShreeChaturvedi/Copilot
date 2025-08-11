@@ -17,14 +17,14 @@ export const authRateLimit = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       error: {
         code: 'RATE_LIMIT_EXCEEDED',
         message: 'Too many authentication attempts. Please try again later.',
         timestamp: new Date().toISOString(),
-        retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + 900000) / 1000) // 15 minutes in seconds
+        retryAfter: Math.round((900000 + Date.now()) / 1000) // 15 minutes in seconds
       }
     });
   }
@@ -46,14 +46,14 @@ export const loginRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       error: {
         code: 'LOGIN_RATE_LIMIT_EXCEEDED',
         message: 'Too many login attempts. Please try again later.',
         timestamp: new Date().toISOString(),
-        retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + 900000) / 1000)
+        retryAfter: Math.round((900000 + Date.now()) / 1000)
       }
     });
   }
@@ -75,14 +75,14 @@ export const passwordResetRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       error: {
         code: 'PASSWORD_RESET_RATE_LIMIT_EXCEEDED',
         message: 'Too many password reset requests. Please try again later.',
         timestamp: new Date().toISOString(),
-        retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + 3600000) / 1000)
+        retryAfter: Math.round((3600000 + Date.now()) / 1000)
       }
     });
   }
@@ -104,14 +104,14 @@ export const refreshTokenRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       error: {
         code: 'REFRESH_RATE_LIMIT_EXCEEDED',
         message: 'Too many token refresh attempts. Please try again later.',
         timestamp: new Date().toISOString(),
-        retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + 300000) / 1000)
+        retryAfter: Math.round((300000 + Date.now()) / 1000)
       }
     });
   }
@@ -133,14 +133,14 @@ export const apiRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       error: {
         code: 'API_RATE_LIMIT_EXCEEDED',
         message: 'Too many requests. Please try again later.',
         timestamp: new Date().toISOString(),
-        retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + 900000) / 1000)
+        retryAfter: Math.round((900000 + Date.now()) / 1000)
       }
     });
   }
@@ -168,14 +168,14 @@ export function createRateLimit(options: {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req: Request, res: Response) => {
+    handler: (_req: Request, res: Response) => {
       res.status(429).json({
         success: false,
         error: {
           code: options.code,
           message: options.message,
           timestamp: new Date().toISOString(),
-          retryAfter: Math.round((req.rateLimit?.resetTime ?? Date.now() + options.windowMs) / 1000)
+          retryAfter: Math.round((options.windowMs + Date.now()) / 1000)
         }
       });
     }

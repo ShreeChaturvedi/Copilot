@@ -1,6 +1,7 @@
 import React from 'react';
 import { EnhancedLayoutWrapper } from './EnhancedLayoutWrapper';
 import { HighlightedTextareaField } from './HighlightedTextareaField';
+import { ParsedTags } from './ParsedTags';
 import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
@@ -41,6 +42,14 @@ export interface EnhancedTaskInputLayoutProps {
   isRecording?: boolean;
   /** File previews to display above the input */
   filePreview?: React.ReactNode;
+  /** Whether to show parsed tags inside the card, under the textarea */
+  showInlineTags?: boolean;
+  /** Whether inline tags are removable */
+  inlineTagsRemovable?: boolean;
+  /** Remove handler for inline tags */
+  onInlineTagRemove?: (tagId: string) => void;
+  /** Maximum number of inline tags to show (ignored for enhanced input; tags wrap) */
+  maxInlineTags?: number;
 }
 
 export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
@@ -62,6 +71,10 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   rightControls,
   isRecording = false,
   filePreview,
+  showInlineTags = false,
+  inlineTagsRemovable = false,
+  onInlineTagRemove,
+  // maxInlineTags,
 }) => {
   const controls = (
     <>
@@ -142,6 +155,14 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
           />
         )}
         </div>
+
+        {showInlineTags && tags.length > 0 && (
+          <ParsedTags
+            tags={tags}
+            removable={inlineTagsRemovable}
+            onRemoveTag={onInlineTagRemove}
+          />
+        )}
       </div>
     </EnhancedLayoutWrapper>
   );

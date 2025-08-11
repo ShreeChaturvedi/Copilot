@@ -1,12 +1,12 @@
 /**
  * Tags API Route - CRUD operations for tags
  */
-import { createCrudHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createCrudHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
-import type { CreateTagDTO, UpdateTagDTO, TagFilters } from '../../lib/services/TagService';
+import type { CreateTagDTO, TagFilters } from '../../lib/services/TagService';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {

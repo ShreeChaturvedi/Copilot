@@ -121,22 +121,21 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
                 <div
                   key={event.id}
                   className={cn(
-                    'flex items-center gap-3 py-2 px-3 rounded-md',
-                    'bg-sidebar-accent/60 dark:bg-sidebar-accent/40',
-                    'hover:bg-sidebar-accent/80 dark:hover:bg-sidebar-accent/60',
-                    'shadow-sm hover:shadow-md transition-all duration-200 ease-out',
-                    'group cursor-pointer border border-sidebar-accent-foreground/10',
-                    'hover:border-sidebar-accent-foreground/20'
+                    'flex items-center gap-3 py-2 px-3 rounded-md shadow-sm hover:shadow-md transition-all duration-200 ease-out group cursor-pointer',
                   )}
+                  style={{
+                    backgroundColor: `${getEventColor(event.calendarName || '')}1A`,
+                    borderColor: `${getEventColor(event.calendarName || '')}30`,
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                  }}
                   title={`${event.title}${event.description ? `\n${event.description}` : ''}${event.location ? `\n📍 ${event.location}` : ''}`}
                 >
                   {/* Calendar color indicator with enhanced styling */}
                   <div className="relative flex-shrink-0">
                     <div
-                      className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10 dark:ring-white/10"
-                      style={{
-                        backgroundColor: getEventColor(event.calendarName || ''),
-                      }}
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: getEventColor(event.calendarName || '') }}
                     />
                   </div>
 

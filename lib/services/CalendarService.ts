@@ -1,7 +1,7 @@
 /**
  * Calendar Service - Concrete implementation of BaseService for Calendar operations
  */
-import type { PrismaClient, Calendar } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -69,8 +69,8 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     return 'Calendar';
   }
 
-  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -98,7 +98,7 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       _count: {
         select: {
@@ -197,7 +197,7 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const createData: any = {
+      const createData: Record<string, unknown> = {
         name: data.name.trim(),
         color: data.color,
         description: data.description?.trim() || null,

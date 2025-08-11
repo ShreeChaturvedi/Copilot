@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import type { UploadedFile } from '@/components/smart-input/components/FileUploadZone';
 import { TaskControls } from '@/components/tasks/TaskControls';
@@ -39,25 +40,42 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const handleAddTaskWithFiles = (
     title: string,
     _groupId?: string,
-    smartData?: any,
+    smartData?: {
+      priority?: 'low' | 'medium' | 'high'
+      scheduledDate?: Date
+      tags?: Array<{
+        id: string
+        type: string
+        value: string
+        displayText: string
+        iconName: string
+        color?: string
+      }>
+      originalInput?: string
+      title?: string
+    },
     files?: UploadedFile[],
   ) => {
     addTask.mutate({
       title,
       priority: smartData?.priority,
       scheduledDate: smartData?.scheduledDate,
-      tags: smartData?.tags?.map((tag: any) => ({
+      tags: smartData?.tags?.map((tag) => ({
         id: tag.id,
-        type: tag.type,
-        value: tag.value,
+        // enforce union-compatible tag type
+        type: tag.type as 'date' | 'time' | 'priority' | 'location' | 'person' | 'label' | 'project',
+        value: typeof tag.value === 'string' ? tag.value : String(tag.value),
         displayText: tag.displayText,
         iconName: tag.iconName,
         color: tag.color,
       })),
-      parsedMetadata: smartData ? {
-        originalInput: smartData.originalInput,
-        cleanTitle: smartData.title,
-      } : undefined,
+      parsedMetadata:
+        smartData?.originalInput && smartData?.title
+          ? {
+              originalInput: smartData.originalInput,
+              cleanTitle: smartData.title,
+            }
+          : undefined,
       attachments: files?.map((f) => ({
         name: f.name,
         type: f.type,
@@ -80,11 +98,52 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
 
   const canAddPane = taskPanes.length < maxTaskPanes && taskViewMode === 'list';
 
+  // Show/Hide enhanced input on demand
+  const [showEnhancedInput, setShowEnhancedInput] = useState(false);
+  const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
+  const handleHideAddTaskInput = () => setShowEnhancedInput(false);
+
+  // Autofocus inner input when panel becomes visible
+  useEffect(() => {
+    if (!showEnhancedInput) return;
+
+    const focusTargets = [
+      'enhanced-task-input-textarea',
+      'enhanced-task-input-textarea-fallback',
+      'smart-task-input-highlighted',
+      'highlighted-task-input',
+      'smart-task-input-fallback',
+    ];
+
+    const tryFocus = () => {
+      for (const id of focusTargets) {
+        const el = document.getElementById(id) as HTMLTextAreaElement | HTMLInputElement | null;
+        if (el) {
+          el.focus();
+          if ('select' in el && typeof el.select === 'function') {
+            el.select();
+          }
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Attempt now, then again on next frame and microtask to handle mount/animation timing
+    if (!tryFocus()) {
+      requestAnimationFrame(() => {
+        if (!tryFocus()) {
+          setTimeout(tryFocus, 0);
+        }
+      });
+    }
+  }, [showEnhancedInput]);
+
   return (
     <div
       className={cn(
         'bg-background text-foreground',
-        'flex flex-col h-full',
+        'flex flex-col h-full relative',
         className
       )}
       data-slot="task-focus-pane"
@@ -98,6 +157,9 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
           canAddPane={canAddPane}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
+          onToggleAddTaskInput={handleToggleAddTaskInput}
+          isAddTaskInputVisible={showEnhancedInput}
+          paneCount={taskPanes.length}
         />
       </div>
 
@@ -139,22 +201,57 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
         )}
       </div>
 
-      {/* Enhanced Input - Bottom Positioned */}
-      <div className="border-t border-border bg-background p-6">
-        <EnhancedTaskInput
-          onAddTask={handleAddTask}
-          onAddTaskWithFiles={handleAddTaskWithFiles}
-          taskGroups={taskGroups}
-          activeTaskGroupId={activeTaskGroupId}
-          onCreateTaskGroup={() => setShowCreateTaskDialog(true)}
-          onSelectTaskGroup={handleSelectTaskGroup}
-          disabled={tasksLoading || addTask.isPending}
-          enableSmartParsing={true}
-          showConfidence={false}
-          maxDisplayTags={3}
-          placeholder="What would you like to work on?"
-        />
-      </div>
+      {/* Enhanced Input - overlayed at the bottom above content */}
+      <AnimatePresence mode="wait">
+        {showEnhancedInput && (
+          <motion.div
+            key="enhanced-input"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="absolute inset-x-0 bottom-0 z-50 pointer-events-none"
+          >
+            <div className="pointer-events-auto mx-4 mb-4">
+              <EnhancedTaskInput
+                onAddTask={(...args) => {
+                  handleAddTask(...args);
+                  handleHideAddTaskInput();
+                }}
+                onAddTaskWithFiles={(title, groupId, smart, files) => {
+                  const normalizedSmart = smart
+                    ? {
+                        priority: smart.priority,
+                        scheduledDate: smart.scheduledDate,
+                        tags: smart.tags?.map((t) => ({
+                          id: t.id,
+                          type: t.type,
+                          value: typeof t.value === 'string' ? t.value : String(t.value),
+                          displayText: t.displayText,
+                          iconName: t.iconName,
+                          color: t.color,
+                        })),
+                        originalInput: smart.originalInput,
+                        title: smart.title,
+                      }
+                    : undefined;
+                  handleAddTaskWithFiles(title, groupId, normalizedSmart as any, files);
+                  handleHideAddTaskInput();
+                }}
+                taskGroups={taskGroups}
+                activeTaskGroupId={activeTaskGroupId}
+                onCreateTaskGroup={() => setShowCreateTaskDialog(true)}
+                onSelectTaskGroup={handleSelectTaskGroup}
+                disabled={tasksLoading || addTask.isPending}
+                enableSmartParsing={true}
+                showConfidence={false}
+                maxDisplayTags={3}
+                placeholder="What would you like to work on?"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

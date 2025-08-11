@@ -1,10 +1,10 @@
 /**
  * Individual Task List API Route - Operations on specific task lists
  */
-import { createCrudHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createCrudHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { UpdateTaskListDTO } from '../../lib/services/TaskListService';
 
@@ -155,20 +155,22 @@ export default createCrudHandler({
       let result;
 
       switch (action) {
-        case 'set-default':
+        case 'set-default': {
           result = await taskListService.setDefault(taskListId, {
             userId,
             requestId: req.headers['x-request-id'] as string,
           });
           break;
+        }
 
-        default:
+        default: {
           // Regular patch update
           const updateData: UpdateTaskListDTO = req.body;
           result = await taskListService.update(taskListId, updateData, {
             userId,
             requestId: req.headers['x-request-id'] as string,
           });
+        }
       }
 
       if (!result) {

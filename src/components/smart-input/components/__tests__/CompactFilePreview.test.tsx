@@ -65,8 +65,8 @@ describe('CompactFilePreview', () => {
       />
     );
 
-    expect(screen.getByText('1KB')).toBeInTheDocument();
-    expect(screen.getByText('2KB')).toBeInTheDocument();
+    expect(screen.getByText('1 KB')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
   });
 
   it('calls onFileRemove when remove button is clicked', () => {

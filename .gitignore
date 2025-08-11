@@ -51,3 +51,5 @@ CLAUDE.md
 screenshots/
 test-scroll.html
 *.tsbuildinfo
+.vercel
+.env*.local

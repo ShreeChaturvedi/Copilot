@@ -51,22 +51,24 @@ function authHeaders(): Record<string, string> {
   }
 }
 
-function reviveTaskDates(task: any): Task {
+function reviveTaskDates(task: Record<string, unknown>): Task {
   return {
     ...task,
-    createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
-    updatedAt: task.updatedAt ? new Date(task.updatedAt) : new Date(),
-    completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
-    scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : undefined,
-    attachments: task.attachments?.map((a: any) => ({
-      id: a.id,
-      name: a.fileName,
-      type: a.fileType,
-      size: a.fileSize,
-      url: a.fileUrl,
-      uploadedAt: a.createdAt ? new Date(a.createdAt) : new Date(),
-      taskId: a.taskId,
-    })) as FileAttachment[] | undefined,
+    createdAt: task.createdAt ? new Date(task.createdAt as string) : new Date(),
+    updatedAt: task.updatedAt ? new Date(task.updatedAt as string) : new Date(),
+    completedAt: task.completedAt ? new Date(task.completedAt as string) : undefined,
+    scheduledDate: task.scheduledDate ? new Date(task.scheduledDate as string) : undefined,
+    attachments: Array.isArray(task.attachments)
+      ? (task.attachments as Array<Record<string, unknown>>).map((a) => ({
+          id: a.id as string,
+          name: a.fileName as string,
+          type: a.fileType as string,
+          size: a.fileSize as number,
+          url: a.fileUrl as string,
+          uploadedAt: a.createdAt ? new Date(a.createdAt as string) : new Date(),
+          taskId: a.taskId as string,
+        })) as FileAttachment[]
+      : undefined,
   } as Task;
 }
 

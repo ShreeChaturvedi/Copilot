@@ -3,8 +3,8 @@
  */
 import type { VercelResponse } from '@vercel/node';
 import { ZodError } from 'zod';
-import type { AuthenticatedRequest, ApiResponse } from '../types/api';
-import { ApiError, ValidationError, InternalServerError } from '../types/api';
+import type { AuthenticatedRequest, ApiResponse } from '../types/api.js';
+import { ApiError, ValidationError, InternalServerError } from '../types/api.js';
 
 /**
  * Error handler middleware
@@ -128,8 +128,8 @@ export function asyncHandler(
 export function sendSuccess<T>(
   res: VercelResponse,
   data?: T,
-  statusCode: number = 200,
-  meta?: any
+  statusCode = 200,
+  meta?: Record<string, unknown>
 ): void {
   const response: ApiResponse<T> = {
     success: true,

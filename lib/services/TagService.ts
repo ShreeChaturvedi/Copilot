@@ -1,7 +1,7 @@
 /**
  * Tag Service - Concrete implementation of BaseService for Tag operations
  */
-import type { PrismaClient, Tag, TagType } from '@prisma/client';
+import type { PrismaClient, TagType } from '@prisma/client';
 import { BaseService, type ServiceContext, type BaseEntity } from './BaseService';
 
 /**
@@ -80,8 +80,8 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
     return 'Tag';
   }
 
-  protected buildWhereClause(filters: TagFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: TagFilters, _context?: ServiceContext): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
 
     // Type filter
     if (filters.type) {
@@ -111,7 +111,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       _count: {
         select: {
@@ -124,7 +124,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Validate tag creation
    */
-  protected async validateCreate(data: CreateTagDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(data: CreateTagDTO, _context?: ServiceContext): Promise<void> {
     if (!data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Tag name is required');
     }

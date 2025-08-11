@@ -9,7 +9,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VoiceInputButton } from '../components/VoiceInputButton';
 
 // Mock Web Speech API
-const mockSpeechRecognition = {
+const mockSpeechRecognition: {
+  start: jest.Mock;
+  stop: jest.Mock;
+  abort: jest.Mock;
+  addEventListener: jest.Mock;
+  removeEventListener: jest.Mock;
+  dispatchEvent: jest.Mock;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: ((event: Event) => void) | null;
+  onend: ((event: Event) => void) | null;
+  onresult: ((event: Event) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+} = {
   start: vi.fn(),
   stop: vi.fn(),
   abort: vi.fn(),

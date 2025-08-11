@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authAPI } from '@/services/api/auth';
 import { devtools, persist } from 'zustand/middleware';
 
 export interface GoogleAuthTokens {
@@ -180,7 +181,7 @@ export const useAuthStore = create<AuthState>()(
         ),
         
         logout: async () => {
-          const { authMethod, jwtTokens, googleTokens, getValidAccessToken } = get();
+          const { authMethod, jwtTokens, getValidAccessToken } = get();
           
           try {
             // Get current access token for API call
@@ -189,9 +190,6 @@ export const useAuthStore = create<AuthState>()(
             if (accessToken) {
               // Call backend logout API with refresh token
               const refreshToken = authMethod === 'jwt' ? jwtTokens?.refreshToken : undefined;
-              
-              // Import auth API dynamically to avoid circular imports
-              const { authAPI } = await import('../services/api/auth.js');
               await authAPI.logout(accessToken, refreshToken);
             }
           } catch (error) {

@@ -6,7 +6,6 @@
 import React from 'react';
 import { ParsedTag } from '@shared/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import * as LucideIcons from 'lucide-react';
 import { X } from 'lucide-react';
@@ -37,12 +36,12 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
   onRemoveTag,
   onTagClick,
   showConfidence = false,
-  maxTags,
+  // maxTags,
   className = '',
 }) => {
   // Limit tags if maxTags is specified
-  const displayTags = maxTags ? tags.slice(0, maxTags) : tags;
-  const hasMoreTags = maxTags && tags.length > maxTags;
+  const displayTags = tags;
+  const hasMoreTags = false; // Enhanced input shows all tags and lets them wrap
 
   if (displayTags.length === 0) {
     return null;
@@ -64,11 +63,7 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
         />
       ))}
 
-      {hasMoreTags && (
-        <Badge variant="outline" className="text-muted-foreground">
-          +{tags.length - maxTags!} more
-        </Badge>
-      )}
+      {hasMoreTags && null}
     </div>
   );
 };
@@ -129,26 +124,42 @@ const TagBadge: React.FC<TagBadgeProps> = ({
     <Badge
       variant={getBadgeVariant()}
       className={cn(
-        // Match TaskItem badge styling exactly
-        'text-xs h-5 px-2 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-colors',
-        // Add click behavior if needed
-        onClick && 'cursor-pointer',
-        removable && 'pr-1'
+        // Match TaskItem badge styling with moderate padding
+        'text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag',
+        // Click/interactive behaviors
+        (onClick || removable) && 'cursor-pointer'
       )}
       style={
         tag.color
           ? {
               borderColor: `${tag.color}30`,
               color: tag.color,
+              backgroundColor: `${tag.color}1A`,
             }
-          : undefined
+          : {
+              // Give non-colored tags a subtle background based on the current text color
+              // 1A ~= 10% alpha on hex; using a neutral foreground tint via CSS currentColor
+              // Since we can't alpha currentColor directly, we fall back to a soft token
+              // that matches other neutral backgrounds.
+              backgroundColor: 'color-mix(in srgb, currentColor 10%, transparent)',
+            }
       }
-      onClick={handleClick}
+      // If removable, clicking the badge removes the tag (mirrors TaskItem UX)
+      onClick={removable ? handleRemove : handleClick}
       title={`${tag.type}: ${tag.displayText}${showConfidence ? ` (${Math.round(tag.confidence * 100)}% confidence)` : ''}`}
+      aria-label={`${removable ? 'Remove' : 'View'} ${tag.displayText} tag`}
     >
-      {/* Icon */}
-      <div style={{ color: tag.color }}>
-        <IconComponent className="w-3 h-3" />
+      {/* Icon that becomes X on hover when removable - same as TaskItem */}
+      <div className="w-3 h-3 relative" aria-hidden="true">
+        <span className="absolute inset-0" style={tag.color ? { color: tag.color } : undefined}>
+          <IconComponent className="w-3 h-3 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" />
+        </span>
+        {removable && (
+          <X
+            className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100"
+            style={tag.color ? { color: tag.color } : undefined}
+          />
+        )}
       </div>
 
       {/* Text */}
@@ -162,23 +173,6 @@ const TagBadge: React.FC<TagBadgeProps> = ({
         >
           {getConfidenceIndicator(tag.confidence)}
         </span>
-      )}
-
-      {/* Remove button - using default theme colors as requested */}
-      {removable && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'h-4 w-4 p-0 ml-1 transition-colors duration-200',
-            'text-muted-foreground/60 hover:text-foreground',
-            'hover:bg-muted/50'
-          )}
-          onClick={handleRemove}
-          aria-label={`Remove ${tag.displayText} tag`}
-        >
-          <X className="w-3 h-3" />
-        </Button>
       )}
     </Badge>
   );

@@ -2,13 +2,13 @@
  * Service Factory - Dependency injection and service instantiation
  */
 import type { PrismaClient } from '@prisma/client';
-import { TaskService } from './TaskService';
-import { CalendarService } from './CalendarService';
-import { EventService } from './EventService';
-import { TaskListService } from './TaskListService';
-import { TagService } from './TagService';
-import { AttachmentService } from './AttachmentService';
-import { BaseServiceConfig } from './BaseService';
+import { TaskService } from './TaskService.js';
+import { CalendarService } from './CalendarService.js';
+import { EventService } from './EventService.js';
+import { TaskListService } from './TaskListService.js';
+import { TagService } from './TagService.js';
+import { AttachmentService } from './AttachmentService.js';
+import { BaseServiceConfig } from './BaseService.js';
 
 /**
  * Service factory configuration

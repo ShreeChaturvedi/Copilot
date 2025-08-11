@@ -2,14 +2,16 @@
  * API route handler utilities for Vercel
  */
 import type { VercelResponse } from '@vercel/node';
-import type { AuthenticatedRequest, RouteConfig, HttpMethod } from '../types/api';
-import { asyncHandler, sendError } from '../middleware/errorHandler';
-import { corsMiddleware } from '../middleware/cors';
-import { requestIdMiddleware, requestLogger } from '../middleware/requestId';
-import { rateLimitPresets } from '../middleware/rateLimit';
-import { validateRequest } from '../middleware/validation';
-import { composeMiddleware } from '../middleware';
-import { ApiError } from '../types/api';
+import type { AuthenticatedRequest, RouteConfig, RouteHandler } from '../types/api.js';
+import { HttpMethod } from '../types/api.js';
+import { asyncHandler, sendError } from '../middleware/errorHandler.js';
+import { corsMiddleware } from '../middleware/cors.js';
+import { requestIdMiddleware, requestLogger } from '../middleware/requestId.js';
+import { rateLimitPresets } from '../middleware/rateLimit.js';
+import { validateRequest } from '../middleware/validation.js';
+import { composeMiddleware } from '../middleware/index.js';
+import { devAuth } from '../middleware/auth.js';
+import { ApiError } from '../types/api.js';
 
 /**
  * Create a standardized API route handler
@@ -32,8 +34,8 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
 
     // Add rate limiting if configured
     if (route.rateLimit) {
-      const { windowMs, max } = route.rateLimit;
-      middlewares.push(rateLimitPresets.api); // Use default or create custom
+      // Custom per-route limits could be wired here; default preset for now
+      middlewares.push(rateLimitPresets.api);
     } else {
       middlewares.push(rateLimitPresets.api); // Default rate limiting
     }
@@ -45,7 +47,7 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
     }
 
     // Add validation if configured
-    const validationConfig: any = {};
+    const validationConfig: { body?: unknown; query?: unknown } = {};
     if (route.validateBody) validationConfig.body = route.validateBody;
     if (route.validateQuery) validationConfig.query = route.validateQuery;
     
@@ -54,6 +56,11 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
     }
 
     // Execute middleware pipeline
+    // Dev auth injection so req.user exists in development
+    if (process.env.NODE_ENV !== 'production') {
+      middlewares.push(devAuth());
+    }
+
     await composeMiddleware(...middlewares)(req, res, async () => {
       await route.handler(req, res);
     });
@@ -63,7 +70,7 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
 /**
  * Simple method-based route handler
  */
-export function createMethodHandler(handlers: Partial<Record<HttpMethod, Function>>) {
+export function createMethodHandler(handlers: Partial<Record<HttpMethod, RouteHandler>>) {
   return asyncHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
     const method = req.method as HttpMethod;
     const handler = handlers[method];

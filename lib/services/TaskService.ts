@@ -1,7 +1,7 @@
 /**
  * Task Service - Concrete implementation of BaseService for Task operations
  */
-import type { PrismaClient, Task, Priority } from '@prisma/client';
+import type { PrismaClient, Priority } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -112,7 +112,7 @@ export interface TaskStats {
  * TaskService - Handles all task-related operations
  */
 export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTaskDTO, TaskFilters> {
-  private tagService?: any; // Will be injected via dependency injection
+  private tagService?: unknown; // Will be injected via dependency injection
 
   protected getModel() {
     return this.prisma.task;
@@ -122,8 +122,8 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
     return 'Task';
   }
 
-  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -186,7 +186,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       taskList: {
         select: {
@@ -207,7 +207,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
   /**
    * Build Prisma orderBy clause from filters
    */
-  private buildOrderByClause(filters: TaskFilters): any {
+  private buildOrderByClause(filters: TaskFilters): Record<string, 'asc' | 'desc'> {
     const sortBy = filters.sortBy || 'createdAt';
     const sortOrder = filters.sortOrder || 'desc';
     // Prisma orderBy for single field
@@ -226,7 +226,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       const orderBy = this.buildOrderByClause(filters);
 
       const tasks = await this.getModel().findMany({ where, include, orderBy });
-      return tasks.map((task: any) => this.transformEntity(task));
+      return tasks.map((task) => this.transformEntity(task));
     } catch (error) {
       this.log('findAll:error', { error: (error as Error).message, filters }, context);
       throw error;
@@ -259,7 +259,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       ]);
 
       return {
-        data: entities.map((task: any) => this.transformEntity(task)),
+        data: entities.map((task) => this.transformEntity(task)),
         pagination: {
           page,
           limit,
@@ -346,7 +346,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
         taskListId = defaultTaskList.id;
       }
 
-      const createData: any = {
+      const createData: Record<string, unknown> = {
         title: data.title.trim(),
         taskListId,
         scheduledDate: data.scheduledDate,
@@ -365,14 +365,14 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
         });
 
         // Create tags if provided
-        if (data.tags && data.tags.length > 0) {
+    if (data.tags && data.tags.length > 0) {
           for (const tagData of data.tags) {
             // Find or create tag
             const tag = await tx.tag.upsert({
               where: { name: tagData.name },
               create: {
                 name: tagData.name,
-                type: tagData.type as any,
+                type: tagData.type as unknown as string,
                 color: tagData.color,
               },
               update: {},

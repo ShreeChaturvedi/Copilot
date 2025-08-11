@@ -3,14 +3,14 @@
  */
 
 // Core middleware
-export * from './cors';
-export * from './errorHandler';
-export * from './validation';
-export * from './rateLimit';
-export * from './requestId';
+export * from './cors.js';
+export * from './errorHandler.js';
+export * from './validation.js';
+export * from './rateLimit.js';
+export * from './requestId.js';
 
 // Auth middleware (will be implemented in task 4.1)
-export * from './auth';
+export * from './auth.js';
 
 // Middleware composition utilities
 import type { VercelResponse } from '@vercel/node';

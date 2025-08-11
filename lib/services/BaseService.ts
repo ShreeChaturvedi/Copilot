@@ -46,7 +46,7 @@ export abstract class BaseService<
   TEntity extends BaseEntity = BaseEntity,
   TCreateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
   TUpdateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
-  TFilters = Record<string, any>
+  TFilters extends Record<string, unknown> = Record<string, unknown>
 > {
   protected readonly config: BaseServiceConfig;
 
@@ -66,7 +66,17 @@ export abstract class BaseService<
    * Get the Prisma model delegate for this service
    * Must be implemented by concrete services
    */
-  protected abstract getModel(): any;
+  protected abstract getModel(): {
+    findMany: (args: unknown) => Promise<TEntity[]>;
+    findUnique: (args: unknown) => Promise<TEntity | null>;
+    count: (args: unknown) => Promise<number>;
+    create: (args: unknown) => Promise<TEntity>;
+    update: (args: unknown) => Promise<TEntity>;
+    delete: (args: unknown) => Promise<TEntity>;
+    createMany?: (args: unknown) => Promise<{ count: number }>;
+    updateMany?: (args: unknown) => Promise<{ count: number }>;
+    deleteMany?: (args: unknown) => Promise<{ count: number }>;
+  };
 
   /**
    * Get the entity name for logging and error messages
@@ -77,15 +87,16 @@ export abstract class BaseService<
    * Build where clause for filtering
    * Can be overridden by concrete services for custom filtering
    */
-  protected buildWhereClause(filters: TFilters, context?: ServiceContext): any {
-    return filters;
+  protected buildWhereClause(filters: TFilters, _context?: ServiceContext): Record<string, unknown> {
+    void _context;
+    return filters as Record<string, unknown>;
   }
 
   /**
    * Build include clause for relations
    * Can be overridden by concrete services
    */
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {};
   }
 
@@ -93,7 +104,7 @@ export abstract class BaseService<
    * Transform entity before returning to client
    * Can be overridden by concrete services
    */
-  protected transformEntity(entity: any): TEntity {
+  protected transformEntity(entity: unknown): TEntity {
     return entity as TEntity;
   }
 
@@ -135,7 +146,7 @@ export abstract class BaseService<
   /**
    * Log service operation
    */
-  protected log(operation: string, data?: any, context?: ServiceContext): void {
+  protected log(operation: string, data?: Record<string, unknown>, context?: ServiceContext): void {
     if (!this.config.enableLogging) return;
 
     const logData = {

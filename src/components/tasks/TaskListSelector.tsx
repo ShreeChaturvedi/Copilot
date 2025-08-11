@@ -27,7 +27,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { type TaskList } from "@shared/types";
+// Local type until shared exports are aligned for TaskList
+type TaskList = {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  taskCount: number;
+  isVisible: boolean;
+};
 import { cn } from '@/lib/utils';
 
 export interface TaskListSelectorProps {

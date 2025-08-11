@@ -1,7 +1,7 @@
 /**
  * TaskList Service - Concrete implementation of BaseService for TaskList operations
  */
-import type { PrismaClient, TaskList } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -75,8 +75,8 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     return 'TaskList';
   }
 
-  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -103,7 +103,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       _count: {
         select: {
@@ -190,7 +190,7 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       await this.validateCreate(data, context);
 
-      const createData: any = {
+      const createData: Record<string, unknown> = {
         name: data.name.trim(),
         color: data.color,
         icon: data.icon || null,

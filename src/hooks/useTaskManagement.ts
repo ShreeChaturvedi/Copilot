@@ -137,18 +137,31 @@ export function useTaskManagement(
   // Task CRUD handlers (only when includeTaskOperations is true)
   const handleAddTask = includeTaskOperations
     ? (title: string, _groupId?: string, smartData?: SmartTaskData) => {
-        addTask.mutate({
-          title,
-          priority: smartData?.priority,
-          scheduledDate: smartData?.scheduledDate,
-          tags: smartData?.tags?.map((tag) => ({
+        // Extract scheduled date from smart data (already provided by parser)
+        const scheduledDate = smartData?.scheduledDate;
+
+        // Convert auto-created natural language date/time tags into the canonical due date
+        // representation by removing them from the tags array. We will surface the due date via
+        // the task's scheduledDate property and a unified editable badge in the UI.
+        const nonDateTimeTags = smartData?.tags
+          ?.filter((tag) => {
+            const type = String((tag as unknown as { type?: string }).type || '').toLowerCase();
+            return type !== 'date' && type !== 'time';
+          })
+          .map((tag) => ({
             id: tag.id,
             type: tag.type,
             value: tag.value,
             displayText: tag.displayText,
             iconName: tag.iconName,
             color: tag.color,
-          })),
+          }));
+
+        addTask.mutate({
+          title,
+          priority: smartData?.priority,
+          scheduledDate,
+          tags: nonDateTimeTags,
           parsedMetadata: smartData
             ? {
                 originalInput: smartData.originalInput,

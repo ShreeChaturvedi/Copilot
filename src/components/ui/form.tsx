@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
+// Keep component-only exports; re-export provider directly to avoid non-component exports in this module
 const Form = FormProvider
 
 type FormFieldContextValue<
@@ -153,13 +154,4 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
-export {
-  useFormField,
-  Form,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-  FormField,
-}
+export { useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField }

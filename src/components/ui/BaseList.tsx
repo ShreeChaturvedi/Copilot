@@ -447,7 +447,7 @@ function BaseListItem<T extends BaseListItem>({
         {/* Toggle/Selection Control */}
         {mode === 'checkbox' ? (
           <Checkbox
-            checked={(item as CheckboxModeItem).visible}
+            checked={(item as unknown as CheckboxModeItem).visible}
             onCheckedChange={() => onToggle?.(item)}
             className={cn(
               'data-[state=checked]:bg-current data-[state=checked]:border-current',

@@ -1,8 +1,10 @@
 import { ReactNode, useCallback, useState, useRef } from 'react';
 import { CalendarView, ConsolidatedCalendarHeader, CalendarViewType } from '../calendar';
-import { EventCreationDialog, EventDisplayDialog } from '../dialogs';
+import { lazy, Suspense } from 'react';
+const LazyEventCreationDialog = lazy(async () => ({ default: (await import('../dialogs/EventCreationDialog')).EventCreationDialog }));
+const LazyEventDisplayDialog = lazy(async () => ({ default: (await import('../dialogs/EventDisplayDialog')).EventDisplayDialog }));
 import type { CalendarEvent } from "@shared/types";
-import FullCalendar from '@fullcalendar/react';
+import type FullCalendar from '@fullcalendar/react';
 
 interface RightPaneProps {
   children?: ReactNode;
@@ -116,19 +118,23 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
       {children}
 
       {/* Event Creation Dialog */}
-      <EventCreationDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        initialEventData={initialEventData}
-      />
+      <Suspense fallback={null}>
+        <LazyEventCreationDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          initialEventData={initialEventData}
+        />
+      </Suspense>
 
       {/* Event Display Dialog */}
-      <EventDisplayDialog
-        open={displayDialogOpen}
-        onOpenChange={setDisplayDialogOpen}
-        event={selectedEvent}
-        onEdit={handleEditEvent}
-      />
+      <Suspense fallback={null}>
+        <LazyEventDisplayDialog
+          open={displayDialogOpen}
+          onOpenChange={setDisplayDialogOpen}
+          event={selectedEvent}
+          onEdit={handleEditEvent}
+        />
+      </Suspense>
     </div>
   );
 };

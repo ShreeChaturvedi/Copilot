@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from "@shared/types";
+import type { ParsedTag } from "../../../../shared/types/tasks";
 import { cn } from '@/lib/utils';
 
 export interface HighlightedInputFieldProps {
@@ -130,8 +130,8 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       const tagText = value.substring(tag.startIndex, tag.endIndex);
       const color = tag.color || '#3b82f6';
       
-      // Use span with exact styling to match TaskItem badges
-      html += `<span class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</span>`;
+      // EXACT fix from Enhanced textarea: no border or margin, vertical padding only via CSS
+      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; color: inherit;">${escapeHtml(tagText)}</mark>`;
       
       lastIndex = tag.endIndex;
     }
@@ -223,37 +223,39 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
         aria-label="Smart task input with highlighting"
       />
 
-      {/* Overlay div - shows visual highlighting */}
-      {/* Key: positioned absolute within the input container, not form */}
+      {/* Overlay - wrapper centers content vertically, inner preserves spaces */}
       <div
-        ref={overlayRef}
         className={cn(
-          // Position within input container only - no margins, container handles spacing
-          'absolute inset-0 pointer-events-none',
-          // Match input styling exactly
-          'flex items-center w-full',
-          // Typography matching
-          'text-foreground',
-          // Scrolling and overflow - constrained to container
-          'whitespace-nowrap overflow-hidden',
-          // Ensure it's behind the input
-          'z-0',
-          // Typography only - no spacing, container handles it
-          'text-base md:text-sm'
+          // Fill input container
+          'absolute inset-0 pointer-events-none z-0',
+          // Vertically center to match input caret
+          'flex items-center'
         )}
-        style={{
-          // Critical: Match input font properties exactly
-          fontFamily: 'inherit',
-          fontSize: 'inherit',
-          lineHeight: 'inherit',
-          letterSpacing: 'inherit',
-          // Match text rendering
-          textRendering: 'optimizeLegibility',
-          // Ensure exact alignment
-          boxSizing: 'border-box',
-        }}
         aria-hidden="true"
-      />
+      >
+        <div
+          ref={overlayRef}
+          className={cn(
+            // Match input width and typography
+            'w-full text-foreground text-base md:text-sm',
+            // Preserve spaces exactly to match input caret behavior
+            'whitespace-pre',
+            // Constrain overflow within input bounds
+            'overflow-hidden'
+          )}
+          style={{
+            // Critical: Match input font properties exactly
+            fontFamily: 'inherit',
+            fontSize: 'inherit',
+            lineHeight: 'inherit',
+            letterSpacing: 'inherit',
+            // Match text rendering
+            textRendering: 'optimizeLegibility',
+            // Ensure exact alignment
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
 
       {/* Confidence indicator */}
       {showConfidence && confidence < 1 && tags.length > 0 && (

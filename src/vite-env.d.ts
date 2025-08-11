@@ -1,4 +1,29 @@
 /// <reference types="vite/client" />
+
+// Test-time globals for voice recognition event types
+// Provide minimal ambient declarations to satisfy TS in Vitest context
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList extends ArrayLike<SpeechRecognitionResult> {
+  item(index: number): SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult extends ArrayLike<SpeechRecognitionAlternative> {
+  isFinal: boolean;
+  item(index: number): SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence?: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error?: string;
+}
 /// <reference types="vitest" />
 /// <reference types="@testing-library/jest-dom" />
 

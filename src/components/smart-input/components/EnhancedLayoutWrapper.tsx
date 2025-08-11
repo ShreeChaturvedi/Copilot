@@ -79,9 +79,9 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
         // Constrain width for better proportions
         'w-full',
         // Focus states - highlight entire card when input is focused
+        // Remove outline/ring when the inner input is focused
         showFocusStates && isFocused && [
-          'ring-2 ring-ring/50',
-          'border-ring',
+          'outline-none ring-0',
         ],
         // Disabled state
         disabled && 'opacity-50 cursor-not-allowed',

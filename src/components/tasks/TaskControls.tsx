@@ -21,6 +21,9 @@ import {
   Plus,
   X,
   Check,
+  Columns2,
+  Columns3,
+  ArrowDownToDot,
 } from 'lucide-react';
 import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
@@ -54,6 +57,9 @@ export interface TaskControlsProps {
   canAddPane?: boolean;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  onToggleAddTaskInput?: () => void;
+  isAddTaskInputVisible?: boolean;
+  paneCount?: number;
 }
 
 /**
@@ -288,6 +294,9 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
   canAddPane = false,
   searchValue = '',
   onSearchChange,
+  onToggleAddTaskInput,
+  isAddTaskInputVisible = false,
+  paneCount = 1,
 }) => {
   // Suppress unused variable warning - taskCount kept for interface compatibility
   void taskCount;
@@ -472,7 +481,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             )}
           </div>
 
-          {/* Add Pane Button */}
+          {/* Add Pane Button (columns icon based on count) */}
           {canAddPane && onAddPane && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -481,12 +490,52 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                   size="sm"
                   className="h-7 w-7 p-0"
                   onClick={onAddPane}
+                  aria-label="Add pane"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  {paneCount === 1 ? (
+                    <Columns2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Columns3 className="w-3.5 h-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Add new pane</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Shiny Add Task Button (same visual as calendar toolbar) with toggle */}
+          {onToggleAddTaskInput && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={onToggleAddTaskInput}
+                  size="sm"
+                  className={cn(
+                    "h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out",
+                    "bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95",
+                    "text-secondary-foreground shadow-xs border border-border/20",
+                    "hover:scale-105 hover:shadow-lg hover:shadow-secondary/20",
+                    "hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90",
+                    "before:absolute before:inset-0 before:bg-gradient-to-r",
+                    "before:from-transparent before:via-black/15 before:to-transparent",
+                    "dark:before:via-white/15",
+                    "before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]",
+                    "hover:before:translate-x-[150%]",
+                    "active:scale-[1.02] active:shadow-md"
+                  )}
+                  aria-label="Add task"
+                >
+                  {isAddTaskInputVisible ? (
+                    <ArrowDownToDot className="h-3.5 w-3.5 relative z-10" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5 relative z-10" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isAddTaskInputVisible ? 'Hide add task' : 'Add task'}</p>
               </TooltipContent>
             </Tooltip>
           )}

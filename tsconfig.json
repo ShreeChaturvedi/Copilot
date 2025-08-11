@@ -3,15 +3,15 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" },
-    { "path": "./shared" },
+    { "path": "./packages/shared" },
     { "path": "./packages/backend" }
   ],
   "compilerOptions": {
-    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "types": ["@types/node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./shared/*"],
+      "@shared/*": ["./packages/shared/src/*"],
       "@backend/*": ["./packages/backend/src/*"],
       "@api/*": ["./api/*"],
       "@lib/*": ["./lib/*"]

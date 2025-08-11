@@ -56,12 +56,13 @@ export function useProfileData(): NormalizedProfileData {
       id: currentUser.id,
       name: currentUser.name || 'User',
       email: currentUser.email || 'user@example.com',
-      bio: isJWT ? (user as any)?.bio : undefined,
-      timezone: isJWT ? (user as any)?.timezone : undefined,
+      // These fields are only available for JWT users in our store typing
+      bio: isJWT ? (user as unknown as { bio?: string })?.bio : undefined,
+      timezone: isJWT ? (user as unknown as { timezone?: string })?.timezone : undefined,
       picture: currentUser.picture,
       canEditEmail: isJWT, // Google users can't edit email
       authMethod,
-      joinedAt: isJWT ? (user as any)?.createdAt : undefined,
+      joinedAt: isJWT ? (user as unknown as { createdAt?: string })?.createdAt : undefined,
     };
   }, [user, googleUser, authMethod]);
 }

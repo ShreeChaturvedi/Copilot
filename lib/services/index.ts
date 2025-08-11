@@ -3,22 +3,22 @@
  */
 
 // Base service exports
-export * from './BaseService';
+export * from './BaseService.js';
 
 // Concrete service exports
-export * from './TaskService';
-export * from './CalendarService';
-export * from './EventService';
-export * from './TaskListService';
-export * from './TagService';
-export * from './AttachmentService';
+export * from './TaskService.js';
+export * from './CalendarService.js';
+export * from './EventService.js';
+export * from './TaskListService.js';
+export * from './TagService.js';
+export * from './AttachmentService.js';
 
 // Service factory exports
-export * from './ServiceFactory';
+export * from './ServiceFactory.js';
 
 // Service initialization and utilities
-import { initializeServiceFactory, getServiceFactory, getServices } from './ServiceFactory';
-import { prisma } from '../config/database';
+import { initializeServiceFactory } from './ServiceFactory.js';
+import { prisma } from '../config/database.js';
 
 /**
  * Initialize all services with default configuration

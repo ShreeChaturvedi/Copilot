@@ -1,7 +1,7 @@
 /**
  * Attachment Service - Concrete implementation of BaseService for Attachment operations
  */
-import type { PrismaClient, Attachment } from '@prisma/client';
+// PrismaClient type is not directly referenced in this file
 import { BaseService, type ServiceContext, type BaseEntity } from './BaseService';
 
 /**
@@ -103,8 +103,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     return 'Attachment';
   }
 
-  protected buildWhereClause(filters: AttachmentFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): Record<string, unknown> {
+    void _context;
+    const where: Record<string, unknown> = {};
 
     // Task filter
     if (filters.taskId) {
@@ -145,7 +146,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       task: {
         select: {
@@ -228,7 +229,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   protected async validateUpdate(
     id: string,
     data: UpdateAttachmentDTO,
-    context?: ServiceContext
+    _context?: ServiceContext
   ): Promise<void> {
     if (data.fileName !== undefined && !data.fileName?.trim()) {
       throw new Error('VALIDATION_ERROR: File name cannot be empty');
@@ -243,12 +244,12 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     }
 
     // Check if user has access to the attachment
-    if (context?.userId) {
+    if (_context?.userId) {
       const attachment = await this.getModel().findFirst({
         where: {
           id,
           task: {
-            userId: context.userId,
+            userId: _context.userId,
           },
         },
       });

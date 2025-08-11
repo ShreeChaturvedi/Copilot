@@ -7,10 +7,16 @@ import nlp from 'compromise';
 import { Parser, ParsedTag } from "@shared/types";
 import { v4 as uuidv4 } from 'uuid';
 
-// Using 'any' type for compromise to avoid complex type resolution issues
-// The compromise library has complex nested type definitions that cause conflicts
-type CompromiseDoc = any;
-type CompromiseMatch = any;
+// Using minimal interfaces for compromise objects we actually use
+// to avoid pulling in heavy and conflicting type definitions.
+type CompromiseDoc = {
+  people: () => CompromiseMatch[];
+  places: () => CompromiseMatch[];
+  organizations: () => CompromiseMatch[];
+};
+type CompromiseMatch = {
+  text: () => string;
+};
 
 export class CompromiseNLPParser implements Parser {
   readonly id = 'compromise-nlp-parser';
@@ -47,7 +53,7 @@ export class CompromiseNLPParser implements Parser {
    * Test if the text contains entities that can be processed by NLP
    */
   test(text: string): boolean {
-    const doc = nlp(text);
+    const doc = nlp(text) as unknown as CompromiseDoc;
 
     // Check for named entities
     const hasEntities =
@@ -75,7 +81,7 @@ export class CompromiseNLPParser implements Parser {
    */
   parse(text: string): ParsedTag[] {
     const tags: ParsedTag[] = [];
-    const doc = nlp(text);
+    const doc = nlp(text) as unknown as CompromiseDoc;
 
     // Extract people
     this.extractPeople(doc, text, tags);
@@ -240,12 +246,10 @@ export class CompromiseNLPParser implements Parser {
     // Find the category with the highest confidence
     Object.entries(this.taskCategories).forEach(([category, pattern]) => {
       pattern.lastIndex = 0;
-      const matches = Array.from(text.matchAll(pattern));
+      const matches = Array.from(text.matchAll(pattern)) as RegExpMatchArray[];
 
       if (matches.length > 0) {
-        // Score based on number of matches and specificity
-        const score =
-          matches.length + (matches.some((m) => m[0].length > 5) ? 0.2 : 0);
+        const score = matches.length + (matches.some((m) => (m[0] || '').length > 5) ? 0.2 : 0);
 
         if (score > bestScore) {
           bestScore = score;
@@ -257,11 +261,9 @@ export class CompromiseNLPParser implements Parser {
 
     // Create semantic label tag
     if (bestCategory && bestMatch) {
-      // Use explicit type casting to avoid TypeScript inference issues
-      const match = bestMatch as any;
-      const matchIndex = match.index;
-      const matchText = match[0];
-      if (typeof matchIndex === 'number' && typeof matchText === 'string') {
+      const matchIndex = (bestMatch as RegExpMatchArray & { index?: number }).index ?? -1;
+      const matchText: string = (bestMatch[0] as unknown as string) || '';
+      if (matchIndex >= 0 && typeof matchText === 'string') {
         tags.push({
           id: uuidv4(),
           type: 'label',
@@ -269,7 +271,7 @@ export class CompromiseNLPParser implements Parser {
           displayText: this.formatCategoryDisplayText(bestCategory),
           iconName: this.getCategoryIcon(bestCategory),
           startIndex: matchIndex,
-          endIndex: matchIndex + matchText.length,
+          endIndex: matchIndex + (matchText?.length || 0),
           originalText: matchText,
           confidence: Math.min(0.85, 0.5 + bestScore * 0.1),
           source: this.id,

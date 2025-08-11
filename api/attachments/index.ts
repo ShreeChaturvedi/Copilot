@@ -1,12 +1,12 @@
 /**
  * Attachments API Route - CRUD operations for attachments
  */
-import { createCrudHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createCrudHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
-import type { CreateAttachmentDTO, UpdateAttachmentDTO, AttachmentFilters } from '../../lib/services/AttachmentService';
+import type { CreateAttachmentDTO, AttachmentFilters } from '../../lib/services/AttachmentService';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -29,7 +29,10 @@ export default createCrudHandler({
         limit = '50',
         offset = '0',
         fileType,
+        // reserved for future use
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         minSize,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         maxSize,
       } = req.query;
 
@@ -59,7 +62,7 @@ export default createCrudHandler({
       if (category) {
         // Get attachments by category for current user (images, documents, audio, video)
         result = await attachmentService.findByCategory(
-          category as any,
+          category as keyof typeof import('../../lib/services/AttachmentService').SUPPORTED_FILE_TYPES,
           {
             userId,
             requestId: req.headers['x-request-id'] as string,

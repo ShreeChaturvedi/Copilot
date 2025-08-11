@@ -1,12 +1,12 @@
 /**
  * Tasks API Route - CRUD operations for tasks
  */
-import { createCrudHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createCrudHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
-import type { CreateTaskDTO, UpdateTaskDTO, TaskFilters } from '../../lib/services/TaskService';
+import type { CreateTaskDTO, TaskFilters } from '../../lib/services/TaskService';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -39,7 +39,7 @@ export default createCrudHandler({
       } = req.query;
 
       // Build filters
-      const filters: TaskFilters = {} as TaskFilters;
+      const filters: TaskFilters = {};
       
       if (completed !== undefined) {
         filters.completed = completed === 'true';
@@ -50,7 +50,7 @@ export default createCrudHandler({
       }
       
       if (priority) {
-        filters.priority = priority as any;
+        filters.priority = priority as unknown as import('@prisma/client').Priority;
       }
       
       if (search) {
@@ -78,10 +78,10 @@ export default createCrudHandler({
 
       // Sorting support via query params
       if (sortBy) {
-        (filters as any).sortBy = sortBy as any;
+        filters.sortBy = sortBy as TaskFilters['sortBy'];
       }
       if (sortOrder) {
-        (filters as any).sortOrder = (sortOrder as string) === 'asc' ? 'asc' : 'desc';
+        filters.sortOrder = (sortOrder as string) === 'asc' ? 'asc' : 'desc';
       }
 
       // Get tasks with pagination if requested

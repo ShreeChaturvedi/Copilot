@@ -4,7 +4,7 @@
  * Tests for voice input integration in SmartTaskInput with enhanced layout
  */
 
-// @ts-ignore: React needed for JSX in test files
+// @ts-expect-error React needed for JSX in test files
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import { render, screen } from '@testing-library/react';

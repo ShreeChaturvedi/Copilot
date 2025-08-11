@@ -2,7 +2,7 @@
  * CORS middleware for Vercel API routes
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { CorsConfig } from '../types/api';
+import type { CorsConfig } from '../types/api.js';
 
 /**
  * Default CORS configuration
@@ -34,7 +34,8 @@ export function corsMiddleware(config: Partial<CorsConfig> = {}) {
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
       setCorsHeaders(res, corsConfig, req);
-      return res.status(200).end();
+      res.status(200).end();
+      return; // Ensure void return type
     }
 
     // Set CORS headers for all requests

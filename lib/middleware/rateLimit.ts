@@ -2,8 +2,8 @@
  * Rate limiting middleware for Vercel API routes
  */
 import type { VercelResponse } from '@vercel/node';
-import type { AuthenticatedRequest } from '../types/api';
-import { RateLimitError } from '../types/api';
+import type { AuthenticatedRequest } from '../types/api.js';
+import { RateLimitError } from '../types/api.js';
 
 /**
  * Rate limit configuration
@@ -54,7 +54,9 @@ class MemoryStore {
 
   cleanup(): void {
     const now = Date.now();
-    for (const [key, entry] of this.store.entries()) {
+    const entries = Array.from(this.store.entries());
+    for (let i = 0; i < entries.length; i++) {
+      const [key, entry] = entries[i];
       if (entry.resetTime < now) {
         this.store.delete(key);
       }

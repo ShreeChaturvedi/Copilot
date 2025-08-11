@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { createApiHandler, createCrudHandler } from '../utils/apiHandler';
 import { HttpMethod } from '../types/api';
-import { sendSuccess, sendError } from '../middleware/errorHandler';
+import { sendSuccess } from '../middleware/errorHandler';
 import { NotFoundError, ValidationError } from '../types/api';
 import type { AuthenticatedRequest } from '../types/api';
 import type { VercelResponse } from '@vercel/node';
@@ -13,11 +13,16 @@ import type { VercelResponse } from '@vercel/node';
 /**
  * Example 1: Simple CRUD handler
  */
-const userSchema = z.object({
+// Example schema used in docs/examples
+// Example schema retained for documentation usage
+export const userSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
   age: z.number().min(0).max(150).optional(),
 });
+
+// Type derived from example schema to ensure it's referenced
+export type ExampleUser = z.infer<typeof userSchema>;
 
 export const exampleCrudHandler = createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {

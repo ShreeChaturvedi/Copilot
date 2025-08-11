@@ -56,9 +56,12 @@ const isSpeechRecognitionSupported = (): boolean => {
 /**
  * Get the SpeechRecognition constructor
  */
-const getSpeechRecognition = (): any => {
+type SpeechRecognitionCtor = new () => SpeechRecognition;
+const getSpeechRecognition = (): SpeechRecognitionCtor | null => {
   if (typeof window === 'undefined') return null;
-  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
+  return (window as unknown as Window & { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition
+    || (window as unknown as Window & { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition
+    || null;
 };
 
 /**
@@ -78,7 +81,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Use refs to avoid stale closure issues with callbacks
   const onTranscriptChangeRef = useRef(onTranscriptChange);
@@ -117,7 +120,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     recognition.maxAlternatives = 1;
 
     // Handle results (both interim and final)
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = '';
       let finalTranscript = '';
 
@@ -159,8 +162,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     };
 
     // Handle errors
-    recognition.onerror = (event: any) => {
-      switch (event.error) {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      switch (event.error as string) {
         case 'not-allowed':
           setPermissionDenied(true);
           setError(

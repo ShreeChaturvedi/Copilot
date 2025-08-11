@@ -16,7 +16,7 @@ import * as LucideIcons from 'lucide-react';
 import { TaskItem } from './TaskItem';
 import type { Task } from "@shared/types";
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
-import { groupItemsByDate, getDayKeyOrder, getTimeString, isItemOverdue } from '@/utils/dateGrouping';
+import { groupItemsByDate, getDayKeyOrder } from '@/utils/dateGrouping';
 import { Button } from '@/components/ui/Button';
 
 import { ColorPicker } from '@/components/ui/color-picker';
@@ -174,8 +174,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     const tasksForCalendar = activeTasks.slice(0, maxTasks);
     const totalCount = activeTasks.length;
 
-    // Group tasks by due date
-    const grouped = groupItemsByDate(tasksForCalendar, (task) => task.dueDate);
+    // Group tasks by scheduled date (canonical due date for tasks)
+    const grouped = groupItemsByDate(tasksForCalendar, (task) => task.scheduledDate ?? null);
 
     return { groupedTasks: grouped, totalTaskCount: totalCount };
   }, [calendarMode, activeTasks, maxTasks]);
@@ -303,10 +303,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                   aria-label={`Task group icon: ${activeTaskGroup.name}`}
                 >
-                  <ActiveGroupIcon
-                    className="w-4 h-4"
-                    style={{ color: activeTaskGroup.color }}
-                  />
+                  <span style={{ color: activeTaskGroup.color }}>
+                    <ActiveGroupIcon className="w-4 h-4" />
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3" align="start">
@@ -341,14 +340,18 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Edit className="mr-2 h-4 w-4" />
-                  <span>Edit</span>
-                </DropdownMenuItem>
+            <DropdownMenuItem>
+                  <span className="mr-2" style={{ color: activeTaskGroup.color }}>
+                    <Settings className="h-4 w-4" />
+                  </span>
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+                  <span className="mr-2" style={{ color: activeTaskGroup.color }}>
+                    <Edit className="h-4 w-4" />
+                  </span>
+              <span>Edit</span>
+            </DropdownMenuItem>
                 <ColorMenuItem />
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -422,10 +425,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                     aria-label={`Task group icon: ${activeTaskGroup.name}`}
                   >
-                    <ActiveGroupIcon
-                      className="w-4 h-4"
-                      style={{ color: activeTaskGroup.color }}
-                    />
+                    <span style={{ color: activeTaskGroup.color }}>
+                      <ActiveGroupIcon className="w-4 h-4" />
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3" align="start">

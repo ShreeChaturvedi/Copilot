@@ -3,9 +3,9 @@
  * Manages parsed tags state and provides clean title extraction
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ParseResult, ParsedTag } from '@shared/types';
-import { SmartParser } from '../parsers/SmartParser';
+import type { SmartParser as SmartParserType } from '../parsers/SmartParser';
 
 export interface UseTextParserOptions {
   /** Debounce delay in milliseconds */
@@ -37,14 +37,15 @@ export interface UseTextParserResult {
   clear: () => void;
 }
 
-let parserInstance: SmartParser | null = null;
+let parserInstance: SmartParserType | null = null;
 
 /**
  * Get singleton parser instance
  */
-function getParser(): SmartParser {
+async function getParser(): Promise<SmartParserType> {
   if (!parserInstance) {
-    parserInstance = new SmartParser();
+    const mod = await import('../parsers/SmartParser');
+    parserInstance = new mod.SmartParser();
   }
   return parserInstance;
 }
@@ -63,7 +64,16 @@ export function useTextParser(
   const [error, setError] = useState<string | null>(null);
 
   // Memoize parser instance
-  const parser = useMemo(() => getParser(), []);
+  const parserRef = useRef<SmartParserType | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    getParser().then((p) => {
+      if (mounted) parserRef.current = p;
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Debounced parsing function - using useRef to maintain timeout across renders
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -86,6 +96,7 @@ export function useTextParser(
         setError(null);
 
         try {
+          const parser = parserRef.current || (await getParser());
           const result = await parser.parse(textToParse);
           setParseResult(result);
         } catch (err) {
@@ -97,7 +108,7 @@ export function useTextParser(
         }
       }, debounceMs);
     },
-    [parser, enabled, minLength, debounceMs]
+    [enabled, minLength, debounceMs]
   );
 
   // Trigger parsing when text changes
@@ -109,8 +120,8 @@ export function useTextParser(
   const triggerParse = useCallback(() => {
     if (enabled && text.length >= minLength) {
       setIsLoading(true);
-      parser
-        .parse(text)
+      (parserRef.current ? Promise.resolve(parserRef.current) : getParser())
+        .then((p) => p.parse(text))
         .then(setParseResult)
         .catch((err) => {
           setError(err instanceof Error ? err.message : 'Parsing failed');
@@ -120,7 +131,7 @@ export function useTextParser(
           setIsLoading(false);
         });
     }
-  }, [parser, text, enabled, minLength]);
+  }, [text, enabled, minLength]);
 
   // Clear function
   const clear = useCallback(() => {
@@ -153,14 +164,23 @@ export function useTextParser(
  */
 export function useTextParserDebug(text: string) {
   const [debugResult, setDebugResult] = useState<{ parserResults: Array<{ parser: string; tags: ParsedTag[] }> } | null>(null);
-  const parser = useMemo(() => getParser(), []);
+  const [parserInstance, setParserInstance] = useState<SmartParserType | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    getParser().then((p) => {
+      if (mounted) setParserInstance(p);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const testParse = useCallback(async () => {
-    if (text.trim()) {
-      const result = await parser.testParse(text);
+    if (text.trim() && parserInstance) {
+      const result = await parserInstance.testParse(text);
       setDebugResult(result);
     }
-  }, [parser, text]);
+  }, [parserInstance, text]);
 
   return {
     debugResult,

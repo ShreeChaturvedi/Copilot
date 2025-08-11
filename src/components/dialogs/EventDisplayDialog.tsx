@@ -19,7 +19,6 @@ import {
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { IntegratedActionBar } from './IntegratedActionBar';
-import { Button } from '@/components/ui/Button';
 import { useUpdateEvent, useCreateEvent, useDeleteEvent } from '@/hooks/useEvents';
 import { toHumanText, clampRRuleUntil } from '@/utils/recurrence';
 import {
@@ -33,7 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import type { CalendarEvent } from "@shared/types";
+import type { CalendarEvent } from "../../../shared/types";
 import { useCalendars } from '@/hooks/useCalendars';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -44,10 +43,13 @@ interface EventDisplayDialogProps {
   onEdit?: (event: CalendarEvent) => void;
 }
 
-function EventDisplayDialogContent({ event }: { event: CalendarEvent }) {
+function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; actions?: React.ReactNode }) {
   const { data: calendars = [] } = useCalendars();
-  const updateEventMutation = useUpdateEvent();
-  const createEventMutation = useCreateEvent();
+  // Mutations are lazily used in actions; keep declarations close to use sites to avoid unused warnings
+  // Lazy usage within action handlers; define here to initialize hooks
+  // Keep hooks declarations but reference variables to satisfy linter until used in handlers
+  const updateEventMutation = useUpdateEvent(); void updateEventMutation;
+  const createEventMutation = useCreateEvent(); void createEventMutation;
 
   const calendar = React.useMemo(() => {
     if (!event) return null;
@@ -78,9 +80,12 @@ function EventDisplayDialogContent({ event }: { event: CalendarEvent }) {
     []
   );
 
+  const effectiveStart = event.occurrenceInstanceStart ?? event.start;
+  const effectiveEnd = event.occurrenceInstanceEnd ?? event.end;
+
   const dateTimeInfo = formatDateTime(
-    new Date(event.start),
-    new Date(event.end),
+    new Date(effectiveStart),
+    new Date(effectiveEnd),
     event.allDay
   );
 
@@ -89,27 +94,30 @@ function EventDisplayDialogContent({ event }: { event: CalendarEvent }) {
       {/* Hidden element to receive initial focus instead of edit button */}
       <div tabIndex={0} className="sr-only" />
 
-      {/* Title with Calendar Color and Name */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
+      {/* Title + actions inline; title truncates within available space */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
           {calendar && (
             <div
-              className="w-4 h-4 rounded-sm border-2 flex-shrink-0"
+              className="w-4 h-4 rounded-sm border-2 flex-shrink-0 mt-1"
               style={{
                 backgroundColor: calendar.color,
                 borderColor: calendar.color,
               }}
             />
           )}
-          <h2 className="text-xl font-semibold leading-tight">{event.title}</h2>
+          <h2 className="text-xl font-semibold leading-tight truncate whitespace-nowrap">
+            {event.title}
+          </h2>
         </div>
-
-        {event.allDay && (
-          <Badge variant="secondary" className="w-fit">
-            All Day
-          </Badge>
-        )}
+        {actions && <div className="flex-shrink-0">{actions}</div>}
       </div>
+
+      {event.allDay && (
+        <Badge variant="secondary" className="w-fit mt-2">
+          All Day
+        </Badge>
+      )}
 
       <div className="space-y-6">
         {calendar && (
@@ -193,7 +201,7 @@ function EventDisplayDialogContent({ event }: { event: CalendarEvent }) {
             <CalendarIcon className="h-4 w-4" />
           </div>
           <div className="flex-1">
-            <p className="text-sm">{toHumanText(event.recurrence, new Date(event.start))?.replace(/^\s*([a-z])/, (m, c) => c.toUpperCase())}</p>
+            <p className="text-sm">{toHumanText(event.recurrence, new Date(event.start))?.replace(/^\s*([a-z])/, (_m, c) => c.toUpperCase())}</p>
           </div>
         </div>
       )}
@@ -209,6 +217,8 @@ export function EventDisplayDialog({
 }: EventDisplayDialogProps) {
   const { peekMode, setPeekMode } = useUIStore();
   const deleteEventMutation = useDeleteEvent();
+  const updateEventMutation = useUpdateEvent();
+  const createEventMutation = useCreateEvent();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -249,23 +259,19 @@ export function EventDisplayDialog({
 
   // Integrate recurrence actions into the same buttons via small dropdown behavior
   const actionButtons = (
-    <div className="absolute top-4 right-4 flex gap-2">
-      <IntegratedActionBar
-        peekMode={peekMode}
-        onPeekModeToggle={togglePeekMode}
-        onEdit={() => {
-          // Defer recurring choice until after user clicks Save in the edit dialog.
-          // Here, simply open the editor for the series or one-off as usual.
-          handleEdit();
-        }}
-        onDelete={() => {
-          if (event.recurrence) setDeleteDialogOpen(true);
-          else void handleDelete();
-        }}
-        onClose={handleClose}
-        isDeleting={isDeleting}
-      />
-    </div>
+    <IntegratedActionBar
+      peekMode={peekMode}
+      onPeekModeToggle={togglePeekMode}
+      onEdit={() => {
+        handleEdit();
+      }}
+      onDelete={() => {
+        if (event.recurrence) setDeleteDialogOpen(true);
+        else void handleDelete();
+      }}
+      onClose={handleClose}
+      isDeleting={isDeleting}
+    />
   );
 
   if (peekMode === 'right') {
@@ -275,8 +281,7 @@ export function EventDisplayDialog({
           side="right"
           className="w-full sm:max-w-md md:max-w-lg p-6 [&>button]:hidden"
         >
-          <EventDisplayDialogContent event={event} />
-          {actionButtons}
+          <EventDisplayDialogContent event={event} actions={actionButtons} />
         </SheetContent>
       </Sheet>
     );
@@ -292,8 +297,7 @@ export function EventDisplayDialog({
         <DialogDescription className="sr-only">
           Event details for {event.title} - view, edit, or delete this event
         </DialogDescription>
-        <EventDisplayDialogContent event={event} />
-        {actionButtons}
+        <EventDisplayDialogContent event={event} actions={actionButtons} />
       </DialogContent>
       {/* Delete dialog for recurring events */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -369,7 +373,7 @@ export function EventDisplayDialog({
                   allDay: event.allDay,
                   description: event.description,
                   location: event.location,
-                  calendarName: event.calendarName || (calendar?.name || ''),
+                  calendarName: event.calendarName || '',
                   color: event.color,
                 });
                 setEditDialogOpen(false);

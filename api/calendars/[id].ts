@@ -1,10 +1,10 @@
 /**
  * Individual Calendar API Route - Operations on specific calendars
  */
-import { createCrudHandler } from '../../lib/utils/apiHandler';
-import { getAllServices } from '../../lib/services';
-import { sendSuccess, sendError } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createCrudHandler } from '../../lib/utils/apiHandler.js';
+import { getAllServices } from '../../lib/services/index.js';
+import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { UpdateCalendarDTO } from '../../lib/services/CalendarService';
 
@@ -155,27 +155,30 @@ export default createCrudHandler({
       let result;
 
       switch (action) {
-        case 'toggle-visibility':
+        case 'toggle-visibility': {
           result = await calendarService.toggleVisibility(calendarId, {
             userId,
             requestId: req.headers['x-request-id'] as string,
           });
           break;
+        }
 
-        case 'set-default':
+        case 'set-default': {
           result = await calendarService.setDefault(calendarId, {
             userId,
             requestId: req.headers['x-request-id'] as string,
           });
           break;
+        }
 
-        default:
+        default: {
           // Regular patch update
           const updateData: UpdateCalendarDTO = req.body;
           result = await calendarService.update(calendarId, updateData, {
             userId,
             requestId: req.headers['x-request-id'] as string,
           });
+        }
       }
 
       if (!result) {

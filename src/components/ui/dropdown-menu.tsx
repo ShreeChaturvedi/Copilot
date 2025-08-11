@@ -22,10 +22,10 @@ function DropdownMenuTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
   return (
-    <DropdownMenuPrimitive.Trigger
+      <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
       // Keep trigger visible even when content opens (avoid losing hover state)
-      className={cn("[&[data-state=open]]:opacity-100", (props as any).className)}
+        className={cn("[&[data-state=open]]:opacity-100", (props as { className?: string }).className)}
       {...props}
     />
   )

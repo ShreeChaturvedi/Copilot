@@ -1,8 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import { 
   authenticateToken, 
-  validateRefreshToken,
-  AuthenticatedRequest 
+  validateRefreshToken
 } from '../middleware/auth.js';
 import {
   authRateLimit,
@@ -21,7 +20,7 @@ import {
   passwordResetRequestSchema,
   passwordResetConfirmSchema,
   changePasswordSchema
-} from '../../../shared/src/validation/auth.js';
+} from '@shared/validation/auth';
 
 const router = Router();
 
@@ -229,10 +228,10 @@ router.post('/password-reset/confirm', authRateLimit, validateBody(passwordReset
  * POST /auth/change-password
  * Change password for authenticated user
  */
-router.post('/change-password', authenticateToken, validateBody(changePasswordSchema), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/change-password', authenticateToken as unknown as RequestHandler, validateBody(changePasswordSchema) as unknown as RequestHandler, async (req: Request & { user?: { id: string; email: string } }, res: Response) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    const user = req.user;
+    const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+    const user = req.user!;
 
     // Verify current password
     const isCurrentPasswordValid = await authService.verifyPassword(user.id, currentPassword);
@@ -289,7 +288,7 @@ router.post('/change-password', authenticateToken, validateBody(changePasswordSc
  * GET /auth/google
  * Get Google OAuth authorization URL
  */
-router.get('/google', (req: Request, res: Response) => {
+router.get('/google', (_req: Request, res: Response) => {
   try {
     if (!googleOAuthService.isConfigured()) {
       return res.status(501).json({
@@ -443,9 +442,9 @@ router.post('/google/verify', authRateLimit, async (req: Request, res: Response)
  * POST /auth/google/unlink
  * Unlink Google account from user
  */
-router.post('/google/unlink', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/google/unlink', authenticateToken as unknown as RequestHandler, async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
-    const user = req.user;
+    const user = req.user!;
 
     await googleOAuthService.unlinkAccount(user.id);
 
@@ -495,10 +494,10 @@ router.post('/google/unlink', authenticateToken, async (req: AuthenticatedReques
  * POST /auth/refresh
  * Refresh access token using refresh token
  */
-router.post('/refresh', refreshTokenRateLimit, validateRefreshToken, async (req: Request, res: Response) => {
+router.post('/refresh', refreshTokenRateLimit as unknown as RequestHandler, validateRefreshToken as unknown as RequestHandler, async (req: Request & { user?: { id: string; email: string } }, res: Response) => {
   try {
-    const { refreshToken } = req.body;
-    const user = req.user!; // Set by validateRefreshToken middleware
+    const { refreshToken } = req.body as { refreshToken: string };
+    const user = req.user!;
 
     // Check for token reuse (security breach detection)
     const isTokenReuse = await refreshTokenService.detectTokenReuse(refreshToken);
@@ -571,10 +570,10 @@ router.post('/refresh', refreshTokenRateLimit, validateRefreshToken, async (req:
  * POST /auth/logout
  * Logout user and blacklist current token
  */
-router.post('/logout', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+router.post('/logout', authenticateToken as unknown as RequestHandler, (req: Request & { token?: string }, res: Response) => {
   try {
-    const { refreshToken } = req.body;
-    const accessToken = req.token;
+    const { refreshToken } = req.body as { refreshToken?: string };
+    const accessToken = req.token as string;
 
     // Blacklist access token
     tokenBlacklistService.blacklistToken(accessToken);
@@ -606,10 +605,10 @@ router.post('/logout', authenticateToken, (req: AuthenticatedRequest, res: Respo
  * POST /auth/logout-all
  * Logout user from all devices
  */
-router.post('/logout-all', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+router.post('/logout-all', authenticateToken as unknown as RequestHandler, (req: Request & { user?: { id: string }; token?: string }, res: Response) => {
   try {
-    const user = req.user;
-    const accessToken = req.token;
+    const user = req.user!;
+    const accessToken = req.token as string;
 
     // Blacklist current access token
     tokenBlacklistService.blacklistToken(accessToken);
@@ -639,8 +638,8 @@ router.post('/logout-all', authenticateToken, (req: AuthenticatedRequest, res: R
  * GET /auth/me
  * Get current user information
  */
-router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
-  const user = req.user;
+router.get('/me', authenticateToken as unknown as RequestHandler, (req: Request & { user?: { id: string; email: string } }, res: Response) => {
+  const user = req.user!;
 
   res.json({
     success: true,
@@ -657,14 +656,14 @@ router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) 
  * GET /auth/verify
  * Verify if current token is valid
  */
-router.get('/verify', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+router.get('/verify', authenticateToken as unknown as RequestHandler, (req: Request & { user?: { id: string; email: string } }, res: Response) => {
   res.json({
     success: true,
     data: {
       valid: true,
       user: {
-        id: req.user.id,
-        email: req.user.email
+        id: req.user!.id,
+        email: req.user!.email
       }
     }
   });
@@ -674,7 +673,7 @@ router.get('/verify', authenticateToken, (req: AuthenticatedRequest, res: Respon
  * GET /auth/stats
  * Get authentication statistics (for debugging/monitoring)
  */
-router.get('/stats', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+router.get('/stats', authenticateToken as unknown as RequestHandler, (_req: Request, res: Response) => {
   // Only allow this for development or admin users
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({

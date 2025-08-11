@@ -1,14 +1,28 @@
 import jwt from 'jsonwebtoken';
-import { promisify } from 'util';
 
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
-// Promisify JWT methods for async/await usage
-const signAsync = promisify(jwt.sign);
-const verifyAsync = promisify(jwt.verify) as (token: string, secret: string, options?: jwt.VerifyOptions) => Promise<JWTPayload>;
+// Promisified wrappers with correct generics
+function signAsync(payload: string | object | Buffer, secret: jwt.Secret, options?: jwt.SignOptions): Promise<string> {
+  return new Promise((resolve, reject) => {
+    jwt.sign(payload, secret, options || {}, (err, token) => {
+      if (err || !token) return reject(err);
+      resolve(token);
+    });
+  });
+}
+
+function verifyAsync<T = unknown>(token: string, secret: jwt.Secret, options?: jwt.VerifyOptions): Promise<T> {
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, secret, options || {}, (err, decoded) => {
+      if (err) return reject(err);
+      resolve(decoded as T);
+    });
+  });
+}
 
 export interface JWTPayload {
   userId: string;
@@ -35,10 +49,10 @@ export async function generateAccessToken(userId: string, email: string): Promis
   };
 
   return await signAsync(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     issuer: 'react-calendar-app',
     audience: 'react-calendar-app-users'
-  }) as string;
+  });
 }
 
 /**
@@ -52,10 +66,10 @@ export async function generateRefreshToken(userId: string, email: string): Promi
   };
 
   return await signAsync(payload, JWT_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRES_IN,
+    expiresIn: JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     issuer: 'react-calendar-app',
     audience: 'react-calendar-app-users'
-  }) as string;
+  });
 }
 
 /**
@@ -83,7 +97,7 @@ export async function generateTokenPair(userId: string, email: string): Promise<
  */
 export async function verifyToken(token: string): Promise<JWTPayload> {
   try {
-    const decoded = await verifyAsync(token, JWT_SECRET);
+    const decoded = await verifyAsync<JWTPayload>(token, JWT_SECRET);
     return decoded as JWTPayload;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {

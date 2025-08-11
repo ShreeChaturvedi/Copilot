@@ -36,3 +36,5 @@ export { ViewToggle, type ViewMode } from './ViewToggle';
 export { SharedToggleButton, type SharedToggleButtonProps, type ToggleOption } from './SharedToggleButton';
 
 export { RangeSlider, type RangeSliderProps } from './RangeSlider';
+
+export { ToggleGroup, ToggleGroupItem } from './toggle-group';

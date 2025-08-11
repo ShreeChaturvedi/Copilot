@@ -1,8 +1,7 @@
 // Placeholder Vercel API route for login - will be implemented in task 4.2
-import { createMethodHandler } from '../../lib/utils/apiHandler';
-import { HttpMethod } from '../../lib/types/api';
-import { sendSuccess } from '../../lib/middleware/errorHandler';
-import type { AuthenticatedRequest } from '../../lib/types/api';
+import { createMethodHandler } from '../../lib/utils/apiHandler.js';
+import { HttpMethod } from '../../lib/types/api.js';
+import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 
 export default createMethodHandler({

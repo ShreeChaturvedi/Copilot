@@ -14,12 +14,11 @@
  * - All controls contained within the bordered area
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { ArrowUp } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/badge';
 import { useTextParser } from './hooks/useTextParser';
 import { SmartTaskData } from './SmartTaskInput';
 import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
@@ -67,7 +66,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   className = '',
   enableSmartParsing = true,
   showConfidence = false,
-  maxDisplayTags = 5,
+  // maxDisplayTags = 5,
   placeholder = "What would you like to work on?",
   onFilesAdded,
   maxFiles = 5,
@@ -79,6 +78,8 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [, setIsFocused] = useState(false); // State maintained for potential future focus styling
   const baseTextRef = useRef('');
+  // Track tags the user dismissed (we hide these without modifying the input text)
+  const [dismissedTagSignatures, setDismissedTagSignatures] = useState<Set<string>>(new Set());
 
   // Initialize text parser
   const {
@@ -176,6 +177,17 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     });
   }, [onFilesAdded]);
 
+  // Create a stable signature for a tag to support dismissal without changing input text
+  const makeTagSignature = useCallback((t: { type: string; originalText: string; startIndex: number }) => {
+    return `${t.type}|${t.originalText}|${t.startIndex}`;
+  }, []);
+
+  // Derived: tags after applying user dismissals (used for highlighting, UI, and submission)
+  const filteredTags = useMemo(() => {
+    if (!tags || dismissedTagSignatures.size === 0) return tags;
+    return tags.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
+  }, [tags, dismissedTagSignatures, makeTagSignature]);
+
   // Handle form submission
   const handleSubmit = useCallback((e?: React.FormEvent) => {
     e?.preventDefault();
@@ -188,11 +200,11 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       
       // Extract smart data if parsing is enabled
       let smartData: SmartTaskData | undefined;
-      if (smartParsingEnabled && tags.length > 0) {
-        const priorityTag = tags.find(tag => tag.type === 'priority');
+      if (smartParsingEnabled && filteredTags.length > 0) {
+        const priorityTag = filteredTags.find(tag => tag.type === 'priority');
         const priority = priorityTag?.value as 'low' | 'medium' | 'high' | undefined;
         
-        const dateTag = tags.find(tag => tag.type === 'date' || tag.type === 'time');
+        const dateTag = filteredTags.find(tag => tag.type === 'date' || tag.type === 'time');
         const scheduledDate = dateTag?.value as Date | undefined;
         
         smartData = {
@@ -200,7 +212,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           originalInput: inputText,
           priority,
           scheduledDate,
-          tags,
+          tags: filteredTags,
           confidence,
         };
       }
@@ -216,8 +228,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       setInputText('');
       setUploadedFiles([]);
       clear();
+      setDismissedTagSignatures(new Set());
     }
-  }, [inputText, smartParsingEnabled, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
+  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, activeTaskGroup.id, clear]);
 
   // Handle key press
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -229,16 +242,18 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Check if we have content to submit (only finalized text, not interim)
   const hasContent = inputText.trim().length > 0;
-  const showTags = smartParsingEnabled && tags.length > 0 && hasContent;
+  const showTags = smartParsingEnabled && filteredTags.length > 0 && hasContent;
   
   // File preview component
-  const filePreview = uploadedFiles.length > 0 ? (
-    <CompactFilePreview
-      files={uploadedFiles}
-      onFileRemove={handleFileRemove}
-      disabled={disabled}
-    />
-  ) : null;
+  const filePreview = useMemo(() => (
+    uploadedFiles.length > 0 ? (
+      <CompactFilePreview
+        files={uploadedFiles}
+        onFileRemove={handleFileRemove}
+        disabled={disabled}
+      />
+    ) : null
+  ), [uploadedFiles, handleFileRemove, disabled]);
 
   // Task Group Selector using Combobox
   const taskGroupSelector = (
@@ -311,13 +326,24 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     </>
   );
 
+  // Remove a tag visually (do not alter input text). Hide tag and its highlight.
+  const handleRemoveInlineTag = useCallback((tagId: string) => {
+    const tagToRemove = tags.find((t) => t.id === tagId);
+    if (!tagToRemove) return;
+    setDismissedTagSignatures((prev) => {
+      const next = new Set(prev);
+      next.add(makeTagSignature(tagToRemove));
+      return next;
+    });
+  }, [tags, makeTagSignature]);
+
   return (
     <div className={cn('max-w-2xl mx-auto', className)}>
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         <EnhancedTaskInputLayout
           value={inputText}
           onChange={setInputText}
-          tags={tags}
+          tags={filteredTags}
           placeholder={placeholder}
           disabled={disabled}
           onKeyPress={handleKeyDown}
@@ -332,40 +358,13 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           maxHeight="150px"
           isRecording={isRecording}
           filePreview={filePreview}
+          showInlineTags={showTags}
+          inlineTagsRemovable={true}
+          onInlineTagRemove={handleRemoveInlineTag}
         />
       </form>
 
-      {/* Parsed Tags Display - Below the input */}
-      {showTags && (
-        <div className="mt-2 px-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">Detected:</span>
-            <div className="flex flex-wrap gap-1">
-              {tags.slice(0, maxDisplayTags).map((tag) => (
-                <Badge
-                  key={tag.id}
-                  variant="outline"
-                  className={cn(
-                    "text-xs h-5 px-2 gap-1 border-border/50",
-                    tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
-                  )}
-                  style={tag.color ? { 
-                    borderColor: `${tag.color}30`, 
-                    color: tag.color 
-                  } : undefined}
-                >
-                  {tag.displayText}
-                </Badge>
-              ))}
-              {tags.length > maxDisplayTags && (
-                <Badge variant="outline" className="text-xs h-5 px-2">
-                  +{tags.length - maxDisplayTags} more
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* External tag display removed; tags shown inline under textarea to prevent layout shift */}
 
       {/* Error Display */}
       {error && smartParsingEnabled && (

@@ -24,11 +24,13 @@ export interface RecurrenceEditorOptions {
   count?: number | null; // used when ends='after'
 }
 
-export interface ParsedRecurrence extends RecurrenceEditorOptions {}
+export type ParsedRecurrence = RecurrenceEditorOptions
 
 const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 
 export function generateRRule(options: RecurrenceEditorOptions, dtstart: Date): string {
+  // Keep dtstart for potential future use; currently not embedded in string
+  void dtstart;
   const parts: string[] = [];
   // FREQ
   const freqMap: Record<Frequency, string> = {
@@ -125,7 +127,7 @@ export function parseRRule(rruleString: string): ParsedRecurrence | null {
 
   if (map['BYDAY']) {
     const bydays = map['BYDAY'].split(',');
-    opts.daysOfWeek = bydays.map((code) => WEEKDAY_CODES.indexOf(code as any));
+    opts.daysOfWeek = bydays.map((code) => WEEKDAY_CODES.indexOf(code as typeof WEEKDAY_CODES[number]));
   }
   if (map['BYMONTHDAY']) {
     const md = parseInt(map['BYMONTHDAY'], 10);
@@ -138,7 +140,7 @@ export function parseRRule(rruleString: string): ParsedRecurrence | null {
   if (map['BYDAY'] && map['BYSETPOS'] && opts.frequency === 'monthly') {
     // monthly nth weekday case
     const w = map['BYDAY'].split(',')[0];
-    opts.monthlyWeekday = WEEKDAY_CODES.indexOf(w as any);
+    opts.monthlyWeekday = WEEKDAY_CODES.indexOf(w as typeof WEEKDAY_CODES[number]);
   }
 
   if (map['BYMONTH'] && opts.frequency === 'yearly') {

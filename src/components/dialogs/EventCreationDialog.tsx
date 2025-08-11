@@ -25,12 +25,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectValue,
+  SelectLabel,
+  SelectSeparator,
+} from "@/components/ui/Select"
 
-import type { CalendarEvent } from "@shared/types"
+import type { CalendarEvent } from "../../../shared/types"
 import { useCalendars } from "@/hooks/useCalendars"
 import { useCreateEvent, useUpdateEvent } from "@/hooks/useEvents"
 import { useUIStore } from "@/stores/uiStore"
 import { ConditionalDialogHeader } from "./ConditionalDialogHeader"
+import type { RecurrenceEditorOptions } from "@/utils/recurrence"
+import { parseRRule, generateRRule } from "@/utils/recurrence"
 //
 import RecurrenceSection from "./RecurrenceSection"
 import {
@@ -65,7 +77,7 @@ interface EventFormData {
 }
 
 
-function CustomDateInput({ value, onChange, className }: {
+export function CustomDateInput({ value, onChange, className }: {
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   className?: string
@@ -135,7 +147,7 @@ function CustomDateInput({ value, onChange, className }: {
   )
 }
 
-function CustomTimeInput({ value, onChange, className }: {
+export function CustomTimeInput({ value, onChange, className }: {
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   className?: string
@@ -388,12 +400,15 @@ function EventCreationDialogContent({
     const now = new Date()
     const oneHourLater = addHours(now, 1)
     
+    const startBase = (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) || now
+    const endBase = (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) || oneHourLater
+
     return {
       title: initialEventData?.title || "",
-      startDate: initialEventData?.start || now,
-      endDate: initialEventData?.end || now, // Default to same day for all-day events
-      startTime: initialEventData?.start ? format(initialEventData.start, 'HH:mm') : format(now, 'HH:mm'),
-      endTime: initialEventData?.end ? format(initialEventData.end, 'HH:mm') : format(oneHourLater, 'HH:mm'),
+      startDate: startBase,
+      endDate: startBase, // Default to same day for all-day events
+      startTime: format(startBase, 'HH:mm'),
+      endTime: format(endBase, 'HH:mm'),
       allDay: initialEventData?.allDay || false,
       description: initialEventData?.description || "",
       location: initialEventData?.location || "",
@@ -438,13 +453,16 @@ function EventCreationDialogContent({
   React.useEffect(() => {
     const now = new Date()
     const oneHourLater = addHours(now, 1)
+
+    const startBase = (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) || now
+    const endBase = (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) || oneHourLater
     
     setFormData({
       title: initialEventData?.title || "",
-      startDate: initialEventData?.start || now,
-      endDate: initialEventData?.end || now, // Default to same day for all-day events
-      startTime: initialEventData?.start ? format(initialEventData.start, 'HH:mm') : format(now, 'HH:mm'),
-      endTime: initialEventData?.end ? format(initialEventData.end, 'HH:mm') : format(oneHourLater, 'HH:mm'),
+      startDate: startBase,
+      endDate: startBase, // Default to same day for all-day events
+      startTime: format(startBase, 'HH:mm'),
+      endTime: format(endBase, 'HH:mm'),
       allDay: initialEventData?.allDay || false,
       description: initialEventData?.description || "",
       location: initialEventData?.location || "",
@@ -596,6 +614,58 @@ function EventCreationDialogContent({
     }
   }, [formData.startDate, formData.endDate, formData.endTime, formData.allDay])
 
+  // Get current frequency from recurrence string
+  const currentFrequency = useMemo((): 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' => {
+    if (!formData.recurrence) return 'none'
+    const parsed = parseRRule(formData.recurrence)
+    return parsed ? parsed.frequency : 'none'
+  }, [formData.recurrence])
+
+  // End condition derived from recurrence (controlled in the parent row)
+  const currentEnds = useMemo((): 'never' | 'on' | 'after' => {
+    const parsed = formData.recurrence ? parseRRule(formData.recurrence) : null
+    return parsed?.ends || 'never'
+  }, [formData.recurrence])
+
+  const handleEndsChangeTopRow = useCallback((ends: 'never' | 'on' | 'after') => {
+    if (!formData.recurrence) return
+    const parsed = parseRRule(formData.recurrence)
+    if (!parsed) return
+    const startDateTime = getStartDateTime() || new Date()
+    const next: RecurrenceEditorOptions = {
+      ...parsed,
+      ends,
+      until: ends === 'on' ? (parsed.until || new Date(startDateTime)) : null,
+      count: ends === 'after' ? (parsed.count || 10) : null,
+    }
+    updateFormData('recurrence', generateRRule(next, startDateTime))
+  }, [formData.recurrence, getStartDateTime, updateFormData])
+
+  // Simple repeat frequency handler
+  const handleFrequencyChange = useCallback((freq: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly') => {
+    if (freq === 'none') {
+      updateFormData('recurrence', undefined)
+      return
+    }
+    
+    // Create a basic recurrence rule with sensible defaults
+    const startDateTime = getStartDateTime() || new Date()
+    const opts: RecurrenceEditorOptions = {
+      frequency: freq,
+      interval: 1,
+      daysOfWeek: freq === 'weekly' ? [startDateTime.getDay()] : undefined,
+      dayOfMonth: freq === 'monthly' ? startDateTime.getDate() : undefined,
+      month: freq === 'yearly' ? startDateTime.getMonth() + 1 : undefined,
+      yearDayOfMonth: freq === 'yearly' ? startDateTime.getDate() : undefined,
+      ends: 'never',
+      until: null,
+      count: null,
+    }
+    
+    const rrule = generateRRule(opts, startDateTime)
+    updateFormData('recurrence', rrule)
+  }, [updateFormData, getStartDateTime])
+
   // Enhanced form validation with multi-day event support
   const isFormValid = useMemo(() => {
     const hasTitle = formData.title.trim().length > 0
@@ -733,18 +803,6 @@ function EventCreationDialogContent({
             </div>
           </div>
 
-          {/* All Day Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="all-day"
-              checked={formData.allDay}
-              onCheckedChange={handleAllDayChange}
-            />
-            <Label htmlFor="all-day" className="text-sm font-medium">
-              All day
-            </Label>
-          </div>
-
           {/* Date and Time Selection */}
           <div className="flex items-center gap-3">
             <CustomDateInput
@@ -780,6 +838,88 @@ function EventCreationDialogContent({
             )}
           </div>
 
+          {/* All Day + Repeat + Ends row */
+          }
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch id="all-day" checked={formData.allDay} onCheckedChange={handleAllDayChange} />
+              <Label htmlFor="all-day" className="text-sm font-medium">All Day</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={currentFrequency} onValueChange={(val) => handleFrequencyChange(val as 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly')}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Never Repeats" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Never Repeats</SelectItem>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Frequency</SelectLabel>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            {currentFrequency !== 'none' && (
+              <div className="flex items-center gap-2">
+                <Select value={currentEnds} onValueChange={(val) => handleEndsChangeTopRow(val as 'never' | 'on' | 'after')}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Never ends" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never ends</SelectItem>
+                    <SelectItem value="on">On date…</SelectItem>
+                    <SelectItem value="after">After N occurrences…</SelectItem>
+                  </SelectContent>
+                </Select>
+                {currentEnds === 'on' && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" className="gap-2">
+                        <Calendar className="h-4 w-4" />
+                        {(() => {
+                          const parsed = formData.recurrence ? parseRRule(formData.recurrence) : null
+                          return parsed?.until ? format(parsed.until, 'yyyy-MM-dd') : 'Pick date'
+                        })()}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={(formData.recurrence && parseRRule(formData.recurrence)?.until) || undefined}
+                        onSelect={(d) => {
+                          if (!formData.recurrence || !d) return
+                          const parsed = parseRRule(formData.recurrence)
+                          if (!parsed) return
+                          const startDateTime = getStartDateTime() || new Date()
+                          const next: RecurrenceEditorOptions = { ...parsed, until: d }
+                          updateFormData('recurrence', generateRRule(next, startDateTime))
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Recurrence Options - should appear directly under repeat row */}
+          {currentFrequency !== 'none' && (
+            <RecurrenceSection
+              startDateTime={getStartDateTime()}
+              value={formData.recurrence}
+              onChange={(rrule) => updateFormData('recurrence', rrule || undefined)}
+              onClearExceptions={() => updateFormData('exceptions', [])}
+              exceptions={formData.exceptions || []}
+              showSummary={false}
+              endsControlled={true}
+            />
+          )}
+
           {/* Location */}
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -807,15 +947,7 @@ function EventCreationDialogContent({
             />
           </div>
 
-          {/* Recurrence (Repeat) Section */}
-          <RecurrenceSection
-            startDateTime={getStartDateTime()}
-            value={formData.recurrence}
-            onChange={(rrule) => updateFormData('recurrence', rrule || undefined)}
-            onClearExceptions={() => updateFormData('exceptions', [])}
-            exceptions={formData.exceptions || []}
-            showSummary={false}
-          />
+          
         </TabsContent>
 
         <TabsContent value="task" className={`space-y-4 ${isEditing ? 'mt-0' : 'mt-6'}`}>
@@ -948,7 +1080,10 @@ export function EventCreationDialog({
   if (peekMode === 'right') {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:max-w-md md:max-w-lg p-6 [&>button]:hidden">
+        <SheetContent
+          side="right"
+          className="w-fit max-w-[calc(100%-2rem)] sm:!max-w-none p-6 overflow-y-auto [&>button]:hidden"
+        >
           <EventCreationDialogContent
             initialEventData={initialEventData}
             onClose={handleClose}
@@ -960,7 +1095,10 @@ export function EventCreationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] md:max-w-[640px] max-h-[90vh] overflow-y-auto" showCloseButton={false}>
+      <DialogContent
+        className="w-fit sm:!max-w-none max-h-[90vh] overflow-y-auto"
+        showCloseButton={false}
+      >
         <DialogTitle className="sr-only">Create Event</DialogTitle>
         <DialogDescription className="sr-only">
           Create a new event with title, date, time, location, and description

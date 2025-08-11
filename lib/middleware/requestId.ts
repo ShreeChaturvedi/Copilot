@@ -2,7 +2,7 @@
  * Request ID middleware for tracing and debugging
  */
 import type { VercelResponse } from '@vercel/node';
-import type { AuthenticatedRequest } from '../types/api';
+import type { AuthenticatedRequest } from '../types/api.js';
 
 /**
  * Generate unique request ID
@@ -48,14 +48,19 @@ export function requestLogger() {
     });
 
     // Override res.end to log response
-    const originalEnd = res.end;
-    res.end = function(chunk?: any, encoding?: any) {
+    const originalEnd = res.end.bind(res);
+    res.end = function(this: VercelResponse, chunk?: string | Uint8Array, encoding?: BufferEncoding | (() => void), cb?: () => void) {
       const duration = Date.now() - startTime;
       
       console.log(`[${new Date().toISOString()}] [${requestId}] Response ${res.statusCode} - ${duration}ms`);
       
-      // Call original end method
-      originalEnd.call(this, chunk, encoding);
+      // Call original end method with proper signature
+      if (typeof encoding === 'function') {
+        cb = encoding as () => void;
+        originalEnd(chunk, undefined as unknown as BufferEncoding, cb);
+        return;
+      }
+      originalEnd(chunk, encoding as BufferEncoding, cb);
     };
 
     next();

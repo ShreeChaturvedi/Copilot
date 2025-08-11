@@ -34,8 +34,8 @@ describe('ConsolidatedCalendarHeader', () => {
     // Check for sidebar trigger
     expect(screen.getByTestId('sidebar-trigger-rightPane')).toBeInTheDocument();
     
-    // Check for title
-    expect(screen.getByText('Calendar')).toBeInTheDocument();
+    // Check for title (should show current month/year)
+    expect(screen.getByText(/\w+ \d{4}/)).toBeInTheDocument();
     
     // Check for navigation buttons
     expect(screen.getByText('Today')).toBeInTheDocument();
@@ -48,8 +48,8 @@ describe('ConsolidatedCalendarHeader', () => {
     expect(screen.getByText('Day')).toBeInTheDocument();
     expect(screen.getByText('List')).toBeInTheDocument();
     
-    // Check for new event button
-    expect(screen.getByText('New Event')).toBeInTheDocument();
+    // Check for new event button (now a plus icon with aria-label)
+    expect(screen.getByLabelText('New Event')).toBeInTheDocument();
   });
 
   it('calls onTodayClick when Today button is clicked', () => {
@@ -76,7 +76,7 @@ describe('ConsolidatedCalendarHeader', () => {
   it('calls onCreateEvent when New Event button is clicked', () => {
     renderWithSidebar(<ConsolidatedCalendarHeader {...defaultProps} />);
     
-    fireEvent.click(screen.getByText('New Event'));
+    fireEvent.click(screen.getByLabelText('New Event'));
     expect(defaultProps.onCreateEvent).toHaveBeenCalledTimes(1);
   });
 

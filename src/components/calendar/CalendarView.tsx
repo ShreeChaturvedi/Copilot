@@ -13,7 +13,7 @@ import './calendar.css';
 
 import { useEvents, useUpdateEvent, useSwipeDetection } from '../../hooks';
 import { useCalendars } from '../../hooks';
-import type { CalendarEvent } from "@shared/types";
+import type { CalendarEvent } from "../../../shared/types";
 import { toLocal, toUTC } from '../../utils/date';
 import { expandOccurrences } from '@/utils/recurrence';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -184,11 +184,19 @@ export const CalendarView = ({
     return events.map(event => {
       const calendar = calendars.find(cal => cal.name === event.calendarName);
 
+      const occurrenceStart = event.occurrenceInstanceStart ?? event.start;
+      const occurrenceEnd = event.occurrenceInstanceEnd ?? event.end;
+
+      // Ensure each rendered occurrence gets a unique id to avoid identity collisions in FullCalendar
+      const instanceKey = new Date(occurrenceStart).toISOString();
+      const eventId = `${event.id}::${instanceKey}`;
+
       return {
-        id: event.id,
+        id: eventId,
+        groupId: event.id, // stable master/series id
         title: event.title,
-        start: toLocal(event.start),
-        end: toLocal(event.end),
+        start: toLocal(occurrenceStart),
+        end: toLocal(occurrenceEnd),
         allDay: event.allDay || false,
         backgroundColor: event.color || calendar?.color || '#3788d8',
         borderColor: event.color || calendar?.color || '#3788d8',
@@ -368,9 +376,6 @@ export const CalendarView = ({
             ...ev,
             occurrenceInstanceStart: o.start,
             occurrenceInstanceEnd: o.end,
-            // For rendering, FullCalendar will use these local conversions
-            start: o.start,
-            end: o.end,
           });
         }
       } else {
@@ -468,7 +473,7 @@ export const CalendarView = ({
             eventClassNames={(arg) => {
               const classes = ['cursor-pointer', 'transition-all', 'duration-200'];
               // Only mark external task mirrors as preview to style with default calendar color
-              const isExternalTask = Boolean((arg.event as any).extendedProps?.isFromTask);
+              const isExternalTask = Boolean((arg.event as unknown as { extendedProps?: { isFromTask?: boolean } }).extendedProps?.isFromTask);
               if (arg.isMirror && isExternalTask) {
                 classes.push('fc-event-preview');
               }
@@ -500,13 +505,17 @@ export const CalendarView = ({
               hour12: true
             }}
             dayHeaderContent={(args) => {
-              const label = args.date.toLocaleDateString('en-US', { weekday: 'short' });
-              const capitalized = label.slice(0,1).toUpperCase() + label.slice(1).toLowerCase();
+              const viewType = args.view?.type ?? '';
+              const isMonthOrWeek = viewType === 'dayGridMonth' || viewType === 'timeGridWeek';
+              const shortWeekdayUpper = args.date
+                .toLocaleDateString('en-US', { weekday: 'short' })
+                .toUpperCase();
+              const labelText = isMonthOrWeek ? shortWeekdayUpper : args.text;
               const dayNumber = args.date.getDate();
               const isToday = args.isToday;
               return (
                 <div className="day-header-container">
-                  <span className="day-header-name">{capitalized}</span>
+                  <span className="day-header-name">{labelText}</span>
                   <span className={`day-header-number ${isToday ? 'today' : ''}`}>{dayNumber}</span>
                 </div>
               );

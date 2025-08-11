@@ -1,7 +1,7 @@
 /**
  * Event Service - Concrete implementation of BaseService for Event operations
  */
-import type { PrismaClient, Event } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -92,8 +92,8 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     return 'Event';
   }
 
-  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): any {
-    const where: any = {};
+  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
 
     // Always filter by user
     if (context?.userId) {
@@ -154,7 +154,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     return where;
   }
 
-  protected buildIncludeClause(): any {
+  protected buildIncludeClause(): Record<string, unknown> {
     return {
       calendar: {
         select: {
@@ -334,7 +334,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     try {
       this.log('getConflicts', { eventData, excludeId }, context);
 
-      const where: any = {
+      const where: Record<string, unknown> = {
         userId: context.userId,
         // Find overlapping events
         AND: [

@@ -237,7 +237,7 @@ class AuthAPI {
     }
   }
 
-  async verifyToken(token: string): Promise<{ valid: boolean; user?: any }> {
+  async verifyToken(token: string): Promise<{ valid: boolean; user?: { id: string; email: string; name?: string; picture?: string } }> {
     try {
       const response = await fetch(`${this.baseURL}/verify`, {
         method: 'GET',
