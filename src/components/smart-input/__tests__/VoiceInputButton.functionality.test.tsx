@@ -4,8 +4,6 @@
  * Tests for the actual voice input functionality and transcript handling
  */
 
-// @ts-expect-error React needed for JSX in test files
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -33,8 +31,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   
   // Mock Web Speech API
-  (global.window as any).SpeechRecognition = vi.fn(() => mockSpeechRecognition);
-  (global.window as any).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition);
+  (global.window as unknown as Window & { SpeechRecognition: new () => unknown }).SpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
+  (global.window as unknown as Window & { webkitSpeechRecognition: new () => unknown }).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
   
   // Reset mock functions
   mockSpeechRecognition.start.mockClear();
@@ -166,7 +164,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as Event;
+    } as unknown as SpeechRecognitionEvent;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -189,7 +187,7 @@ describe('VoiceInputButton Functionality', () => {
           length: 1,
         }
       ]
-    } as unknown as Event;
+    } as unknown as SpeechRecognitionEvent;
 
     act(() => {
       if (mockSpeechRecognition.onresult) {
@@ -233,9 +231,7 @@ describe('VoiceInputButton Functionality', () => {
     fireEvent.click(button);
     
     // Simulate permission denied error
-    const mockErrorEvent = {
-      error: 'not-allowed'
-    } as any;
+    const mockErrorEvent = { error: 'not-allowed' } as SpeechRecognitionErrorEvent;
 
     act(() => {
       if (mockSpeechRecognition.onerror) {

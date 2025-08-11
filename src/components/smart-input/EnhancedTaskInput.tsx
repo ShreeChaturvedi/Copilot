@@ -230,7 +230,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       clear();
       setDismissedTagSignatures(new Set());
     }
-  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, activeTaskGroup.id, clear]);
+  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear]);
 
   // Handle key press
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

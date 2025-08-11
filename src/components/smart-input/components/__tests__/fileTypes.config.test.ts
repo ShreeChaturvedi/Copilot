@@ -17,7 +17,6 @@ import {
   isSupportedExtension,
   getMaxFileSize,
   getPreviewType,
-  getFileIcon,
   formatFileSize,
   validateFile,
   getFileDisplayInfo,
@@ -34,7 +33,7 @@ describe('File Types Configuration', () => {
     });
 
     it('should have valid configuration for each category', () => {
-      Object.entries(FILE_TYPE_CONFIGS).forEach(([category, config]) => {
+      Object.values(FILE_TYPE_CONFIGS).forEach((config) => {
         expect(config).toHaveProperty('accept');
         expect(config).toHaveProperty('maxSize');
         expect(config).toHaveProperty('previewType');

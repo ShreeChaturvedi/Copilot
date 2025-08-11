@@ -1,7 +1,7 @@
 /**
  * Task Service - Concrete implementation of BaseService for Task operations
  */
-import type { PrismaClient, Priority } from '@prisma/client';
+import type { Priority } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService';
 
 /**
@@ -403,7 +403,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('create:success', { id: result?.id }, context);
       return this.transformEntity(result);
     } catch (error) {
-      this.log('create:error', { error: error.message, data }, context);
+      this.log('create:error', { error: (error as Error).message, data }, context);
       throw error;
     }
   }
@@ -444,7 +444,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('toggleCompletion:success', { id, completed: updatedTask.completed }, context);
       return this.transformEntity(updatedTask);
     } catch (error) {
-      this.log('toggleCompletion:error', { error: error.message, id }, context);
+      this.log('toggleCompletion:error', { error: (error as Error).message, id }, context);
       throw error;
     }
   }
@@ -537,7 +537,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('bulkUpdate:success', { count: updatedTasks.length }, context);
       return updatedTasks.map((task) => this.transformEntity(task));
     } catch (error) {
-      this.log('bulkUpdate:error', { error: error.message, ids, updates }, context);
+      this.log('bulkUpdate:error', { error: (error as Error).message, ids, updates }, context);
       throw error;
     }
   }
@@ -571,7 +571,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
       this.log('bulkDelete:success', { count: ids.length }, context);
     } catch (error) {
-      this.log('bulkDelete:error', { error: error.message, ids }, context);
+      this.log('bulkDelete:error', { error: (error as Error).message, ids }, context);
       throw error;
     }
   }

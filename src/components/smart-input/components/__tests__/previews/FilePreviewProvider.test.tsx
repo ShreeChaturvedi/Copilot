@@ -8,7 +8,7 @@ import { FilePreviewProvider } from '../../previews/FilePreviewProvider';
 
 // Mock the preview components
 vi.mock('../../previews/ImagePreview', () => ({
-  ImagePreview: ({ file, size, className }: any) => (
+  ImagePreview: ({ file, size, className }: { file: File; size?: 'sm' | 'md' | 'lg'; className?: string }) => (
     <div data-testid="image-preview" data-file={file.name} data-size={size} className={className}>
       Image Preview
     </div>
@@ -16,7 +16,7 @@ vi.mock('../../previews/ImagePreview', () => ({
 }));
 
 vi.mock('../../previews/PDFPreview', () => ({
-  PDFPreview: ({ file, size, className, onError }: any) => (
+  PDFPreview: ({ file, size, className, onError }: { file: File; size?: 'sm' | 'md' | 'lg'; className?: string; onError?: (err: Error) => void }) => (
     <div 
       data-testid="pdf-preview" 
       data-file={file.name} 
@@ -30,7 +30,7 @@ vi.mock('../../previews/PDFPreview', () => ({
 }));
 
 vi.mock('../../previews/DefaultPreview', () => ({
-  DefaultPreview: ({ file, size, className }: any) => (
+  DefaultPreview: ({ file, size, className }: { file: File; size?: 'sm' | 'md' | 'lg'; className?: string }) => (
     <div data-testid="default-preview" data-file={file.name} data-size={size} className={className}>
       Default Preview
     </div>

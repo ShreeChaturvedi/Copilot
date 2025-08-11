@@ -1,7 +1,7 @@
 /**
  * Tag Service - Concrete implementation of BaseService for Tag operations
  */
-import type { PrismaClient, TagType } from '@prisma/client';
+import type { TagType } from '@prisma/client';
 import { BaseService, type ServiceContext, type BaseEntity } from './BaseService';
 
 /**
@@ -81,6 +81,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   }
 
   protected buildWhereClause(filters: TagFilters, _context?: ServiceContext): Record<string, unknown> {
+    void _context;
     const where: Record<string, unknown> = {};
 
     // Type filter
@@ -125,6 +126,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
    * Validate tag creation
    */
   protected async validateCreate(data: CreateTagDTO, _context?: ServiceContext): Promise<void> {
+    void _context;
     if (!data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Tag name is required');
     }
@@ -160,6 +162,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
     data: UpdateTagDTO,
     context?: ServiceContext
   ): Promise<void> {
+    void context;
     if (data.name !== undefined && !data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Tag name cannot be empty');
     }

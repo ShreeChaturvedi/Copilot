@@ -5,7 +5,7 @@
  * Implements dynamic loading, error handling, and memory management.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -107,7 +107,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       }
 
       // Get first page
-      const page = await (pdfDoc as unknown as { getPage: (n: number) => Promise<any> }).getPage(1);
+      const page = await (pdfDoc as unknown as { getPage: (n: number) => Promise<PDFPageProxy> }).getPage(1);
       
       // Calculate viewport
       const viewport = (page as PDFPageProxy).getViewport({ scale });
@@ -126,7 +126,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       // Render PDF page to canvas
-      const renderContext: any = {
+      const renderContext: { canvasContext: CanvasRenderingContext2D; viewport: PDFPageViewport; canvas?: HTMLCanvasElement } = {
         canvasContext: context,
         viewport: viewport,
         canvas,
@@ -169,7 +169,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
   /**
    * Clean up resources
    */
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     // Cancel ongoing render task
     if (renderTaskRef.current) {
       renderTaskRef.current.cancel();
@@ -187,7 +187,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       URL.revokeObjectURL(thumbnailUrl);
       setThumbnailUrl(null);
     }
-  };
+  }, [thumbnailUrl]);
 
   /**
    * Generate thumbnail on mount
@@ -216,7 +216,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       isMounted = false;
       cleanup();
     };
-  }, [file, isInView]);
+  }, [file, isInView, generateThumbnail, cleanup]);
 
   // Observe visibility to avoid loading/processing when off-screen
   useEffect(() => {
@@ -241,7 +241,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
    */
   useEffect(() => {
     return cleanup;
-  }, []);
+  }, [cleanup]);
 
   /**
    * Render loading state

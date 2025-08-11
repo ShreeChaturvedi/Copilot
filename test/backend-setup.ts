@@ -3,6 +3,7 @@
  * Configures the testing environment for backend API and service tests
  */
 import { expect, vi } from 'vitest';
+type ConsoleLike = Pick<Console, 'log' | 'debug' | 'info' | 'warn' | 'error'>;
 
 // Mock environment variables for testing
 process.env.NODE_ENV = 'test';
@@ -12,13 +13,13 @@ process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
 // Mock console methods to reduce noise in tests
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).console = {
-  ...console,
+  ...(console as ConsoleLike),
   log: vi.fn(),
   debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-};
+} as ConsoleLike;
 
 // Mock Date.now for consistent testing
 const mockNow = new Date('2024-01-15T12:00:00Z');
@@ -27,14 +28,14 @@ vi.setSystemTime(mockNow);
 // Global test utilities
 // Provide explicit global declaration casts for Vitest
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(global as any).createMockContext = (overrides = {}) => ({
+(global as any).createMockContext = (overrides: Record<string, unknown> = {}) => ({
   userId: 'test-user-123',
   requestId: 'test-request-123',
   ...overrides,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(global as any).createMockUser = (overrides = {}) => ({
+(global as any).createMockUser = (overrides: Record<string, unknown> = {}) => ({
   id: 'test-user-123',
   email: 'test@example.com',
   name: 'Test User',
@@ -150,8 +151,6 @@ declare global {
   }
 
   // Global test utilities
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function createMockContext(overrides?: Record<string, unknown>): Record<string, unknown>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function createMockUser(overrides?: Record<string, unknown>): Record<string, unknown>;
 }
