@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 // Icon picker removed; use emoji
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,8 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-// popover and icon picker removed
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { lazy } from 'react';
 import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
+
+const EmojiPicker = lazy(async () => ({ default: (await import('@/components/ui/emoji-picker')).EmojiPicker }));
 
 export interface CreateTaskDialogProps {
   open: boolean;
@@ -42,7 +49,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState('📁');
   const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
-  // legacy state removed
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -54,8 +61,9 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     }
   }, [open]);
 
-  const handleEmojiChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmoji(e.target.value);
+  const handleEmojiSelect = (selectedEmoji: string) => {
+    setEmoji(selectedEmoji);
+    setShowEmojiPicker(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -94,16 +102,28 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             <div className="grid gap-3">
               <Label htmlFor="task-name">Name</Label>
               <div className="flex items-center gap-3">
-                {/* Emoji Input */}
-                <input
-                  type="text"
-                  value={emoji}
-                  onChange={handleEmojiChange}
-                  maxLength={4}
-                  className="w-12 h-10 text-xl text-center rounded-md border"
-                  aria-label="Task list emoji"
-                  style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
-                />
+                {/* Emoji Picker */}
+                <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-12 h-10 text-xl p-0"
+                      aria-label="Select emoji"
+                      style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
+                    >
+                      {emoji}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-3" align="start">
+                    <Suspense fallback={<div className="p-4">Loading...</div>}>
+                      <EmojiPicker
+                        selectedEmoji={emoji}
+                        onEmojiSelect={handleEmojiSelect}
+                      />
+                    </Suspense>
+                  </PopoverContent>
+                </Popover>
                 
                 {/* Name Input */}
                 <Input

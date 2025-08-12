@@ -24,8 +24,6 @@ import {
   Columns2,
   Columns3,
   ArrowDownToDot,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
@@ -519,32 +517,6 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             )}
           </div>
 
-          {/* Show Task List Context (emoji+name) in All Tasks */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
-                className={cn(
-                  'h-7 w-7 p-0',
-                  showTaskListContextInAll
-                    ? 'bg-muted text-foreground border border-border'
-                    : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
-                )}
-                aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
-              >
-                {showTaskListContextInAll ? (
-                  <Eye className="w-3.5 h-3.5" />
-                ) : (
-                  <EyeOff className="w-3.5 h-3.5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
-            </TooltipContent>
-          </Tooltip>
 
           {/* Add Pane Button (columns icon based on count) */}
           {canAddPane && onAddPane && (

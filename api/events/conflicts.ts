@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import { HttpMethod } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
+import { UnauthorizedError, ValidationError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createMethodHandler({
   [HttpMethod.GET]: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -15,11 +16,7 @@ export default createMethodHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const { start, end, startTime, endTime, excludeEventId, calendarId } = req.query as Record<string, string>;
@@ -27,11 +24,13 @@ export default createMethodHandler({
       const startParam = start || startTime;
       const endParam = end || endTime;
       if (!startParam || !endParam) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Start time and end time are required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'start', message: 'Start time is required', code: 'REQUIRED' },
+            { field: 'end', message: 'End time is required', code: 'REQUIRED' },
+          ], 'Start time and end time are required')
+        );
       }
 
       const conflicts = await eventService.getConflicts(
@@ -56,18 +55,10 @@ export default createMethodHandler({
       console.error('GET /api/events/conflicts error:', error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to check event conflicts',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to check event conflicts'));
     }
   },
 });

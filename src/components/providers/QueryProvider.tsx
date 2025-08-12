@@ -64,11 +64,17 @@ const createQueryClient = () => {
           )) {
             return false;
           }
-          // Retry up to 3 times for other errors
-          return failureCount < 3;
+          // In dev, only retry once to avoid long exponential backoff stalls
+          const isDev = import.meta?.env?.MODE !== 'production';
+          return failureCount < (isDev ? 1 : 3);
         },
-        // Exponential backoff retry delay
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+        // Exponential backoff retry delay (shorter in dev)
+        retryDelay: (attemptIndex) => {
+          const isDev = import.meta?.env?.MODE !== 'production';
+          const base = isDev ? 300 : 1000;
+          const cap = isDev ? 3000 : 30000;
+          return Math.min(base * 2 ** attemptIndex, cap);
+        },
         // Refetch on window focus (useful for keeping data fresh)
         refetchOnWindowFocus: false,
         // Refetch on reconnect
@@ -88,10 +94,16 @@ const createQueryClient = () => {
           )) {
             return false;
           }
-          return failureCount < 2;
+          const isDev = import.meta?.env?.MODE !== 'production';
+          return failureCount < (isDev ? 1 : 2);
         },
-        // Retry delay for mutations
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+        // Retry delay for mutations (shorter in dev)
+        retryDelay: (attemptIndex) => {
+          const isDev = import.meta?.env?.MODE !== 'production';
+          const base = isDev ? 300 : 1000;
+          const cap = isDev ? 3000 : 10000;
+          return Math.min(base * 2 ** attemptIndex, cap);
+        },
         // Network mode handling
         networkMode: 'online',
       },

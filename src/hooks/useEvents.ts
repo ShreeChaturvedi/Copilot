@@ -85,7 +85,10 @@ const filterEvents = (events: CalendarEvent[], filters: EventFilters): CalendarE
 /**
  * Hook to fetch and filter events
  */
-export const useEvents = (filters: EventFilters = {}) => {
+export const useEvents = (
+  filters: EventFilters = {},
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: eventQueryKeys.list(filters),
     queryFn: async () => {
@@ -94,6 +97,7 @@ export const useEvents = (filters: EventFilters = {}) => {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: options?.enabled ?? true,
   });
 };
 

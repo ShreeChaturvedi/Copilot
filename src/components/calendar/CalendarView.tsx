@@ -123,15 +123,18 @@ export const CalendarView = ({
   }, [currentView, calendarRef]);
 
   // Hooks for data management
-  const { data: calendars = [] } = useCalendars();
+  const { data: calendars = [], isLoading: calendarsLoading } = useCalendars();
   const visibleCalendars = calendars.filter(cal => cal.visible);
   const visibleCalendarNames = visibleCalendars.map(cal => cal.name);
   // Track default calendar color for consistent preview styling
   const defaultCalendar = calendars.find(cal => cal.isDefault) || visibleCalendars[0];
 
-  const { data: events = [], isLoading: eventsLoading } = useEvents({
-    calendarNames: visibleCalendarNames,
-  });
+  const { data: events = [], isLoading: eventsLoading } = useEvents(
+    {
+      calendarNames: visibleCalendarNames,
+    },
+    { enabled: visibleCalendarNames.length > 0 && !calendarsLoading }
+  );
 
   const updateEventMutation = useUpdateEvent();
 

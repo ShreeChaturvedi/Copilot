@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import { HttpMethod } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
+import { UnauthorizedError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createMethodHandler({
   [HttpMethod.DELETE]: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -15,11 +16,7 @@ export default createMethodHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const deletedCount = await attachmentService.cleanupOrphanedAttachments({
@@ -36,18 +33,10 @@ export default createMethodHandler({
       console.error('DELETE /api/attachments/cleanup error:', error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to cleanup orphaned attachments',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to cleanup orphaned attachments'));
     }
   },
 });

@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { UpdateAttachmentDTO } from '../../lib/services/AttachmentService';
+import { UnauthorizedError, ValidationError, NotFoundError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -16,19 +17,16 @@ export default createCrudHandler({
       const attachmentId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!attachmentId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Attachment ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Attachment ID is required', code: 'REQUIRED' },
+          ], 'Attachment ID is required')
+        );
       }
 
       const attachment = await attachmentService.findById(attachmentId, {
@@ -37,11 +35,7 @@ export default createCrudHandler({
       });
 
       if (!attachment) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Attachment not found',
-        });
+        return sendError(res, new NotFoundError('Attachment'));
       }
 
       sendSuccess(res, attachment);
@@ -49,18 +43,10 @@ export default createCrudHandler({
       console.error(`GET /api/attachments/${req.query.id} error:`, error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to fetch attachment',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch attachment'));
     }
   },
 
@@ -71,19 +57,16 @@ export default createCrudHandler({
       const attachmentId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!attachmentId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Attachment ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Attachment ID is required', code: 'REQUIRED' },
+          ], 'Attachment ID is required')
+        );
       }
 
       const updateData: UpdateAttachmentDTO = req.body;
@@ -94,11 +77,7 @@ export default createCrudHandler({
       });
 
       if (!attachment) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Attachment not found',
-        });
+        return sendError(res, new NotFoundError('Attachment'));
       }
 
       sendSuccess(res, attachment);
@@ -106,26 +85,15 @@ export default createCrudHandler({
       console.error(`PUT /api/attachments/${req.query.id} error:`, error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to update attachment',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to update attachment'));
     }
   },
 
@@ -136,19 +104,16 @@ export default createCrudHandler({
       const attachmentId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!attachmentId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Attachment ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Attachment ID is required', code: 'REQUIRED' },
+          ], 'Attachment ID is required')
+        );
       }
 
       // Regular patch update
@@ -159,11 +124,7 @@ export default createCrudHandler({
       });
 
       if (!result) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Attachment not found',
-        });
+        return sendError(res, new NotFoundError('Attachment'));
       }
 
       sendSuccess(res, result);
@@ -171,26 +132,15 @@ export default createCrudHandler({
       console.error(`PATCH /api/attachments/${req.query.id} error:`, error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to update attachment',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to update attachment'));
     }
   },
 
@@ -201,19 +151,16 @@ export default createCrudHandler({
       const attachmentId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!attachmentId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Attachment ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Attachment ID is required', code: 'REQUIRED' },
+          ], 'Attachment ID is required')
+        );
       }
 
       const success = await attachmentService.delete(attachmentId, {
@@ -222,11 +169,7 @@ export default createCrudHandler({
       });
 
       if (!success) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Attachment not found',
-        });
+        return sendError(res, new NotFoundError('Attachment'));
       }
 
       sendSuccess(res, { deleted: true });
@@ -234,18 +177,10 @@ export default createCrudHandler({
       console.error(`DELETE /api/attachments/${req.query.id} error:`, error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to delete attachment',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to delete attachment'));
     }
   },
 

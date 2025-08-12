@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { UpdateCalendarDTO } from '../../lib/services/CalendarService';
+import { UnauthorizedError, ValidationError, NotFoundError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -16,19 +17,16 @@ export default createCrudHandler({
       const calendarId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!calendarId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Calendar ID is required', code: 'REQUIRED' },
+          ], 'Calendar ID is required')
+        );
       }
 
       const calendar = await calendarService.findById(calendarId, {
@@ -37,11 +35,7 @@ export default createCrudHandler({
       });
 
       if (!calendar) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Calendar not found',
-        });
+        return sendError(res, new NotFoundError('Calendar'));
       }
 
       sendSuccess(res, calendar);
@@ -49,18 +43,10 @@ export default createCrudHandler({
       console.error(`GET /api/calendars/${req.query.id} error:`, error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to fetch calendar',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch calendar'));
     }
   },
 
@@ -71,19 +57,16 @@ export default createCrudHandler({
       const calendarId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!calendarId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Calendar ID is required', code: 'REQUIRED' },
+          ], 'Calendar ID is required')
+        );
       }
 
       const updateData: UpdateCalendarDTO = req.body;
@@ -94,11 +77,7 @@ export default createCrudHandler({
       });
 
       if (!calendar) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Calendar not found',
-        });
+        return sendError(res, new NotFoundError('Calendar'));
       }
 
       sendSuccess(res, calendar);
@@ -106,26 +85,15 @@ export default createCrudHandler({
       console.error(`PUT /api/calendars/${req.query.id} error:`, error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to update calendar',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to update calendar'));
     }
   },
 
@@ -137,19 +105,16 @@ export default createCrudHandler({
       const { action } = req.query;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!calendarId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Calendar ID is required', code: 'REQUIRED' },
+          ], 'Calendar ID is required')
+        );
       }
 
       let result;
@@ -182,11 +147,7 @@ export default createCrudHandler({
       }
 
       if (!result) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Calendar not found',
-        });
+        return sendError(res, new NotFoundError('Calendar'));
       }
 
       sendSuccess(res, result);
@@ -194,26 +155,15 @@ export default createCrudHandler({
       console.error(`PATCH /api/calendars/${req.query.id} error:`, error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to update calendar',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to update calendar'));
     }
   },
 
@@ -224,19 +174,16 @@ export default createCrudHandler({
       const calendarId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       if (!calendarId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Calendar ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'id', message: 'Calendar ID is required', code: 'REQUIRED' },
+          ], 'Calendar ID is required')
+        );
       }
 
       const success = await calendarService.delete(calendarId, {
@@ -245,11 +192,7 @@ export default createCrudHandler({
       });
 
       if (!success) {
-        return sendError(res, {
-          statusCode: 404,
-          code: 'NOT_FOUND',
-          message: 'Calendar not found',
-        });
+        return sendError(res, new NotFoundError('Calendar'));
       }
 
       sendSuccess(res, { deleted: true });
@@ -257,18 +200,10 @@ export default createCrudHandler({
       console.error(`DELETE /api/calendars/${req.query.id} error:`, error);
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to delete calendar',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to delete calendar'));
     }
   },
 

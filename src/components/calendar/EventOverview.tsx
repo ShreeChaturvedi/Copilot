@@ -24,7 +24,7 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
   showHeader = true,
 }) => {
   const { data: calendars = [] } = useCalendars();
-  const { data: allEvents = [] } = useEvents();
+  const { data: allEvents = [] } = useEvents({}, { enabled: true });
 
   // Filter events to get visible calendar events only
   const visibleCalendarNames = calendars

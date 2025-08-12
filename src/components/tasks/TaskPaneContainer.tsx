@@ -3,7 +3,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -11,6 +11,11 @@ import {
 } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { TaskGroupCombobox } from '@/components/smart-input/components/TaskGroupCombobox';
 import { TaskList } from './TaskList';
 import { cn } from '@/lib/utils';
@@ -221,8 +226,9 @@ const TaskPane: React.FC<TaskPaneProps> = ({
   taskGroups,
   onUpdateTaskList,
 }) => {
-  // Get task management operations
+  // Get task management operations and UI state
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
+  const { showTaskListContextInAll, setShowTaskListContextInAll } = useUIStore();
 
   return (
     <div className="h-full flex flex-col">
@@ -240,7 +246,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                   color: '#3b82f6',
                   description: group.name,
                 }))}
-                activeTaskGroupId={paneConfig.selectedTaskListId || undefined}
+                activeTaskGroupId={paneConfig.selectedTaskListId || 'all'}
                 onSelectTaskGroup={(groupId) =>
                   onUpdateTaskList(
                     paneConfig.id,
@@ -257,6 +263,35 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             <Badge variant="outline" className="text-xs h-5">
               {paneData.tasks.length}
             </Badge>
+            
+            {/* Eye toggle - only show when "All Tasks" is selected (not a specific task list) */}
+            {paneConfig.selectedTaskListId === null && paneConfig.grouping === 'taskList' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
+                    className={cn(
+                      'h-6 w-6 p-0 ml-1',
+                      showTaskListContextInAll
+                        ? 'bg-muted text-foreground border border-border'
+                        : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
+                    )}
+                    aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
+                  >
+                    {showTaskListContextInAll ? (
+                      <Eye className="w-3.5 h-3.5" />
+                    ) : (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
           {canRemove && (
             <Button

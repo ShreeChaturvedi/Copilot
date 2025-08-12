@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import { HttpMethod } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
+import { UnauthorizedError, ValidationError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createMethodHandler({
   [HttpMethod.POST]: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -15,29 +16,27 @@ export default createMethodHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const { sourceTagIds, targetTagId } = req.body;
 
       if (!Array.isArray(sourceTagIds) || sourceTagIds.length === 0) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Source tag IDs array is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'sourceTagIds', message: 'Source tag IDs array is required', code: 'REQUIRED' },
+          ], 'Source tag IDs array is required')
+        );
       }
 
       if (!targetTagId) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Target tag ID is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'targetTagId', message: 'Target tag ID is required', code: 'REQUIRED' },
+          ], 'Target tag ID is required')
+        );
       }
 
       const result = await tagService.mergeTags(sourceTagIds, targetTagId, {
@@ -54,26 +53,15 @@ export default createMethodHandler({
       console.error('POST /api/tags/merge error:', error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
       
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, {
-          statusCode: 403,
-          code: 'FORBIDDEN',
-          message: 'Access denied',
-        });
+        return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to merge tags',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to merge tags'));
     }
   },
 });

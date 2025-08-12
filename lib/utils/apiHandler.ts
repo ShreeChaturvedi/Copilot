@@ -30,6 +30,8 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
     const middlewares = [
       corsMiddleware(),
       requestIdMiddleware(),
+      // Move devAuth before logger so logs show userId in dev
+      ...(process.env.NODE_ENV !== 'production' ? [devAuth()] : []),
       requestLogger(),
     ];
 
@@ -58,9 +60,7 @@ export function createApiHandler(routes: Partial<Record<HttpMethod, RouteConfig>
 
     // Execute middleware pipeline
     // Dev auth injection so req.user exists in development
-    if (process.env.NODE_ENV !== 'production') {
-      middlewares.push(devAuth());
-    }
+    // devAuth injected earlier to ensure requestLogger sees userId in dev
 
     await composeMiddleware(...middlewares)(req, res, async () => {
       await route.handler(req, res);

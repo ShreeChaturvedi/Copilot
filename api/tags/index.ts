@@ -7,6 +7,7 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { CreateTagDTO, TagFilters } from '../../lib/services/TagService';
+import { UnauthorizedError, ValidationError, InternalServerError } from '../../lib/types/api.js';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -15,11 +16,7 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const { search, popular } = req.query;
@@ -49,11 +46,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/tags error:', error);
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to fetch tags',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch tags'));
     }
   },
 
@@ -63,29 +56,27 @@ export default createCrudHandler({
       const userId = req.user?.id;
 
       if (!userId) {
-        return sendError(res, {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-          message: 'User authentication required',
-        });
+        return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
       const tagData: CreateTagDTO = req.body;
       
       if (!tagData.name?.trim()) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Tag name is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'name', message: 'Tag name is required', code: 'REQUIRED' },
+          ], 'Tag name is required')
+        );
       }
 
       if (!tagData.color) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: 'Tag color is required',
-        });
+        return sendError(
+          res,
+          new ValidationError([
+            { field: 'color', message: 'Tag color is required', code: 'REQUIRED' },
+          ], 'Tag color is required')
+        );
       }
 
       const tag = await tagService.create(tagData, {
@@ -98,18 +89,11 @@ export default createCrudHandler({
       console.error('POST /api/tags error:', error);
       
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
-        return sendError(res, {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: error.message.replace('VALIDATION_ERROR: ', ''),
-        });
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
       }
 
-      sendError(res, {
-        statusCode: 500,
-        code: 'INTERNAL_ERROR',
-        message: error.message || 'Failed to create tag',
-      });
+      sendError(res, new InternalServerError(error.message || 'Failed to create tag'));
     }
   },
 

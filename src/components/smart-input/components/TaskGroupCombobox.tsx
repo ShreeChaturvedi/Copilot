@@ -109,7 +109,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             </>
           ) : (
             <>
-              <div className="text-base" style={{ color: `${activeTaskGroup.color} !important` }}>
+              <div className="text-base">
                 {activeTaskGroup.emoji}
               </div>
               <span className="text-sm font-medium">{activeTaskGroup.name}</span>
@@ -160,7 +160,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   }}
                 >
                   <div className="flex items-center gap-2 flex-1">
-                    <div className="text-base" style={{ color: `${group.color} !important` }}>
+                    <div className="text-base">
                       {group.emoji}
                     </div>
                     <span>{group.name}</span>

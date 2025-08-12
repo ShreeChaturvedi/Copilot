@@ -19,6 +19,7 @@ import { Task } from "@shared/types";
 import { useUIStore } from '@/stores/uiStore';
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
+import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { DueDateBadge } from './DueDateBadge';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
 
@@ -85,6 +86,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   // Calendars must be read via hook at top-level (Rules of Hooks)
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
+  const { taskGroups } = useTaskManagement({ includeTaskOperations: false });
 
   const handleToggle = () => {
     onToggle(task.id);
@@ -235,28 +237,32 @@ export const TaskItem: React.FC<TaskItemProps> = ({
               className={cn(
                 'cursor-text text-sm font-medium transition-colors duration-200',
                 'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border',
-                'truncate overflow-hidden text-ellipsis whitespace-nowrap',
+                'flex items-center justify-between w-full',
                 task.completed && `line-through text-muted-foreground opacity-[${COMPLETED_TASK_OPACITY}]`
               )}
               title={task.title}
             >
-              {task.title}
+              <span className="truncate overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">
+                {task.title}
+              </span>
+              {/* Task list context - RIGHT ALIGNED emoji + name */}
+              {showTaskListContextInAll && task.taskListId && (
+                (() => {
+                  const taskList = taskGroups.find(group => group.id === task.taskListId);
+                  return taskList ? (
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground/70 flex-shrink-0 ml-3">
+                      <span className="text-base">{taskList.emoji}</span>
+                      <span>{taskList.name}</span>
+                    </span>
+                  ) : null;
+                })()
+              )}
             </div>
           )}
           
           {/* Tags - Hidden in calendar mode */}
           {!calendarMode && (
             <div className="mt-1 flex flex-wrap gap-1">
-              {/* List context badge (shown when enabled in All Tasks view) */}
-              {showTaskListContextInAll && task.taskListId && (
-                <Badge
-                  variant="outline"
-                  className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30"
-                >
-                  {/* Placeholder label; will be replaced by real name/emoji if task includes them */}
-                  <span className="opacity-80">List</span>
-                </Badge>
-              )}
               {/* Canonical Due Date tag - only render when set */}
               {task.scheduledDate && (
                 <DueDateBadge

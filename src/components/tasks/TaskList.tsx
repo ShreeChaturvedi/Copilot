@@ -50,7 +50,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { lazy, Suspense } from 'react';
-const IconPicker = lazy(async () => ({ default: (await import('@/components/ui/icon-picker')).IconPicker }));
+const EmojiPicker = lazy(async () => ({ default: (await import('@/components/ui/emoji-picker')).EmojiPicker }));
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -205,7 +205,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     });
   };
 
-  const handleUpdateIcon = (emoji: string) => {
+  const handleUpdateEmoji = (emoji: string) => {
     onUpdateTaskGroupIcon?.(activeTaskGroup.id, emoji);
     setShowIconPicker(false);
   };
@@ -303,7 +303,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
       <div className="space-y-3 mt-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Icon Picker for Task Group */}
+            {/* Emoji Picker for Task Group */}
             <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
               <PopoverTrigger asChild>
                 <Button
@@ -312,16 +312,16 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                   aria-label={`Task group: ${activeTaskGroup.name}`}
                 >
-                  <span className="text-base" style={{ color: activeTaskGroup.color }}>
+                  <span className="text-base">
                     {activeTaskGroup.emoji}
                   </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3" align="start">
                 <Suspense fallback={null}>
-                  <IconPicker
-                     selectedIcon={activeTaskGroup.emoji}
-                    onIconSelect={handleUpdateIcon}
+                  <EmojiPicker
+                     selectedEmoji={activeTaskGroup.emoji}
+                    onEmojiSelect={handleUpdateEmoji}
                   />
                 </Suspense>
               </PopoverContent>
@@ -424,7 +424,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
         {!hideHeader && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Icon Picker for Task Group */}
+              {/* Emoji Picker for Task Group */}
               <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
                 <PopoverTrigger asChild>
                   <Button
@@ -433,16 +433,16 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                     aria-label={`Task group: ${activeTaskGroup.name}`}
                   >
-                    <span className="text-base" style={{ color: activeTaskGroup.color }}>
+                    <span className="text-base">
                       {activeTaskGroup.emoji}
                     </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3" align="start">
                   <Suspense fallback={null}>
-                    <IconPicker
-                      selectedIcon={activeTaskGroup.emoji}
-                      onIconSelect={handleUpdateIcon}
+                    <EmojiPicker
+                      selectedEmoji={activeTaskGroup.emoji}
+                      onEmojiSelect={handleUpdateEmoji}
                     />
                   </Suspense>
                 </PopoverContent>
