@@ -6,7 +6,7 @@ import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 export interface TaskGroup {
   id: string;
   name: string;
-  iconId: string;
+  emoji: string;
   color: string;
   description?: string;
   isDefault?: boolean;
@@ -18,7 +18,7 @@ export interface TaskGroupListProps {
   onSelectTaskGroup: (id: string) => void;
   onAddTaskGroup: (data: {
     name: string;
-    iconId: string;
+    emoji: string;
     color: string;
     description?: string;
   }) => void;
@@ -26,7 +26,7 @@ export interface TaskGroupListProps {
     id: string,
     updates: {
       name: string;
-      iconId: string;
+      emoji: string;
       color: string;
       description?: string;
     }
@@ -38,7 +38,7 @@ export interface TaskGroupListProps {
 function taskGroupToBaseItem(taskGroup: TaskGroup): SelectionModeItem {
   return {
     id: taskGroup.id,
-    name: taskGroup.name,
+    name: `${taskGroup.emoji ?? ''} ${taskGroup.name}`.trim(),
     color: taskGroup.color,
     description: taskGroup.description,
     isDefault: taskGroup.isDefault,
@@ -65,7 +65,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   const handleAdd = (name: string, color: string) => {
     onAddTaskGroup({
       name,
-      iconId: 'CheckSquare',
+      emoji: '📁',
       color,
       description: '',
     });
@@ -76,7 +76,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
     if (originalTaskGroup) {
       onEditTaskGroup(item.id, {
         name,
-        iconId: originalTaskGroup.iconId,
+        emoji: originalTaskGroup.emoji,
         color,
         description: originalTaskGroup.description,
       });
@@ -97,7 +97,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   }) => {
     onAddTaskGroup({
       name: data.name,
-      iconId: data.iconId,
+      emoji: '📁',
       color: data.color,
       description: data.description,
     });

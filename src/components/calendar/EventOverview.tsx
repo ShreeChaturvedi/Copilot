@@ -11,6 +11,7 @@ import { groupItemsByDate, filterUpcomingItems } from '@/utils/dateGrouping';
 interface EventOverviewProps {
   maxEvents?: number;
   className?: string;
+  showHeader?: boolean;
 }
 
 interface GroupedEvents {
@@ -20,6 +21,7 @@ interface GroupedEvents {
 const EventOverviewComponent: React.FC<EventOverviewProps> = ({
   maxEvents = 5,
   className,
+  showHeader = true,
 }) => {
   const { data: calendars = [] } = useCalendars();
   const { data: allEvents = [] } = useEvents();
@@ -67,12 +69,14 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
   if (upcomingEvents.length === 0) {
     return (
       <div className={cn('space-y-3', className)}>
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="w-4 h-4 text-sidebar-foreground" />
-          <h3 className="text-sm font-semibold text-sidebar-foreground">
-            Upcoming Events
-          </h3>
-        </div>
+        {showHeader && (
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-sidebar-foreground" />
+            <h3 className="text-sm font-semibold text-sidebar-foreground">
+              Upcoming Events
+            </h3>
+          </div>
+        )}
 
         <div className="text-center py-4 text-muted-foreground">
           <CalendarIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
@@ -84,12 +88,14 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
 
   return (
     <div className={cn('space-y-4', className)}>
-      <div className="flex items-center gap-2 pb-1">
-        <CalendarIcon className="w-4 h-4 text-sidebar-foreground opacity-80" />
-        <h3 className="text-sm font-semibold text-sidebar-foreground tracking-wide">
-          Upcoming Events
-        </h3>
-      </div>
+      {showHeader && (
+        <div className="flex items-center gap-2 pb-1">
+          <CalendarIcon className="w-4 h-4 text-sidebar-foreground opacity-80" />
+          <h3 className="text-sm font-semibold text-sidebar-foreground tracking-wide">
+            Upcoming Events
+          </h3>
+        </div>
+      )}
 
       <div className="space-y-4">
         {Object.entries(groupedEvents).map(([dayKey, events]) => (
@@ -182,6 +188,7 @@ const EventOverviewMemoComparison = (
   // Compare primitive props
   if (prevProps.maxEvents !== nextProps.maxEvents) return false;
   if (prevProps.className !== nextProps.className) return false;
+  if (prevProps.showHeader !== nextProps.showHeader) return false;
 
   return true; // Props are equal, skip re-render
 };

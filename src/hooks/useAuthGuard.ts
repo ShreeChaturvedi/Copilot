@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
 
@@ -53,6 +53,8 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
     clearGoogleAuth,
     setError,
   } = useAuthStore();
+
+  const hasLoggedMockSkipRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -158,7 +160,11 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
               // Don't clear auth on network errors, just log
             }
           } else if (isMockToken) {
-            console.log('Mock token detected, skipping backend verification');
+            // Reduce noisy logs in dev; log only once per mount/session
+            if (process.env.NODE_ENV !== 'production' && !hasLoggedMockSkipRef.current) {
+              console.debug('Mock token detected, skipping backend verification');
+              hasLoggedMockSkipRef.current = true;
+            }
           }
         }
 

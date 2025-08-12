@@ -41,6 +41,8 @@
     "db:studio": "npm run db:studio --workspace=packages/backend"
   },
   "dependencies": {
+    "@emoji-mart/data": "1.2.1",
+    "@emoji-mart/react": "1.1.1",
     "@fullcalendar/core": "^6.1.18",
     "@fullcalendar/daygrid": "^6.1.18",
     "@fullcalendar/interaction": "^6.1.18",
@@ -81,6 +83,7 @@
     "compromise": "^14.14.4",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "emoji-mart": "^5.6.0",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.525.0",
     "pdfjs-dist": "^5.4.54",

@@ -272,3 +272,104 @@ All routes under `api/` follow a consistent pattern using `createCrudHandler`:
 
 If anything regresses, please paste the first error block (line numbers + file) from `vercel dev` and/or the Chrome network error body. The system is now structured for quick, targeted fixes.
 
+
+
+## Addendum: Additional Findings, Current Regressions, and Hypotheses
+
+This section records additional, concrete symptoms observed after the baseline fixes above, plus what I think the likely root causes are. Where I’m not fully certain, I explicitly say “I think” or “it might be.” The intent is to give the next agent enough breadcrumbs to avoid rediscovering the same issues.
+
+### Symptoms observed (current state in local runs)
+
+- Task/Task‑lists/Tags serverless route handlers sometimes appear to “do nothing.” In practice, they short‑circuit very early (e.g., 401) and never call services, or they return error payloads through a success response shape.
+- In vitest integration tests for serverless routes (e.g., `api/tags/__tests__/tags.integration.test.ts`, `api/task-lists/__tests__/task-lists.integration.test.ts`, `api/tasks/__tests__/tasks.integration.test.ts`) a number of cases error with:
+  - `TypeError: default is not a function` at the lines like `await tagsHandler(req, res);` (where `tagsHandler` is imported as `import tagsHandler from '../index'`).
+- Some tests expect `sendError` to have been called with an ApiError shape and the spies show “Number of calls: 0” (so the mocked function never got called).
+- When we briefly wired different error shapes (plain objects) into `sendError`, tests that asserted strict `ApiError` usage began to fail more broadly (because the mock is set up expecting a helper function call, not just any response).
+
+### Likely causes (what I think is going on)
+
+1) Authentication short‑circuit in dev
+- In routes such as `api/tasks/index.ts` and `api/tasks/[id].ts`, the first branch is an auth guard:
+  - `if (!userId) return sendError(... 401 ...)`
+- If requests in development don’t have `req.user` populated, handlers bail before reaching services. We expect `devAuth()` to inject a dev user during development, but middleware order and environment can matter.
+- In `lib/utils/apiHandler.ts` the current middleware order is:
+  - `cors → requestId → requestLogger → rateLimit → (optional validateRequest) → devAuth` (dev only) → handler.
+- I think devAuth runs late (after rate limit and logger). That shouldn’t prevent `req.user` from being available to the handler (so the guard should pass), but logs won’t show the user ID. If `NODE_ENV` is not what we think (e.g., not `development`), `devAuth()` won’t run and the guard will 401. It might be worth confirming `NODE_ENV` at runtime and possibly moving `devAuth()` earlier in the chain if we want user ID in logs as well.
+
+2) Error handling contract drift (object vs ApiError)
+- The system used to rely on `sendError(res, new ApiErrorSubclass(...))` across routes to keep a consistent wire contract and to make the test harnesses easy to mock/spy.
+- Some edits changed routes to pass plain objects to `sendError` (e.g., `{ statusCode, code, message }`).
+- Tests that `vi.mock('../../../lib/middleware/errorHandler')` expect to see the mocked `sendError` function being called with an ApiError (or at least with a consistent call signature). When the route bypasses `sendError` or passes a raw object, spies never trip or the expectations don’t match. This shows up in failures like “expected spy to be called... Number of calls: 0”.
+- I think the safest approach is to standardize on `sendError(res, new ApiErrorSubclass(...))` everywhere (or, if we want to support object input, update all callsites and tests consistently). Mixing both leads to confusing test failures and inconsistent runtime responses.
+
+3) Accidental success response in error path
+- In `api/task-lists/[id].ts` there’s a catch branch that (accidentally) calls `sendSuccess(res, {...error payload...})` instead of `sendError(res, ...)`.
+- This makes failing operations appear as `success: true` to the client, which explains UI “no‑ops” after an operation — the UI trusts success and doesn’t retry or surface errors.
+
+4) “default is not a function” in route tests
+- Tests import route handlers as default from `../index` (e.g., `import tagsHandler from '../index'`) and call them (`await tagsHandler(req, res)`), expecting a function.
+- Each `api/*/index.ts` uses `export default createCrudHandler({...})`, where `createCrudHandler` returns a function (by way of `createApiHandler`).
+- We still see `TypeError: default is not a function` consistently. I think there are a few plausible reasons:
+  - Vitest ESM interop edge case (default import vs module namespace) when using `vi.mock` for side modules (e.g., `errorHandler` or `services/index`). In some configurations, the default export might not be materialized the way the tests expect.
+  - Another possibility is a transient import resolution conflict if we change `.js` extension usage inconsistently between route files and tests. The tests import `../index` (extensionless). The code inside uses `.js` extensions for ESM runtime. I think it’s correct for runtime, but in test transforms this can produce surprises if the module loader or transform cache differs.
+  - Finally, if tests are receiving an object (module namespace) rather than the function (default export), calling it would throw exactly this error. If so, rewriting tests to `import * as handlerModule from '../index'` and using `handlerModule.default` is one workaround, but better is to keep export patterns unchanged and ensure transform config preserves default.
+- Action: Pick one standard and stick with it: keep `export default` for handlers and avoid changing it; ensure vitest config (`esModuleInterop`, `moduleResolution`) and imports are consistent; keep `.js` extensions where needed at runtime, but don’t change tests unless necessary.
+
+5) Task service specifics (observed behaviors)
+- Scheduled date filter:
+  - Earlier, we adapted the where clause to Prisma `{ gte/lte }` boundaries. Tests for `findByScheduledDate` expect a shape `{ scheduledDate: { from: Date, to: Date } }` to be passed into `findMany` (mock expectations). When we convert to `{ gte/lte }` before calling the delegate, those tests fail. I think keeping the `from/to` at the call boundary (for test mocks) and mapping to `{ gte/lte }` inside the real delegate path is viable, but whichever we choose must match tests consistently.
+- Delete ownership:
+  - When `delete` didn’t check ownership and simply deleted by ID, tests expecting an authorization error (when non‑owned) failed. The fix is to check `checkOwnership` first and throw on mismatch.
+- Tag creation in a transaction:
+  - Some test transaction mocks don’t include `tx.tag` or `tx.taskTag` objects. When code unconditionally does `tx.tag.upsert` or `tx.taskTag.create`, those mocks throw. I think a defensive guard or improving the test mock shape will fix it.
+
+6) Frontend interop and perceived “no data”
+- Priority enum mismatch (backend `MEDIUM` vs frontend `medium`) caused “created tasks not visible” until mapping was added on the frontend. This was addressed in the client previously; verify that mapping still exists where task objects are revived.
+- Event load performance: I think the UI should fetch events for the visible date range rather than all events on initial load. This can drastically reduce payload and initial render latency. The backend already supports range filters; ensure the calendar view passes `start`/`end` where available.
+
+### Quick checklist (to stabilize task APIs first)
+
+- Confirm `NODE_ENV` is `development` locally and that `devAuth()` is enabled in the middleware chain (present in `createApiHandler`). If desired, move `devAuth()` before `requestLogger()` so logs show `userId` as well.
+- Replace the accidental `sendSuccess` in error catch in `api/task-lists/[id].ts` with `sendError`.
+- Standardize error responses: use `sendError(res, new ApiErrorSubclass(...))` everywhere in routes (e.g., `UnauthorizedError`, `ValidationError`, `NotFoundError`, `InternalServerError`). If we prefer plain objects, update `sendError` typings and tests consistently.
+- Keep route default exports as functions (`export default createCrudHandler({...})`) and avoid changing export forms. If tests still hit “default is not a function,” verify vitest ESM interop settings and import style.
+- In `TaskService`:
+  - Keep ownership checks for `update`, `delete`, and bulk operations.
+  - Align `scheduledDate` filters with test expectations (either keep `{from,to}` at the mocked boundary or update tests accordingly). I think mapping to `{ gte/lte }` right before Prisma is correct for runtime; tests can be adjusted or a compatibility layer can be used in mocks.
+  - Guard tag transaction code if mocks don’t provide `tx.tag`/`tx.taskTag`.
+
+### What I would do next (step‑by‑step)
+
+1) Fix response contract and accidental success path
+- Change the one erroneous `sendSuccess` in `api/task-lists/[id].ts` catch to `sendError`.
+- Ensure every early return uses `sendError(res, new ApiErrorSubclass(...))` for consistency.
+
+2) Verify dev auth and guard removal in dev
+- Confirm `devAuth()` is included (it is, but ensure `NODE_ENV` is `development`). Optionally move it before `requestLogger()` to improve logs.
+- With that in place, re-run manual calls to `/api/tasks` and `/api/task-lists` to confirm 200s and that services are invoked (log statements in services should show calls).
+
+3) Repair TaskService edge cases
+- Add ownership check to `delete` if missing.
+- Align `scheduledDate` shape with tests or adjust tests with a compatibility adapter in the mock layer.
+- Make tag transaction guards resilient to mocks.
+
+4) Resolve “default is not a function” in tests
+- Keep route default export structure; ensure vitest config is compatible with ESM default exports. If needed, modify tests to `import * as handlerModule from '../index'` and call `handlerModule.default(req, res)` — but only if necessary.
+
+5) Performance follow‑up (after correctness)
+- Switch calendar to range‑based fetch on initial load.
+- Confirm the frontend task revive maps backend enum fields (priority) to UI values.
+
+### Open questions
+
+- I’m not fully sure why vitest reports `default is not a function` given the route exports are `export default createCrudHandler(...)`. I think it’s an ESM interop/mocking side effect. Verifying with a minimal reproduction (test that imports a trivial `export default () => {}`) under the same config would confirm.
+- I’m also not 100% on whether tests should assert `{from,to}` vs `{gte,lte}` in Prisma `findMany`. My inclination is runtime `{gte,lte}` is correct, and tests could assert behavior (date‑bounded results) rather than internal shape; but that’s a test‑style decision.
+
+### References in code
+
+- Middleware pipeline: `lib/utils/apiHandler.ts`
+- Tasks routes: `api/tasks/index.ts`, `api/tasks/[id].ts`
+- Task lists routes: `api/task-lists/index.ts`, `api/task-lists/[id].ts`
+- Tags routes: `api/tags/index.ts`, `api/tags/[id].ts`
+- Services: `lib/services/TaskService.ts`, `lib/services/TaskListService.ts`
+- Error helpers: `lib/middleware/errorHandler.ts`

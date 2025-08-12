@@ -16,6 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Task } from "@shared/types";
+import { useUIStore } from '@/stores/uiStore';
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
 import { DueDateBadge } from './DueDateBadge';
@@ -80,6 +81,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     contextMenuPosition: null as { x: number; y: number } | null,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const { showTaskListContextInAll } = useUIStore();
   // Calendars must be read via hook at top-level (Rules of Hooks)
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
@@ -245,6 +247,16 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           {/* Tags - Hidden in calendar mode */}
           {!calendarMode && (
             <div className="mt-1 flex flex-wrap gap-1">
+              {/* List context badge (shown when enabled in All Tasks view) */}
+              {showTaskListContextInAll && task.taskListId && (
+                <Badge
+                  variant="outline"
+                  className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30"
+                >
+                  {/* Placeholder label; will be replaced by real name/emoji if task includes them */}
+                  <span className="opacity-80">List</span>
+                </Badge>
+              )}
               {/* Canonical Due Date tag - only render when set */}
               {task.scheduledDate && (
                 <DueDateBadge
@@ -259,7 +271,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 const IconComponent = getTagIcon(tag.type) as React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
                 return (
                   <Badge
-                    key={tag.id}
+                    key={`${tag.id}_${String(tag.value)}`}
                     variant="outline"
                     className={cn(
                       "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",

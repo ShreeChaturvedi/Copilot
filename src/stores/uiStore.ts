@@ -58,6 +58,8 @@ interface UIState {
   taskPanes: TaskPaneConfig[];
   maxTaskPanes: number;
   globalShowCompleted: boolean;
+  // Show task list context (emoji + name) in All Tasks view
+  showTaskListContextInAll: boolean;
   sortBy: SortBy;
   sortOrder: SortOrder;
 
@@ -90,6 +92,7 @@ interface UIState {
   setGlobalShowCompleted: (show: boolean) => void;
   setSortBy: (sort: SortBy) => void;
   setSortOrder: (order: SortOrder) => void;
+  setShowTaskListContextInAll: (show: boolean) => void;
 
   resetUI: () => void;
 }
@@ -116,6 +119,7 @@ const initialState = {
   ] as TaskPaneConfig[],
   maxTaskPanes: 3,
   globalShowCompleted: false,
+  showTaskListContextInAll: false,
   sortBy: 'createdAt' as SortBy,
   sortOrder: 'desc' as SortOrder,
   dragState: {
@@ -277,6 +281,9 @@ export const useUIStore = create<UIState>()(
       setSortBy: (sort) => set({ sortBy: sort }, false, 'setSortBy'),
 
       setSortOrder: (order) => set({ sortOrder: order }, false, 'setSortOrder'),
+
+      setShowTaskListContextInAll: (show) =>
+        set({ showTaskListContextInAll: show }, false, 'setShowTaskListContextInAll'),
 
       resetUI: () => set(initialState, false, 'resetUI'),
     }),

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTasks } from './useTasks';
 import { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { Task, TaskTag } from '@shared/types';
 import { UseMutationResult } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/authStore';
 
 interface CreateTaskData {
   title: string;
@@ -25,7 +26,7 @@ interface CreateTaskData {
 export interface TaskGroup {
   id: string;
   name: string;
-  iconId: string;
+  emoji: string;
   color: string;
   description?: string;
   isDefault?: boolean;
@@ -125,7 +126,7 @@ export function useTaskManagement(
     {
       id: 'default',
       name: 'Tasks',
-      iconId: 'CheckSquare',
+      emoji: '📋',
       color: '#3b82f6',
       description: 'Default task group',
       isDefault: true,
@@ -133,6 +134,57 @@ export function useTaskManagement(
   ]);
   const [activeTaskGroupId, setActiveTaskGroupId] = useState('default');
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+
+  // Load real task lists from backend and hydrate taskGroups
+  useEffect(() => {
+    let cancelled = false;
+
+    const authHeaders = (): Record<string, string> => {
+      try {
+        const token = useAuthStore.getState().getValidAccessToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const fetchTaskLists = async () => {
+      try {
+        const res = await fetch('/api/task-lists', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        });
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (!isJson(res)) return; // keep default local group
+        const body = await res.json();
+        if (!res.ok || !body.success) return;
+        const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
+        const mapped: TaskGroup[] = items.map((it: any) => ({
+          id: String(it.id),
+          name: String(it.name ?? 'Tasks'),
+          emoji: String(it.icon ?? '📁'),
+          color: String(it.color ?? '#3b82f6'),
+          description: String(it.description ?? ''),
+        }));
+        if (!cancelled && mapped.length > 0) {
+          setTaskGroups(mapped);
+          // If current active selection is default placeholder, switch to first real list by default
+          // Otherwise preserve user selection
+          setActiveTaskGroupId((prev) => (prev === 'default' ? mapped[0].id : prev));
+        }
+      } catch (err) {
+        // Non-fatal: leave local default
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+          console.warn('Failed to load task lists; using default group', err);
+        }
+      }
+    };
+
+    fetchTaskLists();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Task CRUD handlers (only when includeTaskOperations is true)
   const handleAddTask = includeTaskOperations
@@ -221,15 +273,51 @@ export function useTaskManagement(
 
   // Task group handlers (shared across all components)
   const handleAddTaskGroup = (data: Omit<TaskGroup, 'id'>) => {
-    const newTaskGroup: TaskGroup = {
-      id: `group-${Date.now()}`,
-      name: data.name,
-      iconId: data.iconId,
-      color: data.color,
-      description: data.description,
-    };
-    setTaskGroups((prev) => [...prev, newTaskGroup]);
-    setActiveTaskGroupId(newTaskGroup.id);
+    // Persist to backend, then update local state
+    (async () => {
+      try {
+        const res = await fetch('/api/task-lists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            name: data.name,
+            color: data.color,
+            icon: data.emoji,
+            description: data.description,
+          }),
+        });
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (!isJson(res)) {
+          // Fallback: local-only
+          const fallback: TaskGroup = {
+            id: `group-${Date.now()}`,
+            name: data.name,
+            emoji: data.emoji,
+            color: data.color,
+            description: data.description,
+          };
+          setTaskGroups((prev) => [...prev, fallback]);
+          setActiveTaskGroupId(fallback.id);
+          return;
+        }
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create list');
+        const created = body.data as { id: string; name: string; color: string; description?: string };
+        const newTaskGroup: TaskGroup = {
+          id: String(created.id),
+          name: created.name,
+          emoji: data.emoji || '📁',
+          color: created.color,
+          description: created.description,
+        };
+        setTaskGroups((prev) => [...prev, newTaskGroup]);
+        setActiveTaskGroupId(newTaskGroup.id);
+      } catch (err) {
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+          console.error('Failed to create task list', err);
+        }
+      }
+    })();
   };
 
   const handleEditTaskGroup = (
@@ -258,13 +346,13 @@ export function useTaskManagement(
   const handleCreateTaskGroup = (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => {
     const newTaskGroup: TaskGroup = {
       id: `group-${Date.now()}`,
       name: data.name,
-      iconId: data.iconId,
+      emoji: data.emoji,
       color: data.color,
       description: data.description,
     };
@@ -273,9 +361,9 @@ export function useTaskManagement(
     setShowCreateTaskDialog(false);
   };
 
-  const handleUpdateTaskGroupIcon = (groupId: string, iconId: string) => {
+  const handleUpdateTaskGroupIcon = (groupId: string, emoji: string) => {
     setTaskGroups((prev) =>
-      prev.map((group) => (group.id === groupId ? { ...group, iconId } : group))
+      prev.map((group) => (group.id === groupId ? { ...group, emoji } : group))
     );
   };
 

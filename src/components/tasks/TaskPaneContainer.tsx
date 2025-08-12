@@ -373,10 +373,16 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
   return (
     <div className={cn('h-full', className)}>
       {/* Resizable Panes */}
-      <ResizablePanelGroup direction="horizontal" className="h-full">
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="h-full"
+        autoSaveId="task-pane-group"
+      >
         {paneData.map((pane, index) => (
           <React.Fragment key={pane.id}>
             <ResizablePanel
+              id={pane.id}
+              order={index}
               defaultSize={100 / paneData.length}
               minSize={25}
               className="min-w-0"

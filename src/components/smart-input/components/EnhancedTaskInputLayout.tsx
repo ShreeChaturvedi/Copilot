@@ -50,6 +50,16 @@ export interface EnhancedTaskInputLayoutProps {
   onInlineTagRemove?: (tagId: string) => void;
   /** Maximum number of inline tags to show (ignored for enhanced input; tags wrap) */
   maxInlineTags?: number;
+  /** Optional secondary input below the main title input (visual-only description) */
+  secondaryValue?: string;
+  onSecondaryChange?: (value: string) => void;
+  secondaryPlaceholder?: string;
+  /** Key handler for secondary input */
+  onSecondaryKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Optional ref to focus description programmatically */
+  secondaryInputRef?: React.RefObject<HTMLInputElement>;
+  /** Whether the secondary input should be visible and interactive */
+  secondaryEnabled?: boolean;
 }
 
 export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
@@ -75,6 +85,12 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   inlineTagsRemovable = false,
   onInlineTagRemove,
   // maxInlineTags,
+  secondaryValue,
+  onSecondaryChange,
+  secondaryPlaceholder,
+  onSecondaryKeyDown,
+  secondaryInputRef,
+  secondaryEnabled = false,
 }) => {
   const controls = (
     <>
@@ -112,6 +128,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
             placeholder={placeholder}
             disabled={disabled}
             onKeyPress={onKeyPress}
+            onKeyDown={onKeyPress as any}
             onBlur={onBlur}
             onFocus={onFocus}
             confidence={confidence}
@@ -154,6 +171,37 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
             aria-label="Task input"
           />
         )}
+
+          {/* Optional description input below the title field (visual-only) */}
+          {typeof secondaryValue !== 'undefined' && onSecondaryChange && (
+            <input
+              ref={secondaryInputRef}
+              type="text"
+              id="enhanced-task-input-description"
+              name="enhanced-task-input-description"
+              value={secondaryValue}
+              onChange={(e) => onSecondaryChange(e.target.value)}
+              onKeyDown={onSecondaryKeyDown}
+              placeholder={secondaryEnabled ? secondaryPlaceholder : ''}
+              disabled={disabled}
+              className={cn(
+                // Base single-line input styling matching the title field's transparent look
+                'mt-1 w-full bg-transparent border-none outline-none p-0',
+                // Slightly smaller, secondary typography consistent with app standards
+                'text-sm leading-5',
+                // Placeholder + disabled treatments
+                'placeholder:text-muted-foreground',
+                // Reserve space from the beginning; hide and disable pointer events until enabled
+                !secondaryEnabled && 'opacity-0 pointer-events-none select-none',
+                disabled && 'cursor-not-allowed'
+              )}
+              aria-hidden={!secondaryEnabled}
+              tabIndex={secondaryEnabled ? 0 : -1}
+              aria-label="Task description"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          )}
         </div>
 
         {showInlineTags && tags.length > 0 && (

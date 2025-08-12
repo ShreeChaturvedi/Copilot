@@ -28,7 +28,13 @@ import { VoiceInputButton } from './components/VoiceInputButton';
 import { FileUploadButton } from './components/FileUploadButton';
 import { CompactFilePreview } from './components/CompactFilePreview';
 import { UploadedFile } from './components/FileUploadZone';
-import { TaskGroup } from '../tasks/TaskInput';
+type TaskGroup = {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description?: string;
+};
 import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputProps {
@@ -73,11 +79,13 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   enableFileUpload = true
 }) => {
   const [inputText, setInputText] = useState('');
+  const [descriptionText, setDescriptionText] = useState('');
   const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [, setIsFocused] = useState(false); // State maintained for potential future focus styling
   const baseTextRef = useRef('');
+  const descriptionInputRef = useRef<HTMLInputElement>(null);
   // Track tags the user dismissed (we hide these without modifying the input text)
   const [dismissedTagSignatures, setDismissedTagSignatures] = useState<Set<string>>(new Set());
 
@@ -98,7 +106,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const defaultTaskGroup: TaskGroup = {
     id: 'default',
     name: 'Tasks',
-    iconId: 'CheckSquare',
+    emoji: '📋',
     color: '#3b82f6',
     description: 'Default task group'
   };
@@ -226,15 +234,32 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       
       // Clear input and parsing state
       setInputText('');
+      setDescriptionText('');
       setUploadedFiles([]);
       clear();
       setDismissedTagSignatures(new Set());
     }
   }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear]);
 
-  // Handle key press
+  // Handle key press in title field: Enter sends; Shift+Enter focuses description
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      // Only focus description when enabled (after user typed in title)
+      if (inputText.trim().length > 0) {
+        descriptionInputRef.current?.focus();
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }, [handleSubmit, inputText]);
+
+  // Handle key press in description field: Enter sends
+  const handleDescriptionKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
     }
@@ -258,7 +283,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Task Group Selector using Combobox
   const taskGroupSelector = (
     <TaskGroupCombobox
-      taskGroups={taskGroups}
+      taskGroups={taskGroups as any}
       activeTaskGroupId={activeTaskGroup.id}
       onSelectTaskGroup={onSelectTaskGroup}
       onCreateTaskGroup={onCreateTaskGroup}
@@ -297,9 +322,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     <>
       {hasContent && (
         <div className="text-sm text-muted-foreground">
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">⌘</kbd>
+          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">⇧</kbd>
           <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded ml-0.5">⏎</kbd>
-          <span className="ml-1">to send</span>
+          <span className="ml-1">for description</span>
         </div>
       )}
       
@@ -354,13 +379,21 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           enableSmartParsing={smartParsingEnabled}
           leftControls={leftControls}
           rightControls={rightControls}
-          minHeight="60px"
-          maxHeight="150px"
+          // Force one-line height for title field
+          minHeight="28px"
+          maxHeight="28px"
           isRecording={isRecording}
           filePreview={filePreview}
           showInlineTags={showTags}
           inlineTagsRemovable={true}
           onInlineTagRemove={handleRemoveInlineTag}
+          // Visual-only description field
+          secondaryValue={descriptionText}
+          onSecondaryChange={setDescriptionText}
+          secondaryPlaceholder="description"
+          onSecondaryKeyDown={handleDescriptionKeyDown}
+          secondaryInputRef={descriptionInputRef}
+          secondaryEnabled={hasContent}
         />
       </form>
 

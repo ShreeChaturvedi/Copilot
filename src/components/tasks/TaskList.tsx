@@ -12,7 +12,7 @@ import {
   Trash2,
   CheckSquare,
 } from 'lucide-react';
-import { getIconByName } from '@/components/ui/icons';
+// Emoji-based task group UI
 import { TaskItem } from './TaskItem';
 import type { Task } from "@shared/types";
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
@@ -58,7 +58,7 @@ import { useUIStore } from '@/stores/uiStore';
 export interface TaskGroup {
   id: string;
   name: string;
-  iconId: string;
+  emoji: string;
   color: string;
   description?: string;
 }
@@ -130,7 +130,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   const defaultTaskGroup: TaskGroup = {
     id: 'default',
     name: 'Tasks',
-    iconId: 'CheckSquare',
+    emoji: '📋',
     color: '#3b82f6',
     description: 'Default task group',
   };
@@ -143,12 +143,11 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   // Filter tasks by active task group and separate active/completed with stable references
   const { activeTasks, completedTasks } = useMemo(() => {
     // Filter tasks by active task group
-    const groupTasks = tasks.filter(
-      (task) =>
-        activeTaskGroupId === 'all' ||
-        task.taskListId === activeTaskGroupId ||
-        (!task.taskListId && activeTaskGroupId === 'default')
-    );
+    const groupTasks = tasks.filter((task) => {
+      // Treat 'default' as an alias for "All Tasks" so backend-linked tasks are visible
+      if (activeTaskGroupId === 'all' || activeTaskGroupId === 'default') return true;
+      return task.taskListId === activeTaskGroupId;
+    });
 
     // Use partition to avoid creating new arrays unnecessarily
     const active = groupTasks.filter((task) => !task.completed);
@@ -190,19 +189,24 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   }, [calendarMode, activeTasks, maxTasks]);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
+  // Emoji replaces icon component
 
   const handleCreateTaskGroup = (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => {
-    onCreateTaskGroup?.(data);
+    onCreateTaskGroup?.({
+      name: data.name,
+      description: data.description,
+      iconId: data.emoji, // keep prop name for downstream compatibility
+      color: data.color,
+    });
   };
 
-  const handleUpdateIcon = (iconId: string) => {
-    onUpdateTaskGroupIcon?.(activeTaskGroup.id, iconId);
+  const handleUpdateIcon = (emoji: string) => {
+    onUpdateTaskGroupIcon?.(activeTaskGroup.id, emoji);
     setShowIconPicker(false);
   };
 
@@ -306,17 +310,17 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   variant="ghost"
                   size="sm"
                   className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
-                  aria-label={`Task group icon: ${activeTaskGroup.name}`}
+                  aria-label={`Task group: ${activeTaskGroup.name}`}
                 >
-                  <span style={{ color: activeTaskGroup.color }}>
-                    <ActiveGroupIcon className="w-4 h-4" />
+                  <span className="text-base" style={{ color: activeTaskGroup.color }}>
+                    {activeTaskGroup.emoji}
                   </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3" align="start">
                 <Suspense fallback={null}>
                   <IconPicker
-                    selectedIcon={activeTaskGroup.iconId}
+                     selectedIcon={activeTaskGroup.emoji}
                     onIconSelect={handleUpdateIcon}
                   />
                 </Suspense>
@@ -324,17 +328,14 @@ const TaskListComponent: React.FC<TaskListProps> = ({
             </Popover>
 
             {/* Task Group Name with Tooltip */}
-            <CursorTooltip
-              content={tooltipContent}
-              containerClassName="inline-block"
-            >
+            <CursorTooltip content={tooltipContent} containerClassName="inline-block">
               <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                {activeTaskGroup.name}
+                {activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name}
               </div>
             </CursorTooltip>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             {/* Task Group Management Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -430,17 +431,17 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
-                    aria-label={`Task group icon: ${activeTaskGroup.name}`}
+                    aria-label={`Task group: ${activeTaskGroup.name}`}
                   >
-                    <span style={{ color: activeTaskGroup.color }}>
-                      <ActiveGroupIcon className="w-4 h-4" />
+                    <span className="text-base" style={{ color: activeTaskGroup.color }}>
+                      {activeTaskGroup.emoji}
                     </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3" align="start">
                   <Suspense fallback={null}>
                     <IconPicker
-                      selectedIcon={activeTaskGroup.iconId}
+                      selectedIcon={activeTaskGroup.emoji}
                       onIconSelect={handleUpdateIcon}
                     />
                   </Suspense>

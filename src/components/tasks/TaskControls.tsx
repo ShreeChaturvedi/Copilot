@@ -2,7 +2,7 @@
  * TaskControls - Modern task controls with sort, filter, and view options
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowDownUp,
@@ -24,6 +24,8 @@ import {
   Columns2,
   Columns3,
   ArrowDownToDot,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
@@ -48,6 +50,8 @@ import {
   type SortOrder,
 } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { format, addDays, startOfDay } from 'date-fns';
+import { toLocal, isSameDay } from '@/utils/date';
 
 export interface TaskControlsProps {
   className?: string;
@@ -333,16 +337,50 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
     setGlobalShowCompleted(checked);
   };
 
+  // Today title with efficient midnight update and visibility sync
+  const [today, setToday] = useState<Date>(() => new Date());
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    const scheduleNextMidnight = () => {
+      const now = new Date();
+      const nextMidnight = startOfDay(addDays(now, 1));
+      const ms = Math.max(0, nextMidnight.getTime() - now.getTime());
+      timeoutId = window.setTimeout(() => setToday(new Date()), ms);
+    };
+    scheduleNextMidnight();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') {
+        const now = new Date();
+        if (!isSameDay(now, today)) setToday(now);
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [today]);
+  const todayTitle = useMemo(() => format(toLocal(today), 'MMMM d, yyyy'), [today]);
+
   return (
-    <div
-      className={cn('flex items-center justify-between gap-4', className)}
-    >
-      {/* Left Section - Sidebar Trigger and View Mode Toggle */}
-      <div className="flex items-center gap-3">
-        {/* Sidebar Trigger */}
+    <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center gap-4', className)}>
+      {/* Left Section - Sidebar Trigger + Today title */}
+      <div className="flex items-center gap-3 justify-self-start">
         <SmoothSidebarTrigger position="rightPane" />
-        
-        {/* View Mode Toggle */}
+        <h2 className="text-lg font-semibold text-foreground">
+          {todayTitle.includes(' ')
+            ? (
+                <>
+                  <span className="font-bold">{todayTitle.split(' ')[0]}</span>
+                  <span className="font-normal"> {todayTitle.split(' ').slice(1).join(' ')}</span>
+                </>
+              )
+            : todayTitle}
+        </h2>
+      </div>
+
+      {/* Center Section - View Mode Toggle */}
+      <div className="justify-self-center">
         <SharedToggleButton
           currentValue={taskViewMode}
           options={VIEW_MODE_OPTIONS}
@@ -354,7 +392,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       </div>
 
       {/* Right Section - Icon-Only Controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 justify-self-end">
         {/* Grouped Action Buttons */}
         <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1">
           {/* Animated Search */}
@@ -480,6 +518,33 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
               </Badge>
             )}
           </div>
+
+          {/* Show Task List Context (emoji+name) in All Tasks */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
+                className={cn(
+                  'h-7 w-7 p-0',
+                  showTaskListContextInAll
+                    ? 'bg-muted text-foreground border border-border'
+                    : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
+                )}
+                aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
+              >
+                {showTaskListContextInAll ? (
+                  <Eye className="w-3.5 h-3.5" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
+            </TooltipContent>
+          </Tooltip>
 
           {/* Add Pane Button (columns icon based on count) */}
           {canAddPane && onAddPane && (

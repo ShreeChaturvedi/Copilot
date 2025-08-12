@@ -23,6 +23,8 @@ export interface BaseSidebarPaneProps {
   additionalHeaderContent?: ReactNode; // Additional content to append after default header
   showViewToggle?: boolean;
   showSidebarTrigger?: boolean;
+  // Optional right-side header controls rendered before the sidebar trigger
+  rightHeaderControls?: ReactNode;
   
   // Main content
   mainContent?: ReactNode;
@@ -49,6 +51,7 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
   additionalHeaderContent,
   showViewToggle = true,
   showSidebarTrigger = false,
+  rightHeaderControls,
   mainContent,
   footerListContent,
   userProfileContent,
@@ -75,6 +78,7 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
         )}
       </div>
       <div className="flex items-center gap-2">
+        {rightHeaderControls}
         {showSidebarTrigger && (
           <SmoothSidebarTrigger position="sidebar" />
         )}

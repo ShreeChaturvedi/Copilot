@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
-import { getIconByName } from '@/components/ui/icons';
+// Emoji-based task group UI
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import {
@@ -19,7 +19,7 @@ import {
 export interface TaskGroup {
   id: string;
   name: string;
-  iconId: string;
+  emoji: string;
   color: string;
   description?: string;
 }
@@ -47,7 +47,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
   const defaultTaskGroup: TaskGroup = {
     id: 'default',
     name: 'Tasks',
-    iconId: 'CheckSquare',
+    emoji: '📋',
     color: '#3b82f6',
     description: 'Default task group',
   };
@@ -76,7 +76,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
   };
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
+  // Emoji replaces icon
 
   return (
     <form onSubmit={handleSubmit} className="relative">
@@ -90,27 +90,24 @@ export const TaskInput: React.FC<TaskInputProps> = ({
             className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
             aria-label={`Current task group: ${activeTaskGroup.name}`}
           >
-            <span style={{ color: activeTaskGroup.color }}>
-              <ActiveGroupIcon className="w-4 h-4" />
+            <span className="text-base" style={{ color: activeTaskGroup.color }}>
+              {activeTaskGroup.emoji}
             </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
-          {taskGroups.map((group) => {
-            const GroupIcon = getIconByName(group.iconId);
-            return (
-              <DropdownMenuItem
-                key={group.id}
-                onClick={() => onSelectTaskGroup?.(group.id)}
-                className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
-              >
-                <span className="mr-2" style={{ color: group.color }}>
-                  <GroupIcon className="h-4 w-4" />
-                </span>
-                <span>{group.name}</span>
-              </DropdownMenuItem>
-            );
-          })}
+          {taskGroups.map((group) => (
+            <DropdownMenuItem
+              key={group.id}
+              onClick={() => onSelectTaskGroup?.(group.id)}
+              className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
+            >
+              <span className="mr-2 text-base" style={{ color: group.color }}>
+                {group.emoji}
+              </span>
+              <span>{group.name}</span>
+            </DropdownMenuItem>
+          ))}
           <DropdownMenuSeparator />
           {/* New List Option */}
           <DropdownMenuItem
@@ -127,12 +124,12 @@ export const TaskInput: React.FC<TaskInputProps> = ({
         type="text"
         id="task-input"
         name="task-input"
-        placeholder="Enter a new task..."
+        placeholder="Add Task"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyPress={handleKeyPress}
         disabled={disabled}
-        className="pl-10 pr-10 border-input"
+        className="pl-10 pr-10 border-input rounded-lg h-10 text-sm placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-ring focus:ring-offset-0"
         aria-label="New task input"
       />
 

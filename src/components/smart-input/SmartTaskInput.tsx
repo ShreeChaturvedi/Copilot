@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
-import { getIconByName } from '@/components/ui/icons';
+// import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -23,7 +23,14 @@ import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
 import { VoiceInputButton } from './components/VoiceInputButton';
 import { ParsedTags } from './components/ParsedTags';
 import { useTextParser } from './hooks/useTextParser';
-import { TaskGroup } from '../tasks/TaskInput';
+// Local TaskGroup type (emoji-based)
+type TaskGroup = {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description?: string;
+};
 import { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 import './components/smart-tags.css';
@@ -113,7 +120,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   const defaultTaskGroup: TaskGroup = {
     id: 'default',
     name: 'Tasks',
-    iconId: 'CheckSquare',
+    emoji: '📋',
     color: '#3b82f6',
     description: 'Default task group'
   };
@@ -224,7 +231,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   }, []);
 
   // Get the icon component for the active task group
-  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
+  // Emoji replaces icon component for task groups
 
   // Check if we have any content to show
   const hasValidContent = inputText.trim().length > 0;
@@ -241,27 +248,24 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           className="h-7 w-7 p-0"
           aria-label={`Current task group: ${activeTaskGroup.name}`}
         >
-          <span style={{ color: activeTaskGroup.color }}>
-            <ActiveGroupIcon className="w-4 h-4" />
+          <span className="text-base" style={{ color: activeTaskGroup.color }}>
+            {activeTaskGroup.emoji}
           </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-          {taskGroups.map((group) => {
-          const GroupIcon = getIconByName(group.iconId);
-          return (
-            <DropdownMenuItem
-              key={group.id}
-              onClick={() => onSelectTaskGroup?.(group.id)}
-              className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
-            >
-              <span className="mr-2" style={{ color: group.color }}>
-                <GroupIcon className="h-4 w-4" />
-              </span>
-              <span>{group.name}</span>
-            </DropdownMenuItem>
-          );
-        })}
+        {taskGroups.map((group) => (
+          <DropdownMenuItem
+            key={group.id}
+            onClick={() => onSelectTaskGroup?.(group.id)}
+            className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
+          >
+            <span className="mr-2 text-base" style={{ color: group.color }}>
+              {group.emoji}
+            </span>
+            <span>{group.name}</span>
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuSeparator />
         {/* New List Option */}
         <DropdownMenuItem
@@ -318,12 +322,12 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
     <div className={cn('space-y-2', className)}>
       {/* Enhanced Claude AI-style layout */}
       {useEnhancedLayout ? (
-        <form onSubmit={handleSubmit}>
-          <EnhancedTaskInputLayout
+          <form onSubmit={handleSubmit}>
+            <EnhancedTaskInputLayout
             value={inputText}
             onChange={handleInputChange}
             tags={tags}
-            placeholder="Enter a new task..."
+              placeholder="Add Task"
             disabled={disabled}
             onKeyPress={handleKeyPress}
             confidence={confidence}
@@ -350,7 +354,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Enter a new task..."
+                placeholder="Add Task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -361,7 +365,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 type="text"
                 id="smart-task-input-fallback"
                 name="smart-task-input-fallback"
-                placeholder="Enter a new task..."
+                placeholder="Add Task"
                 value={inputText}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -391,27 +395,24 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
                 aria-label={`Current task group: ${activeTaskGroup.name}`}
               >
-                <span style={{ color: activeTaskGroup.color }}>
-                  <ActiveGroupIcon className="w-4 h-4" />
+                <span className="text-base" style={{ color: activeTaskGroup.color }}>
+                  {activeTaskGroup.emoji}
                 </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
-          {taskGroups.map((group) => {
-                const GroupIcon = getIconByName(group.iconId);
-                return (
-                  <DropdownMenuItem
-                    key={group.id}
-                    onClick={() => onSelectTaskGroup?.(group.id)}
-                    className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
-                  >
-                    <span className="mr-2" style={{ color: group.color }}>
-                      <GroupIcon className="h-4 w-4" />
-                    </span>
-                    <span>{group.name}</span>
-                  </DropdownMenuItem>
-                );
-              })}
+              {taskGroups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => onSelectTaskGroup?.(group.id)}
+                  className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
+                >
+                  <span className="mr-2 text-base" style={{ color: group.color }}>
+                    {group.emoji}
+                  </span>
+                  <span>{group.name}</span>
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               {/* New List Option */}
               <DropdownMenuItem
@@ -431,7 +432,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Enter a new task..."
+                placeholder="Add Task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -443,7 +444,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Enter a new task..."
+                placeholder="Add Task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -455,7 +456,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Enter a new task..."
+                placeholder="Add Task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -468,7 +469,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
               type="text"
               id="legacy-task-input"
               name="legacy-task-input"
-              placeholder="Enter a new task..."
+              placeholder="Add Task"
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyPress={handleKeyPress}

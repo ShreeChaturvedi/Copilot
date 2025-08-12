@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Plus, ChevronsUpDown, Check, List } from 'lucide-react';
-import { getIconByName } from '@/components/ui/icons';
+// Emoji-based task group display
 import { Button } from '@/components/ui/Button';
 import {
   Command,
@@ -24,7 +24,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { TaskGroup } from '../../tasks/TaskInput';
+type TaskGroup = {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description?: string;
+};
 
 export interface TaskGroupComboboxProps {
   /** Available task groups */
@@ -65,7 +71,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
   const defaultTaskGroup: TaskGroup = {
     id: 'default',
     name: 'Tasks',
-    iconId: 'CheckSquare',
+    emoji: '📋',
     color: '#3b82f6',
     description: 'Default task group',
   };
@@ -78,8 +84,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
-  // Get the icon component for the active task group
-  const ActiveGroupIcon = getIconByName(activeTaskGroup.iconId);
+  // We render emoji directly; no icon component needed
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -104,8 +109,8 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             </>
           ) : (
             <>
-              <div style={{ color: `${activeTaskGroup.color} !important` }}>
-                <ActiveGroupIcon className="w-4 h-4" />
+              <div className="text-base" style={{ color: `${activeTaskGroup.color} !important` }}>
+                {activeTaskGroup.emoji}
               </div>
               <span className="text-sm font-medium">{activeTaskGroup.name}</span>
             </>
@@ -140,39 +145,36 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup>
-              {taskGroups.map((group) => {
-                const GroupIcon = getIconByName(group.iconId);
-                return (
-                  <CommandItem
-                    key={group.id}
-                    value={group.id}
-                    onSelect={(currentValue) => {
-                      if (
-                        currentValue !== activeTaskGroup.id &&
-                        onSelectTaskGroup
-                      ) {
-                        onSelectTaskGroup(currentValue);
-                      }
-                      setOpen(false);
-                    }}
-                  >
-                    <div className="flex items-center gap-2 flex-1">
-                      <div style={{ color: `${group.color} !important` }}>
-                        <GroupIcon className="w-4 h-4" />
-                      </div>
-                      <span>{group.name}</span>
+              {taskGroups.map((group) => (
+                <CommandItem
+                  key={group.id}
+                  value={group.id}
+                  onSelect={(currentValue) => {
+                    if (
+                      currentValue !== activeTaskGroup.id &&
+                      onSelectTaskGroup
+                    ) {
+                      onSelectTaskGroup(currentValue);
+                    }
+                    setOpen(false);
+                  }}
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <div className="text-base" style={{ color: `${group.color} !important` }}>
+                      {group.emoji}
                     </div>
-                    <Check
-                      className={cn(
-                        'ml-auto h-4 w-4',
-                        activeTaskGroup.id === group.id
-                          ? 'opacity-100'
-                          : 'opacity-0'
-                      )}
-                    />
-                  </CommandItem>
-                );
-              })}
+                    <span>{group.name}</span>
+                  </div>
+                  <Check
+                    className={cn(
+                      'ml-auto h-4 w-4',
+                      activeTaskGroup.id === group.id
+                        ? 'opacity-100'
+                        : 'opacity-0'
+                    )}
+                  />
+                </CommandItem>
+              ))}
             </CommandGroup>
             {onCreateTaskGroup && (
               <>

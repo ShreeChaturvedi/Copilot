@@ -2,7 +2,7 @@
  * LeftPane - Complete rewrite using shadcn Sidebar component
  */
 
-import React, { useCallback, useMemo, memo } from 'react';
+import React, { useCallback, useMemo, memo, useEffect, useState } from 'react';
 import { SmartTaskInput } from '@/components/smart-input/SmartTaskInput';
 import { TaskList } from '@/components/tasks/TaskList';
 import { CalendarList } from '@/components/calendar/CalendarList';
@@ -12,6 +12,11 @@ import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useCalendarManagement } from '@/hooks/useCalendarManagement';
 import { useUIStore } from '@/stores/uiStore';
 import { BaseSidebarPane } from './BaseSidebarPane';
+import { Button } from '@/components/ui/Button';
+import { CalendarArrowDown, CalendarArrowUp } from 'lucide-react';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Calendar as MiniCalendar } from '@/components/ui/calendar';
+import { Separator } from '@/components/ui/separator';
 
 export interface LeftPaneProps {
   className?: string;
@@ -19,6 +24,31 @@ export interface LeftPaneProps {
 
 const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   const { currentView } = useUIStore();
+
+  // Track today so the mini calendar keeps today's highlight updated without reload
+  const [today, setToday] = useState<Date>(() => new Date());
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
+
+    const scheduleNext = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return;
+        setToday(new Date());
+        scheduleNext();
+      }, Math.max(1000, msUntilMidnight));
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Task management with task operations enabled
   const {
@@ -68,7 +98,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   // Additional header content - only show SmartTaskInput in calendar view
   const additionalHeaderContent = useMemo(() => {
     return currentView === 'calendar' ? (
-      <div className="mt-4">
+      <div className="mt-4 text-sm">
         <SmartTaskInput
           onAddTask={memoizedHandleAddTask}
           taskGroups={taskGroups}
@@ -128,6 +158,28 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     setShowCreateTaskDialog,
   ]);
 
+  const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(true);
+
+  // Header controls: calendar toggle button shown in task view
+  const rightHeaderControls = useMemo(() => {
+    if (currentView !== 'task') return null;
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={showMiniCalendar ? 'Hide mini calendar' : 'Show mini calendar'}
+        className="h-8 w-8"
+        onClick={() => setShowMiniCalendar((v) => !v)}
+      >
+        {showMiniCalendar ? (
+          <CalendarArrowUp className="h-4 w-4" />
+        ) : (
+          <CalendarArrowDown className="h-4 w-4" />
+        )}
+      </Button>
+    );
+  }, [currentView, showMiniCalendar]);
+
   // Main content - TaskList in calendar view, EventOverview in task view
   const mainContent = useMemo(() => {
     return currentView === 'calendar' ? (
@@ -151,7 +203,36 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         maxTasks={10}
       />
     ) : (
-      <EventOverview maxEvents={7} />
+      <div className="space-y-3">
+        <Collapsible open={showMiniCalendar}>
+          <CollapsibleContent
+            className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up"
+          >
+            <div className="calendar-item">
+              <div className="pt-1">
+                <MiniCalendar
+                  className="w-full rounded-md border border-sidebar-border bg-card [--cell-size:--spacing(7)]"
+                  classNames={{
+                    root: 'w-full',
+                    months: 'flex flex-col gap-2 md:flex-row relative',
+                    month: 'flex flex-col w-full gap-2',
+                    week: 'flex w-full',
+                  }}
+                  captionLayout="label"
+                  showOutsideDays
+                  mode="single"
+                  selected={today}
+                />
+                <div className="h-2" />
+              </div>
+            </div>
+            <div className="calendar-item">
+              <Separator />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+        <EventOverview maxEvents={7} showHeader={false} />
+      </div>
     );
   }, [
     currentView,
@@ -170,6 +251,8 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     memoizedHandleDeleteTaskGroup,
     showCreateTaskDialog,
     memoizedSetShowCreateTaskDialog,
+    today,
+    showMiniCalendar,
   ]);
 
   // Memoized handlers for CalendarList
@@ -256,6 +339,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         additionalHeaderContent={additionalHeaderContent}
         showViewToggle={true}
         showSidebarTrigger={true}
+        rightHeaderControls={rightHeaderControls}
         mainContent={mainContent}
         footerListContent={footerListContent}
       />

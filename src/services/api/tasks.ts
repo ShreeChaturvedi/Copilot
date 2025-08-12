@@ -52,24 +52,62 @@ function authHeaders(): Record<string, string> {
 }
 
 function reviveTaskDates(task: Record<string, unknown>): Task {
-  return {
+  // Base fields and dates
+  const revived: Record<string, unknown> = {
     ...task,
+    // Normalize priority enum from backend (LOW|MEDIUM|HIGH) to frontend ('low'|'medium'|'high')
+    priority: typeof task.priority === 'string' 
+      ? String(task.priority).toLowerCase()
+      : task.priority,
     createdAt: task.createdAt ? new Date(task.createdAt as string) : new Date(),
     updatedAt: task.updatedAt ? new Date(task.updatedAt as string) : new Date(),
     completedAt: task.completedAt ? new Date(task.completedAt as string) : undefined,
     scheduledDate: task.scheduledDate ? new Date(task.scheduledDate as string) : undefined,
-    attachments: Array.isArray(task.attachments)
-      ? (task.attachments as Array<Record<string, unknown>>).map((a) => ({
-          id: a.id as string,
-          name: a.fileName as string,
-          type: a.fileType as string,
-          size: a.fileSize as number,
-          url: a.fileUrl as string,
-          uploadedAt: a.createdAt ? new Date(a.createdAt as string) : new Date(),
-          taskId: a.taskId as string,
-        })) as FileAttachment[]
-      : undefined,
-  } as Task;
+  };
+
+  // Attachments normalization (server join shape -> FileAttachment)
+  if (Array.isArray(task.attachments)) {
+    revived.attachments = (task.attachments as Array<Record<string, unknown>>).map((a) => ({
+      id: String(a.id ?? a["attachmentId"] ?? cryptoRandomId()),
+      name: String(a.fileName ?? a.name ?? ''),
+      type: String(a.fileType ?? a.type ?? ''),
+      size: Number(a.fileSize ?? a.size ?? 0),
+      url: String(a.fileUrl ?? a.url ?? ''),
+      uploadedAt: a.createdAt ? new Date(a.createdAt as string) : new Date(),
+      taskId: String(a.taskId ?? ''),
+    })) as FileAttachment[];
+  }
+
+  // Tags normalization (server join shape -> TaskTag[])
+  if (Array.isArray((task as any).tags)) {
+    const rawTags = (task as any).tags as Array<Record<string, unknown>>;
+    revived.tags = rawTags.map((t) => {
+      const tagEntity = (t as any).tag as Record<string, unknown> | undefined;
+      return {
+        // Prefer relation id for uniqueness; fallback to tag entity id or a generated id
+        id: String(t.id ?? tagEntity?.id ?? cryptoRandomId()),
+        type: String((t as any).type ?? tagEntity?.type ?? 'label').toLowerCase() as any,
+        value: String((t as any).value ?? tagEntity?.name ?? ''),
+        displayText: String((t as any).displayText ?? tagEntity?.name ?? ''),
+        iconName: String((t as any).iconName ?? 'Tag'),
+        color: (t as any).color ? String((t as any).color) : (tagEntity?.color ? String(tagEntity.color) : undefined),
+      };
+    });
+  }
+
+  return revived as Task;
+}
+
+// Lightweight random id for client-only normalization fallbacks
+function cryptoRandomId() {
+  try {
+    // browsers only
+    const arr = new Uint32Array(2);
+    (globalThis.crypto || ({} as any).msCrypto).getRandomValues(arr);
+    return `tmp_${arr[0].toString(16)}${arr[1].toString(16)}`;
+  } catch {
+    return `tmp_${Math.random().toString(36).slice(2)}`;
+  }
 }
 
 function isJson(res: Response) {

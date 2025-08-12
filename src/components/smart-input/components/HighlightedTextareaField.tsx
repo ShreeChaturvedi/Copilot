@@ -19,6 +19,8 @@ export interface HighlightedTextareaFieldProps {
   className?: string;
   /** Key press handler */
   onKeyPress?: (e: React.KeyboardEvent) => void;
+  /** Key down handler */
+  onKeyDown?: (e: React.KeyboardEvent) => void;
   /** Blur handler */
   onBlur?: () => void;
   /** Focus handler */
@@ -46,6 +48,7 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
   disabled = false,
   className = '',
   onKeyPress,
+  onKeyDown,
   onBlur,
   onFocus,
   confidence = 1,
@@ -151,6 +154,15 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     });
   }, [onKeyPress, syncScroll, autoResize]);
 
+  // Handle key down events (for reliable Enter/Shift+Enter detection)
+  const handleKeyDownInternal = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    onKeyDown?.(e);
+    requestAnimationFrame(() => {
+      syncScroll();
+      autoResize();
+    });
+  }, [onKeyDown, syncScroll, autoResize]);
+
   // Handle focus events
   const handleFocus = useCallback(() => {
     setIsFocused(true);
@@ -187,6 +199,7 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
         value={value}
         onChange={handleChange}
         onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyDownInternal}
         onFocus={handleFocus}
         onBlur={handleBlur}
         placeholder={placeholder}

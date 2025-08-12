@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getIconByName } from '@/components/ui/icons';
+// Icon picker removed; use emoji
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
@@ -12,13 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { lazy, Suspense } from 'react';
-const IconPicker = lazy(async () => ({ default: (await import('@/components/ui/icon-picker')).IconPicker }));
+// popover and icon picker removed
 import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
 
 export interface CreateTaskDialogProps {
@@ -27,7 +21,7 @@ export interface CreateTaskDialogProps {
   onCreateTask?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   onCreateCalendar?: (data: {
@@ -46,24 +40,22 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('Home');
+  const [emoji, setEmoji] = useState('📁');
   const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
-  const [showIconPicker, setShowIconPicker] = useState(false);
+  // legacy state removed
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setName('');
       setDescription('');
-      setSelectedIcon('Home');
+      setEmoji('📁');
       setSelectedColor(COLOR_PRESETS[0]);
-      setShowIconPicker(false);
     }
   }, [open]);
 
-  const handleIconSelect = (iconId: string) => {
-    setSelectedIcon(iconId);
-    setShowIconPicker(false);
+  const handleEmojiChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmoji(e.target.value);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,7 +67,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     onCreateTask?.({
       name: trimmedName,
       description: description.trim(),
-      iconId: selectedIcon,
+      emoji,
       color: selectedColor
     });
 
@@ -85,8 +77,6 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const handleCancel = () => {
     onOpenChange(false);
   };
-
-  const SelectedIconComponent = getIconByName(selectedIcon);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,37 +90,20 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            {/* Icon and Name Row */}
+            {/* Emoji and Name Row */}
             <div className="grid gap-3">
               <Label htmlFor="task-name">Name</Label>
               <div className="flex items-center gap-3">
-                {/* Icon Display - Clickable */}
-                <div className="flex-shrink-0">
-                  <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-10 h-10 p-0 hover:bg-accent"
-                        style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
-                      >
-                        {SelectedIconComponent && (
-                          <div style={{ color: selectedColor }}>
-                            <SelectedIconComponent className="w-5 h-5" />
-                          </div>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-3" align="start">
-                      <Suspense fallback={null}>
-                        <IconPicker
-                          selectedIcon={selectedIcon}
-                          onIconSelect={handleIconSelect}
-                        />
-                      </Suspense>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {/* Emoji Input */}
+                <input
+                  type="text"
+                  value={emoji}
+                  onChange={handleEmojiChange}
+                  maxLength={4}
+                  className="w-12 h-10 text-xl text-center rounded-md border"
+                  aria-label="Task list emoji"
+                  style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
+                />
                 
                 {/* Name Input */}
                 <Input
