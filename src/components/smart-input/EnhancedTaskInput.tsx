@@ -144,22 +144,58 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       reader.readAsDataURL(file);
     });
 
+    async function compressImageIfNeeded(file: File): Promise<File> {
+      if (!file.type.startsWith('image/')) return file;
+      // Only compress if larger than ~1MB
+      if (file.size < 1_000_000) return file;
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const image = new Image();
+          const url = URL.createObjectURL(file);
+          image.onload = () => resolve(image);
+          image.onerror = (e) => reject(e);
+          image.src = url;
+        });
+        const canvas = document.createElement('canvas');
+        const maxDim = 1920; // cap dimensions
+        let { width, height } = img;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return file;
+        ctx.drawImage(img, 0, 0, width, height);
+        const quality = 0.8; // balance quality/size
+        const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality));
+        if (!blob) return file;
+        return new File([blob], file.name, { type: blob.type, lastModified: Date.now() });
+      } catch {
+        return file;
+      }
+    }
+
+    const processed = await Promise.all(files.map(async (f) => await compressImageIfNeeded(f)));
+
     const newUploadedFiles: UploadedFile[] = await Promise.all(
-      files.map(async (file) => ({
+      processed.map(async (file) => ({
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         file,
         name: file.name,
         size: file.size,
         type: file.type,
         status: 'completed' as const,
-        // Use data URL for all files so backend can persist a URL immediately
         preview: await readAsDataUrl(file),
       }))
     );
 
     setUploadedFiles((prev) => {
       const updated = [...prev, ...newUploadedFiles];
-      // Notify parent component if callback provided
       if (onFilesAdded) onFilesAdded(updated);
       return updated;
     });
