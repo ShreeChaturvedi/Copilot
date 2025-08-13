@@ -142,6 +142,7 @@ export default createCrudHandler({
         fileType: attachmentData.fileType!,
         fileSize: attachmentData.fileSize!,
         taskId: attachmentData.taskId!,
+        thumbnailUrl: attachmentData.thumbnailUrl,
       };
 
       const attachment = await attachmentService.create(createPayload, {

@@ -1,67 +1,59 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import { query, withTransaction } from '../config/database.js';
 
 async function main() {
   console.log('🌱 Starting database seeding...');
 
   // Create sample users
   const hashedPassword = await bcrypt.hash('password123', 10);
-  
-  const user1 = await prisma.user.upsert({
-    where: { email: 'john@example.com' },
-    update: {},
-    create: {
-      email: 'john@example.com',
-      name: 'John Doe',
-      password: hashedPassword,
-      profile: {
-        create: {
-          bio: 'Software developer and productivity enthusiast',
-          timezone: 'America/New_York',
-        },
-      },
-    },
+  const user1 = await withTransaction(async (tx) => {
+    const upsert = await query<{ id: string; email: string; name: string | null }>(
+      `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+       RETURNING id, email, name`,
+      ['john@example.com', 'John Doe', hashedPassword], tx);
+    const u = upsert.rows[0];
+    await query(
+      `INSERT INTO user_profiles (id, "userId", bio, timezone)
+       VALUES (gen_random_uuid()::text, $1, $2, $3)
+       ON CONFLICT ("userId") DO NOTHING`,
+      [u.id, 'Software developer and productivity enthusiast', 'America/New_York'], tx);
+    return u;
   });
 
-  const user2 = await prisma.user.upsert({
-    where: { email: 'jane@example.com' },
-    update: {},
-    create: {
-      email: 'jane@example.com',
-      name: 'Jane Smith',
-      password: hashedPassword,
-      profile: {
-        create: {
-          bio: 'Project manager and team lead',
-          timezone: 'America/Los_Angeles',
-        },
-      },
-    },
+  const user2 = await withTransaction(async (tx) => {
+    const upsert = await query<{ id: string; email: string; name: string | null }>(
+      `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+       RETURNING id, email, name`,
+      ['jane@example.com', 'Jane Smith', hashedPassword], tx);
+    const u = upsert.rows[0];
+    await query(
+      `INSERT INTO user_profiles (id, "userId", bio, timezone)
+       VALUES (gen_random_uuid()::text, $1, $2, $3)
+       ON CONFLICT ("userId") DO NOTHING`,
+      [u.id, 'Project manager and team lead', 'America/Los_Angeles'], tx);
+    return u;
   });
 
   console.log('✅ Created users');
 
   // Create sample calendars
-  const personalCalendar = await prisma.calendar.create({
-    data: {
-      name: 'Personal',
-      color: '#3B82F6',
-      description: 'Personal events and appointments',
-      isDefault: true,
-      userId: user1.id,
-    },
-  });
+  const personalCalendar = await query<{ id: string }>(
+    `INSERT INTO calendars (id, name, color, description, "isDefault", "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Personal', '#3B82F6', 'Personal events and appointments', true, $1, NOW(), NOW())
+     RETURNING id`,
+    [user1.id]
+  ).then(r => r.rows[0]);
 
-  const workCalendar = await prisma.calendar.create({
-    data: {
-      name: 'Work',
-      color: '#EF4444',
-      description: 'Work meetings and deadlines',
-      userId: user1.id,
-    },
-  });
+  const workCalendar = await query<{ id: string }>(
+    `INSERT INTO calendars (id, name, color, description, "isDefault", "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Work', '#EF4444', 'Work meetings and deadlines', false, $1, NOW(), NOW())
+     RETURNING id`,
+    [user1.id]
+  ).then(r => r.rows[0]);
 
   console.log('✅ Created calendars');
 
@@ -73,76 +65,54 @@ async function main() {
   const nextWeek = new Date(now);
   nextWeek.setDate(nextWeek.getDate() + 7);
 
-  await prisma.event.createMany({
-    data: [
-      {
-        title: 'Team Meeting',
-        description: 'Weekly team sync',
-        start: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0),
-        end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 11, 0),
-        location: 'Conference Room A',
-        userId: user1.id,
-        calendarId: workCalendar.id,
-      },
-      {
-        title: 'Doctor Appointment',
-        description: 'Annual checkup',
-        start: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 14, 30),
-        end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 15, 30),
-        location: 'Medical Center',
-        userId: user1.id,
-        calendarId: personalCalendar.id,
-      },
-      {
-        title: 'Project Deadline',
-        description: 'Submit final project deliverables',
-        start: nextWeek,
-        end: nextWeek,
-        allDay: true,
-        userId: user1.id,
-        calendarId: workCalendar.id,
-      },
-    ],
-  });
+  await query(
+    `INSERT INTO events (id, title, description, start, "end", location, "userId", "calendarId", "createdAt", "updatedAt", "allDay") VALUES
+     (gen_random_uuid()::text, 'Team Meeting', 'Weekly team sync', $1, $2, 'Conference Room A', $3, $4, NOW(), NOW(), false),
+     (gen_random_uuid()::text, 'Doctor Appointment', 'Annual checkup', $5, $6, 'Medical Center', $3, $7, NOW(), NOW(), false),
+     (gen_random_uuid()::text, 'Project Deadline', 'Submit final project deliverables', $8, $8, NULL, $3, $4, NOW(), NOW(), true)
+    `,
+    [
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0),
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 11, 0),
+      user1.id,
+      workCalendar.id,
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 14, 30),
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 15, 30),
+      personalCalendar.id,
+      nextWeek,
+    ]
+  );
 
   console.log('✅ Created events');
 
   // Create sample task lists
-  const personalTasks = await prisma.taskList.create({
-    data: {
-      name: 'Personal',
-      color: '#8B5CF6',
-      icon: 'user',
-      description: 'Personal tasks and reminders',
-      userId: user1.id,
-    },
-  });
+  const personalTasks = await query<{ id: string }>(
+    `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Personal', '#8B5CF6', 'user', 'Personal tasks and reminders', $1, NOW(), NOW()) RETURNING id`,
+    [user1.id]
+  ).then(r => r.rows[0]);
 
-  const workTasks = await prisma.taskList.create({
-    data: {
-      name: 'Work Projects',
-      color: '#F59E0B',
-      icon: 'briefcase',
-      description: 'Work-related tasks and projects',
-      userId: user1.id,
-    },
-  });
+  const workTasks = await query<{ id: string }>(
+    `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Work Projects', '#F59E0B', 'briefcase', 'Work-related tasks and projects', $1, NOW(), NOW()) RETURNING id`,
+    [user1.id]
+  ).then(r => r.rows[0]);
 
   console.log('✅ Created task lists');
 
   // Create sample tags
-  await prisma.tag.createMany({
-    data: [
-      { name: 'urgent', type: 'PRIORITY', color: '#EF4444' },
-      { name: 'home', type: 'LOCATION', color: '#10B981' },
-      { name: 'office', type: 'LOCATION', color: '#3B82F6' },
-      { name: 'meeting', type: 'LABEL', color: '#8B5CF6' },
-      { name: 'personal', type: 'PROJECT', color: '#F59E0B' },
-      { name: 'work', type: 'PROJECT', color: '#EF4444' },
-    ],
-  });
+  await query(
+    `INSERT INTO tags (id, name, type, color) VALUES
+     (gen_random_uuid()::text, 'urgent', 'PRIORITY', '#EF4444'),
+     (gen_random_uuid()::text, 'home', 'LOCATION', '#10B981'),
+     (gen_random_uuid()::text, 'office', 'LOCATION', '#3B82F6'),
+     (gen_random_uuid()::text, 'meeting', 'LABEL', '#8B5CF6'),
+     (gen_random_uuid()::text, 'personal', 'PROJECT', '#F59E0B'),
+     (gen_random_uuid()::text, 'work', 'PROJECT', '#EF4444')
+     ON CONFLICT (name) DO NOTHING`
+  );
 
-  const createdTags = await prisma.tag.findMany();
+  const createdTags = await query<{ id: string; name: string }>(`SELECT id, name FROM tags`);
   console.log('✅ Created tags');
 
   // Create sample tasks
@@ -195,53 +165,32 @@ async function main() {
   ];
 
   for (const taskData of sampleTasks) {
-    const task = await prisma.task.create({
-      data: taskData,
-    });
+    const taskRes = await query<{ id: string }>(
+      `INSERT INTO tasks (id, title, priority, "scheduledDate", "taskListId", "userId", "originalInput", "cleanTitle", completed, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, COALESCE($8, false), NOW(), NOW()) RETURNING id`,
+      [taskData.title, taskData.priority, taskData.scheduledDate ?? null, taskData.taskListId, taskData.userId, taskData.originalInput, taskData.cleanTitle, taskData.completed ?? false]
+    );
+    const task = taskRes.rows[0];
 
     // Add some tags to tasks
     if (taskData.title.includes('project') || taskData.title.includes('presentation')) {
-      const workTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'work');
+      const workTag = createdTags.rows.find((tag) => tag.name === 'work');
       if (workTag) {
-        await prisma.taskTag.create({
-          data: {
-            taskId: task.id,
-            tagId: workTag.id,
-            value: 'work',
-            displayText: 'Work',
-            iconName: 'briefcase',
-          },
-        });
+        await query(`INSERT INTO task_tags ("taskId", "tagId", value, "displayText", "iconName") VALUES ($1, $2, 'work', 'Work', 'briefcase')`, [task.id, workTag.id]);
       }
     }
 
     if (taskData.priority === 'HIGH') {
-      const urgentTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'urgent');
+      const urgentTag = createdTags.rows.find((tag) => tag.name === 'urgent');
       if (urgentTag) {
-        await prisma.taskTag.create({
-          data: {
-            taskId: task.id,
-            tagId: urgentTag.id,
-            value: 'urgent',
-            displayText: 'Urgent',
-            iconName: 'alert-triangle',
-          },
-        });
+        await query(`INSERT INTO task_tags ("taskId", "tagId", value, "displayText", "iconName") VALUES ($1, $2, 'urgent', 'Urgent', 'alert-triangle')`, [task.id, urgentTag.id]);
       }
     }
 
     if (taskData.title.includes('groceries') || taskData.title.includes('dentist')) {
-      const personalTag = createdTags.find((tag: { name: string; id: string }) => tag.name === 'personal');
+      const personalTag = createdTags.rows.find((tag) => tag.name === 'personal');
       if (personalTag) {
-        await prisma.taskTag.create({
-          data: {
-            taskId: task.id,
-            tagId: personalTag.id,
-            value: 'personal',
-            displayText: 'Personal',
-            iconName: 'user',
-          },
-        });
+        await query(`INSERT INTO task_tags ("taskId", "tagId", value, "displayText", "iconName") VALUES ($1, $2, 'personal', 'Personal', 'user')`, [task.id, personalTag.id]);
       }
     }
   }
@@ -249,37 +198,23 @@ async function main() {
   console.log('✅ Created tasks with tags');
 
   // Create some sample data for user2 as well
-  await prisma.calendar.create({
-    data: {
-      name: 'Personal',
-      color: '#10B981',
-      description: 'Personal calendar',
-      isDefault: true,
-      userId: user2.id,
-    },
-  });
+  await query(
+    `INSERT INTO calendars (id, name, color, description, "isDefault", "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Personal', '#10B981', 'Personal calendar', true, $1, NOW(), NOW())`,
+    [user2.id]
+  );
 
-  const user2TaskList = await prisma.taskList.create({
-    data: {
-      name: 'To Do',
-      color: '#6366F1',
-      icon: 'check-square',
-      description: 'General task list',
-      userId: user2.id,
-    },
-  });
+  const user2TaskList = await query<{ id: string }>(
+    `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'To Do', '#6366F1', 'check-square', 'General task list', $1, NOW(), NOW()) RETURNING id`,
+    [user2.id]
+  ).then(r => r.rows[0]);
 
-  await prisma.task.create({
-    data: {
-      title: 'Plan team building event',
-      priority: 'MEDIUM',
-      scheduledDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10),
-      taskListId: user2TaskList.id,
-      userId: user2.id,
-      originalInput: 'Plan team building event next week',
-      cleanTitle: 'Plan team building event',
-    },
-  });
+  await query(
+    `INSERT INTO tasks (id, title, priority, "scheduledDate", "taskListId", "userId", "originalInput", "cleanTitle", completed, "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, 'Plan team building event', 'MEDIUM', $1, $2, $3, 'Plan team building event next week', 'Plan team building event', false, NOW(), NOW())`,
+    [new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10), user2TaskList.id, user2.id]
+  );
 
   console.log('✅ Created sample data for second user');
 
@@ -296,11 +231,7 @@ async function main() {
   `);
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error during seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error('❌ Error during seeding:', e);
+  process.exit(1);
+});

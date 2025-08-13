@@ -39,3 +39,4 @@ export { RangeSlider, type RangeSliderProps } from './RangeSlider';
 
 export { ToggleGroup, ToggleGroupItem } from './toggle-group';
 export { default as CustomTimeInput } from './CustomTimeInput';
+export { RichTextEditor, type RichTextEditorProps } from './RichTextEditor';

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { query, withTransaction } from '../config/database.js';
 import { generateTokenPair, TokenPair } from '../utils/jwt.js';
 import { refreshTokenService } from './RefreshTokenService.js';
 
@@ -36,11 +36,7 @@ export interface PasswordResetConfirm {
 
 class AuthService {
   private readonly saltRounds = 12;
-  private prisma: PrismaClient;
-
-  constructor(prismaClient?: PrismaClient) {
-    this.prisma = prismaClient || new PrismaClient();
-  }
+  constructor() {}
 
   /**
    * Register a new user with email and password
@@ -49,9 +45,10 @@ class AuthService {
     const { email, password, name } = userData;
 
     // Check if user already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
-    });
+    const existingUser = await query<{ id: string }>(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [email.toLowerCase()]);
+    if (existingUser.rowCount > 0) {
+      throw new Error('USER_ALREADY_EXISTS');
+    }
 
     if (existingUser) {
       throw new Error('USER_ALREADY_EXISTS');
@@ -61,20 +58,17 @@ class AuthService {
     const hashedPassword = await bcrypt.hash(password, this.saltRounds);
 
     // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        name: name || null,
-        profile: {
-          create: {
-            timezone: 'UTC'
-          }
-        }
-      },
-      include: {
-        profile: true
-      }
+    const user = await withTransaction(async (tx) => {
+      const insert = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
+        `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
+         RETURNING id, email, name, "createdAt"`,
+        [email.toLowerCase(), name || null, hashedPassword],
+        tx
+      );
+      const u = insert.rows[0];
+      await query(`INSERT INTO user_profiles (id, "userId", timezone) VALUES (gen_random_uuid()::text, $1, 'UTC')`, [u.id], tx);
+      return u;
     });
 
     // Generate tokens
@@ -105,9 +99,11 @@ class AuthService {
     const { email, password } = credentials;
 
     // Find user by email
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
-    });
+    const res = await query<{ id: string; email: string; name: string | null; password: string | null; createdAt: Date }>(
+      `SELECT id, email, name, password, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email.toLowerCase()]
+    );
+    const user = res.rows[0];
 
     if (!user) {
       throw new Error('INVALID_CREDENTIALS');
@@ -175,19 +171,15 @@ class AuthService {
   async updatePassword(userId: string, newPassword: string): Promise<void> {
     const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
     
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword }
-    });
+    await query(`UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`, [hashedPassword, userId]);
   }
 
   /**
    * Verify password for a user
    */
   async verifyPassword(userId: string, password: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const res = await query<{ id: string; password: string | null }>(`SELECT id, password FROM users WHERE id = $1 LIMIT 1`, [userId]);
+    const user = res.rows[0];
 
     if (!user || !user.password) {
       return false;

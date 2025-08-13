@@ -16,8 +16,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { sanitizeHtml } from '@/utils/validation';
 import { IntegratedActionBar } from './IntegratedActionBar';
 import { useUpdateEvent, useCreateEvent, useDeleteEvent } from '@/hooks/useEvents';
 import { toHumanText, clampRRuleUntil } from '@/utils/recurrence';
@@ -95,18 +96,18 @@ function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; a
       <div tabIndex={0} className="sr-only" />
 
       {/* Title + actions inline; title truncates within available space */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between gap-2 overflow-hidden">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {calendar && (
             <div
-              className="w-4 h-4 rounded-sm border-2 flex-shrink-0 mt-1"
+              className="w-4 h-4 rounded-sm border-2 flex-shrink-0"
               style={{
                 backgroundColor: calendar.color,
                 borderColor: calendar.color,
               }}
             />
           )}
-          <h2 className="text-xl font-semibold leading-tight truncate whitespace-nowrap">
+          <h2 className="text-lg font-semibold leading-tight truncate">
             {event.title}
           </h2>
         </div>
@@ -186,9 +187,15 @@ function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; a
               <FileText className="h-4 w-4" />
             </div>
             <div className="flex-1">
-              <div className="text-sm whitespace-pre-wrap">
-                {event.description}
-              </div>
+              {(() => {
+                const safeHtml = sanitizeHtml(event.description || '')
+                return (
+                  <div
+                    className="text-sm rte-display"
+                    dangerouslySetInnerHTML={{ __html: safeHtml }}
+                  />
+                )
+              })()}
             </div>
           </div>
         )}
@@ -282,6 +289,10 @@ export function EventDisplayDialog({
           side="right"
           className="w-full sm:max-w-md md:max-w-lg p-6 [&>button]:hidden"
         >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{event.title}</SheetTitle>
+            <SheetDescription>Event details for {event.title} - view, edit, or delete this event</SheetDescription>
+          </SheetHeader>
           <EventDisplayDialogContent event={event} actions={actionButtons} />
         </SheetContent>
       </Sheet>
@@ -291,7 +302,7 @@ export function EventDisplayDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
+        className="sm:max-w-[400px] overflow-hidden"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">{event.title}</DialogTitle>

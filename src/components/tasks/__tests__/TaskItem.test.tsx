@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TaskItem } from '../TaskItem';
 import type { Task } from "@shared/types";
+import AttachmentPreviewDialog from '../AttachmentPreviewDialog';
 
 // Test wrapper with QueryClient
 const createWrapper = () => {
@@ -126,26 +127,40 @@ describe('TaskItem Component', () => {
     });
   });
 
-  describe('Inline Editing', () => {
-    it('should enter edit mode when task title is clicked', async () => {
+  describe('Inline Editing and Detail Sheet', () => {
+    it('opens the Task Detail Sheet when title is clicked in task view (non-calendar mode)', async () => {
       const user = userEvent.setup();
       
-      renderTaskItem();
+      renderTaskItem(); // calendarMode defaults to false
       
       const taskTitle = screen.getByText('Test Task');
       await user.click(taskTitle);
       
-      // Should show input field
+      // Sheet opens and shows header actions (Close dialog button)
+      const closeBtn = await screen.findByRole('button', { name: 'Close dialog' });
+      expect(closeBtn).toBeInTheDocument();
+      // And the title should appear inside the sheet content
+      expect(screen.getAllByText('Test Task').length).toBeGreaterThan(0);
+    });
+
+    it('enters inline edit mode when title is clicked in calendar mode', async () => {
+      const user = userEvent.setup();
+      
+      renderTaskItem(mockTask, { calendarMode: true });
+      
+      const taskTitle = screen.getByText('Test Task');
+      await user.click(taskTitle);
+      
       const input = screen.getByDisplayValue('Test Task');
       expect(input).toBeInTheDocument();
       expect(input).toHaveFocus();
     });
 
-    it('should save changes when Enter is pressed', async () => {
+    it('should save changes when Enter is pressed (calendar mode)', async () => {
       const user = userEvent.setup();
       const onEdit = vi.fn();
       
-      renderTaskItem(mockTask, { onEdit });
+      renderTaskItem(mockTask, { onEdit, calendarMode: true });
       
       // Enter edit mode
       const taskTitle = screen.getByText('Test Task');
@@ -161,11 +176,11 @@ describe('TaskItem Component', () => {
       expect(onEdit).toHaveBeenCalledWith('test-task-1', 'Updated Task Title');
     });
 
-    it('should cancel editing when Escape is pressed', async () => {
+    it('should cancel editing when Escape is pressed (calendar mode)', async () => {
       const user = userEvent.setup();
       const onEdit = vi.fn();
       
-      renderTaskItem(mockTask, { onEdit });
+      renderTaskItem(mockTask, { onEdit, calendarMode: true });
       
       // Enter edit mode
       const taskTitle = screen.getByText('Test Task');
@@ -296,10 +311,10 @@ describe('TaskItem Component', () => {
       expect(screen.getByLabelText('Task options for "Test Task"')).toBeInTheDocument();
     });
 
-    it('should have proper edit input accessibility', async () => {
+    it('should have proper edit input accessibility (calendar mode)', async () => {
       const user = userEvent.setup();
       
-      renderTaskItem();
+      renderTaskItem(mockTask, { calendarMode: true });
       
       // Enter edit mode
       const taskTitle = screen.getByText('Test Task');
@@ -324,5 +339,39 @@ describe('TaskItem Component', () => {
       const taskContainer = screen.getByText('Test Task').closest('.group\\/task');
       expect(taskContainer).toHaveClass('opacity-50');
     });
+  });
+
+  it('opens attachment preview dialog when an attachment badge is clicked', async () => {
+    const task = {
+      id: 't1',
+      title: 'Task with file',
+      completed: false,
+      createdAt: new Date(),
+      attachments: [
+        { id: 'a1', name: 'photo.jpg', type: 'image/jpeg', size: 1024, url: 'data:image/jpeg;base64,xxx', uploadedAt: new Date(), taskId: 't1' },
+      ],
+    } as any;
+
+    const onToggle = vi.fn();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <TaskItem
+        task={task}
+        onToggle={onToggle}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        calendarMode={false}
+      />
+    );
+
+    const badge = await screen.findByTitle(/Preview photo.jpg/i);
+    expect(badge).toBeInTheDocument();
+
+    await userEvent.click(badge);
+
+    // Dialog content should appear with file meta text
+    expect(await screen.findByText(/photo.jpg/i)).toBeInTheDocument();
   });
 });

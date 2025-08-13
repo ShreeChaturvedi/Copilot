@@ -66,7 +66,7 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
+        <div className="min-w-0">{children}</div>
         {showCloseButton && (
           <DialogPrimitive.Close asChild data-slot="dialog-close">
             <Button

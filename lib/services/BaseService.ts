@@ -166,9 +166,11 @@ export abstract class BaseService<
   protected async ensureUserExists(userId?: string, emailFallback?: string): Promise<void> {
     if (!userId) return;
     try {
-      if (process.env.NODE_ENV !== 'production') {
+      // Always allow mock/dev users; otherwise, allow in non-production
+      const isMockUser = userId === 'dev-user-id' || userId.startsWith('test-user-');
+      if (process.env.NODE_ENV !== 'production' || isMockUser) {
         await query(
-          `INSERT INTO users (id, email) VALUES ($1, $2)
+          `INSERT INTO users (id, email, "createdAt", "updatedAt") VALUES ($1, $2, NOW(), NOW())
            ON CONFLICT (id) DO NOTHING`,
           [userId, emailFallback || `${userId}@dev.local`],
           this.db

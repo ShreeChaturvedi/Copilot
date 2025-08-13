@@ -12,6 +12,7 @@ interface IntegratedActionBarProps {
   onClose?: () => void
   isDeleting?: boolean
   className?: string
+  showPeekToggle?: boolean
 }
 
 export const IntegratedActionBar: React.FC<IntegratedActionBarProps> = ({
@@ -21,7 +22,8 @@ export const IntegratedActionBar: React.FC<IntegratedActionBarProps> = ({
   onDelete,
   onClose,
   isDeleting = false,
-  className
+  className,
+  showPeekToggle = true
 }) => {
   return (
     <div className={cn("flex items-center gap-1", className)}>
@@ -50,19 +52,21 @@ export const IntegratedActionBar: React.FC<IntegratedActionBarProps> = ({
         </Button>
       )}
       
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onPeekModeToggle}
-        className="p-2 hover:bg-accent hover:text-accent-foreground"
-        aria-label={`Switch to ${peekMode === 'center' ? 'right panel' : 'center'} mode`}
-      >
-        {peekMode === 'center' ? (
-          <PanelRight className="h-4 w-4" />
-        ) : (
-          <PictureInPicture2 className="h-4 w-4" />
-        )}
-      </Button>
+      {showPeekToggle && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onPeekModeToggle}
+          className="p-2 hover:bg-accent hover:text-accent-foreground"
+          aria-label={`Switch to ${peekMode === 'center' ? 'right panel' : 'center'} mode`}
+        >
+          {peekMode === 'center' ? (
+            <PanelRight className="h-4 w-4" />
+          ) : (
+            <PictureInPicture2 className="h-4 w-4" />
+          )}
+        </Button>
+      )}
 
       {onClose && (
         <Button

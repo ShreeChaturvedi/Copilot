@@ -222,14 +222,14 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
     // Attachments
     const taskPlaceholders = taskIds.map((_, i) => `$${i + 1}`).join(',');
     const attachmentsRes = await query(
-      `SELECT id, "fileName", "fileUrl", "fileType", "fileSize", "taskId"
+      `SELECT id, "fileName", "fileUrl", "fileType", "fileSize", "taskId", "createdAt", "thumbnailUrl"
        FROM attachments WHERE "taskId" IN (${taskPlaceholders})`,
       taskIds
     );
     const attachmentsByTask = new Map<string, any[]>();
     attachmentsRes.rows.forEach((r: any) => {
       const arr = attachmentsByTask.get(r.taskId) || [];
-      arr.push({ id: r.id, fileName: r.fileName, fileUrl: r.fileUrl, fileType: r.fileType, fileSize: r.fileSize });
+      arr.push({ id: r.id, fileName: r.fileName, fileUrl: r.fileUrl, fileType: r.fileType, fileSize: r.fileSize, createdAt: r.createdAt, thumbnailUrl: r.thumbnailUrl });
       attachmentsByTask.set(r.taskId, arr);
     });
 
@@ -367,7 +367,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       this.log('create', { data }, context);
 
       await this.validateCreate(data, context);
-      await this.ensureUserExists(context?.userId, 'dev@example.com');
+      await this.ensureUserExists(context?.userId);
 
       // Get or create default task list if none specified
       let taskListId = data.taskListId;
@@ -718,7 +718,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
    * Get or create default task list for user
    */
   private async getOrCreateDefaultTaskList(userId: string) {
-    await this.ensureUserExists(userId, 'dev@example.com');
+    await this.ensureUserExists(userId);
     const existing = await query(`SELECT id, name, color FROM "task_lists" WHERE "userId" = $1 AND name = 'General' LIMIT 1`, [userId], this.db);
     if (existing.rowCount > 0) return existing.rows[0];
     const created = await query(

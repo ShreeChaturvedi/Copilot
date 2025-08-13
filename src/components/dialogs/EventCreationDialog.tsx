@@ -12,6 +12,9 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet"
 import {
   Tabs,
@@ -22,6 +25,7 @@ import { Input } from "@/components/ui/Input"
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
@@ -556,7 +560,7 @@ function EventCreationDialogContent({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsContent value="event" className={`space-y-6 ${isEditing ? 'mt-0' : 'mt-6'}`}>
           {/* Event Name and Calendar Selection */}
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-3 min-w-0">
             <div className="flex-1">
               <Input
                 ref={titleInputRef}
@@ -581,7 +585,7 @@ function EventCreationDialogContent({
           </div>
 
           {/* Date and Time Selection */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <CustomDateInput
               value={formData.startDate ? format(formData.startDate, 'yyyy-MM-dd') : ''}
               onChange={handleStartDateChange}
@@ -698,7 +702,7 @@ function EventCreationDialogContent({
           )}
 
           {/* Location */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={formData.location}
@@ -708,19 +712,15 @@ function EventCreationDialogContent({
             />
           </div>
 
-          {/* Description */}
-          <div className="relative">
-            <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Textarea
+          {/* Description (WYSIWYG) - full width, no leading icon */}
+          <div className="min-w-0">
+            <RichTextEditor
+              ariaLabel="Event description"
               value={formData.description}
-              onChange={(e) => updateFormData("description", e.target.value)}
+              onChange={(html) => updateFormData("description", html)}
               placeholder="Add description"
-              className="pl-10 min-h-[40px] resize-none"
-              style={{
-                maxHeight: '4.5rem',
-                overflowY: formData.description.split('\n').length > 3 ? 'auto' : 'hidden'
-              }}
-              rows={1}
+              minHeight={96}
+              className="text-base md:text-sm"
             />
           </div>
 
@@ -860,6 +860,14 @@ export function EventCreationDialog({
           side="right"
           className="w-fit max-w-[calc(100%-2rem)] sm:!max-w-none p-6 overflow-y-auto [&>button]:hidden"
         >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{initialEventData?.id ? 'Edit Event' : 'Create Event'}</SheetTitle>
+            <SheetDescription>
+              {initialEventData?.id
+                ? 'Edit the selected event details'
+                : 'Create a new event with title, date, time, location, and description'}
+            </SheetDescription>
+          </SheetHeader>
           <EventCreationDialogContent
             initialEventData={initialEventData}
             onClose={handleClose}
@@ -872,7 +880,7 @@ export function EventCreationDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-fit sm:!max-w-none max-h-[90vh] overflow-y-auto"
+        className="max-h-[90vh] overflow-y-auto"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Create Event</DialogTitle>

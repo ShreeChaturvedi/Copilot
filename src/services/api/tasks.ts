@@ -75,6 +75,7 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
       size: Number(a.fileSize ?? a.size ?? 0),
       url: String(a.fileUrl ?? a.url ?? ''),
       uploadedAt: a.createdAt ? new Date(a.createdAt as string) : new Date(),
+      thumbnailUrl: (a as any).thumbnailUrl ? String((a as any).thumbnailUrl) : undefined,
       taskId: String(a.taskId ?? ''),
     })) as FileAttachment[];
   }
@@ -196,9 +197,41 @@ export const taskApi = {
     if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create task');
     const created: Task = reviveTaskDates(body.data);
 
-    // Upload attachments (if any)
+    // Upload attachments (if any) efficiently
     if (data.attachments && data.attachments.length > 0) {
+      const dataUrlToUint8Array = (dataUrl: string): { bytes: Uint8Array; mime: string } => {
+        const match = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+        if (!match) throw new Error('Invalid data URL');
+        const mime = match[1];
+        const b64 = match[2];
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return { bytes, mime };
+      };
+
       for (const f of data.attachments) {
+        let publicUrl = f.url;
+        let thumbnailUrl: string | undefined;
+        try {
+          if (f.url.startsWith('data:')) {
+            const { bytes, mime } = dataUrlToUint8Array(f.url);
+            const putRes = await fetch(`${apiBase}/upload?filename=${encodeURIComponent(f.name)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': mime, ...authHeaders() },
+              body: bytes,
+            });
+            const putBody = await putRes.json().catch(() => ({} as any));
+            if (!putRes.ok || !putBody.success) throw new Error(putBody.error?.message || 'Blob upload failed');
+            publicUrl = String(putBody.data?.url || publicUrl);
+            thumbnailUrl = typeof putBody.data?.thumbnailUrl === 'string' ? putBody.data.thumbnailUrl : undefined;
+          }
+        } catch (e) {
+          if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error('File upload failed; using provided URL as fallback', e);
+          }
+        }
+
         const attRes = await fetch(`${apiBase}/attachments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -206,18 +239,18 @@ export const taskApi = {
             fileName: f.name,
             fileType: f.type,
             fileSize: f.size,
-            fileUrl: f.url, // For MVP we send data URL or blob URL
+            fileUrl: publicUrl,
+            thumbnailUrl,
             taskId: created.id,
           }),
         });
         if (!attRes.ok) {
-          // Non-fatal: continue
           if (typeof console !== 'undefined' && typeof console.error === 'function') {
-            console.error('Attachment upload failed');
+            console.error('Attachment record creation failed');
           }
         }
       }
-      // Refetch single task to include attachments
+      // Refetch tasks to include attachments
       const refreshed = await taskApi.fetchTasks();
       const withAttachments = refreshed.find(t => t.id === created.id);
       return withAttachments || created;

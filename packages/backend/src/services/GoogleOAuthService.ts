@@ -1,9 +1,9 @@
 import { OAuth2Client } from 'google-auth-library';
-import { PrismaClient } from '@prisma/client';
+import { query, withTransaction } from '../config/database.js';
 import { generateTokenPair, TokenPair } from '../utils/jwt.js';
 import { refreshTokenService } from './RefreshTokenService.js';
 
-const prisma = new PrismaClient();
+// Pure SQL queries will be used instead of Prisma
 
 export interface GoogleUserInfo {
   id: string;
@@ -141,51 +141,40 @@ class GoogleOAuthService {
     const { id: googleId, email, name, picture } = googleUserInfo;
 
     // First, try to find user by Google ID
-    let user = await prisma.user.findUnique({
-      where: { googleId },
-      include: { profile: true }
-    });
+    let userRow = await query<{ id: string; email: string; name: string | null; googleId: string | null; createdAt: Date }>(
+      `SELECT id, email, name, "createdAt", "googleId" FROM users WHERE "googleId" = $1 LIMIT 1`,
+      [googleId]
+    );
+    let user = userRow.rows[0] as any;
 
     let isNewUser = false;
 
     if (!user) {
       // Try to find user by email (existing email/password user)
-      user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase() },
-        include: { profile: true }
-      });
+      userRow = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
+        `SELECT id, email, name, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [email.toLowerCase()]
+      );
+      user = userRow.rows[0];
 
       if (user) {
         // Link Google account to existing user
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { googleId },
-          include: { profile: true }
-        });
+        await query(`UPDATE users SET "googleId" = $1, "updatedAt" = NOW() WHERE id = $2`, [googleId, user.id]);
 
         // Update profile with Google info if not set
-        if (user.profile && picture && !user.profile.avatarUrl) {
-          await prisma.userProfile.update({
-            where: { userId: user.id },
-            data: { avatarUrl: picture }
-          });
-        }
+        await query(`UPDATE user_profiles SET "avatarUrl" = COALESCE($1, "avatarUrl") WHERE "userId" = $2`, [picture || null, user.id]);
       } else {
         // Create new user
-        user = await prisma.user.create({
-          data: {
-            email: email.toLowerCase(),
-            name: name || null,
-            googleId,
-            profile: {
-              create: {
-                avatarUrl: picture || null,
-                timezone: 'UTC'
-              }
-            }
-          },
-          include: { profile: true }
+        const created = await withTransaction(async (tx) => {
+          const ins = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
+            `INSERT INTO users (id, email, name, "googleId", "createdAt", "updatedAt")
+             VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW()) RETURNING id, email, name, "createdAt"`,
+            [email.toLowerCase(), name || null, googleId], tx);
+          const u = ins.rows[0];
+          await query(`INSERT INTO user_profiles (id, "userId", "avatarUrl", timezone) VALUES (gen_random_uuid()::text, $1, $2, 'UTC')`, [u.id, picture || null], tx);
+          return u;
         });
+        user = created;
         isNewUser = true;
       }
     } else {
@@ -193,22 +182,13 @@ class GoogleOAuthService {
       const updates: { name?: string } = {};
       if (name && name !== user.name) {
         updates.name = name;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: updates,
-          include: { profile: true }
-        });
+        await query(`UPDATE users SET name = $1, "updatedAt" = NOW() WHERE id = $2`, [name, user.id]);
+        user.name = name;
       }
 
       // Update avatar if changed
-      if (user.profile && picture && picture !== user.profile.avatarUrl) {
-        await prisma.userProfile.update({
-          where: { userId: user.id },
-          data: { avatarUrl: picture }
-        });
+      if (picture) {
+        await query(`UPDATE user_profiles SET "avatarUrl" = $1 WHERE "userId" = $2`, [picture, user.id]);
       }
     }
 
@@ -227,7 +207,7 @@ class GoogleOAuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        avatarUrl: user.profile?.avatarUrl || undefined,
+        avatarUrl: picture || undefined,
         createdAt: user.createdAt
       },
       tokens,
@@ -274,10 +254,7 @@ class GoogleOAuthService {
     await this.revokeTokens(user.googleId);
 
     // Remove Google ID from user
-    await prisma.user.update({
-      where: { id: userId },
-      data: { googleId: null }
-    });
+    await query(`UPDATE users SET "googleId" = NULL, "updatedAt" = NOW() WHERE id = $1`, [userId]);
   }
 
   /**

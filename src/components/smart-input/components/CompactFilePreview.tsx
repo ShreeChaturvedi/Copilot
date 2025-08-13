@@ -24,6 +24,8 @@ export interface CompactFilePreviewProps {
   disabled?: boolean;
   /** Custom className */
   className?: string;
+  /** When true, hides remove buttons while preserving identical visuals */
+  readOnly?: boolean;
 }
 
 
@@ -35,9 +37,10 @@ interface CompactFileItemProps {
   file: UploadedFile;
   onRemove: (id: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
-const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemove, disabled }) => {
+const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemove, disabled, readOnly }) => {
   return (
     <div className={cn(
       'flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/50',
@@ -63,17 +66,19 @@ const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemo
         </div>
       </div>
 
-      {/* Remove Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onRemove(file.id)}
-        disabled={disabled}
-        className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-        aria-label={`Remove ${file.name}`}
-      >
-        <X className="w-3 h-3" />
-      </Button>
+      {/* Remove Button (hidden in readOnly mode) */}
+      {!readOnly && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onRemove(file.id)}
+          disabled={disabled}
+          className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+          aria-label={`Remove ${file.name}`}
+        >
+          <X className="w-3 h-3" />
+        </Button>
+      )}
     </div>
   );
 };
@@ -95,7 +100,8 @@ const CompactFilePreviewComponent: React.FC<CompactFilePreviewProps> = ({
   files,
   onFileRemove,
   disabled = false,
-  className
+  className,
+  readOnly = false
 }) => {
   if (files.length === 0) {
     return null;
@@ -111,6 +117,7 @@ const CompactFilePreviewComponent: React.FC<CompactFilePreviewProps> = ({
             file={file}
             onRemove={onFileRemove}
             disabled={disabled}
+            readOnly={readOnly}
           />
         ))}
       </div>

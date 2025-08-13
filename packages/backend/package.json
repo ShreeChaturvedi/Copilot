@@ -11,15 +11,9 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "vitest",
     "test:run": "vitest run",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "npm run build && node dist/scripts/seed.js",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset"
+    "db:seed": "npm run build && node dist/scripts/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "5.16.1",
     "@react-calendar-app/shared": "*",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -39,7 +33,6 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^24.1.0",
     "nodemon": "^3.1.7",
-    "prisma": "5.16.1",
     "ts-node": "^10.9.2",
     "typescript": "~5.8.3",
     "vitest": "^2.1.9"

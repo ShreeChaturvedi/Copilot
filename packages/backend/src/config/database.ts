@@ -1,79 +1,77 @@
-import { PrismaClient } from '@prisma/client';
+import { Pool, type PoolClient, type QueryResult } from 'pg';
 
-// Global variable to prevent multiple instances in development
-declare global {
-  var __prisma: PrismaClient | undefined;
-}
-
-// Prisma client configuration with connection pooling and query logging
-const createPrismaClient = () => {
-  return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' 
-      ? ['query', 'info', 'warn', 'error']
-      : ['warn', 'error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
-  });
+// Pure SQL (pg) client for the backend workspace
+export const databaseConfig = {
+  url: process.env.DATABASE_URL || 'postgresql://localhost:5432/react_calendar_dev',
+  max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10'),
+  idleTimeoutMillis: parseInt(process.env.DATABASE_TIMEOUT || '10000'),
 };
 
-// Prevent multiple instances in serverless/development environment
-export const prisma = globalThis.__prisma || createPrismaClient();
+declare global {
+  // eslint-disable-next-line no-var
+  var __backendPgPool: Pool | undefined;
+}
 
+const createPool = () => new Pool({
+  connectionString: databaseConfig.url,
+  max: databaseConfig.max,
+  idleTimeoutMillis: databaseConfig.idleTimeoutMillis,
+});
+
+export const pool: Pool = globalThis.__backendPgPool || createPool();
 if (process.env.NODE_ENV !== 'production') {
-  globalThis.__prisma = prisma;
+  globalThis.__backendPgPool = pool;
+}
+
+export type SqlClient = Pool | PoolClient;
+
+export async function connectDatabase(): Promise<void> {
+  const client = await pool.connect();
+  await client.query('SELECT 1');
+  client.release();
+  console.log('✅ Backend (SQL) connected');
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  await pool.end();
+  console.log('✅ Backend (SQL) disconnected');
+}
+
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    const { rows } = await pool.query('SELECT 1');
+    return rows.length === 1;
+  } catch (e) {
+    console.error('Database health check failed (backend):', e);
+    return false;
+  }
+}
+
+export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const res = await fn(client);
+    await client.query('COMMIT');
+    return res;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function query<T = any>(sql: string, params: any[] = [], client?: SqlClient): Promise<QueryResult<T>> {
+  if (client && 'query' in client) {
+    return (client as PoolClient).query<T>(sql, params);
+  }
+  return pool.query<T>(sql, params);
 }
 
 // Graceful shutdown
-const gracefulShutdown = async () => {
-  console.log('Disconnecting from database...');
-  await prisma.$disconnect();
-  process.exit(0);
-};
+process.on('SIGINT', () => void disconnectDatabase());
+process.on('SIGTERM', () => void disconnectDatabase());
+process.on('beforeExit', () => void disconnectDatabase());
 
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
-process.on('beforeExit', gracefulShutdown);
-
-// Database connection utilities with error handling
-export const connectDatabase = async (): Promise<void> => {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    throw error;
-  }
-};
-
-export const disconnectDatabase = async (): Promise<void> => {
-  try {
-    await prisma.$disconnect();
-    console.log('✅ Database disconnected successfully');
-  } catch (error) {
-    console.error('❌ Database disconnection failed:', error);
-    throw error;
-  }
-};
-
-// Health check function
-export const checkDatabaseHealth = async (): Promise<boolean> => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return true;
-  } catch (error) {
-    console.error('Database health check failed:', error);
-    return false;
-  }
-};
-
-// Transaction helper
-export const withTransaction = async <T>(
-  callback: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>
-): Promise<T> => {
-  return await prisma.$transaction(callback);
-};
-
-export default prisma;
+export default pool;

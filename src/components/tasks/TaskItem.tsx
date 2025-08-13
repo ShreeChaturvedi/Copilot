@@ -13,14 +13,18 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Task } from "@shared/types";
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
+import { taskQueryKeys } from '@/hooks/useTasks';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { DueDateBadge } from './DueDateBadge';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
+import AttachmentPreviewDialog from './AttachmentPreviewDialog';
+import { attachmentsApi } from '@/services/api';
+import TaskDetailSheet from './TaskDetailSheet';
 
 export interface TaskItemProps {
   task: Task;
@@ -39,6 +43,54 @@ export interface TaskItemProps {
 // Constants
 const CONTEXT_MENU_OFFSET = 8;
 const COMPLETED_TASK_OPACITY = 0.6;
+
+// File type colors matching DefaultPreview for consistent theming
+const FILE_TYPE_COLORS = {
+  // Documents
+  pdf: 'text-red-500',
+  doc: 'text-blue-600',
+  docx: 'text-blue-600',
+  xls: 'text-green-600',
+  xlsx: 'text-green-600',
+  ppt: 'text-orange-600',
+  pptx: 'text-orange-600',
+  txt: 'text-gray-600',
+  csv: 'text-green-500',
+  
+  // Images
+  jpg: 'text-blue-500',
+  jpeg: 'text-blue-500',
+  png: 'text-blue-500',
+  gif: 'text-blue-500',
+  webp: 'text-blue-500',
+  svg: 'text-purple-500',
+  
+  // Audio
+  mp3: 'text-purple-500',
+  m4a: 'text-purple-500',
+  wav: 'text-purple-500',
+  webm: 'text-purple-600',
+  ogg: 'text-purple-600',
+  
+  // Video
+  mp4: 'text-red-500',
+  mov: 'text-red-500',
+  avi: 'text-red-600',
+  mkv: 'text-red-600',
+  
+  // Archives
+  zip: 'text-orange-500',
+  rar: 'text-orange-600',
+  '7z': 'text-orange-600',
+  
+  // Fallback
+  default: 'text-gray-500',
+} as const;
+
+// Get file extension from filename
+function getFileExtension(filename: string): string {
+  return filename.toLowerCase().split('.').pop() || '';
+}
 
 // Helper function to get the appropriate icon for each tag type
 const getTagIcon = (type: string) => {
@@ -88,6 +140,49 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
   const { taskGroups } = useTaskManagement({ includeTaskOperations: false });
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [activeAttachment, setActiveAttachment] = useState<NonNullable<Task['attachments']>[number] | null>(null);
+  const queryClient = useQueryClient();
+
+  const openAttachment = useCallback((att: NonNullable<Task['attachments']>[number]) => {
+    setActiveAttachment(att);
+    setPreviewOpen(true);
+  }, []);
+
+  const handleDownload = useCallback(async (att: NonNullable<Task['attachments']>[number]) => {
+    try {
+      const a = document.createElement('a');
+      a.href = att.url; // Use stored URL directly; backend can later provide signed URLs if needed
+      a.download = att.name || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('Download failed', e);
+    }
+  }, []);
+
+  const handleDeleteAttachment = useCallback(async (att: NonNullable<Task['attachments']>[number]) => {
+    try {
+      // Optimistically update cache
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map((t) => t.id === task.id ? { ...t, attachments: (t.attachments || []).filter((a) => a.id !== att.id) } : t);
+        }
+      );
+
+      await attachmentsApi.delete(att.id);
+
+      setPreviewOpen(false);
+      setActiveAttachment(null);
+      // Optionally refetch tasks to ensure consistency
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+    } catch (e) {
+      console.error('Delete attachment failed', e);
+    }
+  }, [task.id, queryClient]);
 
   const handleToggle = () => {
     onToggle(task.id);
@@ -97,13 +192,19 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     onDelete(task.id);
   }, [task.id, onDelete]);
 
+  const [detailOpen, setDetailOpen] = useState(false);
   const handleEditStart = useCallback(() => {
-    setUiState(prev => ({
-      ...prev,
-      isEditing: true,
-      editTitle: task.title,
-    }));
-  }, [task.title]);
+    if (calendarMode) {
+      setUiState(prev => ({
+        ...prev,
+        isEditing: true,
+        editTitle: task.title,
+      }));
+      return;
+    }
+    // In task view (right pane), clicking title opens Task Detail Sheet
+    setDetailOpen(true);
+  }, [task.title, calendarMode]);
 
   const handleEditSave = useCallback(() => {
     const trimmedTitle = uiState.editTitle.trim();
@@ -238,7 +339,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
               <div
                 onClick={handleEditStart}
                 className={cn(
-                  'cursor-text text-sm font-medium transition-colors duration-200',
+                  'cursor-pointer text-sm font-medium transition-colors duration-200',
                   'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border',
                   'flex items-center w-full',
                   task.completed && `line-through text-muted-foreground opacity-[${COMPLETED_TASK_OPACITY}]`
@@ -308,91 +409,112 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
         {/* Tags - Hidden in calendar mode */}
         {!calendarMode && (
-          <div className="mt-1 ml-7 flex flex-wrap gap-1">
-            {/* Canonical Due Date tag - only render when set */}
-            {task.scheduledDate && (
-              <DueDateBadge
-                taskId={task.id}
-                date={task.scheduledDate}
-                onChange={(newDate) => updateTask.mutate({ id: task.id, updates: { scheduledDate: newDate } })}
-              />
-            )}
+          <div className="mt-1 ml-7 space-y-1">
+            {/* First row: Due date and other tags */}
+            <div className="flex flex-wrap gap-1">
+              {/* Canonical Due Date tag - only render when set */}
+              {task.scheduledDate && (
+                <DueDateBadge
+                  taskId={task.id}
+                  date={task.scheduledDate}
+                  onChange={(newDate) => updateTask.mutate({ id: task.id, updates: { scheduledDate: newDate } })}
+                />
+              )}
 
-            {/* Show non-date/time smart tags */}
-            {task.tags?.filter(tag => tag.type !== 'date' && tag.type !== 'time').map((tag) => {
-              const IconComponent = getTagIcon(tag.type) as React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-              return (
-                <Badge
-                  key={`${tag.id}_${String(tag.value)}`}
-                  variant="outline"
-                  className={cn(
-                    "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
-                    onRemoveTag && "cursor-pointer",
-                    tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
-                  )}
-                  style={tag.color ? { 
-                    borderColor: `${tag.color}30`, 
-                    color: tag.color,
-                    backgroundColor: `${tag.color}1A`
-                  } : undefined}
-                  onClick={onRemoveTag ? (e) => {
-                    e.stopPropagation();
-                    onRemoveTag(task.id, tag.id);
-                  } : undefined}
-                >
-                  {/* Icon that becomes X on hover - same size, no layout shift */}
-                  <div className="w-3 h-3 relative">
-                    {IconComponent && (
-                      <IconComponent 
-                        className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
-                        style={{ color: tag.color }}
-                      />
+              {/* Show non-date/time smart tags */}
+              {task.tags?.filter(tag => tag.type !== 'date' && tag.type !== 'time').map((tag) => {
+                const IconComponent = getTagIcon(tag.type) as React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+                return (
+                  <Badge
+                    key={`${tag.id}_${String(tag.value)}`}
+                    variant="outline"
+                    className={cn(
+                      "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
+                      onRemoveTag && "cursor-pointer",
+                      tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
                     )}
-                    {onRemoveTag && (
-                      <X 
-                        className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
-                        style={{ color: tag.color }}
-                      />
-                    )}
-                  </div>
-                  {tag.displayText}
-                </Badge>
-              );
-            })}
+                    style={tag.color ? { 
+                      borderColor: `${tag.color}30`, 
+                      color: tag.color,
+                      backgroundColor: `${tag.color}1A`
+                    } : undefined}
+                    onClick={onRemoveTag ? (e) => {
+                      e.stopPropagation();
+                      onRemoveTag(task.id, tag.id);
+                    } : undefined}
+                  >
+                    {/* Icon that becomes X on hover - same size, no layout shift */}
+                    <div className="w-3 h-3 relative">
+                      {IconComponent && (
+                        <IconComponent 
+                          className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
+                          style={{ color: tag.color }}
+                        />
+                      )}
+                      {onRemoveTag && (
+                        <X 
+                          className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
+                          style={{ color: tag.color }}
+                        />
+                      )}
+                    </div>
+                    {tag.displayText}
+                  </Badge>
+                );
+              })}
+            </div>
             
-            {/* Attachments preview (compact) */}
+            {/* Second row: Attachments preview (compact) */}
             {task.attachments && task.attachments.length > 0 && (
-              <div className="flex items-center gap-1 ml-1">
+              <div className="flex items-center gap-1">
                 {task.attachments.slice(0, 3).map((att) => {
                   const isImage = att.type?.startsWith('image/');
                   const isAudio = att.type?.startsWith('audio/');
                   const isVideo = att.type?.startsWith('video/');
                   const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
+                  
+                  // Get file extension and corresponding color for hover effect
+                  const extension = getFileExtension(att.name);
+                  const iconColor = FILE_TYPE_COLORS[extension as keyof typeof FILE_TYPE_COLORS] || FILE_TYPE_COLORS.default;
+                  
+                  // Convert Tailwind color class to CSS color value
+                  const getColorValue = (colorClass: string) => {
+                    const colorMap: Record<string, string> = {
+                      'text-red-500': '#ef4444',
+                      'text-red-600': '#dc2626',
+                      'text-blue-500': '#3b82f6',
+                      'text-blue-600': '#2563eb',
+                      'text-green-500': '#22c55e',
+                      'text-green-600': '#16a34a',
+                      'text-orange-500': '#f97316',
+                      'text-orange-600': '#ea580c',
+                      'text-purple-500': '#a855f7',
+                      'text-purple-600': '#9333ea',
+                      'text-gray-500': '#6b7280',
+                      'text-gray-600': '#4b5563',
+                    };
+                    return colorMap[colorClass] || colorMap['text-gray-500'];
+                  };
+                  
                   return (
-                    <Popover key={att.id}>
-                      <PopoverTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50"
-                          asChild
-                        >
-                          <a href={att.url} target="_blank" rel="noreferrer" title={att.name} onClick={(e)=>e.stopPropagation()}>
-                            <Icon className="w-3 h-3" />
-                            <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
-                          </a>
-                        </Badge>
-                      </PopoverTrigger>
-                      {isImage && (
-                        <PopoverContent className="p-2 w-auto" align="start" sideOffset={8}>
-                          <img
-                            src={att.url}
-                            alt={att.name}
-                            className="max-w-[240px] max-h-[180px] rounded-md border"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </PopoverContent>
+                    <Badge
+                      key={att.id}
+                      variant="outline"
+                      className={cn(
+                        "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 cursor-pointer",
+                        "hover:border-muted-foreground/50 transition-all duration-150 group/attachment badge-shine-border"
                       )}
-                    </Popover>
+                      onClick={(e) => { e.stopPropagation(); openAttachment(att); }}
+                      title={`Preview ${att.name}`}
+                      style={{
+                        '--hover-color': getColorValue(iconColor)
+                      } as React.CSSProperties & { '--hover-color': string }}
+                    >
+                      <Icon 
+                        className="w-3 h-3 transition-colors duration-150 group-hover/attachment:[color:var(--hover-color)]" 
+                      />
+                      <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
+                    </Badge>
                   );
                 })}
                 {task.attachments.length > 3 && (
@@ -430,6 +552,26 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      )}
+
+      {/* Attachment Preview Dialog */}
+      <AttachmentPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        attachment={activeAttachment}
+        onDelete={(att) => handleDeleteAttachment(att)}
+        onDownload={(att) => handleDownload(att)}
+      />
+
+      {/* Task Detail Sheet for right pane task view */}
+      {!calendarMode && (
+        <TaskDetailSheet
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          task={task}
+          onEdit={() => { setDetailOpen(false); setUiState(prev => ({ ...prev, isEditing: true, editTitle: task.title })); }}
+          onDelete={handleDelete}
+        />
       )}
     </div>
   );

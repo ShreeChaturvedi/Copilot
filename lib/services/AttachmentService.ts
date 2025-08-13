@@ -14,6 +14,7 @@ export interface AttachmentEntity extends BaseEntity {
   fileType: string;
   fileSize: number;
   taskId: string;
+  thumbnailUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
   
@@ -34,6 +35,7 @@ export interface CreateAttachmentDTO {
   fileType: string;
   fileSize: number;
   taskId: string;
+  thumbnailUrl?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ export interface UpdateAttachmentDTO {
   fileUrl?: string;
   fileType?: string;
   fileSize?: number;
+  thumbnailUrl?: string | null;
 }
 
 /**
@@ -85,6 +88,23 @@ export const SUPPORTED_FILE_TYPES = {
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain',
     'text/csv',
+    // Align with shared frontend config
+    'text/markdown',
+    'application/json',
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/x-typescript',
+    'application/x-sh',
+    'text/x-java-source',
+    'text/x-python',
+    'text/x-csrc',
+    'text/x-c++src',
+    'text/x-go',
+    'text/x-kotlin',
+    'text/x-ruby',
+    'text/x-php',
+    'text/x-scss',
   ],
   audio: ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg'],
   video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
@@ -98,6 +118,22 @@ export const MAX_FILES_PER_TASK = 20;
  * AttachmentService - Handles all attachment-related operations
  */
 export class AttachmentService extends BaseService<AttachmentEntity, CreateAttachmentDTO, UpdateAttachmentDTO, AttachmentFilters> {
+  private static schemaEnsured = false;
+
+  constructor(dbOrConfig?: any, maybeConfig?: any) {
+    super(dbOrConfig, maybeConfig);
+    void this.ensureSchema();
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (AttachmentService.schemaEnsured) return;
+    try {
+      await query('ALTER TABLE attachments ADD COLUMN IF NOT EXISTS "thumbnailUrl" text', [], this.db);
+      AttachmentService.schemaEnsured = true;
+    } catch {
+      // ignore
+    }
+  }
   protected getTableName(): string { return 'attachments'; }
 
   protected getEntityName(): string {
@@ -125,6 +161,107 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     const map = new Map<string, any>();
     res.rows.forEach((r: any) => map.set(r.id, r));
     return entities.map((e) => ({ ...e, task: map.get(e.taskId) }));
+  }
+
+  /**
+   * Find attachments with optional filters and simple pagination
+   */
+  async findAll(
+    filters: AttachmentFilters & { limit?: number; offset?: number } = {},
+    context?: ServiceContext
+  ): Promise<AttachmentEntity[]> {
+    try {
+      const { sql, params } = this.buildWhereClause({
+        ...filters,
+        userId: context?.userId,
+      }, context);
+      let querySql = `SELECT * FROM attachments ${sql} ORDER BY "createdAt" DESC`;
+      const finalParams = [...params];
+      if (typeof filters.limit === 'number') {
+        querySql += ` LIMIT $${finalParams.length + 1}`;
+        finalParams.push(Math.max(0, Math.min(100, filters.limit)));
+      }
+      if (typeof filters.offset === 'number') {
+        querySql += ` OFFSET $${finalParams.length + 1}`;
+        finalParams.push(Math.max(0, filters.offset));
+      }
+      const res = await query(querySql, finalParams, this.db);
+      const base = res.rows.map((r: any) => this.transformEntity(r));
+      return await this.enrichEntities(base, context);
+    } catch (error: any) {
+      this.log('findAll:error', { error: error.message, filters }, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new attachment row (supports optional thumbnailUrl)
+   */
+  async create(data: CreateAttachmentDTO, context?: ServiceContext): Promise<AttachmentEntity> {
+    try {
+      this.log('create', { data }, context);
+      await this.validateCreate(data, context);
+      await this.ensureUserExists(context?.userId, 'dev@example.com');
+
+      if (context?.userId) {
+        const taskCheck = await query(
+          'SELECT 1 FROM tasks WHERE id = $1 AND "userId" = $2',
+          [data.taskId, context.userId],
+          this.db
+        );
+        if (taskCheck.rowCount === 0) {
+          throw new Error('AUTHORIZATION_ERROR: Task not found or access denied');
+        }
+      }
+
+      const insertRes = await query(
+        `INSERT INTO attachments (id, "fileName", "fileUrl", "fileType", "fileSize", "taskId", "thumbnailUrl", "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())
+         RETURNING *`,
+        [
+          data.fileName.trim(),
+          data.fileUrl.trim(),
+          data.fileType.trim(),
+          data.fileSize,
+          data.taskId,
+          data.thumbnailUrl ?? null,
+        ],
+        this.db
+      );
+
+      const created = this.transformEntity(insertRes.rows[0]);
+      this.log('create:success', { id: created.id }, context);
+      return created;
+    } catch (error: any) {
+      this.log('create:error', { error: error.message }, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Update allowed fields for an attachment
+   */
+  async update(id: string, data: UpdateAttachmentDTO, context?: ServiceContext): Promise<AttachmentEntity | null> {
+    try {
+      this.log('update', { id, data }, context);
+      await this.validateUpdate(id, data, context);
+
+      const sets: string[] = [];
+      const params: any[] = [];
+      if (data.fileName !== undefined) { params.push(data.fileName.trim()); sets.push(`"fileName" = $${params.length}`); }
+      if (data.fileUrl !== undefined) { params.push(data.fileUrl.trim()); sets.push(`"fileUrl" = $${params.length}`); }
+      if (data.fileType !== undefined) { params.push(data.fileType.trim()); sets.push(`"fileType" = $${params.length}`); }
+      if (data.fileSize !== undefined) { params.push(data.fileSize); sets.push(`"fileSize" = $${params.length}`); }
+      if (data.thumbnailUrl !== undefined) { params.push(data.thumbnailUrl); sets.push(`"thumbnailUrl" = $${params.length}`); }
+      if (sets.length === 0) return await this.findById(id, context);
+      params.push(id);
+      const res = await query(`UPDATE attachments SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params, this.db);
+      const row = res.rows[0];
+      return row ? this.transformEntity(row) : null;
+    } catch (error: any) {
+      this.log('update:error', { error: error.message, id }, context);
+      throw error;
+    }
   }
 
   /**
