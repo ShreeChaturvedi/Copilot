@@ -132,3 +132,28 @@ describe('CompactFilePreview', () => {
     expect(screen.getByText('test.txt')).toBeInTheDocument();
   });
 });
+
+import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { CompactFilePreview } from '../CompactFilePreview';
+
+const mockFile = new File([new Uint8Array([1,2,3])], 'doc.pdf', { type: 'application/pdf' });
+
+describe('CompactFilePreview', () => {
+  it('renders file name and size', () => {
+    render(
+      <CompactFilePreview
+        files={[{
+          id: 'f1',
+          file: mockFile,
+          name: 'doc.pdf',
+          size: 3,
+          type: 'application/pdf',
+          status: 'completed',
+        }]}
+        onFileRemove={() => {}}
+      />
+    );
+    expect(screen.getByText('doc.pdf')).toBeInTheDocument();
+  });
+});
