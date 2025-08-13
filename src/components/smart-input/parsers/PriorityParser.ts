@@ -74,7 +74,7 @@ export class PriorityParser implements Parser {
             id: uuidv4(),
             type: 'priority',
             value: level,
-            displayText: this.formatDisplayText(level, match[0]),
+            displayText: this.formatDisplayText(level),
             iconName: this.getIconForPriority(level),
             startIndex,
             endIndex,
@@ -142,13 +142,8 @@ export class PriorityParser implements Parser {
   /**
    * Format display text for priority tag
    */
-  private formatDisplayText(level: string, originalText: string): string {
-    // Use original text for p1/p2/p3 patterns
-    if (/^p[123]$/i.test(originalText.trim())) {
-      return originalText.trim().toUpperCase();
-    }
-
-    // Use level-based display text
+  private formatDisplayText(level: string): string {
+    // Always use level-based verbose display text for consistency
     switch (level) {
       case 'high':
         return 'High Priority';

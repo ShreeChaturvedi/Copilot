@@ -28,7 +28,9 @@ export class ChronoDateParser implements Parser {
    */
   test(text: string): boolean {
     const results = chrono.parse(text, new Date(), { forwardDate: true });
-    return results.length > 0;
+    if (results.length > 0) return true;
+    // Also test custom ordinal weekday-of-month patterns
+    return this.findOrdinalDowMatches(text).length > 0;
   }
 
   /**
@@ -87,6 +89,30 @@ export class ChronoDateParser implements Parser {
 
           tags.push(endTag);
         }
+      }
+    }
+
+    // Add custom ordinal weekday-of-month parsing if not already covered by chrono
+    const existingRanges = tags.map(t => ({ start: t.startIndex, end: t.endIndex }));
+    const overlaps = (s: number, e: number) => existingRanges.some(r => s < r.end && e > r.start);
+    const customMatches = this.findOrdinalDowMatches(text);
+    for (const m of customMatches) {
+      if (!overlaps(m.index, m.index + m.text.length)) {
+        const dateOnly = m.date;
+        tags.push({
+          id: uuidv4(),
+          type: 'date',
+          value: dateOnly,
+          displayText: this.formatDisplayText(dateOnly, false),
+          iconName: 'Calendar',
+          startIndex: m.index,
+          endIndex: m.index + m.text.length,
+          originalText: m.text,
+          confidence: 0.85,
+          source: this.id,
+          color: '#3b82f6',
+        });
+        existingRanges.push({ start: m.index, end: m.index + m.text.length });
       }
     }
 
@@ -191,5 +217,94 @@ export class ChronoDateParser implements Parser {
    */
   private isInPast(date: Date): boolean {
     return date.getTime() < Date.now();
+  }
+
+  /**
+   * Find ordinal weekday-of-month expressions and compute dates
+   */
+  private findOrdinalDowMatches(text: string): Array<{ text: string; index: number; date: Date }> {
+    const ordinals: Record<string, number> = {
+      first: 1,
+      second: 2,
+      third: 3,
+      fourth: 4,
+      fifth: 5,
+    };
+    const weekdays: Record<string, number> = {
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+    };
+    const months: Record<string, number> = {
+      january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+      july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+    };
+
+    const results: Array<{ text: string; index: number; date: Date }> = [];
+    const now = new Date();
+    const baseYear = now.getFullYear();
+    const baseMonth = now.getMonth();
+
+    const pattern = /\b(?:on\s+)?(?:the\s+)?(first|second|third|fourth|fifth|last)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+(?:of|in)\s+(next month|this month|january|february|march|april|may|june|july|august|september|october|november|december)\b/gi;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const [full, ord, dowStr, monthSpec] = match;
+      const index = match.index;
+      const dow = weekdays[dowStr.toLowerCase()];
+      const isLast = ord.toLowerCase() === 'last';
+      let year = baseYear;
+      let month: number;
+      const ms = monthSpec.toLowerCase();
+      if (ms === 'this month') {
+        month = baseMonth;
+      } else if (ms === 'next month') {
+        if (baseMonth === 11) {
+          month = 0;
+          year = baseYear + 1;
+        } else {
+          month = baseMonth + 1;
+        }
+      } else {
+        month = months[ms];
+        // If month already passed this year, consider next year for forward-looking parsing
+        if (month < baseMonth) {
+          year = baseYear + 1;
+        }
+      }
+
+      const date = isLast
+        ? this.getLastWeekdayOfMonth(year, month, dow)
+        : this.getNthWeekdayOfMonth(year, month, dow, ordinals[ord.toLowerCase()]);
+
+      if (date) {
+        results.push({ text: full, index, date });
+      }
+    }
+
+    return results;
+  }
+
+  private getNthWeekdayOfMonth(year: number, month: number, weekday: number, n: number): Date {
+    const firstOfMonth = new Date(year, month, 1);
+    const firstWeekday = firstOfMonth.getDay();
+    const offset = (weekday - firstWeekday + 7) % 7;
+    const day = 1 + offset + (n - 1) * 7;
+    const result = new Date(year, month, day);
+    // If overflowed into next month, clamp to last occurrence
+    if (result.getMonth() !== month) {
+      return this.getLastWeekdayOfMonth(year, month, weekday);
+    }
+    return result;
+  }
+
+  private getLastWeekdayOfMonth(year: number, month: number, weekday: number): Date {
+    const lastDay = new Date(year, month + 1, 0); // last day of month
+    const lastWeekday = lastDay.getDay();
+    const offset = (lastWeekday - weekday + 7) % 7;
+    return new Date(year, month, lastDay.getDate() - offset);
   }
 }
