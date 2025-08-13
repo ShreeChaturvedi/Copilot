@@ -36,7 +36,9 @@ export class ChronoDateParser implements Parser {
    */
   parse(text: string): ParsedTag[] {
     const tags: ParsedTag[] = [];
-    const results = chrono.parse(text, new Date(), { forwardDate: true });
+
+    // Use chrono's casual parser for broader phrase coverage while keeping forwardDate behavior
+    const results = chrono.casual.parse(text, new Date(), { forwardDate: true });
 
     for (const result of results) {
       const startDate = result.start.date();
@@ -120,7 +122,15 @@ export class ChronoDateParser implements Parser {
       confidence += 0.05;
     }
 
-    // Decrease confidence for very ambiguous expressions
+    // Boost confidence for complex natural phrases commonly used
+    if (/\b(third|second|first|fourth)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(result.text)) {
+      confidence += 0.1;
+    }
+    if (/\bnext\s+month\b/i.test(result.text) || /\b(two|three|four)\s+weeks?\s+from\s+now\b/i.test(result.text)) {
+      confidence += 0.05;
+    }
+
+    // Decrease confidence for very ambiguous very short expressions
     if (result.text.length < 3) {
       confidence -= 0.2;
     }

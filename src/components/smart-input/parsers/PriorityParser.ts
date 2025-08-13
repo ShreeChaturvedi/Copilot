@@ -48,44 +48,42 @@ export class PriorityParser implements Parser {
 
   /**
    * Parse the text and extract priority information
+   * Consolidates multiple matches into a single normalized priority tag
    */
   parse(text: string): ParsedTag[] {
-    const tags: ParsedTag[] = [];
-    const processedRanges: Array<{ start: number; end: number }> = [];
+    // Track the strongest match only
+    const severityRank: Record<'low' | 'medium' | 'high', number> = { low: 1, medium: 2, high: 3 };
+
+    let chosen: {
+      level: 'low' | 'medium' | 'high';
+      confidence: number;
+      startIndex: number;
+      endIndex: number;
+      originalText: string;
+    } | null = null;
 
     for (const { pattern, level, confidence } of this.priorityPatterns) {
       // Reset regex lastIndex to ensure clean matching
       pattern.lastIndex = 0;
-      
-      let match;
+      let match: RegExpExecArray | null;
       while ((match = pattern.exec(text)) !== null) {
         const startIndex = match.index;
         const endIndex = match.index + match[0].length;
-        
-        // Check if this range overlaps with already processed ranges
-        const overlaps = processedRanges.some(range => 
-          (startIndex >= range.start && startIndex < range.end) ||
-          (endIndex > range.start && endIndex <= range.end) ||
-          (startIndex <= range.start && endIndex >= range.end)
-        );
+        const adjustedConfidence = this.adjustConfidence(confidence, match[0], text);
 
-        if (!overlaps) {
-          const priorityTag: ParsedTag = {
-            id: uuidv4(),
-            type: 'priority',
-            value: level,
-            displayText: this.formatDisplayText(level, match[0]),
-            iconName: this.getIconForPriority(level),
-            startIndex,
-            endIndex,
-            originalText: match[0],
-            confidence: this.adjustConfidence(confidence, match[0], text),
-            source: this.id,
-            color: this.getColorForPriority(level as 'high' | 'medium' | 'low'),
-          };
-
-          tags.push(priorityTag);
-          processedRanges.push({ start: startIndex, end: endIndex });
+        if (!chosen) {
+          chosen = { level: level as 'low' | 'medium' | 'high', confidence: adjustedConfidence, startIndex, endIndex, originalText: match[0] };
+        } else {
+          // Prefer higher severity; if equal severity, prefer higher confidence; if equal, prefer earliest occurrence
+          const currentRank = severityRank[chosen.level];
+          const newRank = severityRank[level as 'low' | 'medium' | 'high'];
+          if (
+            newRank > currentRank ||
+            (newRank === currentRank && adjustedConfidence > chosen.confidence) ||
+            (newRank === currentRank && adjustedConfidence === chosen.confidence && startIndex < chosen.startIndex)
+          ) {
+            chosen = { level: level as 'low' | 'medium' | 'high', confidence: adjustedConfidence, startIndex, endIndex, originalText: match[0] };
+          }
         }
 
         // Prevent infinite loop for global regex
@@ -95,13 +93,23 @@ export class PriorityParser implements Parser {
       }
     }
 
-    // Sort by confidence descending, then by position
-    return tags.sort((a, b) => {
-      if (a.confidence !== b.confidence) {
-        return b.confidence - a.confidence;
-      }
-      return a.startIndex - b.startIndex;
-    });
+    if (!chosen) return [];
+
+    const priorityTag: ParsedTag = {
+      id: uuidv4(),
+      type: 'priority',
+      value: chosen.level,
+      displayText: this.formatDisplayText(chosen.level, chosen.originalText),
+      iconName: this.getIconForPriority(chosen.level),
+      startIndex: chosen.startIndex,
+      endIndex: chosen.endIndex,
+      originalText: chosen.originalText,
+      confidence: chosen.confidence,
+      source: this.id,
+      color: this.getColorForPriority(chosen.level),
+    };
+
+    return [priorityTag];
   }
 
   /**
@@ -121,9 +129,10 @@ export class PriorityParser implements Parser {
     }
 
     // Reduce confidence if the match is part of a larger word
-    const beforeChar = fullText[matchText.length > 0 ? fullText.indexOf(matchText) - 1 : -1];
-    const afterChar = fullText[fullText.indexOf(matchText) + matchText.length];
-    
+    const beforeIndex = Math.max(0, fullText.indexOf(matchText));
+    const afterIndex = beforeIndex + matchText.length;
+    const beforeChar = beforeIndex > 0 ? fullText[beforeIndex - 1] : undefined;
+    const afterChar = afterIndex < fullText.length ? fullText[afterIndex] : undefined;
     if (beforeChar && /[a-zA-Z0-9]/.test(beforeChar)) {
       confidence *= 0.7;
     }
@@ -140,15 +149,9 @@ export class PriorityParser implements Parser {
   }
 
   /**
-   * Format display text for priority tag
+   * Format display text for priority tag (standardized)
    */
-  private formatDisplayText(level: string, originalText: string): string {
-    // Use original text for p1/p2/p3 patterns
-    if (/^p[123]$/i.test(originalText.trim())) {
-      return originalText.trim().toUpperCase();
-    }
-
-    // Use level-based display text
+  private formatDisplayText(level: string, _originalText: string): string {
     switch (level) {
       case 'high':
         return 'High Priority';
