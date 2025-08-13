@@ -4,6 +4,7 @@ import React from 'react';
 import { TaskItem } from '../TaskItem';
 import type { Task } from '@shared/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { attachmentsApi as mockedAttachmentsApi } from '@/services/api/attachments';
 
 vi.mock('@/services/api/attachments', () => ({
   attachmentsApi: {
@@ -37,7 +38,12 @@ describe('TaskItem attachments', () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
 
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
 
     render(
       <QueryClientProvider client={qc}>
@@ -58,11 +64,15 @@ describe('TaskItem attachments', () => {
     await screen.findByText('image.png');
 
     // Click delete button
-    const deleteBtn = screen.getByRole('button', { name: /delete attachment/i });
+    const deleteBtn = screen.getByRole('button', {
+      name: /delete attachment/i,
+    });
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
-      expect(require('@/services/api/attachments').attachmentsApi.delete).toHaveBeenCalledWith('a1');
+      expect(
+        mockedAttachmentsApi.delete as unknown as jest.Mock
+      ).toHaveBeenCalledWith('a1');
     });
   });
 });
