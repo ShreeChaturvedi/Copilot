@@ -260,12 +260,12 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             
             {/* Eye toggle - only show when "All Tasks" is selected (not a specific task list) */}
             {paneConfig.selectedTaskListId === null && paneConfig.grouping === 'taskList' && (
-              <Tooltip>
-                <TooltipTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
+                      onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
                     className={cn(
                       'h-6 w-6 p-0 ml-1',
                       showTaskListContextInAll
@@ -280,7 +280,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                       <EyeOff className="w-3.5 h-3.5" />
                     )}
                   </Button>
-                </TooltipTrigger>
+                  </TooltipTrigger>
                 <TooltipContent>
                   <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
                 </TooltipContent>

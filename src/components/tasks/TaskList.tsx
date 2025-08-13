@@ -641,6 +641,10 @@ const TaskListMemoComparison = (
   if (prevProps.showCreateTaskDialog !== nextProps.showCreateTaskDialog)
     return false;
   if (prevProps.hideHeader !== nextProps.hideHeader) return false;
+  // Props that impact rendering mode and label visibility
+  if (prevProps.calendarMode !== nextProps.calendarMode) return false;
+  if (prevProps.showTaskListLabels !== nextProps.showTaskListLabels) return false;
+  if (prevProps.maxTasks !== nextProps.maxTasks) return false;
 
   // Function props are assumed to be stable (will be optimized in LeftPane with useCallback)
   // We don't compare function props as they should be memoized by the parent

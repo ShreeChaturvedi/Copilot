@@ -38,10 +38,11 @@ export interface TaskGroupListProps {
 function taskGroupToBaseItem(taskGroup: TaskGroup): SelectionModeItem {
   return {
     id: taskGroup.id,
-    name: `${taskGroup.emoji ?? ''} ${taskGroup.name}`.trim(),
+    name: taskGroup.name,
     color: taskGroup.color,
     description: taskGroup.description,
     isDefault: taskGroup.isDefault,
+    emoji: taskGroup.emoji,
   };
 }
 

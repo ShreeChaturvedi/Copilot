@@ -43,6 +43,7 @@ export interface BaseListItem {
   color: string;
   description?: string;
   isDefault?: boolean;
+  emoji?: string;
 }
 
 // Mode-specific properties
@@ -493,22 +494,24 @@ function BaseListItem<T extends BaseListItem>({
             aria-label={`Toggle ${item.name} visibility`}
           />
         ) : (
-          <Checkbox
-            checked={isActive}
-            onCheckedChange={() => onSelect?.(item)}
-            className={cn(
-              'data-[state=checked]:bg-current data-[state=checked]:border-current',
-              'border-2 rounded-sm flex-shrink-0'
-            )}
-            style={
-              {
-                borderColor: item.color,
-                '--tw-border-opacity': '1',
-                color: item.color,
-              } as React.CSSProperties
-            }
+          <button
+            type="button"
+            onClick={() => onSelect?.(item)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(item);
+              }
+            }}
+            className={cn('flex-shrink-0')}
+            style={{ color: item.color } as React.CSSProperties}
             aria-label={`Select ${item.name}`}
-          />
+            aria-pressed={isActive}
+          >
+            <span className={cn('text-[18px] leading-none', isActive ? '' : 'opacity-80')}>
+              {item.emoji ?? '📁'}
+            </span>
+          </button>
         )}
 
         <div
