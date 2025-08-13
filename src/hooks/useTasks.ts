@@ -160,6 +160,19 @@ export const useTasks = (filters: TaskFilters = {}) => {
     },
   });
 
+  // Helper to update attachments for a task in cache
+  const updateTaskAttachmentsInCache = (taskId: string, updater: (attachments: Task['attachments'] | undefined) => Task['attachments'] | undefined) => {
+    queryClient.setQueriesData(
+      { queryKey: taskQueryKeys.all },
+      (oldData: Task[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map((t) =>
+          t.id === taskId ? { ...t, attachments: updater(t.attachments) } : t
+        );
+      }
+    );
+  };
+
   // Return data and mutations in the format LeftPane expects
   return {
     data: tasksQuery.data || [],
@@ -171,6 +184,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
     updateTask,
     deleteTask,
     scheduleTask,
+    updateTaskAttachmentsInCache,
     refetch: tasksQuery.refetch,
   };
 };

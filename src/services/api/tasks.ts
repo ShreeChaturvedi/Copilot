@@ -3,7 +3,7 @@
  * Replaces localStorage mocks with real API calls to /api/tasks and related endpoints
  */
 
-import type { Task, TaskTag, FileAttachment } from "@shared/types";
+import type { Task, TaskTag, FileAttachment } from '@shared/types';
 import { validateTaskTitle } from '../../utils/validation';
 import { useAuthStore } from '@/stores/authStore';
 import { taskStorage } from '../../utils/storage';
@@ -56,18 +56,24 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
     ...task,
     createdAt: task.createdAt ? new Date(task.createdAt as string) : new Date(),
     updatedAt: task.updatedAt ? new Date(task.updatedAt as string) : new Date(),
-    completedAt: task.completedAt ? new Date(task.completedAt as string) : undefined,
-    scheduledDate: task.scheduledDate ? new Date(task.scheduledDate as string) : undefined,
+    completedAt: task.completedAt
+      ? new Date(task.completedAt as string)
+      : undefined,
+    scheduledDate: task.scheduledDate
+      ? new Date(task.scheduledDate as string)
+      : undefined,
     attachments: Array.isArray(task.attachments)
-      ? (task.attachments as Array<Record<string, unknown>>).map((a) => ({
+      ? ((task.attachments as Array<Record<string, unknown>>).map((a) => ({
           id: a.id as string,
           name: a.fileName as string,
           type: a.fileType as string,
           size: a.fileSize as number,
           url: a.fileUrl as string,
-          uploadedAt: a.createdAt ? new Date(a.createdAt as string) : new Date(),
+          uploadedAt: a.createdAt
+            ? new Date(a.createdAt as string)
+            : new Date(),
           taskId: a.taskId as string,
-        })) as FileAttachment[]
+        })) as FileAttachment[])
       : undefined,
   } as Task;
 }
@@ -94,8 +100,11 @@ export const taskApi = {
       return taskStorage.getTasks();
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to fetch tasks');
-    const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []); // support paginated or plain
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to fetch tasks');
+    const items = Array.isArray(body.data?.data)
+      ? body.data.data
+      : body.data || []; // support paginated or plain
     return items.map(reviveTaskDates);
   },
 
@@ -115,9 +124,12 @@ export const taskApi = {
         title: data.title,
         scheduledDate: data.scheduledDate?.toISOString(),
         priority: data.priority?.toUpperCase(), // Backend uses enum LOW|MEDIUM|HIGH
-        tags: data.tags?.map(t => ({
+        tags: data.tags?.map((t) => ({
           type: t.type.toUpperCase(),
-          name: typeof t.value === 'string' ? String(t.value).toLowerCase() : String(t.value),
+          name:
+            typeof t.value === 'string'
+              ? String(t.value).toLowerCase()
+              : String(t.value),
           value: String(t.value),
           displayText: t.displayText,
           iconName: t.iconName,
@@ -153,12 +165,37 @@ export const taskApi = {
       return newTask;
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create task');
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to create task');
     const created: Task = reviveTaskDates(body.data);
 
     // Upload attachments (if any)
     if (data.attachments && data.attachments.length > 0) {
       for (const f of data.attachments) {
+        let fileUrl = f.url;
+        // If Data URL, push to blob storage via our upload endpoint first
+        if (fileUrl.startsWith('data:')) {
+          const [meta, b64] = fileUrl.split(',');
+          const contentType =
+            (meta.split(';')[0] || '').replace('data:', '') ||
+            f.type ||
+            'application/octet-stream';
+          const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          const putRes = await fetch(
+            `${apiBase}/upload?filename=${encodeURIComponent(f.name)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': contentType, ...authHeaders() },
+              body: bin,
+            }
+          );
+          if (putRes.ok) {
+            const uploaded = await putRes.json();
+            if (uploaded?.success && uploaded?.data?.url)
+              fileUrl = uploaded.data.url as string;
+          }
+        }
+
         const attRes = await fetch(`${apiBase}/attachments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -166,20 +203,23 @@ export const taskApi = {
             fileName: f.name,
             fileType: f.type,
             fileSize: f.size,
-            fileUrl: f.url, // For MVP we send data URL or blob URL
+            fileUrl,
             taskId: created.id,
           }),
         });
         if (!attRes.ok) {
           // Non-fatal: continue
-          if (typeof console !== 'undefined' && typeof console.error === 'function') {
+          if (
+            typeof console !== 'undefined' &&
+            typeof console.error === 'function'
+          ) {
             console.error('Attachment upload failed');
           }
         }
       }
       // Refetch single task to include attachments
       const refreshed = await taskApi.fetchTasks();
-      const withAttachments = refreshed.find(t => t.id === created.id);
+      const withAttachments = refreshed.find((t) => t.id === created.id);
       return withAttachments || created;
     }
 
@@ -210,12 +250,13 @@ export const taskApi = {
       });
       if (!ok) throw new Error('Failed to update task');
       const tasks = taskStorage.getTasks();
-      const updated = tasks.find(t => t.id === id);
+      const updated = tasks.find((t) => t.id === id);
       if (!updated) throw new Error('Task not found after update');
       return updated;
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task');
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to update task');
     return reviveTaskDates(body.data);
   },
 
@@ -255,16 +296,17 @@ export const taskApi = {
     });
     if (!isJson(res)) {
       const tasks = taskStorage.getTasks();
-      const task = tasks.find(t => t.id === id);
+      const task = tasks.find((t) => t.id === id);
       if (!task) throw new Error('Task not found');
       const ok = taskStorage.updateTask(id, { completed: !task.completed });
       if (!ok) throw new Error('Failed to toggle task');
       const refreshed = taskStorage.getTasks();
-      const updated = refreshed.find(t => t.id === id)!;
+      const updated = refreshed.find((t) => t.id === id)!;
       return updated;
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to toggle task');
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to toggle task');
     return reviveTaskDates(body.data);
   },
 };

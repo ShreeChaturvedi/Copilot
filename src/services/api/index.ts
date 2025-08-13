@@ -2,6 +2,7 @@
 export { taskApi } from './tasks';
 export { eventApi } from './events';
 export { calendarApi, DEFAULT_CALENDAR_COLORS } from './calendars';
+export { attachmentsApi } from './attachments';
 
 export type {
   CreateTaskData,

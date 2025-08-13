@@ -3,13 +3,14 @@ import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
+import dynamicIconImportsSrc from 'lucide-react/dynamicIconImports';
 
 // Use Lucide's dynamic icon imports to code-split each icon.
 // Static import so bundlers can include the small mapping table only.
-// lucide-react exposes a mapping of kebab-case icon names to dynamic imports
-// Types are not exported, so we cast to a safe index signature.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-var-requires
-const dynamicIconImports = require('lucide-react/dynamicIconImports').default as Record<string, () => Promise<{ default: React.ComponentType<any> }>>;
+const dynamicIconImports = dynamicIconImportsSrc as Record<
+  string,
+  () => Promise<{ default: React.ComponentType<{ className?: string }> }>
+>;
 
 const allIconNames: string[] = Object.keys(dynamicIconImports);
 
@@ -22,7 +23,7 @@ export interface IconPickerProps {
 export const IconPicker: React.FC<IconPickerProps> = ({
   selectedIcon,
   onIconSelect,
-  className
+  className,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -38,7 +39,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
   };
 
   return (
-    <div className={cn("w-full max-w-sm", className)}>
+    <div className={cn('w-full max-w-sm', className)}>
       {/* Search Input */}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -64,33 +65,39 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       {/* Icons Grid */}
       <div className="max-h-64 overflow-y-auto border rounded-md">
         {!readyToShow ? (
-          <div className="p-6 text-center text-muted-foreground text-sm">Type at least 2 characters to search icons</div>
+          <div className="p-6 text-center text-muted-foreground text-sm">
+            Type at least 2 characters to search icons
+          </div>
         ) : (
-        <div className="grid grid-cols-6 gap-1 p-2">
-          {filteredIcons.map((iconName) => {
-            const loader = dynamicIconImports[iconName];
-            if (!loader) return null;
-            const IconLazy = React.lazy(loader);
-            return (
-              <Suspense key={iconName} fallback={<div className="h-10 w-10" />}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onIconSelect(iconName)}
-                  className={cn(
-                    "h-10 w-10 p-0 hover:bg-accent",
-                    selectedIcon === iconName && "bg-accent border-2 border-primary"
-                  )}
-                  title={iconName}
+          <div className="grid grid-cols-6 gap-1 p-2">
+            {filteredIcons.map((iconName) => {
+              const loader = dynamicIconImports[iconName];
+              if (!loader) return null;
+              const IconLazy = React.lazy(loader);
+              return (
+                <Suspense
+                  key={iconName}
+                  fallback={<div className="h-10 w-10" />}
                 >
-                  <IconLazy className="w-4 h-4" />
-                </Button>
-              </Suspense>
-            );
-          })}
-        </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onIconSelect(iconName)}
+                    className={cn(
+                      'h-10 w-10 p-0 hover:bg-accent',
+                      selectedIcon === iconName &&
+                        'bg-accent border-2 border-primary'
+                    )}
+                    title={iconName}
+                  >
+                    <IconLazy className="w-4 h-4" />
+                  </Button>
+                </Suspense>
+              );
+            })}
+          </div>
         )}
-        
+
         {filteredIcons.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">No icons found</p>

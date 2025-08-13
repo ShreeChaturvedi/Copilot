@@ -129,6 +129,41 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Handle file uploads
   const handleFilesAdded = useCallback(async (files: File[]) => {
+    // Basic client-side validation & compression for images
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    const compressImage = async (file: File): Promise<File> => {
+      if (!file.type.startsWith('image/')) return file;
+      // Downscale large images via canvas while preserving aspect ratio
+      const img = document.createElement('img');
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = (e) => reject(e);
+        img.src = dataUrl;
+      });
+      const MAX_DIM = 2000;
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      if (scale === 1) return file;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return file;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const quality = 0.85;
+      const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const outDataUrl = canvas.toDataURL(outType, quality);
+      const res = await fetch(outDataUrl);
+      const blob = await res.blob();
+      if (blob.size >= file.size) return file;
+      return new File([blob], file.name, { type: outType, lastModified: Date.now() });
+    };
+
     const readAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -137,7 +172,11 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     });
 
     const newUploadedFiles: UploadedFile[] = await Promise.all(
-      files.map(async (file) => ({
+      files
+        .filter((f) => f.size > 0 && f.size <= MAX_SIZE)
+        .map(async (orig) => {
+          const file = await compressImage(orig);
+          return ({
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         file,
         name: file.name,
@@ -146,7 +185,8 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         status: 'completed' as const,
         // Use data URL for all files so backend can persist a URL immediately
         preview: await readAsDataUrl(file),
-      }))
+      });
+        })
     );
 
     setUploadedFiles((prev) => {

@@ -13,11 +13,14 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
 import { cn } from '@/lib/utils';
 import { Task } from "@shared/types";
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Download, Trash2 } from 'lucide-react';
+import { attachmentsApi } from '@/services/api/attachments';
 import { DueDateBadge } from './DueDateBadge';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
 
@@ -72,6 +75,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   className,
   calendarMode = false,
 }) => {
+  const [previewState, setPreviewState] = useState<{ open: boolean; attachmentId?: string }>(() => ({ open: false }));
   // Consolidated UI state for better performance
   const [uiState, setUiState] = useState({
     isEditing: false,
@@ -82,11 +86,41 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   // Calendars must be read via hook at top-level (Rules of Hooks)
   const { data: calendars = [] } = useCalendars();
-  const { updateTask } = useTasks();
+  const { updateTask, updateTaskAttachmentsInCache } = useTasks();
 
   const handleToggle = () => {
     onToggle(task.id);
   };
+
+  const handleOpenPreview = useCallback((attachmentId: string) => {
+    setPreviewState({ open: true, attachmentId });
+  }, []);
+
+  const handleClosePreview = useCallback(() => setPreviewState({ open: false }), []);
+
+  const handleDeleteAttachment = useCallback(async () => {
+    const att = task.attachments?.find(a => a.id === previewState.attachmentId);
+    if (!att) return;
+    try {
+      await attachmentsApi.delete(att.id);
+      updateTaskAttachmentsInCache(task.id, (prev) => (prev || []).filter(a => a.id !== att.id));
+      setPreviewState({ open: false });
+    } catch (e) {
+      console.error('Failed to delete attachment', e);
+    }
+  }, [previewState.attachmentId, task.attachments, task.id, updateTaskAttachmentsInCache]);
+
+  const handleDownloadAttachment = useCallback(() => {
+    const att = task.attachments?.find(a => a.id === previewState.attachmentId);
+    if (!att) return;
+    const a = document.createElement('a');
+    a.href = att.url;
+    a.download = att.name;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [previewState.attachmentId, task.attachments]);
 
   const handleDelete = useCallback(() => {
     onDelete(task.id);
@@ -305,30 +339,16 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                     const isVideo = att.type?.startsWith('video/');
                     const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
                     return (
-                      <Popover key={att.id}>
-                        <PopoverTrigger asChild>
-                          <Badge
-                            variant="outline"
-                            className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50"
-                            asChild
-                          >
-                            <a href={att.url} target="_blank" rel="noreferrer" title={att.name} onClick={(e)=>e.stopPropagation()}>
-                              <Icon className="w-3 h-3" />
-                              <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
-                            </a>
-                          </Badge>
-                        </PopoverTrigger>
-                        {isImage && (
-                          <PopoverContent className="p-2 w-auto" align="start" sideOffset={8}>
-                            <img
-                              src={att.url}
-                              alt={att.name}
-                              className="max-w-[240px] max-h-[180px] rounded-md border"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </PopoverContent>
-                        )}
-                      </Popover>
+                      <Badge
+                        key={att.id}
+                        onClick={(e) => { e.stopPropagation(); handleOpenPreview(att.id); }}
+                        variant="outline"
+                        className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 cursor-pointer"
+                        title={att.name}
+                      >
+                        <Icon className="w-3 h-3" />
+                        <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
+                      </Badge>
                     );
                   })}
                   {task.attachments.length > 3 && (
@@ -394,6 +414,44 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </DropdownMenu>
         </div>
       )}
+
+      {/* Attachment Preview Dialog */}
+      {previewState.open && (() => {
+        const att = task.attachments?.find(a => a.id === previewState.attachmentId);
+        if (!att) return null;
+        const isImage = att.type?.startsWith('image/');
+        return (
+          <Dialog open={previewState.open} onOpenChange={(open) => !open && handleClosePreview()}>
+            <DialogContent className="max-w-2xl">
+              <div className="flex items-start justify-between">
+                <DialogTitle className="truncate pr-4">{att.name}</DialogTitle>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleDownloadAttachment} aria-label="Download attachment">
+                    <Download className="w-4 h-4" />
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={handleDeleteAttachment} aria-label="Delete attachment">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col items-center gap-3">
+                {isImage ? (
+                  <img src={att.url} alt={att.name} className="max-h-[60vh] rounded border" />
+                ) : (
+                  <div className="w-full flex flex-col items-center py-8">
+                    <FileIcon className="w-16 h-16 text-muted-foreground" />
+                    <div className="mt-2 text-sm text-muted-foreground">{att.type || 'file'}</div>
+                  </div>
+                )}
+                <div className="text-sm text-muted-foreground">
+                  <span className="mr-2">{att.type || 'file'}</span>
+                  <span>• {(att.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 };

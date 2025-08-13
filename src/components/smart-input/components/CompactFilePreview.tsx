@@ -55,7 +55,7 @@ const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemo
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium max-w-[160px]">
+        <div className="text-xs font-medium max-w-[160px]" title={file.name}>
           {truncateMiddle(file.name, 24)}
         </div>
         <div className="text-xs text-muted-foreground">

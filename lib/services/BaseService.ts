@@ -46,7 +46,7 @@ export abstract class BaseService<
   TEntity extends BaseEntity = BaseEntity,
   TCreateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
   TUpdateDTO = Partial<Omit<TEntity, keyof BaseEntity>>,
-  TFilters extends object = Record<string, unknown>
+  TFilters extends object = Record<string, unknown>,
 > {
   protected readonly config: BaseServiceConfig;
 
@@ -66,7 +66,16 @@ export abstract class BaseService<
    * Get the Prisma model delegate for this service
    * Must be implemented by concrete services
    */
-  protected abstract getModel(): any;
+  protected abstract getModel(): {
+    findMany: (args: Record<string, unknown>) => Promise<unknown[]>;
+    count?: (args: Record<string, unknown>) => Promise<number>;
+    findFirst: (args: Record<string, unknown>) => Promise<unknown | null>;
+    findUnique?: (args: Record<string, unknown>) => Promise<unknown | null>;
+    create?: (args: Record<string, unknown>) => Promise<unknown>;
+    update?: (args: Record<string, unknown>) => Promise<unknown | null>;
+    delete?: (args: Record<string, unknown>) => Promise<unknown>;
+    deleteMany?: (args: Record<string, unknown>) => Promise<unknown>;
+  };
 
   /**
    * Get the entity name for logging and error messages
@@ -77,7 +86,10 @@ export abstract class BaseService<
    * Build where clause for filtering
    * Can be overridden by concrete services for custom filtering
    */
-  protected buildWhereClause(filters: TFilters, _context?: ServiceContext): Record<string, unknown> {
+  protected buildWhereClause(
+    filters: TFilters,
+    _context?: ServiceContext
+  ): Record<string, unknown> {
     void _context;
     return filters as Record<string, unknown>;
   }
@@ -98,18 +110,20 @@ export abstract class BaseService<
     return entity as TEntity;
   }
 
-  /**
-   * Validate create data
-   * Can be overridden by concrete services
-   */
-  protected async validateCreate(_data: TCreateDTO, _context?: ServiceContext): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected async validateCreate(
+    data: TCreateDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     // Override in concrete services for validation
   }
 
-  /**
-   * Validate update data
-   */
-  protected async validateUpdate(_id: string, _data: TUpdateDTO, _context?: ServiceContext): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected async validateUpdate(
+    id: string,
+    data: TUpdateDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     // Override in concrete services for validation
   }
 
@@ -132,7 +146,11 @@ export abstract class BaseService<
   /**
    * Log service operation
    */
-  protected log(operation: string, data?: Record<string, unknown>, context?: ServiceContext): void {
+  protected log(
+    operation: string,
+    data?: Record<string, unknown>,
+    context?: ServiceContext
+  ): void {
     if (!this.config.enableLogging) return;
 
     const logData = {
@@ -151,11 +169,24 @@ export abstract class BaseService<
   /**
    * Ensure a user row exists in development to satisfy FK connects
    */
-  protected async ensureUserExists(userId?: string, emailFallback?: string): Promise<void> {
+  protected async ensureUserExists(
+    userId?: string,
+    emailFallback?: string
+  ): Promise<void> {
     if (!userId) return;
     try {
       if (process.env.NODE_ENV !== 'production') {
-        await (this.prisma as unknown as { user: { upsert: Function } }).user.upsert({
+        await (
+          this.prisma as unknown as {
+            user: {
+              upsert: (args: {
+                where: { id: string };
+                update: Record<string, unknown>;
+                create: { id: string; email: string };
+              }) => Promise<unknown>;
+            };
+          }
+        ).user.upsert({
           where: { id: userId },
           update: {},
           create: {
@@ -172,7 +203,10 @@ export abstract class BaseService<
   /**
    * Find all entities with optional filtering
    */
-  async findAll(filters: TFilters = {} as TFilters, context?: ServiceContext): Promise<TEntity[]> {
+  async findAll(
+    filters: TFilters = {} as TFilters,
+    context?: ServiceContext
+  ): Promise<TEntity[]> {
     try {
       this.log('findAll', { filters }, context);
 
@@ -184,9 +218,13 @@ export abstract class BaseService<
         include: includeClause,
       });
 
-      return entities.map(entity => this.transformEntity(entity));
+      return entities.map((entity) => this.transformEntity(entity));
     } catch (error) {
-      this.log('findAll:error', { error: (error as Error).message, filters }, context);
+      this.log(
+        'findAll:error',
+        { error: (error as Error).message, filters },
+        context
+      );
       throw error;
     }
   }
@@ -227,7 +265,7 @@ export abstract class BaseService<
       ]);
 
       return {
-        data: entities.map(entity => this.transformEntity(entity)),
+        data: entities.map((entity) => this.transformEntity(entity)),
         pagination: {
           page,
           limit,
@@ -236,7 +274,11 @@ export abstract class BaseService<
         },
       };
     } catch (error) {
-      this.log('findPaginated:error', { error: error.message, filters, page, limit }, context);
+      this.log(
+        'findPaginated:error',
+        { error: error.message, filters, page, limit },
+        context
+      );
       throw error;
     }
   }
@@ -244,7 +286,10 @@ export abstract class BaseService<
   /**
    * Find entity by ID
    */
-  async findById(id: string, context?: ServiceContext): Promise<TEntity | null> {
+  async findById(
+    id: string,
+    context?: ServiceContext
+  ): Promise<TEntity | null> {
     try {
       this.log('findById', { id }, context);
 
@@ -289,7 +334,11 @@ export abstract class BaseService<
   /**
    * Update entity by ID
    */
-  async update(id: string, data: TUpdateDTO, context?: ServiceContext): Promise<TEntity | null> {
+  async update(
+    id: string,
+    data: TUpdateDTO,
+    context?: ServiceContext
+  ): Promise<TEntity | null> {
     try {
       this.log('update', { id, data }, context);
 
@@ -352,7 +401,10 @@ export abstract class BaseService<
   /**
    * Count entities with optional filtering
    */
-  async count(filters: TFilters = {} as TFilters, context?: ServiceContext): Promise<number> {
+  async count(
+    filters: TFilters = {} as TFilters,
+    context?: ServiceContext
+  ): Promise<number> {
     try {
       this.log('count', { filters }, context);
 
@@ -368,7 +420,10 @@ export abstract class BaseService<
   /**
    * Bulk create entities
    */
-  async createMany(data: TCreateDTO[], context?: ServiceContext): Promise<{ count: number }> {
+  async createMany(
+    data: TCreateDTO[],
+    context?: ServiceContext
+  ): Promise<{ count: number }> {
     try {
       this.log('createMany', { count: data.length }, context);
 
@@ -380,7 +435,11 @@ export abstract class BaseService<
       this.log('createMany:success', { count: result.count }, context);
       return result;
     } catch (error) {
-      this.log('createMany:error', { error: error.message, count: data.length }, context);
+      this.log(
+        'createMany:error',
+        { error: error.message, count: data.length },
+        context
+      );
       throw error;
     }
   }
@@ -409,7 +468,11 @@ export abstract class BaseService<
       this.log('updateMany:success', { count: result.count }, context);
       return result;
     } catch (error) {
-      this.log('updateMany:error', { error: error.message, filters, data }, context);
+      this.log(
+        'updateMany:error',
+        { error: error.message, filters, data },
+        context
+      );
       throw error;
     }
   }
@@ -417,7 +480,10 @@ export abstract class BaseService<
   /**
    * Bulk delete entities
    */
-  async deleteMany(filters: TFilters, context?: ServiceContext): Promise<{ count: number }> {
+  async deleteMany(
+    filters: TFilters,
+    context?: ServiceContext
+  ): Promise<{ count: number }> {
     try {
       this.log('deleteMany', { filters }, context);
 

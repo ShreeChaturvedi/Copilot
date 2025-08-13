@@ -2,7 +2,11 @@
  * Attachment Service - Concrete implementation of BaseService for Attachment operations
  */
 // PrismaClient type is not directly referenced in this file
-import { BaseService, type ServiceContext, type BaseEntity } from './BaseService.js';
+import {
+  BaseService,
+  type ServiceContext,
+  type BaseEntity,
+} from './BaseService.js';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -16,7 +20,7 @@ export interface AttachmentEntity extends BaseEntity {
   taskId: string;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Relations (optional for different query contexts)
   task?: {
     id: string;
@@ -74,7 +78,13 @@ export interface FileUploadResult {
  * Supported file types configuration
  */
 export const SUPPORTED_FILE_TYPES = {
-  images: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+  images: [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+  ],
   documents: [
     'application/pdf',
     'application/msword',
@@ -88,7 +98,11 @@ export const SUPPORTED_FILE_TYPES = {
   ],
   audio: ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg'],
   video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
-  archives: ['application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'],
+  archives: [
+    'application/zip',
+    'application/x-rar-compressed',
+    'application/x-7z-compressed',
+  ],
 };
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -97,7 +111,12 @@ export const MAX_FILES_PER_TASK = 20;
 /**
  * AttachmentService - Handles all attachment-related operations
  */
-export class AttachmentService extends BaseService<AttachmentEntity, CreateAttachmentDTO, UpdateAttachmentDTO, AttachmentFilters> {
+export class AttachmentService extends BaseService<
+  AttachmentEntity,
+  CreateAttachmentDTO,
+  UpdateAttachmentDTO,
+  AttachmentFilters
+> {
   protected getModel() {
     return this.prisma.attachment;
   }
@@ -106,7 +125,10 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     return 'Attachment';
   }
 
-  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): Prisma.AttachmentWhereInput {
+  protected buildWhereClause(
+    filters: AttachmentFilters,
+    _context?: ServiceContext
+  ): Prisma.AttachmentWhereInput {
     void _context;
     const where: Prisma.AttachmentWhereInput = {};
 
@@ -161,9 +183,62 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   }
 
   /**
+   * Create an attachment and generate thumbnail for images
+   */
+  async create(
+    data: CreateAttachmentDTO,
+    context?: ServiceContext
+  ): Promise<AttachmentEntity> {
+    if (!context?.userId) {
+      throw new Error('AUTHORIZATION_ERROR: User ID required');
+    }
+    await this.validateCreate(data, context);
+
+    const isImage = SUPPORTED_FILE_TYPES.images.includes(data.fileType);
+
+    if (isImage) {
+      try {
+        // Generate server-side thumbnail using sharp if available
+        const fetchMod = await import('node-fetch');
+        const res = await fetchMod.default(data.fileUrl);
+        const buf = Buffer.from(await res.arrayBuffer());
+        const sharp = (await import('sharp')).default;
+        const thumb = await sharp(buf)
+          .resize({ width: 512, height: 512, fit: 'inside' })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        const { put } = await import('@vercel/blob');
+        await put(`thumb-${Date.now()}-${data.fileName}.jpg`, thumb, {
+          access: 'public',
+          contentType: 'image/jpeg',
+        } as { access: 'public' | 'private'; contentType?: string });
+      } catch (e) {
+        this.log('thumbnail:error', { message: (e as Error).message }, context);
+      }
+    }
+
+    const created = await this.getModel().create({
+      data: {
+        fileName: data.fileName,
+        fileUrl: data.fileUrl,
+        fileType: data.fileType,
+        fileSize: data.fileSize,
+        task: { connect: { id: data.taskId } },
+        // If schema lacks thumbnailUrl, this will be ignored by Prisma typing; keep comment for future migration
+        // thumbnailUrl,
+      } as unknown as import('@prisma/client').Prisma.AttachmentCreateInput,
+      include: this.buildIncludeClause(),
+    });
+    return this.transformEntity(created);
+  }
+
+  /**
    * Validate attachment creation
    */
-  protected async validateCreate(data: CreateAttachmentDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(
+    data: CreateAttachmentDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     if (!data.fileName?.trim()) {
       throw new Error('VALIDATION_ERROR: File name is required');
     }
@@ -182,7 +257,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
     // Validate file size
     if (data.fileSize > MAX_FILE_SIZE) {
-      throw new Error(`VALIDATION_ERROR: File size exceeds maximum limit of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      throw new Error(
+        `VALIDATION_ERROR: File size exceeds maximum limit of ${MAX_FILE_SIZE / 1024 / 1024}MB`
+      );
     }
 
     // Validate file type
@@ -220,7 +297,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
       // Check attachment limit per task
       if (task._count.attachments >= MAX_FILES_PER_TASK) {
-        throw new Error(`VALIDATION_ERROR: Maximum ${MAX_FILES_PER_TASK} attachments per task allowed`);
+        throw new Error(
+          `VALIDATION_ERROR: Maximum ${MAX_FILES_PER_TASK} attachments per task allowed`
+        );
       }
     }
   }
@@ -257,13 +336,17 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       });
 
       if (!attachment) {
-        throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
+        throw new Error(
+          'AUTHORIZATION_ERROR: Attachment not found or access denied'
+        );
       }
     }
 
     // Validate file size if being updated
     if (data.fileSize && data.fileSize > MAX_FILE_SIZE) {
-      throw new Error(`VALIDATION_ERROR: File size exceeds maximum limit of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      throw new Error(
+        `VALIDATION_ERROR: File size exceeds maximum limit of ${MAX_FILE_SIZE / 1024 / 1024}MB`
+      );
     }
 
     // Validate file type if being updated
@@ -285,7 +368,10 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   /**
    * Get attachments for a specific task
    */
-  async findByTask(taskId: string, context?: ServiceContext): Promise<AttachmentEntity[]> {
+  async findByTask(
+    taskId: string,
+    context?: ServiceContext
+  ): Promise<AttachmentEntity[]> {
     const filters: AttachmentFilters = { taskId };
     return await this.findAll(filters, context);
   }
@@ -293,8 +379,11 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   /**
    * Get attachments by file type
    */
-  async findByFileType(fileType: string, context?: ServiceContext): Promise<AttachmentEntity[]> {
-    const filters: AttachmentFilters = { 
+  async findByFileType(
+    fileType: string,
+    context?: ServiceContext
+  ): Promise<AttachmentEntity[]> {
+    const filters: AttachmentFilters = {
       fileType,
       userId: context?.userId,
     };
@@ -304,7 +393,10 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   /**
    * Get attachments by file category (images, documents, etc.)
    */
-  async findByCategory(category: keyof typeof SUPPORTED_FILE_TYPES, context?: ServiceContext): Promise<AttachmentEntity[]> {
+  async findByCategory(
+    category: keyof typeof SUPPORTED_FILE_TYPES,
+    context?: ServiceContext
+  ): Promise<AttachmentEntity[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -328,10 +420,18 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
         orderBy: { createdAt: 'desc' },
       });
 
-      this.log('findByCategory:success', { count: attachments.length }, context);
+      this.log(
+        'findByCategory:success',
+        { count: attachments.length },
+        context
+      );
       return attachments.map((attachment) => this.transformEntity(attachment));
     } catch (error) {
-      this.log('findByCategory:error', { error: error.message, category }, context);
+      this.log(
+        'findByCategory:error',
+        { error: error.message, category },
+        context
+      );
       throw error;
     }
   }
@@ -367,7 +467,8 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       const totalFiles = attachments.length;
       const totalSize = attachments.reduce((sum, att) => sum + att.fileSize, 0);
       const totalSizeMB = Math.round((totalSize / 1024 / 1024) * 100) / 100;
-      const averageFileSize = totalFiles > 0 ? Math.round(totalSize / totalFiles) : 0;
+      const averageFileSize =
+        totalFiles > 0 ? Math.round(totalSize / totalFiles) : 0;
 
       // Group by file type
       const filesByType: Record<string, { count: number; size: number }> = {};
@@ -419,7 +520,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       });
 
       if (!attachment) {
-        throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
+        throw new Error(
+          'AUTHORIZATION_ERROR: Attachment not found or access denied'
+        );
       }
 
       // Delete from database
@@ -431,7 +534,11 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       // This would require implementing file storage cleanup
       // await this.deleteFileFromStorage(attachment.fileUrl);
 
-      this.log('delete:success', { id, fileName: attachment.fileName }, context);
+      this.log(
+        'delete:success',
+        { id, fileName: attachment.fileName },
+        context
+      );
       return true;
     } catch (error) {
       this.log('delete:error', { error: error.message, id }, context);
@@ -442,7 +549,10 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   /**
    * Bulk delete attachments
    */
-  async bulkDelete(ids: string[], context?: ServiceContext): Promise<{ deletedCount: number }> {
+  async bulkDelete(
+    ids: string[],
+    context?: ServiceContext
+  ): Promise<{ deletedCount: number }> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -461,7 +571,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       });
 
       if (attachments.length !== ids.length) {
-        throw new Error('AUTHORIZATION_ERROR: Some attachments not found or access denied');
+        throw new Error(
+          'AUTHORIZATION_ERROR: Some attachments not found or access denied'
+        );
       }
 
       // Delete from database
@@ -505,7 +617,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       });
 
       if (!attachment) {
-        throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
+        throw new Error(
+          'AUTHORIZATION_ERROR: Attachment not found or access denied'
+        );
       }
 
       // For now, return the stored URL directly
@@ -537,7 +651,9 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
   /**
    * Get file category from file type
    */
-  static getFileCategory(fileType: string): keyof typeof SUPPORTED_FILE_TYPES | null {
+  static getFileCategory(
+    fileType: string
+  ): keyof typeof SUPPORTED_FILE_TYPES | null {
     for (const [category, types] of Object.entries(SUPPORTED_FILE_TYPES)) {
       if (types.includes(fileType)) {
         return category as keyof typeof SUPPORTED_FILE_TYPES;
@@ -551,18 +667,20 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
    */
   static formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   /**
    * Clean up orphaned attachments (attachments with no associated task)
    */
-  async cleanupOrphanedAttachments(context?: ServiceContext): Promise<{ deletedCount: number }> {
+  async cleanupOrphanedAttachments(
+    context?: ServiceContext
+  ): Promise<{ deletedCount: number }> {
     try {
       this.log('cleanupOrphanedAttachments', {}, context);
 
@@ -575,7 +693,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
       if (orphanedAttachments.length > 0) {
         const orphanedIds = orphanedAttachments.map((att) => att.id);
-        
+
         await this.getModel().deleteMany({
           where: {
             id: { in: orphanedIds },
@@ -588,10 +706,18 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
         // }
       }
 
-      this.log('cleanupOrphanedAttachments:success', { deletedCount: orphanedAttachments.length }, context);
+      this.log(
+        'cleanupOrphanedAttachments:success',
+        { deletedCount: orphanedAttachments.length },
+        context
+      );
       return { deletedCount: orphanedAttachments.length };
     } catch (error) {
-      this.log('cleanupOrphanedAttachments:error', { error: error.message }, context);
+      this.log(
+        'cleanupOrphanedAttachments:error',
+        { error: error.message },
+        context
+      );
       throw error;
     }
   }
