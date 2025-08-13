@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TaskItem } from '../TaskItem';
 import type { Task } from "@shared/types";
+import AttachmentPreviewDialog from '../AttachmentPreviewDialog';
 
 // Test wrapper with QueryClient
 const createWrapper = () => {
@@ -324,5 +325,39 @@ describe('TaskItem Component', () => {
       const taskContainer = screen.getByText('Test Task').closest('.group\\/task');
       expect(taskContainer).toHaveClass('opacity-50');
     });
+  });
+
+  it('opens attachment preview dialog when an attachment badge is clicked', async () => {
+    const task = {
+      id: 't1',
+      title: 'Task with file',
+      completed: false,
+      createdAt: new Date(),
+      attachments: [
+        { id: 'a1', name: 'photo.jpg', type: 'image/jpeg', size: 1024, url: 'data:image/jpeg;base64,xxx', uploadedAt: new Date(), taskId: 't1' },
+      ],
+    } as any;
+
+    const onToggle = vi.fn();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <TaskItem
+        task={task}
+        onToggle={onToggle}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        calendarMode={false}
+      />
+    );
+
+    const badge = await screen.findByTitle(/Preview photo.jpg/i);
+    expect(badge).toBeInTheDocument();
+
+    await userEvent.click(badge);
+
+    // Dialog content should appear with file meta text
+    expect(await screen.findByText(/photo.jpg/i)).toBeInTheDocument();
   });
 });

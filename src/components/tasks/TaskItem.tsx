@@ -18,9 +18,13 @@ import { cn } from '@/lib/utils';
 import { Task } from "@shared/types";
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
+import { taskQueryKeys } from '@/hooks/useTasks';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { DueDateBadge } from './DueDateBadge';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
+import AttachmentPreviewDialog from './AttachmentPreviewDialog';
+import { attachmentsApi } from '@/services/api';
 
 export interface TaskItemProps {
   task: Task;
@@ -88,6 +92,50 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
   const { taskGroups } = useTaskManagement({ includeTaskOperations: false });
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [activeAttachment, setActiveAttachment] = useState<NonNullable<Task['attachments']>[number] | null>(null);
+  const queryClient = useQueryClient();
+
+  const openAttachment = useCallback((att: NonNullable<Task['attachments']>[number]) => {
+    setActiveAttachment(att);
+    setPreviewOpen(true);
+  }, []);
+
+  const handleDownload = useCallback(async (att: NonNullable<Task['attachments']>[number]) => {
+    try {
+      const url = await attachmentsApi.getDownloadUrl(att.id);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = att.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('Download failed', e);
+    }
+  }, []);
+
+  const handleDeleteAttachment = useCallback(async (att: NonNullable<Task['attachments']>[number]) => {
+    try {
+      // Optimistically update cache
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map((t) => t.id === task.id ? { ...t, attachments: (t.attachments || []).filter((a) => a.id !== att.id) } : t);
+        }
+      );
+
+      await attachmentsApi.delete(att.id);
+
+      setPreviewOpen(false);
+      setActiveAttachment(null);
+      // Optionally refetch tasks to ensure consistency
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+    } catch (e) {
+      console.error('Delete attachment failed', e);
+    }
+  }, [task.id, queryClient]);
 
   const handleToggle = () => {
     onToggle(task.id);
@@ -369,30 +417,16 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                   const isVideo = att.type?.startsWith('video/');
                   const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
                   return (
-                    <Popover key={att.id}>
-                      <PopoverTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50"
-                          asChild
-                        >
-                          <a href={att.url} target="_blank" rel="noreferrer" title={att.name} onClick={(e)=>e.stopPropagation()}>
-                            <Icon className="w-3 h-3" />
-                            <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
-                          </a>
-                        </Badge>
-                      </PopoverTrigger>
-                      {isImage && (
-                        <PopoverContent className="p-2 w-auto" align="start" sideOffset={8}>
-                          <img
-                            src={att.url}
-                            alt={att.name}
-                            className="max-w-[240px] max-h-[180px] rounded-md border"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </PopoverContent>
-                      )}
-                    </Popover>
+                    <Badge
+                      key={att.id}
+                      variant="outline"
+                      className="text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); openAttachment(att); }}
+                      title={`Preview ${att.name}`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
+                    </Badge>
                   );
                 })}
                 {task.attachments.length > 3 && (
@@ -431,6 +465,15 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </DropdownMenu>
         </div>
       )}
+
+      {/* Attachment Preview Dialog */}
+      <AttachmentPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        attachment={activeAttachment}
+        onDelete={(att) => handleDeleteAttachment(att)}
+        onDownload={(att) => handleDownload(att)}
+      />
     </div>
   );
 };
