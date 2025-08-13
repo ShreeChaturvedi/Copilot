@@ -2,7 +2,7 @@
  * Event Service - Concrete implementation of BaseService for Event operations
  */
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
-import type { Prisma } from '@prisma/client';
+import { query } from '../config/database.js';
 
 /**
  * Event entity interface extending base
@@ -86,9 +86,7 @@ export interface EventConflict {
  * EventService - Handles all event-related operations
  */
 export class EventService extends BaseService<EventEntity, CreateEventDTO, UpdateEventDTO, EventFilters> {
-  protected getModel() {
-    return this.prisma.event;
-  }
+  protected getTableName(): string { return 'events'; }
 
   protected getEntityName(): string {
     return 'Event';
@@ -103,96 +101,100 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       await this.validateCreate(data, context);
       await this.ensureUserExists(context?.userId, 'dev@example.com');
 
-      const createData: Prisma.EventCreateInput = {
-        title: data.title.trim(),
-        start: data.start,
-        end: data.end,
-        description: data.description?.trim() || null,
-        location: data.location?.trim() || null,
-        notes: data.notes?.trim() || null,
-        allDay: data.allDay ?? false,
-        recurrence: data.recurrence || null,
-        user: { connect: { id: context!.userId! } },
-        calendar: { connect: { id: data.calendarId } },
-      };
+      const inserted = await query(
+        `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, "userId", "calendarId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+         RETURNING *`,
+        [
+          data.title.trim(),
+          data.description?.trim() || null,
+          data.start,
+          data.end,
+          data.allDay ?? false,
+          data.location?.trim() || null,
+          data.notes?.trim() || null,
+          data.recurrence || null,
+          context!.userId!,
+          data.calendarId,
+        ],
+        this.db
+      );
 
-      const result = await this.getModel().create({
-        data: createData,
-        include: this.buildIncludeClause(),
-      });
-
-      this.log('create:success', { id: result.id }, context);
-      return this.transformEntity(result);
+      const row = inserted.rows[0];
+      this.log('create:success', { id: row.id }, context);
+      return this.transformEntity(row);
     } catch (error) {
       this.log('create:error', { error: (error as Error).message, data }, context);
       throw error;
     }
   }
 
-  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): Prisma.EventWhereInput {
-    const where: Prisma.EventWhereInput = {};
-
-    // Always filter by user
+  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
     if (context?.userId) {
-      where.userId = context.userId;
+      params.push(context.userId);
+      clauses.push('"userId" = $' + params.length);
     }
-
-    // Calendar filter
     if (filters.calendarId) {
-      where.calendarId = filters.calendarId;
+      params.push(filters.calendarId);
+      clauses.push('"calendarId" = $' + params.length);
     }
-
-    // Multiple calendars filter
     if (filters.calendarIds && filters.calendarIds.length > 0) {
-      where.calendarId = { in: filters.calendarIds };
+      const placeholders = filters.calendarIds.map((_, i) => '$' + (params.length + i + 1)).join(',');
+      params.push(...filters.calendarIds);
+      clauses.push('"calendarId" IN (' + placeholders + ')');
     }
-
-    // Date range filter
-    if (filters.start || filters.end) {
-      const andClauses: Prisma.EventWhereInput[] = [];
-      if (filters.start) {
-        andClauses.push({ end: { gte: filters.start } });
-      }
-      if (filters.end) {
-        andClauses.push({ start: { lte: filters.end } });
-      }
-      if (andClauses.length > 0) where.AND = andClauses;
+    if (filters.start) {
+      params.push(filters.start);
+      clauses.push('"end" >= $' + params.length);
     }
-
-    // Search filter
+    if (filters.end) {
+      params.push(filters.end);
+      clauses.push('start <= $' + params.length);
+    }
     if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-        { location: { contains: filters.search, mode: 'insensitive' } },
-        { notes: { contains: filters.search, mode: 'insensitive' } },
-      ];
+      params.push('%' + filters.search + '%');
+      const idx = params.length;
+      clauses.push(`(title ILIKE $${idx} OR description ILIKE $${idx} OR location ILIKE $${idx} OR notes ILIKE $${idx})`);
     }
-
-    // All-day filter
     if (filters.allDay !== undefined) {
-      where.allDay = filters.allDay;
+      params.push(filters.allDay);
+      clauses.push('"allDay" = $' + params.length);
     }
-
-    // Recurrence filter
     if (filters.hasRecurrence !== undefined) {
-      where.recurrence = filters.hasRecurrence ? { not: null } : null;
+      clauses.push(filters.hasRecurrence ? 'recurrence IS NOT NULL' : 'recurrence IS NULL');
     }
-
-    return where;
+    const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    return { sql, params };
   }
 
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {
-      calendar: {
-        select: {
-          id: true,
-          name: true,
-          color: true,
-          isVisible: true,
-        },
-      },
-    };
+  async findAll(filters: EventFilters = {}, context?: ServiceContext): Promise<EventEntity[]> {
+    try {
+      this.log('findAll', { filters }, context);
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const order = 'ORDER BY start ASC, "createdAt" DESC';
+      const res = await query(`SELECT * FROM events ${sql} ${order}`, params, this.db);
+      const base = res.rows.map((r: any) => this.transformEntity(r));
+      return await this.enrichEntities(base, context);
+    } catch (error: any) {
+      this.log('findAll:error', { error: error.message, filters }, context);
+      throw error;
+    }
+  }
+
+  protected async enrichEntities(entities: EventEntity[], _context?: ServiceContext): Promise<EventEntity[]> {
+    if (!entities.length) return entities;
+    const calendarIds = Array.from(new Set(entities.map((e) => e.calendarId)));
+    const placeholders = calendarIds.map((_, i) => `$${i + 1}`).join(',');
+    const calendars = await query(
+      `SELECT id, name, color, "isVisible" FROM calendars WHERE id IN (${placeholders})`,
+      calendarIds,
+      this.db
+    );
+    const calMap = new Map<string, any>();
+    calendars.rows.forEach((c: any) => calMap.set(c.id, c));
+    return entities.map((e) => ({ ...e, calendar: calMap.get(e.calendarId) }));
   }
 
   /**
@@ -214,14 +216,8 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Validate calendar exists and user owns it
     if (context?.userId) {
-      const calendar = await this.prisma.calendar.findFirst({
-        where: {
-          id: data.calendarId,
-          userId: context.userId,
-        },
-      });
-
-      if (!calendar) {
+      const calendar = await query('SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.calendarId, context.userId], this.db);
+      if (calendar.rowCount === 0) {
         throw new Error('VALIDATION_ERROR: Calendar not found or access denied');
       }
     }
@@ -252,18 +248,16 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     }
 
     // Get current event data for validation
-    const currentEvent = await this.getModel().findUnique({
-      where: { id },
-      select: { start: true, end: true, allDay: true },
-    });
+    const currentRes = await query('SELECT start, "end", "allDay" FROM events WHERE id = $1', [id], this.db);
+    const currentEvent = currentRes.rows[0];
 
     if (!currentEvent) {
       throw new Error('NOT_FOUND: Event not found');
     }
 
     // Validate start/end relationship
-    const start = data.start ?? currentEvent.start;
-    const end = data.end ?? currentEvent.end;
+    const start = (typeof data.start === 'string' ? new Date(data.start) : data.start) ?? currentEvent.start;
+    const end = (typeof data.end === 'string' ? new Date(data.end) : data.end) ?? currentEvent.end;
     const allDay = data.allDay ?? currentEvent.allDay;
 
     if (!allDay && start >= end) {
@@ -272,14 +266,8 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Validate calendar if being updated
     if (data.calendarId && context?.userId) {
-      const calendar = await this.prisma.calendar.findFirst({
-        where: {
-          id: data.calendarId,
-          userId: context.userId,
-        },
-      });
-
-      if (!calendar) {
+      const calendar = await query('SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.calendarId, context.userId], this.db);
+      if (calendar.rowCount === 0) {
         throw new Error('VALIDATION_ERROR: Calendar not found or access denied');
       }
     }
@@ -288,6 +276,66 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     if (data.recurrence && !this.isValidRRule(data.recurrence)) {
       throw new Error('VALIDATION_ERROR: Invalid recurrence rule format');
     }
+  }
+
+  /**
+   * Update event by ID
+   */
+  async update(id: string, data: UpdateEventDTO, context?: ServiceContext): Promise<EventEntity | null> {
+    await this.validateUpdate(id, data, context);
+
+    const sets: string[] = [];
+    const params: any[] = [];
+
+    if (data.title !== undefined) {
+      params.push(data.title.trim());
+      sets.push(`title = $${params.length}`);
+    }
+    if (data.description !== undefined) {
+      params.push(data.description?.trim() || null);
+      sets.push(`description = $${params.length}`);
+    }
+    if (data.start !== undefined) {
+      const d = typeof data.start === 'string' ? new Date(data.start) : data.start;
+      params.push(d);
+      sets.push(`start = $${params.length}`);
+    }
+    if (data.end !== undefined) {
+      const d = typeof data.end === 'string' ? new Date(data.end) : data.end;
+      params.push(d);
+      sets.push(`"end" = $${params.length}`);
+    }
+    if (data.allDay !== undefined) {
+      params.push(!!data.allDay);
+      sets.push(`"allDay" = $${params.length}`);
+    }
+    if (data.location !== undefined) {
+      params.push(data.location?.trim() || null);
+      sets.push(`location = $${params.length}`);
+    }
+    if (data.notes !== undefined) {
+      params.push(data.notes?.trim() || null);
+      sets.push(`notes = $${params.length}`);
+    }
+    if (data.recurrence !== undefined) {
+      params.push(data.recurrence || null);
+      sets.push(`recurrence = $${params.length}`);
+    }
+    if (data.calendarId !== undefined) {
+      params.push(data.calendarId);
+      sets.push(`"calendarId" = $${params.length}`);
+    }
+
+    params.push(new Date());
+    sets.push(`"updatedAt" = $${params.length}`);
+    params.push(id);
+
+    const sql = `UPDATE events SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
+    const res = await query(sql, params, this.db);
+    if (res.rowCount === 0) return null;
+    const base = this.transformEntity(res.rows[0]);
+    const [enriched] = await this.enrichEntities([base], context);
+    return enriched;
   }
 
   /**
@@ -318,21 +366,20 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       this.log('findUpcoming', { limit }, context);
 
       const now = new Date();
-      const events = await this.getModel().findMany({
-        where: {
-          userId: context.userId,
-          start: { gte: now },
-          calendar: {
-            isVisible: true,
-          },
-        },
-        include: this.buildIncludeClause(),
-        orderBy: { start: 'asc' },
-        take: limit,
-      });
-
-      this.log('findUpcoming:success', { count: events.length }, context);
-      return events.map((event) => this.transformEntity(event));
+      const res = await query(
+        `SELECT e.*
+         FROM events e
+         JOIN calendars c ON c.id = e."calendarId"
+         WHERE e."userId" = $1 AND e.start >= $2 AND c."isVisible" = true
+         ORDER BY e.start ASC
+         LIMIT $3`,
+        [context.userId!, now, limit],
+        this.db
+      );
+      const base = res.rows.map((r: any) => this.transformEntity(r));
+      const enriched = await this.enrichEntities(base, context);
+      this.log('findUpcoming:success', { count: enriched.length }, context);
+      return enriched;
     } catch (error) {
       this.log('findUpcoming:error', { error: error.message, limit }, context);
       throw error;
@@ -362,29 +409,13 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     try {
       this.log('getConflicts', { eventData, excludeId }, context);
 
-      const where: Record<string, unknown> = {
-        userId: context.userId,
-        // Find overlapping events
-        AND: [
-          { start: { lt: eventData.end } },
-          { end: { gt: eventData.start } },
-        ],
-      };
-
-      // Exclude the event being updated
-      if (excludeId) {
-        where.id = { not: excludeId };
-      }
-
-      // Only check conflicts within the same calendar or specified calendars
-      if (eventData.calendarId) {
-        where.calendarId = eventData.calendarId;
-      }
-
-      const conflictingEvents = await this.getModel().findMany({
-        where,
-        include: this.buildIncludeClause(),
-      });
+      const params: any[] = [context.userId!, eventData.end!, eventData.start!];
+      const and: string[] = ['e."userId" = $1', 'e.start < $2', 'e."end" > $3'];
+      if (excludeId) { params.push(excludeId); and.push('e.id <> $' + params.length); }
+      if (eventData.calendarId) { params.push(eventData.calendarId); and.push('e."calendarId" = $' + params.length); }
+      const sql = `SELECT e.* FROM events e WHERE ${and.join(' AND ')}`;
+      const res = await query(sql, params, this.db);
+      const conflictingEvents = res.rows as any[];
 
       const conflicts: EventConflict[] = conflictingEvents.map((conflictEvent) => {
         const overlapStart = new Date(Math.max(eventData.start!.getTime(), conflictEvent.start.getTime()));

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon } from 'lucide-react';
+import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, CornerDownRight } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,7 +16,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Task } from "@shared/types";
-import { useUIStore } from '@/stores/uiStore';
 import { useCalendars } from '@/hooks/useCalendars';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
@@ -33,6 +32,8 @@ export interface TaskItemProps {
   groupColor?: string;
   className?: string;
   calendarMode?: boolean; // Hide tags when in calendar view
+  /** Whether to show the task list label (emoji + name) inline with the title */
+  showTaskListLabel?: boolean;
 }
 
 // Constants
@@ -73,6 +74,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   groupColor,
   className,
   calendarMode = false,
+  showTaskListLabel = false,
 }) => {
   // Consolidated UI state for better performance
   const [uiState, setUiState] = useState({
@@ -82,7 +84,6 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     contextMenuPosition: null as { x: number; y: number } | null,
   });
   const inputRef = useRef<HTMLInputElement>(null);
-  const { showTaskListContextInAll } = useUIStore();
   // Calendars must be read via hook at top-level (Rules of Hooks)
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
@@ -237,26 +238,40 @@ export const TaskItem: React.FC<TaskItemProps> = ({
               className={cn(
                 'cursor-text text-sm font-medium transition-colors duration-200',
                 'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border',
-                'flex items-center justify-between w-full',
+                'flex items-center w-full',
                 task.completed && `line-through text-muted-foreground opacity-[${COMPLETED_TASK_OPACITY}]`
               )}
               title={task.title}
             >
-              <span className="truncate overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">
-                {task.title}
-              </span>
-              {/* Task list context - RIGHT ALIGNED emoji + name */}
-              {showTaskListContextInAll && task.taskListId && (
-                (() => {
-                  const taskList = taskGroups.find(group => group.id === task.taskListId);
-                  return taskList ? (
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground/70 flex-shrink-0 ml-3">
-                      <span className="text-base">{taskList.emoji}</span>
-                      <span>{taskList.name}</span>
-                    </span>
-                  ) : null;
-                })()
-              )}
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="truncate overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+                  {task.title}
+                </span>
+                {/* Task list context - LEFT ALIGNED inline label with icon */}
+                {showTaskListLabel && !calendarMode && task.taskListId && (
+                  (() => {
+                    const taskList = taskGroups.find(group => group.id === task.taskListId);
+                    return taskList ? (
+                      <span
+                        className={cn(
+                          'relative inline-flex items-center gap-1.5 text-sm flex-shrink-0',
+                          'text-muted-foreground/70 ml-2',
+                          // Metallic shine effect overlay + fast, smooth transition
+                          'before:absolute before:inset-0 before:bg-gradient-to-r',
+                          'before:from-transparent before:via-black/15 before:to-transparent',
+                          'dark:before:via-white/15 before:translate-x-[-150%] before:skew-x-12',
+                          'before:transition-transform before:duration-[480ms]',
+                          'hover:before:translate-x-[150%] hover:text-white transition-colors duration-150 ease-out'
+                        )}
+                      >
+                        <CornerDownRight className="w-3 h-3 opacity-70" />
+                        <span className="text-base">{taskList.emoji}</span>
+                        <span className="whitespace-nowrap">{taskList.name}</span>
+                      </span>
+                    ) : null;
+                  })()
+                )}
+              </div>
             </div>
           )}
           

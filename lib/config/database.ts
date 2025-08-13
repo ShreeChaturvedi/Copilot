@@ -1,42 +1,9 @@
 /**
- * Database configuration for Vercel API routes
+ * Database configuration for Vercel API routes (Pure SQL via pg)
  */
-import { PrismaClient } from '@prisma/client';
+import { Pool, type PoolClient, type QueryResult } from 'pg';
 
-// Global variable to prevent multiple instances in serverless environment
-declare global {
-  var __prisma: PrismaClient | undefined;
-}
-
-/**
- * Create Prisma client with appropriate configuration
- */
-const createPrismaClient = () => {
-  return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' 
-      ? ['query', 'info', 'warn', 'error']
-      : ['warn', 'error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
-  });
-};
-
-/**
- * Prisma client instance - prevents multiple instances in serverless
- */
-export const prisma = globalThis.__prisma || createPrismaClient();
-
-// Cache instance in development to prevent hot reload issues
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.__prisma = prisma;
-}
-
-/**
- * Database configuration object
- */
+// Database configuration object
 export const databaseConfig = {
   url: process.env.DATABASE_URL || 'postgresql://localhost:5432/react_calendar_dev',
   maxConnections: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10'),
@@ -44,52 +11,85 @@ export const databaseConfig = {
   queryTimeout: parseInt(process.env.DATABASE_QUERY_TIMEOUT || '60000'),
 };
 
-/**
- * Initialize database connection
- */
-export const initDatabase = async (): Promise<void> => {
+// Global pool (cached in dev to avoid multiple instances during HMR)
+declare global {
+  // eslint-disable-next-line no-var
+  var __pgPool: Pool | undefined;
+}
+
+const createPool = () =>
+  new Pool({
+    connectionString: databaseConfig.url,
+    max: databaseConfig.maxConnections,
+    idleTimeoutMillis: databaseConfig.connectionTimeout,
+  });
+
+export const pool: Pool = globalThis.__pgPool || createPool();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.__pgPool = pool;
+}
+
+export type SqlClient = Pool | PoolClient;
+
+export async function initDatabase(): Promise<void> {
   try {
-    await prisma.$connect();
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
     console.log('✅ Database connected successfully (API)');
   } catch (error) {
     console.error('❌ Database connection failed (API):', error);
     throw error;
   }
-};
+}
 
-/**
- * Health check for database
- */
-export const checkDatabaseHealth = async (): Promise<boolean> => {
+export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    return true;
+    const { rows } = await pool.query('SELECT 1');
+    return rows.length === 1;
   } catch (error) {
     console.error('Database health check failed:', error);
     return false;
   }
-};
+}
 
-/**
- * Cleanup database connections
- */
-export const cleanupDatabase = async (): Promise<void> => {
+export async function cleanupDatabase(): Promise<void> {
   try {
-    await prisma.$disconnect();
+    await pool.end();
     console.log('✅ Database disconnected successfully (API)');
   } catch (error) {
     console.error('❌ Database disconnection failed (API):', error);
   }
-};
+}
 
-/**
- * Transaction helper for API routes
- */
-export const withTransaction = async <T>(
-  callback: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>
-): Promise<T> => {
-  return await prisma.$transaction(callback);
-};
+// Simple query helper
+export async function query<T = any>(sql: string, params: any[] = [], client?: SqlClient): Promise<QueryResult<T>> {
+  if (client) {
+    return (client as PoolClient).query<T>(sql, params);
+  }
+  return pool.query<T>(sql, params);
+}
+
+// Transaction helper for API routes
+export async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // ignore rollback errors
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 // Graceful shutdown for serverless functions
 if (typeof process !== 'undefined') {
@@ -98,4 +98,4 @@ if (typeof process !== 'undefined') {
   });
 }
 
-export default prisma;
+export default pool;

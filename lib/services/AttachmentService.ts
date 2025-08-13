@@ -3,7 +3,7 @@
  */
 // PrismaClient type is not directly referenced in this file
 import { BaseService, type ServiceContext, type BaseEntity } from './BaseService.js';
-import type { Prisma } from '@prisma/client';
+import { query } from '../config/database.js';
 
 /**
  * Attachment entity interface extending base
@@ -98,66 +98,33 @@ export const MAX_FILES_PER_TASK = 20;
  * AttachmentService - Handles all attachment-related operations
  */
 export class AttachmentService extends BaseService<AttachmentEntity, CreateAttachmentDTO, UpdateAttachmentDTO, AttachmentFilters> {
-  protected getModel() {
-    return this.prisma.attachment;
-  }
+  protected getTableName(): string { return 'attachments'; }
 
   protected getEntityName(): string {
     return 'Attachment';
   }
 
-  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): Prisma.AttachmentWhereInput {
-    void _context;
-    const where: Prisma.AttachmentWhereInput = {};
-
-    // Task filter
-    if (filters.taskId) {
-      where.taskId = filters.taskId;
-    }
-
-    // Filter by task owner (user)
-    if (filters.userId) {
-      where.task = { userId: filters.userId } as Prisma.TaskWhereInput;
-    }
-
-    // File type filter
-    if (filters.fileType) {
-      where.fileType = filters.fileType;
-    }
-
-    // Search filter (by filename)
-    if (filters.search) {
-      where.fileName = {
-        contains: filters.search,
-        mode: 'insensitive',
-      };
-    }
-
-    // File size filters
-    if (filters.minSize !== undefined || filters.maxSize !== undefined) {
-      const range: { gte?: number; lte?: number } = {};
-      if (filters.minSize !== undefined) {
-        range.gte = filters.minSize;
-      }
-      if (filters.maxSize !== undefined) {
-        range.lte = filters.maxSize;
-      }
-      where.fileSize = range;
-    }
-
-    return where;
+  protected buildWhereClause(filters: AttachmentFilters, _context?: ServiceContext): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
+    if (filters.taskId) { params.push(filters.taskId); clauses.push('"taskId" = $' + params.length); }
+    if (filters.userId) { params.push(filters.userId); clauses.push('EXISTS (SELECT 1 FROM tasks t WHERE t.id = attachments."taskId" AND t."userId" = $' + params.length + ')'); }
+    if (filters.fileType) { params.push(filters.fileType); clauses.push('"fileType" = $' + params.length); }
+    if (filters.search) { params.push('%' + filters.search + '%'); clauses.push('"fileName" ILIKE $' + params.length); }
+    if (filters.minSize !== undefined) { params.push(filters.minSize); clauses.push('"fileSize" >= $' + params.length); }
+    if (filters.maxSize !== undefined) { params.push(filters.maxSize); clauses.push('"fileSize" <= $' + params.length); }
+    const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    return { sql, params };
   }
 
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {
-      task: {
-        select: {
-          id: true,
-          title: true,
-          userId: true,
-        },
-      },
-    };
+  protected async enrichEntities(entities: AttachmentEntity[], _context?: ServiceContext): Promise<AttachmentEntity[]> {
+    if (!entities.length) return entities;
+    const taskIds = Array.from(new Set(entities.map((e) => e.taskId)));
+    const placeholders = taskIds.map((_, i) => `$${i + 1}`).join(',');
+    const res = await query('SELECT id, title, "userId" FROM tasks WHERE id IN (' + placeholders + ')', taskIds, this.db);
+    const map = new Map<string, any>();
+    res.rows.forEach((r: any) => map.set(r.id, r));
+    return entities.map((e) => ({ ...e, task: map.get(e.taskId) }));
   }
 
   /**
@@ -200,28 +167,12 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
     // Validate task exists and user has access
     if (context?.userId) {
-      const task = await this.prisma.task.findFirst({
-        where: {
-          id: data.taskId,
-          userId: context.userId,
-        },
-        include: {
-          _count: {
-            select: {
-              attachments: true,
-            },
-          },
-        },
-      });
-
-      if (!task) {
+      const task = await query('SELECT id, (SELECT COUNT(*) FROM attachments a WHERE a."taskId" = tasks.id) AS cnt FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.taskId, context.userId], this.db);
+      if (task.rowCount === 0) {
         throw new Error('VALIDATION_ERROR: Task not found or access denied');
       }
-
-      // Check attachment limit per task
-      if (task._count.attachments >= MAX_FILES_PER_TASK) {
-        throw new Error(`VALIDATION_ERROR: Maximum ${MAX_FILES_PER_TASK} attachments per task allowed`);
-      }
+      const cnt = Number((task.rows[0] as any).cnt || 0);
+      if (cnt >= MAX_FILES_PER_TASK) throw new Error(`VALIDATION_ERROR: Maximum ${MAX_FILES_PER_TASK} attachments per task allowed`);
     }
   }
 
@@ -247,18 +198,8 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
 
     // Check if user has access to the attachment
     if (_context?.userId) {
-      const attachment = await this.getModel().findFirst({
-        where: {
-          id,
-          task: {
-            userId: _context.userId,
-          },
-        },
-      });
-
-      if (!attachment) {
-        throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
-      }
+      const attachment = await query('SELECT a.id FROM attachments a JOIN tasks t ON t.id = a."taskId" WHERE a.id = $1 AND t."userId" = $2 LIMIT 1', [id, _context.userId], this.db);
+      if (attachment.rowCount === 0) throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
     }
 
     // Validate file size if being updated
@@ -317,19 +258,18 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
         throw new Error('VALIDATION_ERROR: Invalid file category');
       }
 
-      const attachments = await this.getModel().findMany({
-        where: {
-          fileType: { in: supportedTypes },
-          task: {
-            userId: context.userId,
-          },
-        },
-        include: this.buildIncludeClause(),
-        orderBy: { createdAt: 'desc' },
-      });
-
-      this.log('findByCategory:success', { count: attachments.length }, context);
-      return attachments.map((attachment) => this.transformEntity(attachment));
+      const placeholders = supportedTypes.map((_, i) => `$${i + 1}`).join(',');
+      const res = await query(
+        `SELECT a.* FROM attachments a
+         JOIN tasks t ON t.id = a."taskId"
+         WHERE a."fileType" IN (${placeholders}) AND t."userId" = $${supportedTypes.length + 1}
+         ORDER BY a."createdAt" DESC`,
+        [...supportedTypes, context.userId!],
+        this.db
+      );
+      this.log('findByCategory:success', { count: res.rowCount }, context);
+      const base = res.rows.map((r: any) => this.transformEntity(r));
+      return await this.enrichEntities(base, context);
     } catch (error) {
       this.log('findByCategory:error', { error: error.message, category }, context);
       throw error;
@@ -354,18 +294,18 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     try {
       this.log('getStorageStats', {}, context);
 
-      const attachments = await this.getModel().findMany({
-        where: {
-          task: {
-            userId: context.userId,
-          },
-        },
-        include: this.buildIncludeClause(),
-        orderBy: { fileSize: 'desc' },
-      });
+      const attachmentsRes = await query(
+        `SELECT a.* FROM attachments a
+         JOIN tasks t ON t.id = a."taskId"
+         WHERE t."userId" = $1
+         ORDER BY a."fileSize" DESC`,
+        [context.userId!],
+        this.db
+      );
 
+      const attachments = attachmentsRes.rows as any[];
       const totalFiles = attachments.length;
-      const totalSize = attachments.reduce((sum, att) => sum + att.fileSize, 0);
+      const totalSize = attachments.reduce((sum, att) => sum + Number(att.fileSize), 0);
       const totalSizeMB = Math.round((totalSize / 1024 / 1024) * 100) / 100;
       const averageFileSize = totalFiles > 0 ? Math.round(totalSize / totalFiles) : 0;
 
@@ -379,9 +319,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
         filesByType[attachment.fileType].size += attachment.fileSize;
       });
 
-      const largestFiles = attachments
-        .slice(0, 10)
-        .map((attachment) => this.transformEntity(attachment));
+      const largestFiles = attachments.slice(0, 10).map((attachment) => this.transformEntity(attachment));
 
       const stats = {
         totalFiles,
@@ -408,24 +346,21 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       this.log('delete', { id }, context);
 
       // Get attachment details first
-      const attachment = await this.getModel().findFirst({
-        where: {
-          id,
-          task: {
-            userId: context?.userId,
-          },
-        },
-        include: this.buildIncludeClause(),
-      });
+      const attachmentRes = await query(
+        `SELECT a.* FROM attachments a
+         JOIN tasks t ON t.id = a."taskId"
+         WHERE a.id = $1 AND t."userId" = $2 LIMIT 1`,
+        [id, context?.userId!],
+        this.db
+      );
+      const attachment = attachmentRes.rows[0];
 
       if (!attachment) {
         throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
       }
 
       // Delete from database
-      await this.getModel().delete({
-        where: { id },
-      });
+      await query('DELETE FROM attachments WHERE id = $1', [id], this.db);
 
       // TODO: Delete file from storage (Vercel Blob, S3, etc.)
       // This would require implementing file storage cleanup
@@ -451,25 +386,19 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       this.log('bulkDelete', { ids }, context);
 
       // Get attachments to verify ownership
-      const attachments = await this.getModel().findMany({
-        where: {
-          id: { in: ids },
-          task: {
-            userId: context.userId,
-          },
-        },
-      });
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+      const attachments = await query(
+        `SELECT a.id, t."userId" FROM attachments a JOIN tasks t ON t.id = a."taskId" WHERE a.id IN (${placeholders}) AND t."userId" = $${ids.length + 1}`,
+        [...ids, context.userId!],
+        this.db
+      );
 
-      if (attachments.length !== ids.length) {
+      if (attachments.rowCount !== ids.length) {
         throw new Error('AUTHORIZATION_ERROR: Some attachments not found or access denied');
       }
 
       // Delete from database
-      const result = await this.getModel().deleteMany({
-        where: {
-          id: { in: ids },
-        },
-      });
+      const result = await query('DELETE FROM attachments WHERE id = ANY($1::text[])', [ids], this.db);
 
       // TODO: Delete files from storage
       // for (const attachment of attachments) {
@@ -477,7 +406,7 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
       // }
 
       this.log('bulkDelete:success', { deletedCount: result.count }, context);
-      return { deletedCount: result.count };
+      return { deletedCount: result.rowCount ?? 0 };
     } catch (error) {
       this.log('bulkDelete:error', { error: error.message, ids }, context);
       throw error;
@@ -495,14 +424,14 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     try {
       this.log('getDownloadUrl', { id }, context);
 
-      const attachment = await this.getModel().findFirst({
-        where: {
-          id,
-          task: {
-            userId: context.userId,
-          },
-        },
-      });
+      const attachmentRes = await query(
+        `SELECT a.* FROM attachments a
+         JOIN tasks t ON t.id = a."taskId"
+         WHERE a.id = $1 AND t."userId" = $2 LIMIT 1`,
+        [id, context.userId!],
+        this.db
+      );
+      const attachment = attachmentRes.rows[0];
 
       if (!attachment) {
         throw new Error('AUTHORIZATION_ERROR: Attachment not found or access denied');
@@ -566,21 +495,17 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
     try {
       this.log('cleanupOrphanedAttachments', {}, context);
 
-      const orphanedAttachments = await this.getModel().findMany({
-        where: {
-          task: null,
-        },
-        select: { id: true, fileUrl: true },
-      });
+      const orphanedRes = await query<{ id: string; fileUrl: string }>(
+        `SELECT a.id, a."fileUrl" FROM attachments a
+         LEFT JOIN tasks t ON t.id = a."taskId"
+         WHERE t.id IS NULL`,
+        [],
+        this.db
+      );
 
-      if (orphanedAttachments.length > 0) {
-        const orphanedIds = orphanedAttachments.map((att) => att.id);
-        
-        await this.getModel().deleteMany({
-          where: {
-            id: { in: orphanedIds },
-          },
-        });
+      if (orphanedRes.rowCount > 0) {
+        const orphanedIds = orphanedRes.rows.map((att) => att.id);
+        await query('DELETE FROM attachments WHERE id = ANY($1::text[])', [orphanedIds], this.db);
 
         // TODO: Clean up files from storage
         // for (const attachment of orphanedAttachments) {
@@ -588,8 +513,8 @@ export class AttachmentService extends BaseService<AttachmentEntity, CreateAttac
         // }
       }
 
-      this.log('cleanupOrphanedAttachments:success', { deletedCount: orphanedAttachments.length }, context);
-      return { deletedCount: orphanedAttachments.length };
+      this.log('cleanupOrphanedAttachments:success', { deletedCount: orphanedRes.rowCount }, context);
+      return { deletedCount: orphanedRes.rowCount };
     } catch (error) {
       this.log('cleanupOrphanedAttachments:error', { error: error.message }, context);
       throw error;

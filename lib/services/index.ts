@@ -18,14 +18,14 @@ export * from './ServiceFactory.js';
 
 // Service initialization and utilities
 import { initializeServiceFactory } from './ServiceFactory.js';
-import { prisma } from '../config/database.js';
+import pool from '../config/database.js';
 
 /**
  * Initialize all services with default configuration
  */
 export const initServices = () => {
   const factory = initializeServiceFactory({
-    prisma,
+    dbClient: undefined,
     enableLogging: process.env.NODE_ENV === 'development',
     enableCaching: process.env.REDIS_URL ? true : false,
     cacheTTL: 300, // 5 minutes

@@ -508,7 +508,8 @@ function EventCreationDialogContent({
         })
       } else {
         // Create new event
-        await createEventMutation.mutateAsync({
+        // Optimistic create is handled in the hook; we can close immediately upon triggering
+        createEventMutation.mutate({
           title: formData.title.trim(),
           start: startDateTime,
           end: endDateTime,

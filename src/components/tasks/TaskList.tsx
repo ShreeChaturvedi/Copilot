@@ -87,6 +87,8 @@ export interface TaskListProps {
   hideHeader?: boolean;
   calendarMode?: boolean; // New prop for calendar view mode
   maxTasks?: number; // New prop to limit tasks shown in calendar mode
+  /** Controls whether task list labels should be shown inline with tasks */
+  showTaskListLabels?: boolean;
 }
 
 const TASK_COLORS = [
@@ -118,6 +120,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   hideHeader = false,
   calendarMode = false,
   maxTasks = 10,
+  showTaskListLabels = false,
 }) => {
   // Use global show completed state instead of local state
   const { globalShowCompleted } = useUIStore();
@@ -317,7 +320,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   </span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-3" align="start">
+                <PopoverContent className="w-fit p-0" align="start">
                 <Suspense fallback={null}>
                   <EmojiPicker
                      selectedEmoji={activeTaskGroup.emoji}
@@ -348,13 +351,31 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                onEditTaskGroup?.(activeTaskGroup.id, {
+                  name: activeTaskGroup.name,
+                  emoji: activeTaskGroup.emoji,
+                  color: activeTaskGroup.color,
+                  description: activeTaskGroup.description,
+                })
+              }
+            >
                   <span className="mr-2" style={{ color: activeTaskGroup.color }}>
                     <Settings className="h-4 w-4" />
                   </span>
               <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                onEditTaskGroup?.(activeTaskGroup.id, {
+                  name: activeTaskGroup.name,
+                  emoji: activeTaskGroup.emoji,
+                  color: activeTaskGroup.color,
+                  description: activeTaskGroup.description,
+                })
+              }
+            >
                   <span className="mr-2" style={{ color: activeTaskGroup.color }}>
                     <Edit className="h-4 w-4" />
                   </span>
@@ -438,7 +459,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-3" align="start">
+              <PopoverContent className="w-fit p-0" align="start">
                   <Suspense fallback={null}>
                     <EmojiPicker
                       selectedEmoji={activeTaskGroup.emoji}
@@ -565,6 +586,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   onSchedule={onScheduleTask}
                   onRemoveTag={onRemoveTag}
                   groupColor={activeTaskGroup.color}
+                  showTaskListLabel={showTaskListLabels}
                 />
               ))}
             </div>

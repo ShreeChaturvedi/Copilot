@@ -2,7 +2,7 @@
  * TaskList Service - Concrete implementation of BaseService for TaskList operations
  */
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
-import type { Prisma } from '@prisma/client';
+import { query } from '../config/database.js';
 
 /**
  * TaskList entity interface extending base
@@ -69,46 +69,92 @@ export interface TaskListWithCounts extends TaskListEntity {
  * TaskListService - Handles all task list-related operations
  */
 export class TaskListService extends BaseService<TaskListEntity, CreateTaskListDTO, UpdateTaskListDTO, TaskListFilters> {
-  protected getModel() {
-    return this.prisma.taskList;
-  }
+  protected getTableName(): string { return 'task_lists'; }
 
   protected getEntityName(): string {
     return 'TaskList';
   }
 
-  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): Prisma.TaskListWhereInput {
-    const where: Prisma.TaskListWhereInput = {};
+  /**
+   * Update task list by ID
+   */
+  async update(id: string, data: UpdateTaskListDTO, context?: ServiceContext): Promise<TaskListEntity | null> {
+    await this.validateUpdate(id, data, context);
 
-    // Always filter by user
-    if (context?.userId) {
-      where.userId = context.userId;
+    const sets: string[] = [];
+    const params: any[] = [];
+
+    if (data.name !== undefined) {
+      params.push(data.name.trim());
+      sets.push(`name = $${params.length}`);
+    }
+    if (data.color !== undefined) {
+      params.push(data.color);
+      sets.push(`color = $${params.length}`);
+    }
+    if (data.icon !== undefined) {
+      params.push(data.icon ?? null);
+      sets.push(`icon = $${params.length}`);
+    }
+    if (data.description !== undefined) {
+      params.push(data.description?.trim() || null);
+      sets.push(`description = $${params.length}`);
     }
 
-    // Search filter
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
+    params.push(new Date());
+    sets.push(`"updatedAt" = $${params.length}`);
+    params.push(id);
 
-    // Filter for task lists with active tasks
-    if (filters.hasActiveTasks) {
-      where.tasks = { some: { completed: false } };
-    }
-
-    return where;
+    const sql = `UPDATE task_lists SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
+    const res = await query(sql, params, this.db);
+    if (res.rowCount === 0) return null;
+    return this.transformEntity(res.rows[0]);
   }
 
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {
-      _count: {
-        select: {
-          tasks: true,
-        },
-      },
-    };
+  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
+    if (context?.userId) { params.push(context.userId); clauses.push('"userId" = $' + params.length); }
+    if (filters.search) { params.push('%' + filters.search + '%'); const idx = params.length; clauses.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`); }
+    if (filters.hasActiveTasks) { clauses.push('EXISTS (SELECT 1 FROM tasks t WHERE t."taskListId" = task_lists.id AND t.completed = false)'); }
+    const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    return { sql, params };
+  }
+
+  async findAll(filters: TaskListFilters = {}, context?: ServiceContext): Promise<TaskListEntity[]> {
+    try {
+      this.log('findAll', { filters }, context);
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const res = await query(`SELECT * FROM task_lists ${sql} ORDER BY name ASC`, params, this.db);
+      return res.rows.map((r: any) => this.transformEntity(r));
+    } catch (error: any) {
+      this.log('findAll:error', { error: error.message, filters }, context);
+      throw error;
+    }
+  }
+
+  protected async enrichEntities(entities: TaskListEntity[], context?: ServiceContext): Promise<TaskListEntity[]> {
+    if (!entities.length) return entities;
+    const ids = entities.map((l) => l.id);
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const counts = await query<{ id: string; total: string; completed: string }>(
+      `SELECT tl.id,
+              COUNT(t.*)::bigint AS total,
+              COUNT(CASE WHEN t.completed THEN 1 END)::bigint AS completed
+       FROM task_lists tl
+       LEFT JOIN tasks t ON t."taskListId" = tl.id
+       WHERE tl.id IN (${placeholders})
+       GROUP BY tl.id`,
+      ids,
+      this.db
+    );
+    const map = new Map<string, { total: number; completed: number }>();
+    counts.rows.forEach((r) => map.set(r.id, { total: Number(r.total), completed: Number(r.completed) }));
+    return entities.map((e) => ({
+      ...e,
+      _count: { tasks: map.get(e.id)?.total ?? 0 },
+      tasks: undefined,
+    }));
   }
 
   /**
@@ -121,14 +167,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Check for duplicate task list name for the user
     if (context?.userId) {
-      const existingTaskList = await this.prisma.taskList.findFirst({
-        where: {
-          name: data.name.trim(),
-          userId: context.userId,
-        },
-      });
+      const existingTaskList = await query('SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 LIMIT 1', [data.name.trim(), context.userId], this.db);
 
-      if (existingTaskList) {
+      if (existingTaskList.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
       }
     }
@@ -160,15 +201,8 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Check for duplicate name if name is being updated
     if (data.name && context?.userId) {
-      const existingTaskList = await this.prisma.taskList.findFirst({
-        where: {
-          name: data.name.trim(),
-          userId: context.userId,
-          id: { not: id }, // Exclude current task list
-        },
-      });
-
-      if (existingTaskList) {
+      const existingTaskList = await query('SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 AND id <> $3 LIMIT 1', [data.name.trim(), context.userId, id], this.db);
+      if (existingTaskList.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
       }
     }
@@ -188,21 +222,16 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       await this.validateCreate(data, context);
 
-      const createData: Prisma.TaskListCreateInput = {
-        name: data.name.trim(),
-        color: data.color,
-        icon: data.icon || null,
-        description: data.description?.trim() || null,
-        user: { connect: { id: context!.userId! } },
-      };
-
-      const result = await this.getModel().create({
-        data: createData,
-        include: this.buildIncludeClause(),
-      });
-
-      this.log('create:success', { id: result.id }, context);
-      return this.transformEntity(result);
+      const inserted = await query(
+        `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW(), NOW())
+         RETURNING *`,
+        [data.name.trim(), data.color, data.icon || null, data.description?.trim() || null, context!.userId!],
+        this.db
+      );
+      const row = inserted.rows[0];
+      this.log('create:success', { id: row.id }, context);
+      return this.transformEntity(row);
     } catch (error) {
       this.log('create:error', { error: error.message, data }, context);
       throw error;
@@ -221,21 +250,13 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       this.log('getDefault', {}, context);
 
       // Try to find "General" task list first
-      let defaultTaskList = await this.getModel().findFirst({
-        where: {
-          userId: context.userId,
-          name: 'General',
-        },
-        include: this.buildIncludeClause(),
-      });
+      const generalRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 LIMIT 1', [context.userId!, 'General'], this.db);
+      let defaultTaskList = generalRes.rows[0];
 
       // If no "General" list, get the first task list
       if (!defaultTaskList) {
-        defaultTaskList = await this.getModel().findFirst({
-          where: { userId: context.userId },
-          include: this.buildIncludeClause(),
-          orderBy: { createdAt: 'asc' },
-        });
+        const firstRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1', [context.userId!], this.db);
+        defaultTaskList = firstRes.rows[0];
       }
 
       // If no task lists exist, create a default one
@@ -271,35 +292,32 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     try {
       this.log('getWithTaskCount', {}, context);
 
-      const taskLists = await this.getModel().findMany({
-        where: { userId: context.userId },
-        include: {
-          _count: {
-            select: {
-              tasks: true,
-            },
-          },
-          tasks: {
-            select: {
-              id: true,
-              completed: true,
-            },
-          },
-        },
-        orderBy: { name: 'asc' },
-      });
+      const res = await query(
+        `SELECT tl.id, tl.name, tl.color, tl.icon, tl.description, tl."userId", tl."createdAt", tl."updatedAt",
+                COUNT(t.*)::bigint AS task_count,
+                COUNT(CASE WHEN t.completed THEN 1 END)::bigint AS completed_count
+         FROM task_lists tl
+         LEFT JOIN tasks t ON t."taskListId" = tl.id
+         WHERE tl."userId" = $1
+         GROUP BY tl.id
+         ORDER BY tl.name ASC`,
+        [context.userId!],
+        this.db
+      );
 
-      const results: TaskListWithCounts[] = taskLists.map((taskList) => {
-        const completedTaskCount = taskList.tasks.filter((task) => task.completed).length;
-        const totalTaskCount = taskList.tasks.length;
-
-        return {
-          ...this.transformEntity(taskList),
-          taskCount: totalTaskCount,
-          completedTaskCount,
-          pendingTaskCount: totalTaskCount - completedTaskCount,
-        };
-      });
+      const results: TaskListWithCounts[] = res.rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        color: r.color,
+        icon: r.icon,
+        description: r.description,
+        userId: r.userId,
+        createdAt: new Date(r.createdAt),
+        updatedAt: new Date(r.updatedAt),
+        taskCount: Number(r.task_count),
+        completedTaskCount: Number(r.completed_count),
+        pendingTaskCount: Number(r.task_count) - Number(r.completed_count),
+      }));
 
       this.log('getWithTaskCount:success', { count: results.length }, context);
       return results;
@@ -320,30 +338,42 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     try {
       this.log('getWithTasks', {}, context);
 
-      const taskLists = await this.getModel().findMany({
-        where: { userId: context.userId },
-        include: {
-          _count: { select: { tasks: true } },
-          tasks: {
-            select: {
-              id: true,
-              title: true,
-              completed: true,
-              scheduledDate: true,
-              priority: true,
-            },
-            orderBy: [
-              { completed: 'asc' },
-              { scheduledDate: 'asc' },
-              { createdAt: 'desc' },
-            ],
-            take: 10, // Limit to recent tasks to avoid performance issues
-          },
-        },
-        orderBy: { name: 'asc' },
+      const listsRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY name ASC', [context.userId!], this.db);
+      const listIds = listsRes.rows.map((r) => r.id);
+      const placeholders = listIds.map((_, i) => `$${i + 1}`).join(',');
+      const tasksRes = listIds.length
+        ? await query(
+            `SELECT id, title, completed, "scheduledDate", priority, "taskListId"
+             FROM tasks WHERE "taskListId" IN (${placeholders})
+             ORDER BY completed ASC, "scheduledDate" ASC NULLS LAST, "createdAt" DESC`,
+            listIds,
+            this.db
+          )
+        : { rows: [] } as any;
+      const tasksByList = new Map<string, any[]>();
+      (tasksRes.rows as any[]).forEach((t) => {
+        const arr = tasksByList.get(t.taskListId) || [];
+        if (arr.length < 10) arr.push(t);
+        tasksByList.set(t.taskListId, arr);
       });
-
-      const results = taskLists.map((taskList) => this.transformEntity(taskList));
+      const results = listsRes.rows.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        color: l.color,
+        icon: l.icon,
+        description: l.description,
+        userId: l.userId,
+        createdAt: new Date(l.createdAt),
+        updatedAt: new Date(l.updatedAt),
+        _count: { tasks: (tasksByList.get(l.id) || []).length },
+        tasks: (tasksByList.get(l.id) || []).map((t) => ({
+          id: t.id,
+          title: t.title,
+          completed: t.completed,
+          scheduledDate: t.scheduledDate,
+          priority: t.priority,
+        })),
+      }));
 
       this.log('getWithTasks:success', { count: results.length }, context);
       return results;
@@ -365,14 +395,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       this.log('reorder', { taskListIds }, context);
 
       // Validate all task lists belong to user
-      const userTaskLists = await this.getModel().findMany({
-        where: {
-          id: { in: taskListIds },
-          userId: context.userId,
-        },
-      });
-
-      if (userTaskLists.length !== taskListIds.length) {
+      const placeholders = taskListIds.map((_, i) => `$${i + 1}`).join(',');
+      const res = await query(`SELECT id FROM task_lists WHERE id IN (${placeholders}) AND "userId" = $${taskListIds.length + 1}`, [...taskListIds, context.userId!], this.db);
+      if (res.rowCount !== taskListIds.length) {
         throw new Error('VALIDATION_ERROR: Some task lists not found or access denied');
       }
 
@@ -380,11 +405,8 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       // In a full implementation, you might add an `order` field to the database
       const orderedTaskLists = await Promise.all(
         taskListIds.map(async (id) => {
-          const taskList = await this.getModel().findUnique({
-            where: { id },
-            include: this.buildIncludeClause(),
-          });
-          return taskList;
+          const r = await query('SELECT * FROM task_lists WHERE id = $1', [id], this.db);
+          return r.rows[0];
         })
       );
 
@@ -424,22 +446,12 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
         // Move all tasks to the default task list if they're not already there
         if (defaultTaskList.id !== id) {
-          await this.prisma.task.updateMany({
-            where: {
-              taskListId: id,
-              userId: context.userId,
-            },
-            data: {
-              taskListId: defaultTaskList.id,
-            },
-          });
+          await query('UPDATE tasks SET "taskListId" = $1 WHERE "taskListId" = $2 AND "userId" = $3', [defaultTaskList.id, id, context.userId!], this.db);
         }
       }
 
       // Delete the task list
-      await this.getModel().delete({
-        where: { id },
-      });
+      await query('DELETE FROM task_lists WHERE id = $1', [id], this.db);
 
       this.log('delete:success', { id }, context);
       return true;
@@ -466,27 +478,17 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     try {
       this.log('getStatistics', {}, context);
 
-      const [totalLists, totalTasks, completedTasks] = await Promise.all([
-        this.getModel().count({ where: { userId: context.userId } }),
-        this.prisma.task.count({ where: { userId: context.userId } }),
-        this.prisma.task.count({ 
-          where: { 
-            userId: context.userId,
-            completed: true,
-          },
-        }),
+      const [listsRes, tasksRes, completedRes] = await Promise.all([
+        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM task_lists WHERE "userId" = $1', [context.userId!], this.db),
+        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1', [context.userId!], this.db),
+        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true', [context.userId!], this.db),
       ]);
-
+      const totalLists = Number(listsRes.rows[0].count);
+      const totalTasks = Number(tasksRes.rows[0].count);
+      const completedTasks = Number(completedRes.rows[0].count);
       const pendingTasks = totalTasks - completedTasks;
       const averageTasksPerList = totalLists > 0 ? Math.round((totalTasks / totalLists) * 100) / 100 : 0;
-
-      const stats = {
-        totalLists,
-        totalTasks,
-        completedTasks,
-        pendingTasks,
-        averageTasksPerList,
-      };
+      const stats = { totalLists, totalTasks, completedTasks, pendingTasks, averageTasksPerList };
 
       this.log('getStatistics:success', stats, context);
       return stats;

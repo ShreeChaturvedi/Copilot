@@ -39,6 +39,7 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
   onDeleteCalendar,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
+  const [editingItem, setEditingItem] = React.useState<CheckboxModeItem | null>(null);
 
   // Convert calendars to base list items
   const baseItems = calendars.map(calendarToBaseItem);
@@ -67,8 +68,16 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
     iconId: string;
     color: string;
   }) => {
-    onAddCalendar(data.name, data.color);
+    if (editingItem) {
+      onEditCalendar(editingItem.name, data.name, data.color);
+      setEditingItem(null);
+      setShowCreateDialog(false);
+    } else {
+      onAddCalendar(data.name, data.color);
+    }
   };
+
+  const currentCal = editingItem ? calendars.find(c => c.name === editingItem.name) : undefined;
 
   return (
     <BaseList<CheckboxModeItem>
@@ -79,11 +88,26 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
       onToggle={handleToggle}
       onAdd={handleAdd}
       onEdit={handleEdit}
+      onStartEdit={(item) => {
+        setEditingItem(item);
+        setShowCreateDialog(true);
+      }}
       onDelete={handleDelete}
       showCreateDialog={showCreateDialog}
-      onShowCreateDialog={setShowCreateDialog}
+      onShowCreateDialog={(open) => {
+        setShowCreateDialog(open);
+        if (!open) setEditingItem(null);
+      }}
       onCreateDialogSubmit={handleCreateFromDialog}
       CreateDialogComponent={CreateCalendarDialog}
+      createDialogInitialData={editingItem ? {
+        name: currentCal?.name || editingItem.name,
+        description: currentCal?.description || '',
+        iconId: 'Calendar',
+        color: currentCal?.color || editingItem.color,
+        submitLabel: 'Save Changes',
+        titleLabel: 'Edit Calendar',
+      } : undefined}
       addButtonLabel="Calendar"
       emptyStateText="No calendars yet"
       createFirstItemText="Create your first calendar"

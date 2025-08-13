@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTasks } from './useTasks';
 import { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { Task, TaskTag } from '@shared/types';
 import { UseMutationResult } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
+import { toast } from 'sonner';
 
 interface CreateTaskData {
   title: string;
@@ -135,56 +137,51 @@ export function useTaskManagement(
   const [activeTaskGroupId, setActiveTaskGroupId] = useState('default');
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
 
-  // Load real task lists from backend and hydrate taskGroups
+  const queryClient = useQueryClient();
+
+  const authHeaders = (): Record<string, string> => {
+    try {
+      const token = useAuthStore.getState().getValidAccessToken();
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  };
+
+  // Consolidated task lists fetch with React Query to dedupe network calls across components
+  const taskListsQuery = useQuery({
+    queryKey: ['task-lists', { withTaskCount: false }],
+    queryFn: async () => {
+      const res = await fetch('/api/task-lists', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      });
+      const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+      if (!isJson(res)) return [] as TaskGroup[];
+      const body = await res.json();
+      if (!res.ok || !body.success) return [] as TaskGroup[];
+      const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
+      const mapped: TaskGroup[] = items.map((it: any) => ({
+        id: String(it.id),
+        name: String(it.name ?? 'Tasks'),
+        emoji: String(it.icon ?? '📁'),
+        color: String(it.color ?? '#3b82f6'),
+        description: String(it.description ?? ''),
+      }));
+      return mapped;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  // Hydrate local state from shared query to maintain current component behaviors
   useEffect(() => {
-    let cancelled = false;
-
-    const authHeaders = (): Record<string, string> => {
-      try {
-        const token = useAuthStore.getState().getValidAccessToken();
-        return token ? { Authorization: `Bearer ${token}` } : {};
-      } catch {
-        return {};
-      }
-    };
-
-    const fetchTaskLists = async () => {
-      try {
-        const res = await fetch('/api/task-lists', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        });
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
-        if (!isJson(res)) return; // keep default local group
-        const body = await res.json();
-        if (!res.ok || !body.success) return;
-        const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
-        const mapped: TaskGroup[] = items.map((it: any) => ({
-          id: String(it.id),
-          name: String(it.name ?? 'Tasks'),
-          emoji: String(it.icon ?? '📁'),
-          color: String(it.color ?? '#3b82f6'),
-          description: String(it.description ?? ''),
-        }));
-        if (!cancelled && mapped.length > 0) {
-          setTaskGroups(mapped);
-          // If current active selection is default placeholder, switch to first real list by default
-          // Otherwise preserve user selection
-          setActiveTaskGroupId((prev) => (prev === 'default' ? mapped[0].id : prev));
-        }
-      } catch (err) {
-        // Non-fatal: leave local default
-        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-          console.warn('Failed to load task lists; using default group', err);
-        }
-      }
-    };
-
-    fetchTaskLists();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (taskListsQuery.data && taskListsQuery.data.length > 0) {
+      setTaskGroups(taskListsQuery.data);
+      setActiveTaskGroupId((prev) => (prev === 'default' ? taskListsQuery.data![0].id : prev));
+    }
+  }, [taskListsQuery.data]);
 
   // Task CRUD handlers (only when includeTaskOperations is true)
   const handleAddTask = includeTaskOperations
@@ -209,8 +206,12 @@ export function useTaskManagement(
             color: tag.color,
           }));
 
+        // Normalize special group ids
+        const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
+
         addTask.mutate({
           title,
+          taskListId,
           priority: smartData?.priority,
           scheduledDate,
           tags: nonDateTimeTags,
@@ -288,55 +289,98 @@ export function useTaskManagement(
         });
         const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
         if (!isJson(res)) {
-          // Fallback: local-only
-          const fallback: TaskGroup = {
-            id: `group-${Date.now()}`,
-            name: data.name,
-            emoji: data.emoji,
-            color: data.color,
-            description: data.description,
-          };
-          setTaskGroups((prev) => [...prev, fallback]);
-          setActiveTaskGroupId(fallback.id);
-          return;
+          // Optimistic local-only path already applied by UI add below
         }
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create list');
         const created = body.data as { id: string; name: string; color: string; description?: string };
-        const newTaskGroup: TaskGroup = {
-          id: String(created.id),
-          name: created.name,
-          emoji: data.emoji || '📁',
-          color: created.color,
-          description: created.description,
-        };
-        setTaskGroups((prev) => [...prev, newTaskGroup]);
-        setActiveTaskGroupId(newTaskGroup.id);
+        setTaskGroups((prev) => prev.map(g => g.id.startsWith('group-temp-') && g.name === data.name ? { ...g, id: String(created.id), color: created.color, description: created.description } : g));
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
-        if (typeof console !== 'undefined' && typeof console.error === 'function') {
-          console.error('Failed to create task list', err);
-        }
+        toast.error((err as Error).message || 'Failed to create task list');
+        // Rollback optimistic add
+        setTaskGroups((prev) => prev.filter((g) => !g.id.startsWith('group-temp-') || g.name !== data.name));
       }
     })();
+    // Optimistic add
+    const tempId = `group-temp-${Date.now()}`;
+    const fallback: TaskGroup = {
+      id: tempId,
+      name: data.name,
+      emoji: data.emoji,
+      color: data.color,
+      description: data.description,
+    };
+    setTaskGroups((prev) => [...prev, fallback]);
+    setActiveTaskGroupId(tempId);
   };
 
   const handleEditTaskGroup = (
     groupId: string,
     updates: Partial<TaskGroup>
   ) => {
-    setTaskGroups((prev) =>
-      prev.map((group) =>
-        group.id === groupId ? { ...group, ...updates } : group
-      )
-    );
+    // Persist to backend, then update local state
+    (async () => {
+      try {
+        const payload: Record<string, unknown> = {
+          ...(updates.name ? { name: updates.name } : {}),
+          ...(updates.color ? { color: updates.color } : {}),
+          ...(updates.emoji ? { icon: updates.emoji } : {}),
+          ...(updates.description ? { description: updates.description } : {}),
+        };
+
+        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify(payload),
+        });
+        // Ignore non-json responses silently in dev
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (isJson(res)) {
+          const body = await res.json();
+          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list');
+        }
+      } catch (err) {
+        toast.error((err as Error).message || 'Failed to update task list');
+        // No rollback snapshot in this simplified path; refetch list
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+        return;
+      }
+      // Optimistic apply already done now
+      setTaskGroups((prev) =>
+        prev.map((group) =>
+          group.id === groupId ? { ...group, ...updates } : group
+        )
+      );
+      void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+    })();
   };
 
   const handleDeleteTaskGroup = (groupId: string) => {
     if (groupId === 'default') return; // Don't delete default group
+    const previous = taskGroups;
     setTaskGroups((prev) => prev.filter((group) => group.id !== groupId));
     if (groupId === activeTaskGroupId) {
       setActiveTaskGroupId('default');
     }
+    (async () => {
+      try {
+        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
+          method: 'DELETE',
+          headers: { ...authHeaders() },
+        });
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (isJson(res) && !res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error?.message || 'Failed to delete task list');
+        }
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+      } catch (err) {
+        toast.error((err as Error).message || 'Failed to delete task list');
+        // Rollback
+        setTaskGroups(previous);
+      }
+    })();
   };
 
   const handleSelectTaskGroup = (groupId: string) => {
@@ -362,15 +406,51 @@ export function useTaskManagement(
   };
 
   const handleUpdateTaskGroupIcon = (groupId: string, emoji: string) => {
-    setTaskGroups((prev) =>
-      prev.map((group) => (group.id === groupId ? { ...group, emoji } : group))
-    );
+    // Optimistic update with rollback
+    const previous = taskGroups;
+    setTaskGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, emoji } : g)));
+    (async () => {
+      try {
+        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ icon: emoji }),
+        });
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (isJson(res)) {
+          const body = await res.json();
+          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list icon');
+        }
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+      } catch (err) {
+        setTaskGroups(previous);
+        toast.error((err as Error).message || 'Failed to update task list icon');
+      }
+    })();
   };
 
   const handleUpdateTaskGroupColor = (groupId: string, color: string) => {
-    setTaskGroups((prev) =>
-      prev.map((group) => (group.id === groupId ? { ...group, color } : group))
-    );
+    // Optimistic update with rollback
+    const previous = taskGroups;
+    setTaskGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, color } : g)));
+    (async () => {
+      try {
+        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ color }),
+        });
+        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        if (isJson(res)) {
+          const body = await res.json();
+          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list color');
+        }
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+      } catch (err) {
+        setTaskGroups(previous);
+        toast.error((err as Error).message || 'Failed to update task list color');
+      }
+    })();
   };
 
   const handleOpenCreateTaskDialog = () => {

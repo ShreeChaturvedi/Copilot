@@ -54,6 +54,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   onDeleteTaskGroup,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
+  const [editingItem, setEditingItem] = React.useState<SelectionModeItem | null>(null);
 
   // Convert task groups to base list items
   const baseItems = taskGroups.map(taskGroupToBaseItem);
@@ -95,13 +96,26 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
     iconId: string;
     color: string;
   }) => {
-    onAddTaskGroup({
-      name: data.name,
-      emoji: '📁',
-      color: data.color,
-      description: data.description,
-    });
+    if (editingItem) {
+      onEditTaskGroup(editingItem.id, {
+        name: data.name,
+        emoji: data.iconId,
+        color: data.color,
+        description: data.description,
+      });
+      setEditingItem(null);
+      setShowCreateDialog(false);
+    } else {
+      onAddTaskGroup({
+        name: data.name,
+        emoji: '📁',
+        color: data.color,
+        description: data.description,
+      });
+    }
   };
+
+  const currentGroup = editingItem ? taskGroups.find(g => g.id === editingItem.id) : undefined;
 
   return (
     <BaseList<SelectionModeItem>
@@ -113,11 +127,26 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
       onSelect={handleSelect}
       onAdd={handleAdd}
       onEdit={handleEdit}
+      onStartEdit={(item) => {
+        setEditingItem(item);
+        setShowCreateDialog(true);
+      }}
       onDelete={handleDelete}
       showCreateDialog={showCreateDialog}
-      onShowCreateDialog={setShowCreateDialog}
+      onShowCreateDialog={(open) => {
+        setShowCreateDialog(open);
+        if (!open) setEditingItem(null);
+      }}
       onCreateDialogSubmit={handleCreateFromDialog}
       CreateDialogComponent={CreateTaskDialog}
+      createDialogInitialData={editingItem ? {
+        name: currentGroup?.name || '',
+        description: currentGroup?.description || '',
+        emoji: currentGroup?.emoji || '📁',
+        color: currentGroup?.color,
+        submitLabel: 'Save Changes',
+        titleLabel: 'Edit Task List',
+      } : undefined}
       addButtonLabel="Task List"
       emptyStateText="No task lists yet"
       createFirstItemText="Create your first task list"

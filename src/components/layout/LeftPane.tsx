@@ -13,7 +13,7 @@ import { useCalendarManagement } from '@/hooks/useCalendarManagement';
 import { useUIStore } from '@/stores/uiStore';
 import { BaseSidebarPane } from './BaseSidebarPane';
 import { Button } from '@/components/ui/Button';
-import { CalendarArrowDown, CalendarArrowUp } from 'lucide-react';
+import { CalendarArrowDown, CalendarArrowUp, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Calendar as MiniCalendar } from '@/components/ui/calendar';
 import { Separator } from '@/components/ui/separator';
@@ -65,6 +65,8 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     activeTaskGroupId,
     showCreateTaskDialog,
     setShowCreateTaskDialog,
+    handleAddTaskGroup,
+    handleEditTaskGroup,
     handleCreateTaskGroup,
     handleSelectTaskGroup,
     handleUpdateTaskGroupIcon,
@@ -95,28 +97,59 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     [handleOpenCreateTaskDialog]
   );
 
-  // Additional header content - only show SmartTaskInput in calendar view
+  // State and controls for collapsible SmartTaskInput (shown in calendar view)
+  const [showSmartInput, setShowSmartInput] = useState<boolean>(true);
+  const [hasUserToggledSmartInput, setHasUserToggledSmartInput] = useState<boolean>(false);
+
+  // Disable animation on initial mount and when switching tabs; enable only after explicit user toggle
+  useEffect(() => {
+    setHasUserToggledSmartInput(false);
+  }, [currentView]);
+
+  const handleToggleSmartInput = useCallback(() => {
+    setHasUserToggledSmartInput(true);
+    setShowSmartInput((v) => !v);
+  }, []);
+
+  // Additional header content - SmartTaskInput wrapped in Collapsible in calendar view
   const additionalHeaderContent = useMemo(() => {
-    return currentView === 'calendar' ? (
-      <div className="mt-4 text-sm">
-        <SmartTaskInput
-          onAddTask={memoizedHandleAddTask}
-          taskGroups={taskGroups}
-          activeTaskGroupId={activeTaskGroupId}
-          onCreateTaskGroup={memoizedHandleOpenCreateTaskDialog}
-          onSelectTaskGroup={memoizedHandleSelectTaskGroup}
-          disabled={isLoading || addTask.isPending}
-          enableSmartParsing={true}
-          showConfidence={false}
-          maxDisplayTags={3}
-          useInlineHighlighting={false}
-          useOverlayHighlighting={false}
-          useFlexInputGroup={true}
-        />
-      </div>
-    ) : null;
+    if (currentView !== 'calendar') return null;
+    return (
+      <Collapsible open={showSmartInput}>
+        <CollapsibleContent
+          className={
+            'overflow-hidden ' +
+            (hasUserToggledSmartInput
+              ? 'data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up'
+              : '')
+          }
+        >
+          <div className={hasUserToggledSmartInput ? 'calendar-item' : undefined}>
+            <div className="mt-4 text-sm">
+              <SmartTaskInput
+                onAddTask={memoizedHandleAddTask}
+                taskGroups={taskGroups}
+                activeTaskGroupId={activeTaskGroupId}
+                onCreateTaskGroup={memoizedHandleOpenCreateTaskDialog}
+                onSelectTaskGroup={memoizedHandleSelectTaskGroup}
+                disabled={isLoading || addTask.isPending}
+                enableSmartParsing={true}
+                showConfidence={false}
+                maxDisplayTags={3}
+                useInlineHighlighting={false}
+                useOverlayHighlighting={false}
+                useFlexInputGroup={true}
+                hideFocusOutline={true}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
   }, [
     currentView,
+    showSmartInput,
+    hasUserToggledSmartInput,
     memoizedHandleAddTask,
     taskGroups,
     activeTaskGroupId,
@@ -143,6 +176,23 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   const memoizedHandleCreateTaskGroup = useCallback(handleCreateTaskGroup, [
     handleCreateTaskGroup,
   ]);
+  // In calendar view TaskList, ensure creation persists via API, not local-only
+  const memoizedHandleAddTaskGroupForTaskList = useCallback(
+    (data: {
+      name: string;
+      description: string;
+      iconId: string;
+      color: string;
+    }) => {
+      handleAddTaskGroup({
+        name: data.name,
+        emoji: data.iconId,
+        color: data.color,
+        description: data.description,
+      });
+    },
+    [handleAddTaskGroup]
+  );
   const memoizedHandleUpdateTaskGroupIcon = useCallback(
     handleUpdateTaskGroupIcon,
     [handleUpdateTaskGroupIcon]
@@ -159,31 +209,62 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   ]);
 
   const [showMiniCalendar, setShowMiniCalendar] = useState<boolean>(true);
+  const [hasUserToggledMiniCalendar, setHasUserToggledMiniCalendar] =
+    useState<boolean>(false);
 
-  // Header controls: calendar toggle button shown in task view
+  // Disable animation on initial mount and when switching tabs; enable only after explicit user toggle
+  useEffect(() => {
+    setHasUserToggledMiniCalendar(false);
+  }, [currentView]);
+
+  const handleToggleMiniCalendar = useCallback(() => {
+    setHasUserToggledMiniCalendar(true);
+    setShowMiniCalendar((v) => !v);
+  }, [setShowMiniCalendar]);
+
+  // Header controls: collapse toggle button (identical styling/behavior) per view
   const rightHeaderControls = useMemo(() => {
-    if (currentView !== 'task') return null;
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={showMiniCalendar ? 'Hide mini calendar' : 'Show mini calendar'}
-        className="h-8 w-8"
-        onClick={() => setShowMiniCalendar((v) => !v)}
-      >
-        {showMiniCalendar ? (
-          <CalendarArrowUp className="h-4 w-4" />
-        ) : (
-          <CalendarArrowDown className="h-4 w-4" />
-        )}
-      </Button>
-    );
-  }, [currentView, showMiniCalendar]);
+    if (currentView === 'task') {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={showMiniCalendar ? 'Hide mini calendar' : 'Show mini calendar'}
+          className="h-8 w-8"
+          onClick={handleToggleMiniCalendar}
+        >
+          {showMiniCalendar ? (
+            <CalendarArrowUp className="h-4 w-4" />
+          ) : (
+            <CalendarArrowDown className="h-4 w-4" />
+          )}
+        </Button>
+      );
+    }
+    if (currentView === 'calendar') {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={showSmartInput ? 'Hide input' : 'Show input'}
+          className="h-8 w-8"
+          onClick={handleToggleSmartInput}
+        >
+          {showSmartInput ? (
+            <ArrowUpToLine className="h-4 w-4" />
+          ) : (
+            <ArrowDownToLine className="h-4 w-4" />
+          )}
+        </Button>
+      );
+    }
+    return null;
+  }, [currentView, showMiniCalendar, handleToggleMiniCalendar, showSmartInput, handleToggleSmartInput]);
 
   // Main content - TaskList in calendar view, EventOverview in task view
   const mainContent = useMemo(() => {
     return currentView === 'calendar' ? (
-      <TaskList
+        <TaskList
         tasks={tasks}
         taskGroups={taskGroups}
         activeTaskGroupId={activeTaskGroupId}
@@ -192,7 +273,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         onDeleteTask={memoizedHandleDeleteTask}
         onScheduleTask={memoizedHandleScheduleTask}
         onRemoveTag={memoizedHandleRemoveTag}
-        onCreateTaskGroup={memoizedHandleCreateTaskGroup}
+          onCreateTaskGroup={memoizedHandleAddTaskGroupForTaskList}
         onSelectTaskGroup={memoizedHandleSelectTaskGroup}
         onUpdateTaskGroupIcon={memoizedHandleUpdateTaskGroupIcon}
         onUpdateTaskGroupColor={memoizedHandleUpdateTaskGroupColor}
@@ -206,9 +287,14 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
       <div className="space-y-3">
         <Collapsible open={showMiniCalendar}>
           <CollapsibleContent
-            className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up"
+            className={
+              'overflow-hidden ' +
+              (hasUserToggledMiniCalendar
+                ? 'data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up'
+                : '')
+            }
           >
-            <div className="calendar-item">
+            <div className={hasUserToggledMiniCalendar ? 'calendar-item' : undefined}>
               <div className="pt-1">
                 <MiniCalendar
                   className="w-full rounded-md border border-sidebar-border bg-card [--cell-size:--spacing(7)]"
@@ -226,7 +312,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
                 <div className="h-2" />
               </div>
             </div>
-            <div className="calendar-item">
+            <div className={hasUserToggledMiniCalendar ? 'calendar-item' : undefined}>
               <Separator />
             </div>
           </CollapsibleContent>
@@ -293,8 +379,8 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         color: string;
         description?: string;
       }
-    ) => handleUpdateTaskGroupIcon(id, updates.iconId),
-    [handleUpdateTaskGroupIcon]
+    ) => handleEditTaskGroup(id, { name: updates.name, color: updates.color, emoji: updates.iconId, description: updates.description }),
+    [handleEditTaskGroup]
   );
 
   // Footer content - CalendarList in calendar view, TaskGroupList in task view
@@ -344,15 +430,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         footerListContent={footerListContent}
       />
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm">Loading...</span>
-          </div>
-        </div>
-      )}
+      
     </>
   );
 };

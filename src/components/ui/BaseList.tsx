@@ -78,6 +78,7 @@ export interface BaseListProps<T extends BaseListItem> {
   onAdd: (name: string, color: string) => void;
   onEdit: (item: T, name: string, color: string) => void;
   onDelete?: (item: T) => void;
+  onStartEdit?: (item: T) => void; // Optional: trigger parent-controlled dialog edit flow
 
   // Dialog support
   showCreateDialog?: boolean;
@@ -103,6 +104,13 @@ export interface BaseListProps<T extends BaseListItem> {
       iconId: string;
       color: string;
     }) => void;
+    initialName?: string;
+    initialDescription?: string;
+    initialIconId?: string;
+    initialEmoji?: string;
+    initialColor?: string;
+    submitLabel?: string;
+    titleLabel?: string;
   }>;
 
   // Styling
@@ -111,6 +119,16 @@ export interface BaseListProps<T extends BaseListItem> {
   createFirstItemText: string;
   deleteDialogTitle: string;
   deleteDialogDescription: (itemName: string) => string;
+  // Optional initial data for the create dialog (used when reusing dialog for edit)
+  createDialogInitialData?: {
+    name?: string;
+    description?: string;
+    iconId?: string;
+    emoji?: string;
+    color?: string;
+    submitLabel?: string;
+    titleLabel?: string;
+  };
 }
 
 export function BaseList<T extends BaseListItem>({
@@ -123,6 +141,7 @@ export function BaseList<T extends BaseListItem>({
   onSelect,
   onAdd,
   onEdit,
+  onStartEdit,
   onDelete,
   showCreateDialog = false,
   onShowCreateDialog,
@@ -133,6 +152,7 @@ export function BaseList<T extends BaseListItem>({
   createFirstItemText,
   deleteDialogTitle,
   deleteDialogDescription,
+  createDialogInitialData,
 }: BaseListProps<T>) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -236,6 +256,7 @@ export function BaseList<T extends BaseListItem>({
                 onToggle={onToggle}
                 onSelect={onSelect}
                 onEdit={onEdit}
+                onStartEdit={onStartEdit}
                 onDelete={onDelete}
                 recentColors={recentColors}
                 onRecentColorAdd={handleRecentColorAdd}
@@ -334,6 +355,13 @@ export function BaseList<T extends BaseListItem>({
             onCreateTask={
               mode === 'selection' ? handleCreateFromDialog : undefined
             }
+            initialName={createDialogInitialData?.name}
+            initialDescription={createDialogInitialData?.description}
+            initialIconId={createDialogInitialData?.iconId}
+            initialEmoji={createDialogInitialData?.emoji}
+            initialColor={createDialogInitialData?.color}
+            submitLabel={createDialogInitialData?.submitLabel}
+            titleLabel={createDialogInitialData?.titleLabel}
           />
         )}
       </div>
@@ -348,6 +376,7 @@ interface BaseListItemProps<T extends BaseListItem> {
   onToggle?: (item: T) => void;
   onSelect?: (item: T) => void;
   onEdit: (item: T, name: string, color: string) => void;
+  onStartEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   recentColors: string[];
   onRecentColorAdd: (color: string) => void;
@@ -362,6 +391,7 @@ function BaseListItem<T extends BaseListItem>({
   onToggle,
   onSelect,
   onEdit,
+  onStartEdit,
   onDelete,
   recentColors,
   onRecentColorAdd,
@@ -507,10 +537,10 @@ function BaseListItem<T extends BaseListItem>({
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Edit</span>
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => (onStartEdit ? onStartEdit(item) : setIsEditing(true))}>
+              <Edit className="mr-2 h-4 w-4" />
+              <span>Edit</span>
+            </DropdownMenuItem>
               <DropdownMenuItem>
                 <div
                   className="mr-2 h-4 w-4 rounded-full flex-shrink-0 border-2 border-border"

@@ -57,8 +57,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     },
     files?: UploadedFile[],
   ) => {
+    const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
     addTask.mutate({
       title,
+      taskListId,
       priority: smartData?.priority,
       scheduledDate: smartData?.scheduledDate,
       tags: smartData?.tags?.map((tag) => ({

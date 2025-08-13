@@ -1,18 +1,20 @@
 /**
- * Task Service - Concrete implementation of BaseService for Task operations
+ * Task Service - Concrete implementation of BaseService for Task operations (SQL)
  */
-import type { Priority, Prisma, TagType } from '@prisma/client';
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import { withTransaction, query } from '../config/database.js';
 
 /**
  * Task entity interface extending base
  */
+export type DbPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+
 export interface TaskEntity extends UserOwnedEntity {
   title: string;
   completed: boolean;
   completedAt: Date | null;
   scheduledDate: Date | null;
-  priority: Priority;
+  priority: DbPriority;
   originalInput: string | null;
   cleanTitle: string | null;
   taskListId: string;
@@ -51,11 +53,11 @@ export interface CreateTaskDTO {
   title: string;
   taskListId?: string;
   scheduledDate?: Date;
-  priority?: Priority;
+  priority?: DbPriority;
   originalInput?: string;
   cleanTitle?: string;
   tags?: Array<{
-    type: string;
+    type: 'DATE' | 'TIME' | 'PRIORITY' | 'LOCATION' | 'PERSON' | 'LABEL' | 'PROJECT';
     name: string;
     value: string;
     displayText: string;
@@ -71,7 +73,7 @@ export interface UpdateTaskDTO {
   title?: string;
   completed?: boolean;
   scheduledDate?: Date;
-  priority?: Priority;
+  priority?: DbPriority;
   taskListId?: string;
   originalInput?: string;
   cleanTitle?: string;
@@ -83,7 +85,7 @@ export interface UpdateTaskDTO {
 export interface TaskFilters {
   completed?: boolean;
   taskListId?: string;
-  priority?: Priority;
+  priority?: DbPriority;
   scheduledDate?: {
     from?: Date;
     to?: Date;
@@ -112,120 +114,163 @@ export interface TaskStats {
  * TaskService - Handles all task-related operations
  */
 export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTaskDTO, TaskFilters> {
-  private tagService?: unknown; // Will be injected via dependency injection
+  private tagService?: unknown; // placeholder for DI
 
-  protected getModel() {
-    return this.prisma.task;
+  protected getTableName(): string {
+    return 'tasks';
   }
 
   protected getEntityName(): string {
     return 'Task';
   }
 
-  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): Prisma.TaskWhereInput {
-    const where: Prisma.TaskWhereInput = {};
-
+  protected buildWhereClause(filters: TaskFilters, context?: ServiceContext): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
     // Always filter by user
     if (context?.userId) {
-      where.userId = context.userId;
+      params.push(context.userId);
+      clauses.push(`"userId" = $${params.length}`);
     }
-
-    // Completion filter
     if (filters.completed !== undefined) {
-      where.completed = filters.completed;
+      params.push(filters.completed);
+      clauses.push(`completed = $${params.length}`);
     }
-
-    // Task list filter
     if (filters.taskListId) {
-      where.taskListId = filters.taskListId;
+      params.push(filters.taskListId);
+      clauses.push(`"taskListId" = $${params.length}`);
     }
-
-    // Priority filter
     if (filters.priority) {
-      where.priority = filters.priority;
+      params.push(filters.priority);
+      clauses.push(`priority = $${params.length}`);
     }
-
-    // Scheduled date filter
     if (filters.scheduledDate) {
-      const range: { gte?: Date; lte?: Date } = {};
       if (filters.scheduledDate.from) {
-        range.gte = filters.scheduledDate.from;
+        params.push(filters.scheduledDate.from);
+        clauses.push(`"scheduledDate" >= $${params.length}`);
       }
       if (filters.scheduledDate.to) {
-        range.lte = filters.scheduledDate.to;
+        params.push(filters.scheduledDate.to);
+        clauses.push(`"scheduledDate" <= $${params.length}`);
       }
-      where.scheduledDate = range;
     }
-
-    // Search filter (title or clean title)
     if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { cleanTitle: { contains: filters.search, mode: 'insensitive' } },
-      ];
+      params.push(`%${filters.search}%`);
+      const idx = params.length;
+      clauses.push(`(title ILIKE $${idx} OR "cleanTitle" ILIKE $${idx})`);
     }
-
-    // Tags filter
     if (filters.tags && filters.tags.length > 0) {
-      where.tags = {
-        some: {
-          tag: {
-            name: { in: filters.tags },
-          },
-        },
-      };
+      const tagParams = filters.tags.map((t) => t.toLowerCase());
+      const placeholders = tagParams.map((_, i) => `$${params.length + i + 1}`).join(',');
+      params.push(...tagParams);
+      clauses.push(
+        `id IN (
+          SELECT DISTINCT tt."taskId"
+          FROM "task_tags" tt
+          JOIN tags t ON t.id = tt."tagId"
+          WHERE t.name IN (${placeholders})
+        )`
+      );
     }
-
-    // Overdue filter
     if (filters.overdue) {
-      where.scheduledDate = { lt: new Date() };
-      where.completed = false;
+      clauses.push(`"scheduledDate" < NOW()`);
+      clauses.push(`completed = false`);
     }
-
-    return where;
+    const sql = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    return { sql, params };
   }
 
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {
-      taskList: {
-        select: {
-          id: true,
-          name: true,
-          color: true,
-        },
-      },
-      tags: {
-        include: {
-          tag: true,
-        },
-      },
-      attachments: true,
-    };
-  }
-
-  /**
-   * Build Prisma orderBy clause from filters
-   */
-  private buildOrderByClause(filters: TaskFilters): Record<string, 'asc' | 'desc'> {
+  private buildOrderByClause(filters: TaskFilters): string {
     const sortBy = filters.sortBy || 'createdAt';
-    const sortOrder = filters.sortOrder || 'desc';
-    // Prisma orderBy for single field
-    return { [sortBy]: sortOrder };
+    const sortOrder = (filters.sortOrder || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const allowed = new Set(['createdAt', 'updatedAt', 'scheduledDate', 'priority', 'title']);
+    const column = allowed.has(sortBy || '') ? sortBy : 'createdAt';
+    return `ORDER BY "${column}" ${sortOrder}`;
   }
 
-  /**
-   * Override: findAll with sorting support
-   */
+  protected transformEntity(row: any): TaskEntity {
+    return {
+      id: row.id,
+      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+      updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
+      userId: row.userId,
+      title: row.title,
+      completed: row.completed,
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      scheduledDate: row.scheduledDate ? new Date(row.scheduledDate) : null,
+      priority: row.priority,
+      originalInput: row.originalInput ?? null,
+      cleanTitle: row.cleanTitle ?? null,
+      taskListId: row.taskListId,
+    } as TaskEntity;
+  }
+
+  protected async enrichEntities(entities: TaskEntity[], _context?: ServiceContext): Promise<TaskEntity[]> {
+    if (entities.length === 0) return entities;
+    const taskIds = entities.map((t) => t.id);
+    const listIds = Array.from(new Set(entities.map((t) => t.taskListId)));
+
+    // Task lists
+    const listPlaceholders = listIds.map((_, i) => `$${i + 1}`).join(',');
+    const listsRes = await query(
+      `SELECT id, name, color FROM "task_lists" WHERE id IN (${listPlaceholders})`,
+      listIds
+    );
+    const listMap = new Map<string, { id: string; name: string; color: string }>();
+    listsRes.rows.forEach((r: any) => listMap.set(r.id, { id: r.id, name: r.name, color: r.color }));
+
+    // Attachments
+    const taskPlaceholders = taskIds.map((_, i) => `$${i + 1}`).join(',');
+    const attachmentsRes = await query(
+      `SELECT id, "fileName", "fileUrl", "fileType", "fileSize", "taskId"
+       FROM attachments WHERE "taskId" IN (${taskPlaceholders})`,
+      taskIds
+    );
+    const attachmentsByTask = new Map<string, any[]>();
+    attachmentsRes.rows.forEach((r: any) => {
+      const arr = attachmentsByTask.get(r.taskId) || [];
+      arr.push({ id: r.id, fileName: r.fileName, fileUrl: r.fileUrl, fileType: r.fileType, fileSize: r.fileSize });
+      attachmentsByTask.set(r.taskId, arr);
+    });
+
+    // Tags with tag details
+    const tagsRes = await query(
+      `SELECT tt."taskId", tt.value, tt."displayText", tt."iconName", t.id as tag_id, t.name, t.type, t.color
+       FROM "task_tags" tt
+       JOIN tags t ON t.id = tt."tagId"
+       WHERE tt."taskId" IN (${taskPlaceholders})`,
+      taskIds
+    );
+    const tagsByTask = new Map<string, any[]>();
+    tagsRes.rows.forEach((r: any) => {
+      const arr = tagsByTask.get(r.taskId) || [];
+      arr.push({
+        id: r.tag_id,
+        value: r.value,
+        displayText: r.displayText,
+        iconName: r.iconName,
+        tag: { id: r.tag_id, name: r.name, type: r.type, color: r.color },
+      });
+      tagsByTask.set(r.taskId, arr);
+    });
+
+    // Attach relations onto entities
+    return entities.map((t) => ({
+      ...t,
+      taskList: listMap.get(t.taskListId) || undefined,
+      attachments: attachmentsByTask.get(t.id) || [],
+      tags: tagsByTask.get(t.id) || [],
+    }));
+  }
+
   async findAll(filters: TaskFilters = {}, context?: ServiceContext): Promise<TaskEntity[]> {
     try {
       this.log('findAll', { filters }, context);
-
-      const where = this.buildWhereClause(filters, context);
-      const include = this.buildIncludeClause();
-      const orderBy = this.buildOrderByClause(filters);
-
-      const tasks = await this.getModel().findMany({ where, include, orderBy });
-      return tasks.map((task) => this.transformEntity(task));
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const order = this.buildOrderByClause(filters);
+      const res = await query(`SELECT * FROM tasks ${sql} ${order}`, params, this.db);
+      const base = res.rows.map((r: any) => this.transformEntity(r));
+      return await this.enrichEntities(base, context);
     } catch (error) {
       this.log('findAll:error', { error: (error as Error).message, filters }, context);
       throw error;
@@ -246,25 +291,17 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
   }> {
     try {
       this.log('findPaginated', { filters, page, limit }, context);
-
-      const where = this.buildWhereClause(filters, context);
-      const include = this.buildIncludeClause();
-      const orderBy = this.buildOrderByClause(filters);
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const order = this.buildOrderByClause(filters);
       const offset = (page - 1) * limit;
-
-      const [entities, total] = await Promise.all([
-        this.getModel().findMany({ where, include, skip: offset, take: limit, orderBy }),
-        this.getModel().count({ where }),
-      ]);
-
+      const dataRes = await query(`SELECT * FROM tasks ${sql} ${order} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset], this.db);
+      const countRes = await query<{ count: string }>(`SELECT COUNT(*)::bigint AS count FROM tasks ${sql}`, params, this.db);
+      const rows = dataRes.rows.map((r: any) => this.transformEntity(r));
+      const enriched = await this.enrichEntities(rows, context);
+      const total = Number(countRes.rows[0]?.count || 0);
       return {
-        data: entities.map((task) => this.transformEntity(task)),
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: enriched,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       };
     } catch (error) {
       this.log('findPaginated:error', { error: (error as Error).message, filters, page, limit }, context);
@@ -282,14 +319,13 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
     // Validate task list exists and user owns it
     if (data.taskListId && context?.userId) {
-      const taskList = await this.prisma.taskList.findFirst({
-        where: {
-          id: data.taskListId,
-          userId: context.userId,
-        },
-      });
+      const taskList = await query(
+        'SELECT id FROM "task_lists" WHERE id = $1 AND "userId" = $2 LIMIT 1',
+        [data.taskListId, context.userId],
+        this.db
+      );
 
-      if (!taskList) {
+      if (taskList.rowCount === 0) {
         throw new Error('VALIDATION_ERROR: Task list not found or access denied');
       }
     }
@@ -316,14 +352,8 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
     // Validate task list if being updated
     if (data.taskListId && context?.userId) {
-      const taskList = await this.prisma.taskList.findFirst({
-        where: {
-          id: data.taskListId,
-          userId: context.userId,
-        },
-      });
-
-      if (!taskList) {
+      const taskList = await query('SELECT id FROM "task_lists" WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.taskListId, context.userId], this.db);
+      if (taskList.rowCount === 0) {
         throw new Error('VALIDATION_ERROR: Task list not found or access denied');
       }
     }
@@ -346,66 +376,107 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
         taskListId = defaultTaskList.id;
       }
 
-      const createData: Prisma.TaskCreateInput = {
-        title: data.title.trim(),
-        taskList: { connect: { id: taskListId! } },
-        scheduledDate: data.scheduledDate ?? null,
-        priority: (data.priority || 'MEDIUM') as Priority,
-        originalInput: data.originalInput ?? null,
-        cleanTitle: data.cleanTitle ?? null,
-        user: { connect: { id: context!.userId! } },
-      };
+      const created = await withTransaction(async (client) => {
+        // Insert task
+        const insertRes = await query(
+          `INSERT INTO tasks (id, title, completed, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, false, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+           RETURNING *`,
+          [
+            data.title.trim(),
+            taskListId!,
+            data.scheduledDate ?? null,
+            (data.priority || 'MEDIUM'),
+            data.originalInput ?? null,
+            data.cleanTitle ?? null,
+            context!.userId!,
+          ],
+          client
+        );
+        const createdRow = insertRes.rows[0];
 
-      // Create task with tags in transaction
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Create the task
-        const task = await tx.task.create({
-          data: createData,
-          include: this.buildIncludeClause(),
-        });
-
-        // Create tags if provided
-    if (data.tags && data.tags.length > 0) {
+        // Tags
+        if (data.tags && data.tags.length > 0) {
           for (const tagData of data.tags) {
-            // Find or create tag
-            const tag = await tx.tag.upsert({
-              where: { name: tagData.name },
-              create: {
-                name: tagData.name,
-                type: (tagData.type as unknown as TagType),
-                color: tagData.color,
-              },
-              update: {},
-            });
-
-            // Create task-tag relationship
-            await tx.taskTag.create({
-              data: {
-                taskId: task.id,
-                tagId: tag.id,
-                value: tagData.value,
-                displayText: tagData.displayText,
-                iconName: tagData.iconName,
-              },
-            });
+            const name = tagData.name.trim().toLowerCase();
+            await query(
+              `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
+               ON CONFLICT (name) DO NOTHING`,
+              [name, tagData.type, tagData.color ?? null],
+              client
+            );
+            const tagRow = await query<{ id: string }>(`SELECT id FROM tags WHERE name = $1`, [name], client);
+            const tagId = tagRow.rows[0].id;
+            await query(
+              `INSERT INTO "task_tags" ("taskId", "tagId", value, "displayText", "iconName")
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT ("taskId", "tagId") DO NOTHING`,
+              [createdRow.id, tagId, tagData.value, tagData.displayText, tagData.iconName],
+              client
+            );
           }
-
-          // Fetch the complete task with all relations
-          return await tx.task.findUnique({
-            where: { id: task.id },
-            include: this.buildIncludeClause(),
-          });
         }
-
-        return task;
+        return createdRow;
       });
 
-      this.log('create:success', { id: result?.id }, context);
-      return this.transformEntity(result);
+      this.log('create:success', { id: created.id }, context);
+      const entity = this.transformEntity(created);
+      const [enriched] = await this.enrichEntities([entity], context);
+      return enriched;
     } catch (error) {
       this.log('create:error', { error: (error as Error).message, data }, context);
       throw error;
     }
+  }
+
+  /**
+   * Update task
+   */
+  async update(id: string, data: UpdateTaskDTO, context?: ServiceContext): Promise<TaskEntity | null> {
+    await this.validateUpdate(id, data, context);
+    const sets: string[] = [];
+    const params: any[] = [];
+    if (data.title !== undefined) { params.push(data.title.trim()); sets.push(`title = $${params.length}`); }
+    if (data.completed !== undefined) {
+      params.push(data.completed);
+      sets.push(`completed = $${params.length}`);
+      params.push(data.completed ? new Date() : null);
+      sets.push(`"completedAt" = $${params.length}`);
+    }
+    if (data.scheduledDate !== undefined) { params.push(data.scheduledDate); sets.push(`"scheduledDate" = $${params.length}`); }
+    if (data.priority !== undefined) { params.push(data.priority); sets.push(`priority = $${params.length}`); }
+    if (data.taskListId !== undefined) { params.push(data.taskListId); sets.push(`"taskListId" = $${params.length}`); }
+    if (data.originalInput !== undefined) { params.push(data.originalInput); sets.push(`"originalInput" = $${params.length}`); }
+    if (data.cleanTitle !== undefined) { params.push(data.cleanTitle); sets.push(`"cleanTitle" = $${params.length}`); }
+    params.push(new Date());
+    sets.push(`"updatedAt" = $${params.length}`);
+    params.push(id);
+    const updateSql = `UPDATE tasks SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
+    const res = await query(updateSql, params, this.db);
+    if (res.rowCount === 0) return null;
+    const base = this.transformEntity(res.rows[0]);
+    const [enriched] = await this.enrichEntities([base], context);
+    return enriched;
+  }
+
+  /**
+   * Delete task
+   */
+  async delete(id: string, context?: ServiceContext): Promise<boolean> {
+    // Ownership already validated via routes/use of service; keep as is
+    await query('DELETE FROM tasks WHERE id = $1', [id], this.db);
+    return true;
+  }
+
+  /**
+   * Find task by id with relations
+   */
+  async findById(id: string, context?: ServiceContext): Promise<TaskEntity | null> {
+    const res = await query('SELECT * FROM tasks WHERE id = $1 LIMIT 1', [id], this.db);
+    if (res.rowCount === 0) return null;
+    const base = this.transformEntity(res.rows[0]);
+    const [enriched] = await this.enrichEntities([base], context);
+    return enriched ?? base;
   }
 
   /**
@@ -422,27 +493,23 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
         }
       }
 
-      const currentTask = await this.getModel().findUnique({
-        where: { id },
-        select: { completed: true },
-      });
-
-      if (!currentTask) {
-        throw new Error('NOT_FOUND: Task not found');
-      }
-
-      const updatedTask = await this.getModel().update({
-        where: { id },
-        data: {
-          completed: !currentTask.completed,
-          completedAt: !currentTask.completed ? new Date() : null,
-          updatedAt: new Date(),
-        },
-        include: this.buildIncludeClause(),
-      });
-
-      this.log('toggleCompletion:success', { id, completed: updatedTask.completed }, context);
-      return this.transformEntity(updatedTask);
+      const currentRes = await query<{ completed: boolean }>(`SELECT completed FROM tasks WHERE id = $1`, [id], this.db);
+      if (currentRes.rowCount === 0) throw new Error('NOT_FOUND: Task not found');
+      const current = currentRes.rows[0].completed;
+      const updatedRes = await query(
+        `UPDATE tasks
+         SET completed = $1,
+             "completedAt" = $2,
+             "updatedAt" = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [!current, !current ? new Date() : null, id],
+        this.db
+      );
+      const base = this.transformEntity(updatedRes.rows[0]);
+      const [enriched] = await this.enrichEntities([base], context);
+      this.log('toggleCompletion:success', { id, completed: enriched.completed }, context);
+      return enriched;
     } catch (error) {
       this.log('toggleCompletion:error', { error: (error as Error).message, id }, context);
       throw error;
@@ -506,33 +573,63 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
       // Validate all tasks belong to user
       if (context?.userId) {
-        const userTasks = await this.getModel().findMany({
-          where: {
-            id: { in: ids },
-            userId: context.userId,
-          },
-          select: { id: true },
-        });
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+        const userTasksRes = await query<{ id: string }>(
+          `SELECT id FROM tasks WHERE id IN (${placeholders}) AND "userId" = $${ids.length + 1}`,
+          [...ids, context.userId],
+          this.db
+        );
 
-        if (userTasks.length !== ids.length) {
+        if (userTasksRes.rowCount !== ids.length) {
           throw new Error('AUTHORIZATION_ERROR: Some tasks not found or access denied');
         }
       }
 
       // Perform bulk update
-      await this.getModel().updateMany({
-        where: { id: { in: ids } },
-        data: {
-          ...updates,
-          updatedAt: new Date(),
-        },
-      });
+      const setClauses: string[] = [];
+      const params: any[] = [];
+      if (updates.title !== undefined) {
+        params.push(updates.title);
+        setClauses.push(`title = $${params.length}`);
+      }
+      if (updates.completed !== undefined) {
+        params.push(updates.completed);
+        setClauses.push(`completed = $${params.length}`);
+      }
+      if (updates.scheduledDate !== undefined) {
+        params.push(updates.scheduledDate);
+        setClauses.push(`"scheduledDate" = $${params.length}`);
+      }
+      if (updates.priority !== undefined) {
+        params.push(updates.priority);
+        setClauses.push(`priority = $${params.length}`);
+      }
+      if (updates.taskListId !== undefined) {
+        params.push(updates.taskListId);
+        setClauses.push(`"taskListId" = $${params.length}`);
+      }
+      if (updates.originalInput !== undefined) {
+        params.push(updates.originalInput);
+        setClauses.push(`"originalInput" = $${params.length}`);
+      }
+      if (updates.cleanTitle !== undefined) {
+        params.push(updates.cleanTitle);
+        setClauses.push(`"cleanTitle" = $${params.length}`);
+      }
+      params.push(new Date());
+      setClauses.push(`"updatedAt" = $${params.length}`);
+      const idPlaceholders = ids.map((_, i) => `$${params.length + i + 1}`).join(',');
+      const whereParams = [...params, ...ids];
+      await query(
+        `UPDATE tasks SET ${setClauses.join(', ')} WHERE id IN (${idPlaceholders})`,
+        whereParams,
+        this.db
+      );
 
       // Return updated tasks
-      const updatedTasks = await this.getModel().findMany({
-        where: { id: { in: ids } },
-        include: this.buildIncludeClause(),
-      });
+      const selectRes = await query(`SELECT * FROM tasks WHERE id IN (${ids.map((_, i) => `$${i + 1}`).join(',')})`, ids, this.db);
+      const base = selectRes.rows.map((r: any) => this.transformEntity(r));
+      const updatedTasks = await this.enrichEntities(base, context);
 
       this.log('bulkUpdate:success', { count: updatedTasks.length }, context);
       return updatedTasks.map((task) => this.transformEntity(task));
@@ -551,23 +648,19 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
       // Validate all tasks belong to user
       if (context?.userId) {
-        const userTasks = await this.getModel().findMany({
-          where: {
-            id: { in: ids },
-            userId: context.userId,
-          },
-          select: { id: true },
-        });
-
-        if (userTasks.length !== ids.length) {
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+        const userTasksRes = await query<{ id: string }>(
+          `SELECT id FROM tasks WHERE id IN (${placeholders}) AND "userId" = $${ids.length + 1}`,
+          [...ids, context.userId],
+          this.db
+        );
+        if (userTasksRes.rowCount !== ids.length) {
           throw new Error('AUTHORIZATION_ERROR: Some tasks not found or access denied');
         }
       }
 
       // Perform bulk delete (cascade will handle tags and attachments)
-      await this.getModel().deleteMany({
-        where: { id: { in: ids } },
-      });
+      await query(`DELETE FROM tasks WHERE id IN (${ids.map((_, i) => `$${i + 1}`).join(',')})`, ids, this.db);
 
       this.log('bulkDelete:success', { count: ids.length }, context);
     } catch (error) {
@@ -595,53 +688,29 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
-      total,
-      completed,
-      overdue,
-      completedToday,
-      completedThisWeek,
-      completedThisMonth,
+      totalRes,
+      completedRes,
+      overdueRes,
+      completedTodayRes,
+      completedThisWeekRes,
+      completedThisMonthRes,
     ] = await Promise.all([
-      this.getModel().count({ where: { userId: context.userId } }),
-      this.getModel().count({ where: { userId: context.userId, completed: true } }),
-      this.getModel().count({
-        where: {
-          userId: context.userId,
-          completed: false,
-          scheduledDate: { lt: now },
-        },
-      }),
-      this.getModel().count({
-        where: {
-          userId: context.userId,
-          completed: true,
-          completedAt: { gte: startOfDay },
-        },
-      }),
-      this.getModel().count({
-        where: {
-          userId: context.userId,
-          completed: true,
-          completedAt: { gte: startOfWeek },
-        },
-      }),
-      this.getModel().count({
-        where: {
-          userId: context.userId,
-          completed: true,
-          completedAt: { gte: startOfMonth },
-        },
-      }),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1', [context.userId!], this.db),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true', [context.userId!], this.db),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = false AND "scheduledDate" < NOW()', [context.userId!], this.db),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2', [context.userId!, startOfDay], this.db),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2', [context.userId!, startOfWeek], this.db),
+      query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2', [context.userId!, startOfMonth], this.db),
     ]);
 
     return {
-      total,
-      completed,
-      pending: total - completed,
-      overdue,
-      completedToday,
-      completedThisWeek,
-      completedThisMonth,
+      total: Number(totalRes.rows[0].count),
+      completed: Number(completedRes.rows[0].count),
+      pending: Number(totalRes.rows[0].count) - Number(completedRes.rows[0].count),
+      overdue: Number(overdueRes.rows[0].count),
+      completedToday: Number(completedTodayRes.rows[0].count),
+      completedThisWeek: Number(completedThisWeekRes.rows[0].count),
+      completedThisMonth: Number(completedThisMonthRes.rows[0].count),
     };
   }
 
@@ -650,20 +719,14 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
    */
   private async getOrCreateDefaultTaskList(userId: string) {
     await this.ensureUserExists(userId, 'dev@example.com');
-    let defaultTaskList = await this.prisma.taskList.findFirst({
-      where: { userId, name: 'General' },
-    });
-
-    if (!defaultTaskList) {
-      defaultTaskList = await this.prisma.taskList.create({
-        data: {
-          name: 'General',
-          color: '#8B5CF6',
-          userId,
-        },
-      });
-    }
-
-    return defaultTaskList;
+    const existing = await query(`SELECT id, name, color FROM "task_lists" WHERE "userId" = $1 AND name = 'General' LIMIT 1`, [userId], this.db);
+    if (existing.rowCount > 0) return existing.rows[0];
+    const created = await query(
+      `INSERT INTO "task_lists" (id, name, color, "userId", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, 'General', '#8B5CF6', $1, NOW(), NOW()) RETURNING id, name, color`,
+      [userId],
+      this.db
+    );
+    return created.rows[0];
   }
 }

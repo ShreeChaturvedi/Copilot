@@ -1,8 +1,8 @@
 /**
- * Base service class with common CRUD operations
+ * Base service class with common utilities for SQL-backed services
  * Provides foundation for all business logic services
  */
-import type { PrismaClient } from '@prisma/client';
+import { pool, query, type SqlClient } from '../config/database.js';
 
 /**
  * Base entity interface
@@ -49,24 +49,32 @@ export abstract class BaseService<
   TFilters extends object = Record<string, unknown>
 > {
   protected readonly config: BaseServiceConfig;
+  protected readonly db: SqlClient;
 
-  constructor(
-    protected readonly prisma: PrismaClient,
-    config: BaseServiceConfig = {}
-  ) {
-    this.config = {
-      enableLogging: true,
-      enableCaching: false,
-      cacheTTL: 300, // 5 minutes
-      ...config,
-    };
+  constructor(dbOrConfig?: SqlClient | BaseServiceConfig, maybeConfig?: BaseServiceConfig) {
+    if (dbOrConfig && typeof (dbOrConfig as any).query === 'function') {
+      this.db = dbOrConfig as SqlClient;
+      this.config = {
+        enableLogging: true,
+        enableCaching: false,
+        cacheTTL: 300,
+        ...(maybeConfig || {}),
+      };
+    } else {
+      this.db = pool;
+      this.config = {
+        enableLogging: true,
+        enableCaching: false,
+        cacheTTL: 300,
+        ...(dbOrConfig as BaseServiceConfig | undefined),
+      };
+    }
   }
 
   /**
-   * Get the Prisma model delegate for this service
-   * Must be implemented by concrete services
+   * Table name for the entity (snake_case)
    */
-  protected abstract getModel(): any;
+  protected abstract getTableName(): string;
 
   /**
    * Get the entity name for logging and error messages
@@ -77,24 +85,26 @@ export abstract class BaseService<
    * Build where clause for filtering
    * Can be overridden by concrete services for custom filtering
    */
-  protected buildWhereClause(filters: TFilters, _context?: ServiceContext): Record<string, unknown> {
+  protected buildWhereClause(_filters: TFilters, _context?: ServiceContext): { sql: string; params: any[] } {
+    void _filters;
     void _context;
-    return filters as Record<string, unknown>;
+    return { sql: '', params: [] };
   }
 
   /**
    * Build include clause for relations
    * Can be overridden by concrete services
    */
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {};
+  // Services can override to post-load relations
+  protected async enrichEntities(entities: TEntity[], _context?: ServiceContext): Promise<TEntity[]> {
+    return entities;
   }
 
   /**
    * Transform entity before returning to client
    * Can be overridden by concrete services
    */
-  protected transformEntity(entity: unknown): TEntity {
+  protected transformEntity(entity: any): TEntity {
     return entity as TEntity;
   }
 
@@ -118,12 +128,14 @@ export abstract class BaseService<
    */
   protected async checkOwnership(id: string, userId: string): Promise<boolean> {
     try {
-      const entity = await this.getModel().findFirst({
-        where: { id },
-        select: { userId: true },
-      });
-
-      return (entity as { userId?: string } | null)?.userId === userId;
+      const table = this.getTableName();
+      const result = await query<{ userId: string }>(
+        `SELECT "userId" FROM ${table} WHERE id = $1 LIMIT 1`,
+        [id],
+        this.db
+      );
+      const row = result.rows[0];
+      return !!row && row.userId === userId;
     } catch {
       return false;
     }
@@ -155,90 +167,33 @@ export abstract class BaseService<
     if (!userId) return;
     try {
       if (process.env.NODE_ENV !== 'production') {
-        await (this.prisma as unknown as { user: { upsert: Function } }).user.upsert({
-          where: { id: userId },
-          update: {},
-          create: {
-            id: userId,
-            email: emailFallback || `${userId}@dev.local`,
-          },
-        });
+        await query(
+          `INSERT INTO users (id, email) VALUES ($1, $2)
+           ON CONFLICT (id) DO NOTHING`,
+          [userId, emailFallback || `${userId}@dev.local`],
+          this.db
+        );
       }
     } catch {
-      // noop in production or if upsert is not available
+      // ignore
     }
   }
 
   /**
    * Find all entities with optional filtering
    */
-  async findAll(filters: TFilters = {} as TFilters, context?: ServiceContext): Promise<TEntity[]> {
-    try {
-      this.log('findAll', { filters }, context);
-
-      const whereClause = this.buildWhereClause(filters, context);
-      const includeClause = this.buildIncludeClause();
-
-      const entities = await this.getModel().findMany({
-        where: whereClause,
-        include: includeClause,
-      });
-
-      return entities.map(entity => this.transformEntity(entity));
-    } catch (error) {
-      this.log('findAll:error', { error: (error as Error).message, filters }, context);
-      throw error;
-    }
+  async findAll(_filters: TFilters = {} as TFilters, _context?: ServiceContext): Promise<TEntity[]> {
+    throw new Error('NOT_IMPLEMENTED: findAll must be implemented in the concrete service');
   }
 
   /**
    * Find entities with pagination
    */
-  async findPaginated(
-    filters: TFilters = {} as TFilters,
-    page: number = 1,
-    limit: number = 20,
-    context?: ServiceContext
-  ): Promise<{
+  async findPaginated(_filters: TFilters = {} as TFilters, _page = 1, _limit = 20, _context?: ServiceContext): Promise<{
     data: TEntity[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
+    pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    try {
-      this.log('findPaginated', { filters, page, limit }, context);
-
-      const whereClause = this.buildWhereClause(filters, context);
-      const includeClause = this.buildIncludeClause();
-      const offset = (page - 1) * limit;
-
-      const [entities, total] = await Promise.all([
-        this.getModel().findMany({
-          where: whereClause,
-          include: includeClause,
-          skip: offset,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.getModel().count({ where: whereClause }),
-      ]);
-
-      return {
-        data: entities.map(entity => this.transformEntity(entity)),
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
-    } catch (error) {
-      this.log('findPaginated:error', { error: error.message, filters, page, limit }, context);
-      throw error;
-    }
+    throw new Error('NOT_IMPLEMENTED: findPaginated must be implemented in the concrete service');
   }
 
   /**
@@ -247,16 +202,11 @@ export abstract class BaseService<
   async findById(id: string, context?: ServiceContext): Promise<TEntity | null> {
     try {
       this.log('findById', { id }, context);
-
-      const includeClause = this.buildIncludeClause();
-
-      const entity = await this.getModel().findUnique({
-        where: { id },
-        include: includeClause,
-      });
-
-      return entity ? this.transformEntity(entity) : null;
-    } catch (error) {
+      const table = this.getTableName();
+      const res = await query(`SELECT * FROM ${table} WHERE id = $1 LIMIT 1`, [id], this.db);
+      const row = res.rows[0];
+      return row ? this.transformEntity(row) : null;
+    } catch (error: any) {
       this.log('findById:error', { error: error.message, id }, context);
       throw error;
     }
@@ -265,53 +215,15 @@ export abstract class BaseService<
   /**
    * Create new entity
    */
-  async create(data: TCreateDTO, context?: ServiceContext): Promise<TEntity> {
-    try {
-      this.log('create', { data }, context);
-
-      await this.validateCreate(data, context);
-
-      const includeClause = this.buildIncludeClause();
-
-      const entity = await this.getModel().create({
-        data,
-        include: includeClause,
-      });
-
-      this.log('create:success', { id: entity.id }, context);
-      return this.transformEntity(entity);
-    } catch (error) {
-      this.log('create:error', { error: error.message, data }, context);
-      throw error;
-    }
+  async create(_data: TCreateDTO, _context?: ServiceContext): Promise<TEntity> {
+    throw new Error('NOT_IMPLEMENTED: create must be implemented in the concrete service');
   }
 
   /**
    * Update entity by ID
    */
-  async update(id: string, data: TUpdateDTO, context?: ServiceContext): Promise<TEntity | null> {
-    try {
-      this.log('update', { id, data }, context);
-
-      await this.validateUpdate(id, data, context);
-
-      const includeClause = this.buildIncludeClause();
-
-      const entity = await this.getModel().update({
-        where: { id },
-        data: {
-          ...data,
-          updatedAt: new Date(),
-        },
-        include: includeClause,
-      });
-
-      this.log('update:success', { id }, context);
-      return this.transformEntity(entity);
-    } catch (error) {
-      this.log('update:error', { error: error.message, id, data }, context);
-      throw error;
-    }
+  async update(_id: string, _data: TUpdateDTO, _context?: ServiceContext): Promise<TEntity | null> {
+    throw new Error('NOT_IMPLEMENTED: update must be implemented in the concrete service');
   }
 
   /**
@@ -320,14 +232,11 @@ export abstract class BaseService<
   async delete(id: string, context?: ServiceContext): Promise<boolean> {
     try {
       this.log('delete', { id }, context);
-
-      await this.getModel().delete({
-        where: { id },
-      });
-
+      const table = this.getTableName();
+      await query(`DELETE FROM ${table} WHERE id = $1`, [id], this.db);
       this.log('delete:success', { id }, context);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.log('delete:error', { error: error.message, id }, context);
       throw error;
     }
@@ -338,12 +247,10 @@ export abstract class BaseService<
    */
   async exists(id: string, context?: ServiceContext): Promise<boolean> {
     try {
-      const entity = await this.getModel().findUnique({
-        where: { id },
-      });
-
-      return !!entity;
-    } catch (error) {
+      const table = this.getTableName();
+      const res = await query(`SELECT 1 FROM ${table} WHERE id = $1`, [id], this.db);
+      return res.rowCount > 0;
+    } catch (error: any) {
       this.log('exists:error', { error: error.message, id }, context);
       return false;
     }
@@ -355,11 +262,11 @@ export abstract class BaseService<
   async count(filters: TFilters = {} as TFilters, context?: ServiceContext): Promise<number> {
     try {
       this.log('count', { filters }, context);
-
-      const whereClause = this.buildWhereClause(filters, context);
-
-      return await this.getModel().count({ where: whereClause });
-    } catch (error) {
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const table = this.getTableName();
+      const res = await query<{ count: string }>(`SELECT COUNT(*)::bigint AS count FROM ${table} ${sql}`, params, this.db);
+      return Number(res.rows[0]?.count || 0);
+    } catch (error: any) {
       this.log('count:error', { error: error.message, filters }, context);
       throw error;
     }
@@ -368,70 +275,21 @@ export abstract class BaseService<
   /**
    * Bulk create entities
    */
-  async createMany(data: TCreateDTO[], context?: ServiceContext): Promise<{ count: number }> {
-    try {
-      this.log('createMany', { count: data.length }, context);
-
-      const result = await this.getModel().createMany({
-        data,
-        skipDuplicates: true,
-      });
-
-      this.log('createMany:success', { count: result.count }, context);
-      return result;
-    } catch (error) {
-      this.log('createMany:error', { error: error.message, count: data.length }, context);
-      throw error;
-    }
+  async createMany(_data: TCreateDTO[], _context?: ServiceContext): Promise<{ count: number }> {
+    throw new Error('NOT_IMPLEMENTED: createMany must be implemented in the concrete service');
   }
 
   /**
    * Bulk update entities
    */
-  async updateMany(
-    filters: TFilters,
-    data: Partial<TUpdateDTO>,
-    context?: ServiceContext
-  ): Promise<{ count: number }> {
-    try {
-      this.log('updateMany', { filters, data }, context);
-
-      const whereClause = this.buildWhereClause(filters, context);
-
-      const result = await this.getModel().updateMany({
-        where: whereClause,
-        data: {
-          ...data,
-          updatedAt: new Date(),
-        },
-      });
-
-      this.log('updateMany:success', { count: result.count }, context);
-      return result;
-    } catch (error) {
-      this.log('updateMany:error', { error: error.message, filters, data }, context);
-      throw error;
-    }
+  async updateMany(_filters: TFilters, _data: Partial<TUpdateDTO>, _context?: ServiceContext): Promise<{ count: number }> {
+    throw new Error('NOT_IMPLEMENTED: updateMany must be implemented in the concrete service');
   }
 
   /**
    * Bulk delete entities
    */
-  async deleteMany(filters: TFilters, context?: ServiceContext): Promise<{ count: number }> {
-    try {
-      this.log('deleteMany', { filters }, context);
-
-      const whereClause = this.buildWhereClause(filters, context);
-
-      const result = await this.getModel().deleteMany({
-        where: whereClause,
-      });
-
-      this.log('deleteMany:success', { count: result.count }, context);
-      return result;
-    } catch (error) {
-      this.log('deleteMany:error', { error: error.message, filters }, context);
-      throw error;
-    }
+  async deleteMany(_filters: TFilters, _context?: ServiceContext): Promise<{ count: number }> {
+    throw new Error('NOT_IMPLEMENTED: deleteMany must be implemented in the concrete service');
   }
 }

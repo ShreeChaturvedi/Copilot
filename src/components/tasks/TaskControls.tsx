@@ -519,14 +519,15 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
 
 
           {/* Add Pane Button (columns icon based on count) */}
-          {canAddPane && onAddPane && (
+          {onAddPane && taskViewMode === 'list' && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 w-7 p-0"
-                  onClick={onAddPane}
+                  onClick={canAddPane ? onAddPane : undefined}
+                  disabled={!canAddPane}
                   aria-label="Add pane"
                 >
                   {paneCount === 1 ? (
@@ -537,7 +538,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Add new pane</p>
+                <p>{canAddPane ? 'Add new pane' : 'Max 3 panes'}</p>
               </TooltipContent>
             </Tooltip>
           )}

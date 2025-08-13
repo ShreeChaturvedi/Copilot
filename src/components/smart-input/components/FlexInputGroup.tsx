@@ -26,6 +26,8 @@ export interface FlexInputGroupProps {
   disabled?: boolean;
   /** Size variant */
   size?: 'sm' | 'default' | 'lg';
+  /** Hide focus outline/ring on focus-within */
+  hideFocusOutline?: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export const FlexInputGroup: React.FC<FlexInputGroupProps> = ({
   className,
   disabled = false,
   size = 'default',
+  hideFocusOutline = false,
 }) => {
   const sizeClasses = {
     sm: 'h-8',
@@ -68,7 +71,7 @@ export const FlexInputGroup: React.FC<FlexInputGroupProps> = ({
         // Background and transitions
         'bg-background transition-[border-color,ring]',
         // Focus state - highlights entire group when any child is focused
-        'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
+        !hideFocusOutline && 'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
         // Disabled state
         disabled && 'opacity-50 cursor-not-allowed',
         // Size variants

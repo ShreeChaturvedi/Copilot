@@ -25,10 +25,18 @@ export default createCrudHandler({
       
       if (popular === 'true') {
         // Get popular tags (frequently used)
-        result = await tagService.getPopularTags({
-          userId,
-          requestId: req.headers['x-request-id'] as string,
-        });
+        if (typeof (tagService as any).getPopularTags === 'function') {
+          result = await (tagService as any).getPopularTags({
+            userId,
+            requestId: req.headers['x-request-id'] as string,
+          });
+        } else {
+          // Fallback: list all tags
+          result = await tagService.findAll({}, {
+            userId,
+            requestId: req.headers['x-request-id'] as string,
+          });
+        }
       } else {
         // Build filters
         const filters: TagFilters = {};

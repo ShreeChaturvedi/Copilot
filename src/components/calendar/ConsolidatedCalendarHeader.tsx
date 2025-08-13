@@ -477,7 +477,7 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
         <div className="flex items-center gap-3 flex-shrink-0 justify-self-start">
           <SmoothSidebarTrigger position="rightPane" />
           <h2 className="text-lg font-semibold text-foreground">
-            {calendarTitle.includes(' ') && (currentView === 'dayGridMonth' || currentView === 'timeGridWeek') ? (
+            {calendarTitle.includes(' ') ? (
               <>
                 <span className="font-bold">{calendarTitle.split(' ')[0]}</span>
                 <span className="font-normal"> {calendarTitle.split(' ').slice(1).join(' ')}</span>

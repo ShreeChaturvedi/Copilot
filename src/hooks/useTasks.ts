@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Task } from '@shared/types';
 import { taskApi, type UpdateTaskData, type CreateTaskData } from '../services/api';
+import { toast } from 'sonner';
 
 /**
  * Query keys for task-related queries
@@ -82,81 +83,143 @@ export const useTasks = (filters: TaskFilters = {}) => {
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });
 
-  // Create task mutation
-  const addTask = useMutation<Task, Error, CreateTaskData>({
+  // Create task mutation (optimistic)
+  const addTask = useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string }>({
     mutationFn: taskApi.createTask,
-    onSuccess: (newTask) => {
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
+      const tempId = `temp-${Date.now()}`;
+      const tempTask: Task = {
+        id: tempId,
+        title: variables.title.trim(),
+        completed: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        scheduledDate: variables.scheduledDate,
+        priority: variables.priority || 'medium',
+        taskListId: variables.taskListId,
+        tags: variables.tags,
+        parsedMetadata: variables.parsedMetadata,
+        attachments: variables.attachments?.map((f, idx) => ({
+          id: `temp-att-${idx}-${Date.now()}`,
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          url: f.url,
+          uploadedAt: new Date(),
+          taskId: tempId,
+        })),
+      };
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => [tempTask, ...(oldData || [])]
+      );
+      return { previousTasks, tempId };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+      toast.error(error.message || 'Failed to create task');
+    },
+    onSuccess: (newTask, _variables, context) => {
+      // Replace temp with real task if present
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
-          if (!oldData) return [newTask];
-          return [newTask, ...oldData];
+          const list = oldData || [];
+          if (!context?.tempId) return [newTask, ...list];
+          const idx = list.findIndex((t) => t.id === context.tempId);
+          if (idx === -1) return [newTask, ...list];
+          const copy = [...list];
+          copy[idx] = newTask;
+          return copy;
         }
       );
     },
-    onError: (error) => {
-      console.error('Failed to create task:', error);
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
     },
   });
 
-  // Update task mutation
+  // Update task mutation (optimistic)
   const updateTask = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Task> }) =>
       taskApi.updateTask(id, updates),
-    onSuccess: (updatedTask) => {
-      queryClient.setQueriesData(
-        { queryKey: taskQueryKeys.all },
-        (oldData: Task[] | undefined) => {
-          if (!oldData) return [updatedTask];
-          return oldData.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task
-          );
-        }
-      );
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
-    },
-    onError: (error) => {
-      console.error('Failed to update task:', error);
-    },
-  });
-
-  // Delete task mutation
-  const deleteTask = useMutation({
-    mutationFn: taskApi.deleteTask,
-    onSuccess: (_, deletedId) => {
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.filter((task) => task.id !== deletedId);
+          return oldData.map((task) => (task.id === id ? { ...task, ...updates } : task));
         }
       );
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+      return { previousTasks };
     },
-    onError: (error) => {
-      console.error('Failed to delete task:', error);
+    onError: (error, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+      toast.error(error.message || 'Failed to update task');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 
-  // Schedule task mutation
+  // Delete task mutation (optimistic)
+  const deleteTask = useMutation({
+    mutationFn: taskApi.deleteTask,
+    onMutate: async (deletedId: string) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => (oldData || []).filter((task) => task.id !== deletedId)
+      );
+      return { previousTasks };
+    },
+    onError: (error, _deletedId, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+      toast.error(error.message || 'Failed to delete task');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+    },
+  });
+
+  // Schedule task mutation (optimistic)
   const scheduleTask = useMutation({
     mutationFn: (variables: { id: string; scheduledDate: Date }) =>
       taskApi.scheduleTask(variables.id, variables.scheduledDate),
-    onSuccess: (updatedTask) => {
+    onMutate: async ({ id, scheduledDate }) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
-          if (!oldData) return [updatedTask];
-          return oldData.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task
-          );
+          if (!oldData) return [];
+          return oldData.map((task) => (task.id === id ? { ...task, scheduledDate } : task));
         }
       );
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+      return { previousTasks };
     },
-    onError: (error) => {
-      console.error('Failed to schedule task:', error);
+    onError: (error, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+      toast.error(error.message || 'Failed to schedule task');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 
@@ -227,23 +290,51 @@ export const useTask = (id: string) => {
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string}>({
     mutationFn: taskApi.createTask,
-    onSuccess: (newTask) => {
-      // Invalidate and refetch task queries
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-
-      // Optimistically add the task to existing queries
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
+      const tempId = `temp-${Date.now()}`;
+      const tempTask: Task = {
+        id: tempId,
+        title: variables.title.trim(),
+        completed: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        scheduledDate: variables.scheduledDate,
+        priority: variables.priority || 'medium',
+        taskListId: variables.taskListId,
+        tags: variables.tags,
+        parsedMetadata: variables.parsedMetadata,
+      };
       queryClient.setQueriesData(
-        { queryKey: taskQueryKeys.lists() },
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => [tempTask, ...(oldData || [])]
+      );
+      return { previousTasks, tempId };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+    },
+    onSuccess: (newTask, _variables, context) => {
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
-          if (!oldData) return [newTask];
-          return [newTask, ...oldData];
+          const list = oldData || [];
+          if (!context?.tempId) return [newTask, ...list];
+          const idx = list.findIndex((t) => t.id === context.tempId);
+          if (idx === -1) return [newTask, ...list];
+          const copy = [...list];
+          copy[idx] = newTask;
+          return copy;
         }
       );
     },
-    onError: (error) => {
-      console.error('Failed to create task:', error);
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
     },
   });
 };
@@ -257,23 +348,26 @@ export const useUpdateTask = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTaskData }) =>
       taskApi.updateTask(id, data),
-    onSuccess: (updatedTask) => {
-      // Update the task in all relevant queries
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
-          if (!oldData) return [updatedTask];
-          return oldData.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task
-          );
+          if (!oldData) return [];
+          return oldData.map((task) => (task.id === id ? { ...task, ...data } : task));
         }
       );
-
-      // Invalidate filtered queries to ensure they re-filter
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+      return { previousTasks };
     },
-    onError: (error) => {
-      console.error('Failed to update task:', error);
+    onError: (_error, _vars, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };
@@ -286,21 +380,23 @@ export const useDeleteTask = () => {
 
   return useMutation({
     mutationFn: taskApi.deleteTask,
-    onSuccess: (_, deletedId) => {
-      // Remove the task from all queries
+    onMutate: async (deletedId: string) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
-        (oldData: Task[] | undefined) => {
-          if (!oldData) return [];
-          return oldData.filter((task) => task.id !== deletedId);
-        }
+        (oldData: Task[] | undefined) => (oldData || []).filter((task) => task.id !== deletedId)
       );
-
-      // Invalidate filtered queries
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+      return { previousTasks };
     },
-    onError: (error) => {
-      console.error('Failed to delete task:', error);
+    onError: (_error, _deletedId, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };
@@ -356,22 +452,26 @@ export const useScheduleTask = () => {
   return useMutation({
     mutationFn: ({ id, scheduledDate }: { id: string; scheduledDate: Date }) =>
       taskApi.scheduleTask(id, scheduledDate),
-    onSuccess: (updatedTask) => {
-      // Update the task in all queries
+    onMutate: async ({ id, scheduledDate }) => {
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
+      const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
-          if (!oldData) return [updatedTask];
-          return oldData.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task
-          );
+          if (!oldData) return [];
+          return oldData.map((task) => (task.id === id ? { ...task, scheduledDate } : task));
         }
       );
-
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
+      return { previousTasks };
     },
-    onError: (error) => {
-      console.error('Failed to schedule task:', error);
+    onError: (_error, _vars, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };

@@ -3,6 +3,8 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { toast } from 'sonner';
 import type { CalendarEvent } from '@shared/types';
 import { eventApi, type UpdateEventData } from '../services/api';
 import { toUTC } from '../utils/date';
@@ -89,16 +91,25 @@ export const useEvents = (
   filters: EventFilters = {},
   options?: { enabled?: boolean }
 ) => {
-  return useQuery({
-    queryKey: eventQueryKeys.list(filters),
-    queryFn: async () => {
-      const events = await eventApi.fetchEvents();
-      return filterEvents(events, filters);
-    },
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+  const allEventsQuery = useQuery({
+    queryKey: eventQueryKeys.all,
+    queryFn: eventApi.fetchEvents,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     enabled: options?.enabled ?? true,
   });
+
+  const filtered = useMemo(() => {
+    return filterEvents(allEventsQuery.data || [], filters);
+  }, [allEventsQuery.data, filters]);
+
+  return {
+    data: filtered,
+    isLoading: allEventsQuery.isLoading,
+    isSuccess: allEventsQuery.isSuccess,
+    error: allEventsQuery.error,
+    refetch: allEventsQuery.refetch,
+  } as const;
 };
 
 /**
@@ -117,11 +128,17 @@ export const useAllEvents = () => {
  * Hook to fetch a single event by ID
  */
 export const useEvent = (id: string) => {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: eventQueryKeys.detail(id),
     queryFn: async () => {
-      const events = await eventApi.fetchEvents();
-      const event = events.find(e => e.id === id);
+      const allEvents = await queryClient.ensureQueryData({
+        queryKey: eventQueryKeys.all,
+        queryFn: eventApi.fetchEvents,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+      });
+      const event = allEvents.find(e => e.id === id);
       if (!event) {
         throw new Error('Event not found');
       }
@@ -136,9 +153,18 @@ export const useEvent = (id: string) => {
  * Hook to fetch events for a specific calendar
  */
 export const useEventsByCalendar = (calendarName: string) => {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: eventQueryKeys.byCalendar(calendarName),
-    queryFn: () => eventApi.fetchEventsByCalendar(calendarName),
+    queryFn: async () => {
+      const allEvents = await queryClient.ensureQueryData({
+        queryKey: eventQueryKeys.all,
+        queryFn: eventApi.fetchEvents,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+      });
+      return allEvents.filter(e => e.calendarName === calendarName);
+    },
     enabled: !!calendarName,
     staleTime: 2 * 60 * 1000,
   });
@@ -148,9 +174,24 @@ export const useEventsByCalendar = (calendarName: string) => {
  * Hook to fetch events within a date range
  */
 export const useEventsByDateRange = (start: Date, end: Date) => {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: eventQueryKeys.byDateRange(start, end),
-    queryFn: () => eventApi.fetchEventsByDateRange(start, end),
+    queryFn: async () => {
+      const allEvents = await queryClient.ensureQueryData({
+        queryKey: eventQueryKeys.all,
+        queryFn: eventApi.fetchEvents,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+      });
+      const startUTC = toUTC(start);
+      const endUTC = toUTC(end);
+      return allEvents.filter(event => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        return eventStart < endUTC && eventEnd > startUTC;
+      });
+    },
     enabled: !!start && !!end,
     staleTime: 2 * 60 * 1000,
   });
@@ -162,26 +203,56 @@ export const useEventsByDateRange = (start: Date, end: Date) => {
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<CalendarEvent, Error, Parameters<typeof eventApi.createEvent>[0], { previousEvents?: CalendarEvent[]; tempId?: string}>({
     mutationFn: eventApi.createEvent,
-    onSuccess: (newEvent) => {
-      // Invalidate and refetch event queries
-      queryClient.invalidateQueries({ queryKey: eventQueryKeys.all });
-      
-      // Optimistically add the event to existing queries
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: eventQueryKeys.all });
+      const previousEvents = queryClient.getQueryData<CalendarEvent[]>(eventQueryKeys.all);
+      const tempId = `temp-${Date.now()}`;
+      const tempEvent: CalendarEvent = {
+        id: tempId,
+        title: variables.title.trim(),
+        start: variables.start,
+        end: variables.end,
+        description: variables.description?.trim(),
+        location: variables.location?.trim(),
+        calendarName: variables.calendarName,
+        notes: variables.notes,
+        color: variables.color,
+        allDay: variables.allDay || false,
+        recurrence: variables.recurrence,
+        exceptions: variables.exceptions || [],
+      };
       queryClient.setQueriesData(
-        { queryKey: eventQueryKeys.lists() },
+        { queryKey: eventQueryKeys.all },
         (oldData: CalendarEvent[] | undefined) => {
-          if (!oldData) return [newEvent];
-          return [...oldData, newEvent].sort((a, b) => 
-            new Date(a.start).getTime() - new Date(b.start).getTime()
-          );
+          const list = [...(oldData || []), tempEvent];
+          return list.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        }
+      );
+      return { previousEvents, tempId };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousEvents) {
+        queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
+      }
+      toast.error(error.message || 'Failed to create event');
+    },
+    onSuccess: (newEvent, _variables, context) => {
+      queryClient.setQueriesData(
+        { queryKey: eventQueryKeys.all },
+        (oldData: CalendarEvent[] | undefined) => {
+          const list = oldData || [];
+          if (!context?.tempId) return [...list, newEvent];
+          const idx = list.findIndex((e) => e.id === context.tempId);
+          if (idx === -1) return [...list, newEvent];
+          const copy = [...list];
+          copy[idx] = newEvent;
+          return copy.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
         }
       );
     },
-    onError: (error) => {
-      console.error('Failed to create event:', error);
-    },
+    // Avoid immediate invalidation to prevent optimistic item flicker
   });
 };
 
@@ -219,12 +290,9 @@ export const useUpdateEvent = () => {
       if (context?.previousEvents) {
         queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
       }
-      console.error('Failed to update event:', error);
+      toast.error(error.message || 'Failed to update event');
     },
-    onSettled: () => {
-      // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: eventQueryKeys.all });
-    },
+    // Avoid immediate invalidation to keep optimistic position stable
   });
 };
 
@@ -259,11 +327,8 @@ export const useDeleteEvent = () => {
       if (context?.previousEvents) {
         queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
       }
-      console.error('Failed to delete event:', error);
+      toast.error(error.message || 'Failed to delete event');
     },
-    onSettled: () => {
-      // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: eventQueryKeys.all });
-    },
+    // Avoid immediate invalidation to keep optimistic delete stable
   });
 };

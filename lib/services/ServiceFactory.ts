@@ -1,7 +1,8 @@
 /**
  * Service Factory - Dependency injection and service instantiation
  */
-import type { PrismaClient } from '@prisma/client';
+import type { PoolClient } from 'pg';
+import { pool, withTransaction as sqlWithTransaction, checkDatabaseHealth as sqlHealth } from '../config/database.js';
 import { TaskService } from './TaskService.js';
 import { CalendarService } from './CalendarService.js';
 import { EventService } from './EventService.js';
@@ -14,7 +15,7 @@ import { BaseServiceConfig } from './BaseService.js';
  * Service factory configuration
  */
 export interface ServiceFactoryConfig {
-  prisma: PrismaClient;
+  dbClient?: PoolClient; // optional transactional client
   enableLogging?: boolean;
   enableCaching?: boolean;
   cacheTTL?: number;
@@ -54,7 +55,7 @@ export class ServiceFactory {
    */
   getTaskService(): TaskService {
     if (!this.services.task) {
-      this.services.task = new TaskService(this.config.prisma, this.baseServiceConfig);
+      this.services.task = new TaskService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.task;
   }
@@ -64,7 +65,7 @@ export class ServiceFactory {
    */
   getCalendarService(): CalendarService {
     if (!this.services.calendar) {
-      this.services.calendar = new CalendarService(this.config.prisma, this.baseServiceConfig);
+      this.services.calendar = new CalendarService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.calendar;
   }
@@ -74,7 +75,7 @@ export class ServiceFactory {
    */
   getEventService(): EventService {
     if (!this.services.event) {
-      this.services.event = new EventService(this.config.prisma, this.baseServiceConfig);
+      this.services.event = new EventService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.event;
   }
@@ -84,7 +85,7 @@ export class ServiceFactory {
    */
   getTaskListService(): TaskListService {
     if (!this.services.taskList) {
-      this.services.taskList = new TaskListService(this.config.prisma, this.baseServiceConfig);
+      this.services.taskList = new TaskListService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.taskList;
   }
@@ -94,7 +95,7 @@ export class ServiceFactory {
    */
   getTagService(): TagService {
     if (!this.services.tag) {
-      this.services.tag = new TagService(this.config.prisma, this.baseServiceConfig);
+      this.services.tag = new TagService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.tag;
   }
@@ -104,7 +105,7 @@ export class ServiceFactory {
    */
   getAttachmentService(): AttachmentService {
     if (!this.services.attachment) {
-      this.services.attachment = new AttachmentService(this.config.prisma, this.baseServiceConfig);
+      this.services.attachment = new AttachmentService(this.config.dbClient || pool, this.baseServiceConfig);
     }
     return this.services.attachment;
   }
@@ -133,28 +134,16 @@ export class ServiceFactory {
     this.services = {};
   }
 
-  /**
-   * Get Prisma client instance
-   */
-  getPrisma(): PrismaClient {
-    return this.config.prisma;
-  }
+  // Removed Prisma accessor: factory now uses SQL clients only
 
   /**
    * Execute database transaction with all services
    */
-  async transaction<T>(
-    callback: (services: Services, prisma: PrismaClient) => Promise<T>
-  ): Promise<T> {
-    return await this.config.prisma.$transaction(async (tx) => {
-      // Create temporary factory with transaction client
-      const txFactory = new ServiceFactory({
-        ...this.config,
-        prisma: tx as PrismaClient,
-      });
-
+  async transaction<T>(callback: (services: Services, client: PoolClient) => Promise<T>): Promise<T> {
+    return await sqlWithTransaction(async (client) => {
+      const txFactory = new ServiceFactory({ ...this.config, dbClient: client });
       const services = txFactory.getAllServices();
-      return await callback(services, tx as PrismaClient);
+      return await callback(services, client);
     });
   }
 
@@ -172,13 +161,7 @@ export class ServiceFactory {
       timestamp: new Date(),
     };
 
-    try {
-      // Check database connection
-      await this.config.prisma.$queryRaw`SELECT 1`;
-      results.database = true;
-    } catch (error) {
-      console.error('Database health check failed:', error);
-    }
+    results.database = await sqlHealth();
 
     // Check each service
     const serviceNames: (keyof Services)[] = ['task', 'calendar', 'event', 'taskList', 'tag', 'attachment'];
@@ -201,17 +184,13 @@ export class ServiceFactory {
    * Cleanup resources
    */
   async cleanup(): Promise<void> {
-    try {
-      await this.config.prisma.$disconnect();
-    } catch (error) {
-      console.error('Error during service factory cleanup:', error);
-    }
+    // Pool cleanup is handled globally in database.ts
   }
 }
 
 /**
  * Global service factory instance
- * This will be initialized with the Prisma client
+ * This will be initialized with the SQL pool
  */
 let globalServiceFactory: ServiceFactory | null = null;
 

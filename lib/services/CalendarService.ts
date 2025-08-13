@@ -1,8 +1,8 @@
 /**
- * Calendar Service - Concrete implementation of BaseService for Calendar operations
+ * Calendar Service - Concrete implementation of BaseService for Calendar operations (SQL)
  */
 import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
-import type { Prisma } from '@prisma/client';
+import { query, withTransaction } from '../config/database.js';
 
 /**
  * Calendar entity interface extending base
@@ -63,51 +63,67 @@ export interface CalendarFilters {
  * CalendarService - Handles all calendar-related operations
  */
 export class CalendarService extends BaseService<CalendarEntity, CreateCalendarDTO, UpdateCalendarDTO, CalendarFilters> {
-  protected getModel() {
-    return this.prisma.calendar;
+  protected getTableName(): string {
+    return 'calendars';
   }
 
   protected getEntityName(): string {
     return 'Calendar';
   }
 
-  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): Prisma.CalendarWhereInput {
-    const where: Prisma.CalendarWhereInput = {};
-
-    // Always filter by user
+  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): { sql: string; params: any[] } {
+    const clauses: string[] = [];
+    const params: any[] = [];
     if (context?.userId) {
-      where.userId = context.userId;
+      params.push(context.userId);
+      clauses.push(`"userId" = $${params.length}`);
     }
-
-    // Visibility filter
     if (filters.isVisible !== undefined) {
-      where.isVisible = filters.isVisible;
+      params.push(filters.isVisible);
+      clauses.push(`"isVisible" = $${params.length}`);
     }
-
-    // Default calendar filter
     if (filters.isDefault !== undefined) {
-      where.isDefault = filters.isDefault;
+      params.push(filters.isDefault);
+      clauses.push(`"isDefault" = $${params.length}`);
     }
-
-    // Search filter
     if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-      ];
+      params.push(`%${filters.search}%`);
+      const idx = params.length;
+      clauses.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
     }
-
-    return where;
+    const sql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    return { sql, params };
   }
 
-  protected buildIncludeClause(): Record<string, unknown> {
-    return {
-      _count: {
-        select: {
-          events: true,
-        },
-      },
-    };
+  async findAll(filters: CalendarFilters = {}, context?: ServiceContext): Promise<CalendarEntity[]> {
+    try {
+      this.log('findAll', { filters }, context);
+      const { sql, params } = this.buildWhereClause(filters, context);
+      const res = await query(`SELECT * FROM calendars ${sql} ORDER BY "isDefault" DESC, name ASC`, params, this.db);
+      const rows = res.rows.map((r: any) => this.transformEntity(r));
+      return rows;
+    } catch (error: any) {
+      this.log('findAll:error', { error: error.message, filters }, context);
+      throw error;
+    }
+  }
+
+  protected async enrichEntities(entities: CalendarEntity[], context?: ServiceContext): Promise<CalendarEntity[]> {
+    if (!entities.length) return entities;
+    const ids = entities.map((c) => c.id);
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const counts = await query<{ id: string; count: string }>(
+      `SELECT c.id, COUNT(e.*)::bigint as count
+       FROM calendars c
+       LEFT JOIN events e ON e."calendarId" = c.id
+       WHERE c.id IN (${placeholders})
+       GROUP BY c.id`,
+      ids,
+      this.db
+    );
+    const countMap = new Map<string, number>();
+    counts.rows.forEach((r) => countMap.set(r.id, Number(r.count)));
+    return entities.map((c) => ({ ...c, _count: { events: countMap.get(c.id) || 0 } } as unknown as CalendarEntity));
   }
 
   /**
@@ -120,14 +136,13 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
     // Check for duplicate calendar name for the user
     if (context?.userId) {
-      const existingCalendar = await this.prisma.calendar.findFirst({
-        where: {
-          name: data.name.trim(),
-          userId: context.userId,
-        },
-      });
+      const existingCalendar = await query(
+        'SELECT id FROM calendars WHERE name = $1 AND "userId" = $2 LIMIT 1',
+        [data.name.trim(), context.userId],
+        this.db
+      );
 
-      if (existingCalendar) {
+      if (existingCalendar.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Calendar name already exists');
       }
     }
@@ -159,15 +174,12 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
     // Check for duplicate name if name is being updated
     if (data.name && context?.userId) {
-      const existingCalendar = await this.prisma.calendar.findFirst({
-        where: {
-          name: data.name.trim(),
-          userId: context.userId,
-          id: { not: id }, // Exclude current calendar
-        },
-      });
-
-      if (existingCalendar) {
+      const existingCalendar = await query(
+        'SELECT id FROM calendars WHERE name = $1 AND "userId" = $2 AND id <> $3 LIMIT 1',
+        [data.name.trim(), context.userId, id],
+        this.db
+      );
+      if (existingCalendar.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Calendar name already exists');
       }
     }
@@ -200,32 +212,18 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const createData: Prisma.CalendarCreateInput = {
-        name: data.name.trim(),
-        color: data.color,
-        description: data.description?.trim() || null,
-        isDefault,
-        isVisible: true, // New calendars are visible by default
-        user: { connect: { id: context!.userId! } },
-      };
-
-      // Handle default calendar logic in transaction
-      const result = await this.prisma.$transaction(async (tx) => {
-        // If setting as default, unset other defaults
+      const result = await withTransaction(async (client) => {
         if (isDefault && context?.userId) {
-          await tx.calendar.updateMany({
-            where: {
-              userId: context.userId,
-              isDefault: true,
-            },
-            data: { isDefault: false },
-          });
+          await query('UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true', [context.userId], client);
         }
-
-        return await tx.calendar.create({
-          data: createData,
-          include: this.buildIncludeClause(),
-        });
+        const created = await query(
+          `INSERT INTO calendars (id, name, color, description, "isDefault", "isVisible", "userId", "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, true, $5, NOW(), NOW())
+           RETURNING *`,
+          [data.name.trim(), data.color, data.description?.trim() || null, isDefault, context!.userId!],
+          client
+        );
+        return created.rows[0];
       });
 
       this.log('create:success', { id: result.id }, context);
@@ -247,28 +245,18 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     try {
       this.log('getDefault', {}, context);
 
-      let defaultCalendar: CalendarEntity | null = (await this.getModel().findFirst({
-        where: {
-          userId: context.userId,
-          isDefault: true,
-        },
-        include: this.buildIncludeClause(),
-      })) as unknown as CalendarEntity | null;
+      const defaultRes = await query('SELECT * FROM calendars WHERE "userId" = $1 AND "isDefault" = true LIMIT 1', [context.userId], this.db);
+      let defaultCalendar: any | null = defaultRes.rows[0] || null;
 
       // If no default calendar exists, get the first one or create one
       if (!defaultCalendar) {
-        const firstCalendar = (await this.getModel().findFirst({
-          where: { userId: context.userId },
-          include: this.buildIncludeClause(),
-        })) as unknown as CalendarEntity | null;
+        const firstRes = await query('SELECT * FROM calendars WHERE "userId" = $1 LIMIT 1', [context.userId], this.db);
+        const firstCalendar = (firstRes.rows[0] as any) || null;
 
         if (firstCalendar) {
           // Set first calendar as default
-          defaultCalendar = await this.getModel().update({
-            where: { id: firstCalendar.id },
-            data: { isDefault: true },
-            include: this.buildIncludeClause(),
-          });
+          const updated = await query('UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *', [firstCalendar.id], this.db);
+          defaultCalendar = updated.rows[0];
         } else {
           // Create a default calendar and return immediately to avoid mixed inferred types
           const created = await this.create(
@@ -307,27 +295,12 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Unset all other defaults
+      const result = await withTransaction(async (client) => {
         if (context?.userId) {
-          await tx.calendar.updateMany({
-            where: {
-              userId: context.userId,
-              isDefault: true,
-            },
-            data: { isDefault: false },
-          });
+          await query('UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true', [context.userId], client);
         }
-
-        // Set this calendar as default
-        return await tx.calendar.update({
-          where: { id },
-          data: { 
-            isDefault: true,
-            updatedAt: new Date(),
-          },
-          include: this.buildIncludeClause(),
-        });
+        const updated = await query('UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *', [id], client);
+        return updated.rows[0];
       });
 
       this.log('setDefault:success', { id }, context);
@@ -352,23 +325,15 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const currentCalendar = await this.getModel().findUnique({
-        where: { id },
-        select: { isVisible: true },
-      });
+      const currentRes = await query<{ isVisible: boolean }>('SELECT "isVisible" FROM calendars WHERE id = $1', [id], this.db);
+      const currentCalendar = currentRes.rows[0];
 
       if (!currentCalendar) {
         throw new Error('NOT_FOUND: Calendar not found');
       }
 
-      const updatedCalendar = await this.getModel().update({
-        where: { id },
-        data: {
-          isVisible: !currentCalendar.isVisible,
-          updatedAt: new Date(),
-        },
-        include: this.buildIncludeClause(),
-      });
+      const updatedRes = await query('UPDATE calendars SET "isVisible" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING *', [!currentCalendar.isVisible, id], this.db);
+      const updatedCalendar = updatedRes.rows[0];
 
       this.log('toggleVisibility:success', { id, isVisible: updatedCalendar.isVisible }, context);
       return this.transformEntity(updatedCalendar);
@@ -397,21 +362,22 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     try {
       this.log('getWithEventCounts', {}, context);
 
-      const calendars = await this.getModel().findMany({
-        where: { userId: context.userId },
-        include: {
-          _count: {
-            select: { events: true },
-          },
-        },
-        orderBy: [
-          { isDefault: 'desc' },
-          { name: 'asc' },
-        ],
-      });
+      const res = await query(
+        `SELECT c.*, COALESCE(e_cnt.count, 0)::bigint AS events_count
+         FROM calendars c
+         LEFT JOIN (
+           SELECT "calendarId", COUNT(*)::bigint AS count
+           FROM events
+           GROUP BY "calendarId"
+         ) e_cnt ON e_cnt."calendarId" = c.id
+         WHERE c."userId" = $1
+         ORDER BY c."isDefault" DESC, c.name ASC`,
+        [context.userId!],
+        this.db
+      );
 
-      this.log('getWithEventCounts:success', { count: calendars.length }, context);
-      return calendars.map((calendar) => this.transformEntity(calendar));
+      this.log('getWithEventCounts:success', { count: res.rowCount }, context);
+      return res.rows.map((row: any) => this.transformEntity({ ...row, _count: { events: Number(row.events_count) } }));
     } catch (error) {
       this.log('getWithEventCounts:error', { error: error.message }, context);
       throw error;
@@ -432,39 +398,28 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
 
         // Check if this is the only calendar
-        const userCalendarCount = await this.count({}, context);
+        const userCalendarCountRes = await query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM calendars WHERE "userId" = $1', [context.userId!], this.db);
+        const userCalendarCount = Number(userCalendarCountRes.rows[0].count);
         if (userCalendarCount <= 1) {
           throw new Error('VALIDATION_ERROR: Cannot delete the only calendar');
         }
 
         // Check if this is the default calendar
-        const calendar = await this.getModel().findUnique({
-          where: { id },
-          select: { isDefault: true },
-        });
+        const calendarRes = await query<{ isDefault: boolean }>('SELECT "isDefault" FROM calendars WHERE id = $1', [id], this.db);
+        const calendar = calendarRes.rows[0];
 
         if (calendar?.isDefault) {
           // Set another calendar as default before deleting
-          const otherCalendar = await this.getModel().findFirst({
-            where: {
-              userId: context.userId,
-              id: { not: id },
-            },
-          });
+          const otherRes = await query('SELECT id FROM calendars WHERE "userId" = $1 AND id <> $2 LIMIT 1', [context.userId!, id], this.db);
+          const otherCalendar = otherRes.rows[0];
 
           if (otherCalendar) {
-            await this.getModel().update({
-              where: { id: otherCalendar.id },
-              data: { isDefault: true },
-            });
+            await query('UPDATE calendars SET "isDefault" = true WHERE id = $1', [otherCalendar.id], this.db);
           }
         }
       }
 
-      // Delete the calendar (cascade will handle events)
-      await this.getModel().delete({
-        where: { id },
-      });
+      await query('DELETE FROM calendars WHERE id = $1', [id], this.db);
 
       this.log('delete:success', { id }, context);
       return true;
@@ -486,14 +441,14 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
       this.log('reorder', { calendarIds }, context);
 
       // Validate all calendars belong to user
-      const userCalendars = await this.getModel().findMany({
-        where: {
-          id: { in: calendarIds },
-          userId: context.userId,
-        },
-      });
+      const placeholders = calendarIds.map((_, i) => `$${i + 1}`).join(',');
+      const userCalendars = await query(
+        `SELECT id FROM calendars WHERE id IN (${placeholders}) AND "userId" = $${calendarIds.length + 1}`,
+        [...calendarIds, context.userId!],
+        this.db
+      );
 
-      if (userCalendars.length !== calendarIds.length) {
+      if (userCalendars.rowCount !== calendarIds.length) {
         throw new Error('VALIDATION_ERROR: Some calendars not found or access denied');
       }
 
@@ -501,11 +456,8 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
       // In a full implementation, you might add an `order` field to the database
       const orderedCalendars = await Promise.all(
         calendarIds.map(async (id) => {
-          const calendar = await this.getModel().findUnique({
-            where: { id },
-            include: this.buildIncludeClause(),
-          });
-          return calendar;
+          const res = await query('SELECT * FROM calendars WHERE id = $1', [id], this.db);
+          return res.rows[0];
         })
       );
 

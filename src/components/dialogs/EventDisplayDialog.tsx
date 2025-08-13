@@ -240,7 +240,8 @@ export function EventDisplayDialog({
     setIsDeleting(true);
 
     try {
-      await deleteEventMutation.mutateAsync(event.id);
+      // Trigger optimistic delete; close immediately for snappy UX
+      deleteEventMutation.mutate(event.id);
       handleClose();
     } catch (error) {
       console.error('Failed to delete event:', error);

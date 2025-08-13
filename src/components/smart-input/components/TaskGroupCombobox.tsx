@@ -80,9 +80,12 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
   const isAllSelected = activeTaskGroupId === 'all';
 
   // Get current active task group for non-all selection
-  const activeTaskGroup =
-    taskGroups.find((group) => group.id === activeTaskGroupId) ||
-    (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
+  // IMPORTANT: Do NOT fall back to the first group when 'all' is selected,
+  // otherwise both "All Tasks" and the first group will appear selected.
+  const activeTaskGroup = isAllSelected
+    ? null
+    : taskGroups.find((group) => group.id === activeTaskGroupId) ||
+      (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // We render emoji directly; no icon component needed
 
@@ -100,7 +103,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             className
           )}
         >
-          {isAllSelected ? (
+           {isAllSelected ? (
             <>
               <div style={{ color: 'hsl(var(--muted-foreground))' }}>
                 <List className="w-4 h-4" />
@@ -110,9 +113,9 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
           ) : (
             <>
               <div className="text-base">
-                {activeTaskGroup.emoji}
+                {activeTaskGroup?.emoji}
               </div>
-              <span className="text-sm font-medium">{activeTaskGroup.name}</span>
+              <span className="text-sm font-medium">{activeTaskGroup?.name}</span>
             </>
           )}
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
@@ -150,10 +153,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   key={group.id}
                   value={group.id}
                   onSelect={(currentValue) => {
-                    if (
-                      currentValue !== activeTaskGroup.id &&
-                      onSelectTaskGroup
-                    ) {
+                    if (currentValue !== activeTaskGroupId && onSelectTaskGroup) {
                       onSelectTaskGroup(currentValue);
                     }
                     setOpen(false);
@@ -168,7 +168,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   <Check
                     className={cn(
                       'ml-auto h-4 w-4',
-                      activeTaskGroup.id === group.id
+                      !isAllSelected && activeTaskGroupId === group.id
                         ? 'opacity-100'
                         : 'opacity-0'
                     )}

@@ -59,7 +59,6 @@ export const CalendarView = ({
 }: CalendarViewProps) => {
   const internalCalendarRef = useRef<FullCalendar>(null);
   const [internalCurrentView] = useState<CalendarViewType>('timeGridWeek');
-  const [isLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Use external refs and state if provided, otherwise use internal ones
@@ -129,7 +128,7 @@ export const CalendarView = ({
   // Track default calendar color for consistent preview styling
   const defaultCalendar = calendars.find(cal => cal.isDefault) || visibleCalendars[0];
 
-  const { data: events = [], isLoading: eventsLoading } = useEvents(
+  const { data: events = [] } = useEvents(
     {
       calendarNames: visibleCalendarNames,
     },
@@ -201,6 +200,8 @@ export const CalendarView = ({
         start: toLocal(occurrenceStart),
         end: toLocal(occurrenceEnd),
         allDay: event.allDay || false,
+        // Disable drag/resize for optimistic temp events to avoid 404 updates
+        editable: !String(event.id).startsWith('temp-'),
         backgroundColor: event.color || calendar?.color || '#3788d8',
         borderColor: event.color || calendar?.color || '#3788d8',
         textColor: '#ffffff',
@@ -293,22 +294,22 @@ export const CalendarView = ({
         changeInfo.revert();
         return;
       }
-
-      const updatedEvent: CalendarEvent = {
-        ...originalEvent,
-        start: toUTC(event.start!),
-        end: toUTC(event.end!),
-        allDay: event.allDay,
-      };
-
-      await updateEventMutation.mutateAsync({
-        id: originalEvent.id,
-        data: {
-          start: updatedEvent.start,
-          end: updatedEvent.end,
-          allDay: updatedEvent.allDay,
+      // Optimistic update is handled by the hook; ensure visual revert on error
+      updateEventMutation.mutate(
+        {
+          id: originalEvent.id,
+          data: {
+            start: toUTC(event.start!),
+            end: toUTC(event.end!),
+            allDay: event.allDay,
+          },
         },
-      });
+        {
+          onError: () => {
+            changeInfo.revert();
+          },
+        }
+      );
     } catch (error) {
       // Revert the change on error
       changeInfo.revert();
@@ -408,18 +409,7 @@ export const CalendarView = ({
         )} 
         style={{ overscrollBehavior: 'none' }}
       >
-        {(isLoading || eventsLoading) && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
-            <div className="flex items-center space-x-2 text-muted-foreground">
-              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span className="text-sm">Loading...</span>
-            </div>
-          </div>
-        )}
-
+        
         <div className="h-full" style={{ overscrollBehavior: 'none' }}>
           <FullCalendar
             key={calendarKey}

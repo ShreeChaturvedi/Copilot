@@ -19,6 +19,7 @@ export const useCalendarManagement = () => {
   };
 
   const handleEditCalendar = (currentName: string, newName: string, color: string) => {
+    // Request to update, then optimistically show create dialog behavior is not required.
     updateCalendar.mutate({
       name: currentName,
       updates: { name: newName, color }

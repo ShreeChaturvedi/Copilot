@@ -77,6 +77,8 @@ export interface SmartTaskInputProps {
     debounceMs?: number;
     minLength?: number;
   };
+  /** Hide focus outline/ring around the input group when focused */
+  hideFocusOutline?: boolean;
 }
 
 /**
@@ -98,6 +100,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   useFlexInputGroup = true, // Enable new flexbox architecture
   useEnhancedLayout = false, // Feature flag for enhanced layout
   parsingOptions = {},
+  hideFocusOutline = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [, setVoiceTranscript] = useState(''); // Voice transcript state maintained for potential future use
@@ -346,6 +349,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             prefix={taskGroupSelector}
             suffix={submitButton}
             disabled={disabled}
+            hideFocusOutline={hideFocusOutline}
           >
             {enableSmartParsing ? (
               <HighlightedInputField

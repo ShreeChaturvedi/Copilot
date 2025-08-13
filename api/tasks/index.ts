@@ -47,7 +47,11 @@ export default createCrudHandler({
       }
       
       if (priority) {
-        filters.priority = priority as unknown as import('@prisma/client').Priority;
+        const p = String(priority).toUpperCase();
+        if (p === 'LOW' || p === 'MEDIUM' || p === 'HIGH') {
+          // Backend enum uses DB form
+          filters.priority = p as TaskFilters['priority'];
+        }
       }
       
       if (search) {

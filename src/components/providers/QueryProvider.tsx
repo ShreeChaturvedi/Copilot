@@ -4,6 +4,7 @@
 
 import React, { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface QueryProviderProps {
   children: ReactNode;
@@ -14,12 +15,9 @@ interface QueryProviderProps {
  */
 const handleQueryError = (error: Error) => {
   console.error('Query error:', error);
-  
-  // In a real app, you might want to show a toast notification
-  // For now, we'll just log the error
-  // TODO: Integrate with a toast notification system
-  if (error.message.includes('Failed to fetch')) {
-    console.warn('Network error detected - user may be offline');
+  if (typeof window !== 'undefined') {
+    const isNetwork = /Failed to fetch|NetworkError|ERR_NETWORK/i.test(error.message);
+    toast.error(isNetwork ? 'Network error. Please check your connection.' : error.message || 'Something went wrong loading data');
   }
 };
 
@@ -28,11 +26,8 @@ const handleQueryError = (error: Error) => {
  */
 const handleMutationError = (error: Error) => {
   console.error('Mutation error:', error);
-  
-  // Show user-friendly error messages
-  // TODO: Integrate with a toast notification system
-  if (error.message.includes('Failed to save')) {
-    console.warn('Save operation failed - data may not be persisted');
+  if (typeof window !== 'undefined') {
+    toast.error(error.message || 'Action failed. Changes were not saved.');
   }
 };
 

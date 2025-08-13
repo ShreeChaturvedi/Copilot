@@ -1,20 +1,146 @@
 # API Backend Fixes, Architecture, and Handoff Notes
 
+## 2025-08 Direct SQL Migration (node-postgres) — Read This First
+
+This codebase has been migrated off Prisma ORM to direct SQL using node-postgres (`pg`) for the serverless API. The frontend contracts remain the same. Keep the `.js` extensions in ESM imports; do not remove them.
+
+What changed (high level):
+- Database client: Prisma → `pg` (`Pool`/`PoolClient`) via `lib/config/database.ts`
+  - Exports: `pool`, `query(sql, params, client?)`, `withTransaction(fn)`, `initDatabase`, `checkDatabaseHealth`, `cleanupDatabase`
+- Services are now SQL-backed. `BaseService` no longer exposes Prisma delegates. It provides logging, ownership checks, and helpers; concrete services implement SQL themselves.
+- `ServiceFactory` injects a `dbClient` (for transactions) and no longer exposes or expects a Prisma client.
+- API routes under `api/*` are unchanged in shape, but call SQL-backed services.
+- Error handling unchanged: always use `sendError(res, new ApiErrorSubclass(...))` and `sendSuccess` for success.
+
+Key service behaviors (SQL):
+- TaskListService: CRUD + `getDefault`, `getWithTaskCount`. PATCH to `/api/task-lists/:id` supports `{ name, color, icon, description }` for emoji/color updates.
+- TaskService: `create` will use provided `taskListId` or fall back to the user’s default task list. Tags are upserted and linked within a transaction.
+- CalendarService: CRUD + default calendar helpers; visibility toggles and counts.
+- EventService: CRUD with calendar join. Update implemented to accept Date or ISO strings for `start`/`end`.
+
+Frontend contract clarifications (unchanged API shapes, now honored by SQL services):
+- POST /api/tasks accepts `taskListId`; the UI now passes the selected list id. Without it, tasks go to the default list.
+- PATCH /api/task-lists/:id persists `icon` (emoji) and `color` updates.
+- PUT /api/events/:id accepts Date or ISO string for `start`/`end` and returns enriched calendar info.
+
+Dev ergonomics and Vite fixes:
+- Vite now pre-bundles `react-resizable-panels`, `react-dropzone`, and `@radix-ui/react-toggle` via `optimizeDeps.include`, and enforces `server.port=5173` with `strictPort=true` to eliminate “Outdated Optimize Dep” 504s.
+- If you see optimize errors, clear caches: `rm -rf node_modules/.vite node_modules/.cache/vite` and restart dev.
+
+## 2025-08 Optimistic UI (Frontend) — Instant UX + Toast Rollbacks
+
+This session implemented an end-to-end Optimistic UI across Tasks, Events, Calendars, and Task Lists. Actions update the UI immediately and roll back on error with a Sonner toast. This section documents the decisions and the exact places that were changed so future agents can reason safely about the behavior.
+
+### Why events “disappeared” after create (root cause and fix)
+
+- Symptom: Creating an event shows it immediately, then it “vanishes” once the network call finishes.
+- Root cause:
+  - The UI filtered events by `calendarName` for visible calendars.
+  - The server response for create/update sometimes returned an event without `calendarName` (only `calendarId`/joined `calendar`).
+  - An immediate refetch replaced the optimistic item with the server list; the new event lacked `calendarName` so the filter dropped it.
+- Fix:
+  - Map `calendarName` on the client for both create and update responses (from `data.calendarName` or the joined `calendar.name`).
+    - File: `src/services/api/events.ts` (create/update mapping)
+  - Remove premature invalidation right after create/update/delete in events, so the optimistic item remains stable.
+    - File: `src/hooks/useEvents.ts`
+  - Keep a single “all events” cache and derive filtered views in-memory to avoid list/fetch races.
+
+### Libraries and global setup
+
+- Toasts: `sonner`
+  - Toaster mounted once in `src/App.tsx` with system theming and rich colors.
+  - Global error surfacing in `src/components/providers/QueryProvider.tsx` pipes query/mutation errors to `toast.error(...)`.
+- Data: `@tanstack/react-query` v5
+  - Use optimistic `onMutate` with snapshots + rollback in all mutations.
+
+### Events (create/update/delete/drag)
+
+- Hook: `src/hooks/useEvents.ts`
+  - Create: optimistic insert with temp id; replace temp with server entity in `onSuccess`; no immediate invalidation (prevents flicker).
+  - Update: optimistic merge; rollback on error; avoid immediate invalidation.
+  - Delete: optimistic remove; rollback on error; avoid immediate invalidation.
+  - Filtering: switched to a single `all` query and derived filtered results via `useMemo`.
+- Mapping: `src/services/api/events.ts`
+  - Ensure `calendarName` is always present on create/update responses by backfilling from `calendar.name` or request payload.
+- Drag/move: `src/components/calendar/CalendarView.tsx`
+  - `eventChange` uses `mutate` (not `await`) for a true optimistic move; revert only on error.
+- Dialogs:
+  - `src/components/dialogs/EventCreationDialog.tsx`: create uses non-blocking `mutate` and closes immediately.
+  - `src/components/dialogs/EventDisplayDialog.tsx`: delete uses non-blocking `mutate` and closes immediately.
+
+### Tasks (create/update/delete/schedule/toggle)
+
+- Hook: `src/hooks/useTasks.ts`
+  - Create: temp id, optimistic insert + replacement on success; rollback + toast on error.
+  - Update/Delete/Schedule/Toggle: optimistic mutations with snapshot + rollback + toast.
+
+### Calendars (create/update/delete/toggle visibility)
+
+- Hook: `src/hooks/useCalendars.ts`
+  - Create: optimistic add with temp id + replacement on success; rollback + toast on error.
+  - Update/Delete/Toggle: optimistic with rollback + toast.
+
+### Task Lists (emoji/color/create/edit/delete)
+
+- Hook: `src/hooks/useTaskManagement.ts`
+  - Create/Edit/Delete: optimistic changes with rollback + toast.
+  - Emoji/Color: now optimistic with rollback + toast.
+
+### Operational guidance (important for future agents)
+
+- Filters depend on `calendarName`. If you ever change server responses, ensure `calendarName` is preserved or computed; otherwise new events will vanish from filtered views.
+- Avoid immediate `invalidateQueries` on optimistic create/update/delete unless you specifically need a server truth refresh; it often causes visible flicker. Prefer reconciling during background moments or on a subsequent screen.
+- When wiring FullCalendar moves/resizes, use `mutate` (not `await`) so the UI doesn’t snap back. Revert only in the mutation `onError` path.
+
+### Quick troubleshooting
+
+- Verify server responses contain `calendarName`:
+  - POST `/api/events` should return the newly created event with `calendarName` populated.
+  - PUT `/api/events/:id` should return `calendarName` (original or updated).
+- If an event is missing:
+  - Confirm the event’s `calendarName` matches a visible calendar name on the client.
+  - Check that no immediate invalidation is clearing your optimistic entry.
+
+### Files changed (Frontend)
+
+- Toaster + global errors: `src/App.tsx`, `src/components/providers/QueryProvider.tsx`
+- Events: `src/hooks/useEvents.ts`, `src/services/api/events.ts`, `src/components/calendar/CalendarView.tsx`, `src/components/dialogs/EventCreationDialog.tsx`, `src/components/dialogs/EventDisplayDialog.tsx`
+- Tasks: `src/hooks/useTasks.ts`
+- Calendars: `src/hooks/useCalendars.ts`
+- Task Lists: `src/hooks/useTaskManagement.ts`
+
+Do’s
+- Keep `.js` extensions in ESM imports inside `api/` and `lib/`.
+- Use `query`/`withTransaction` from `lib/config/database.ts` for all DB work.
+- Always pass `context.userId` from routes into services; services enforce ownership.
+- Return `ApiResponse<T>` and use `sendError` with typed `ApiError`s.
+
+Don’ts
+- Don’t reintroduce Prisma in the serverless API.
+- Don’t mutate `req.query`. Use validation middleware or parse locally and pass through.
+- Don’t bypass error helpers with raw objects.
+
+Recently fixed bugs (SQL phase):
+- 500s on GET /api/events and /api/task-lists due to unimplemented `findAll` → implemented in `EventService`, `TaskListService`, `CalendarService`.
+- PUT /api/events/:id returned 500 (“Event not found”) → implemented `EventService.update` and tolerant date parsing.
+- Tasks always created in General → UI now sends `taskListId`; backend honors it.
+- Emoji updates didn’t persist → UI now PATCHes `/api/task-lists/:id` with `{ icon }`; SQL service updates persist.
+- Vite dev 504s (optimized deps) → added `optimizeDeps.include` and `strictPort`.
+
 This document captures a comprehensive, end-to-end summary of the backend/API state, the fixes applied during this session, design decisions, expected behavior, known issues, and a roadmap for the next agent.
 
 The goal is to make future work predictable and safe by fully documenting the architecture, constraints, and the rationale behind code changes.
 
 ## TL;DR (Executive Summary)
 
-- Worked on serverless API build/runtime problems (TypeScript + Prisma + ESM paths) that were causing 500s on basic GETs and POSTs.
-- Standardized API error responses; routes should now construct proper `ApiError` subclasses.
-- Tightened Prisma usage with concrete `Prisma.*WhereInput` and `Prisma.*CreateInput` rather than loose Records.
-- Resolved duplicate Prisma d.ts identifier issues by pinning Prisma to `5.16.1` and regenerating the client.
-- Addressed ESM resolution issues in serverless runtime; imports now use `./BaseService.js`.
-- Replaced unsafe response overrides with safe request logging (`res.once('finish', ...)`).
-- Implemented dev-only user upsert to satisfy FK constraints for POST flows (tasks, task lists, calendars, events) when running without real authentication.
-- Event creation now connects to both `user` and `calendar`, removing 500s during event POST.
-- GETs are 200 on page load; task/event POSTs succeed with dev user upsert.
+- Serverless API migrated to direct SQL using `pg` (node-postgres). Prisma is no longer used in `api/` or `lib/`.
+- All services (`Task`, `TaskList`, `Calendar`, `Event`, `Tag`, `Attachment`) now use `query(...)` and `withTransaction(...)` from `lib/config/database.ts`.
+- Fixed critical 500s by implementing missing methods and tolerant validators:
+  - Implemented `findAll` in `EventService`, `TaskListService`, `CalendarService`.
+  - Implemented `EventService.update` (accepts Date or ISO strings; returns enriched event with calendar).
+  - Implemented `TaskListService.update` (name, color, icon/emoji, description) used by PATCH/PUT routes.
+- Frontend contract unchanged; APIs return the same shapes. UI fixes now send `taskListId` on task create and persist emoji/color edits via PATCH `/api/task-lists/:id`.
+- ESM requires `.js` extensions in imports inside `api/` + `lib/`; do not remove them.
 
 ## Background and Symptoms
 
@@ -30,8 +156,7 @@ Observed issues before fixes:
 
 - Platform: Vercel serverless functions under `api/` directory.
 - Backend logic lives in `lib/` (services, middleware, utilities). Serverless routes call into services.
-- Database: PostgreSQL via Prisma ORM. Prisma schema in `packages/backend/prisma/schema.prisma`.
-- Prisma Client generated into root `node_modules/@prisma/client` and used both by monorepo server (`packages/backend`) and API routes.
+- Database: PostgreSQL via node-postgres (`pg`) for serverless API. SQL helpers in `lib/config/database.ts`.
 - Frontend dev: Vite serves the UI and proxies `/api` to `localhost:3000` (where `vercel dev` serves serverless functions by default).
 
 Request flow:
@@ -39,18 +164,18 @@ Request flow:
 2. API route enters `createApiHandler`/`createCrudHandler` in `lib/utils/apiHandler.ts`.
 3. Middleware pipeline runs (CORS → RequestId → RequestLogger → RateLimit → Validation → DevAuth).
 4. Route handler executes, constructs filters/payloads, and defers to the appropriate service method.
-5. Services execute Prisma queries and return domain entities.
+5. Services execute parameterized SQL and return domain entities (optionally enriched via post-load joins).
 
 ## Middleware Pipeline and Order
 
 - `corsMiddleware()`
 - `requestIdMiddleware()` – sets `req.requestId`, adds an `X-Request-ID` header
+- `devAuth()` – in development only, attaches a default user (`dev-user-id`) to `req.user` for routes that expect authentication
 - `requestLogger()` – logs request on arrival and response on finish
 - Rate limit preset (`rateLimitPresets.api`) – basic per-route limiting
 - `validateRequest(config)` – if validation schemas are provided
-- `devAuth()` – in development only, attaches a default user (`dev-user-id`) to `req.user` for routes that expect authentication
 
-Note: `requestLogger()` runs before `devAuth()`, so `userId` will log as `undefined` in dev even when `devAuth()` attaches a mock user later in the chain. The route handler will still see `req.user`. If you prefer logs to show `userId`, move `devAuth()` earlier in the middleware list.
+Note: In dev, `devAuth()` precedes the logger so logs include the mock `userId`.
 
 ## Error Handling and Response Contract
 
@@ -70,17 +195,11 @@ Note: `requestLogger()` runs before `devAuth()`, so `userId` will log as `undefi
 - This lets services rely on `context.userId` during development.
 - IMPORTANT: In production, remove `devAuth()` and implement proper JWT verification. Routes using `requireAuth` must add `authenticateJWT()` in the chain.
 
-## Prisma and TypeScript Decisions
+## TypeScript and ESM Details
 
-- Pinned Prisma to `5.16.1` across root and backend. Reason: Avoid duplicate identifier issues seen in later versions under the serverless builder.
-- Regenerated client at root against `packages/backend/prisma/schema.prisma`.
-- Enforced concrete Prisma types in services:
-  - Filters use `Prisma.*WhereInput`.
-  - Creates use `Prisma.*CreateInput` with proper `connect` relations.
-- Root `tsconfig.json` now sets `skipLibCheck: true` to avoid lib.d.ts noise from serverless builder and node typings.
-
-Trade-offs:
-- `BaseService.getModel()` typing was relaxed to `any` to support varying delegate signatures without introducing a large generic surface. Concrete services enforce stricter types via Prisma inputs. Consider refactoring to a typed delegate interface per model in the future.
+- The repo is strict TS. `lib/` and `api/` are authored in TS with ESM; runtime requires `.js` in import specifiers.
+- `lib/config/database.ts` provides the `pg` Pool and helpers. Prefer `query(sql, params, client)` with parameterized inputs.
+- Use `withTransaction(async client => { ... })` for multi-step writes (e.g., task + tag relations).
 
 ## Services Layer (Design and Behavior)
 
@@ -94,37 +213,29 @@ Services live under `lib/services/` and extend `BaseService<TEntity, CreateDTO, 
 
 Shared responsibilities implemented in `BaseService`:
 - Logging (`this.log`) with request metadata.
-- CRUD operations with overridable clauses (`buildWhereClause`, `buildIncludeClause`, `transformEntity`).
-- Pagination and counting utilities.
-- `ensureUserExists(userId, emailFallback)`: Dev-only helper that upserts a user row, preventing FK violations when routes connect to `user` without a real auth flow. Guarded by `process.env.NODE_ENV !== 'production'`.
+- Ownership checks (`checkOwnership`) for user-owned rows.
+- `buildWhereClause` and `enrichEntities` hooks for filtering and relation loading.
+- Helpers: `findById`, `count`, `exists`; concrete classes implement `findAll`, `create`, `update`.
+- `ensureUserExists(userId, emailFallback)` (dev-only) inserts a user row to satisfy FKs.
 
 Key service behaviors and fixes:
 
-### TaskService
-- `create(data, context)`:
-  - Validates payload.
-  - `ensureUserExists(context.userId)` before any write.
-  - If no `taskListId`, calls `getOrCreateDefaultTaskList(userId)` (which also ensures user exists) then connects task to that list.
-  - Uses `Prisma.TaskCreateInput` to connect `user` and `taskList` properly and to assign optional fields.
-- Tags: Upserts tags (by name) then creates `taskTag` relations within the same transaction when tags are provided.
+### TaskService (SQL)
+- `create(data, context)`: validates, ensures dev user, resolves `taskListId` (or default), inserts task, upserts tags and `task_tags` in a transaction, returns enriched task (taskList, tags, attachments).
+- `update(...)`, `toggleCompletion(...)`, `findByTaskList(...)`, `findByScheduledDate(...)`, `search(...)` implemented with SQL.
 
-### TaskListService
-- `create` uses `Prisma.TaskListCreateInput` and connects `user`.
-- `getDefault(context)`
-  - Returns an existing "General" list or the first user list.
-  - If none exist, creates a default list and returns immediately (avoids confusing union types in TS).
+### TaskListService (SQL)
+- `create`: inserts row tied to user.
+- `update`: supports `name`, `color`, `icon` (emoji), and `description`.
+- `getDefault(context)`: returns "General" or first list, creating a default if none exist.
+- `getWithTaskCount(...)`: returns aggregate counts per list.
 
-### CalendarService
-- `create` uses `Prisma.CalendarCreateInput` and connects `user`.
-- `getDefault(context)`
-  - Returns the default calendar if present; otherwise sets the first as default; otherwise creates a new default calendar and returns immediately.
+### CalendarService (SQL)
+- `create`, `toggleVisibility`, `setDefault`, `getWithEventCounts`, standard findAll/filtering via SQL.
 
-### EventService
-- `create(data, context)` – OVERRIDDEN (Important Fix)
-  - Validates payload and relations.
-  - `ensureUserExists(context.userId)`.
-  - Builds `Prisma.EventCreateInput` and connects both `user` and `calendar`.
-  - Includes calendar summary in the result to match UI expectations.
+### EventService (SQL)
+- `create`: validates, ensures dev user, inserts with calendar relation, returns enriched event (with calendar summary).
+- `update`: now implemented; accepts Date or ISO string for `start`/`end`; validates start < end; optional calendar change with ownership validation.
 
 ### TagService / AttachmentService
 - Where clauses are typed (`Prisma.TagWhereInput`, `Prisma.AttachmentWhereInput`).
@@ -141,11 +252,13 @@ All routes under `api/` follow a consistent pattern using `createCrudHandler`:
 
 - `api/calendars/index.ts`:
   - GET: returns calendars; `withEventCounts=true` includes counts.
-  - POST: creates a calendar; returns 201 on success.
+  - POST: creates a calendar; returns 201.
+  - `api/calendars/[id].ts`: GET by id, PUT/PATCH update, DELETE.
 
 - `api/events/index.ts`:
   - GET: returns events with optional range filters and upcoming mode.
-  - POST: creates event; uses `EventService.create` (now connects required relations).
+  - POST: creates event (calendar relation required).
+  - `api/events/[id].ts`: GET by id, PUT/PATCH update (now implemented), DELETE.
 
 - All `sendError` usages now receive `ApiError` subclasses (`UnauthorizedError`, `ValidationError`, `InternalServerError`) to satisfy typings and unify response shape.
 
@@ -165,16 +278,17 @@ All routes under `api/` follow a consistent pattern using `createCrudHandler`:
   - GET `/api/calendars?withEventCounts=true` → 200
   - GET `/api/events` → 200
   - GET `/api/tasks` → 200
-- Create flows (in dev, without real auth):
-  - POST `/api/tasks` → 201; creates a "General" list on first use if needed; task shows in UI.
-  - POST `/api/calendars` → 201; creates a default calendar if none exists.
-  - POST `/api/events` → 201; requires `calendarId`; connects to dev user and specified calendar; event shows in UI.
+- Create/update flows (dev auth injected):
+  - POST `/api/tasks` → 201; honors `taskListId` if provided; falls back to default list.
+  - PATCH/PUT `/api/task-lists/:id` → 200; persists `name`, `color`, `icon` (emoji), `description`.
+  - POST `/api/calendars` → 201; basic create; default handling via service.
+  - PUT/PATCH `/api/events/:id` → 200; accepts Date or ISO `start/end`; returns enriched event.
 - Error responses follow `ApiResponse` format consistently.
 
 ## Known Issues (and Mitigations)
 
-- Dev logger shows `userId: undefined` even though route handler has a dev user.
-  - Cause: `requestLogger` runs before `devAuth`. Mitigation: If needed, reorder middleware so `devAuth()` is earlier.
+- Ensure `DATABASE_URL` is configured; serverless routes rely on `pg` connectivity.
+- Frontend dialogs reuse create components for edit; ensure initial values are passed (now implemented) and labels set appropriately.
 - `BaseService.getModel()` is typed `any` to accommodate varying Prisma delegates.
   - Trade-off: Simpler common base, less static type coverage. Improvement: Introduce a typed delegate interface per model or generic mapping.
 - `skipLibCheck: true` at root.
@@ -250,10 +364,9 @@ All routes under `api/` follow a consistent pattern using `createCrudHandler`:
   - Check terminal for Prisma or TS errors.
   - Confirm `DATABASE_URL` is set and DB is reachable.
   - Run `npm run db:migrate` and `npm run db:seed` if needed.
-- Prisma regeneration:
-  - `npx prisma generate --schema packages/backend/prisma/schema.prisma`
-- Prisma version alignment (root + backend workspaces):
-  - `npm i -E @prisma/client@5.16.1 prisma@5.16.1`
+- Database migrations (still via backend workspace using Prisma CLI for the monorepo DB):
+  - `npm run db:migrate`
+  - `npm run db:seed`
 
 ## Security Notes
 

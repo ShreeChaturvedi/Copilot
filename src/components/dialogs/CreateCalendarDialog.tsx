@@ -36,30 +36,43 @@ export interface CreateCalendarDialogProps {
     iconId: string;
     color: string;
   }) => void;
+  // Optional initial values to support edit reuse
+  initialName?: string;
+  initialDescription?: string;
+  initialIconId?: string;
+  initialColor?: string;
+  submitLabel?: string;
+  titleLabel?: string;
 }
 
 export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
   open,
   onOpenChange,
   onCreateCalendar,
-  onCreateTask
+  onCreateTask,
+  initialName,
+  initialDescription,
+  initialIconId,
+  initialColor,
+  submitLabel,
+  titleLabel,
 }) => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('Calendar');
-  const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
+  const [name, setName] = useState(initialName ?? '');
+  const [description, setDescription] = useState(initialDescription ?? '');
+  const [selectedIcon, setSelectedIcon] = useState(initialIconId ?? 'Calendar');
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setName('');
-      setDescription('');
-      setSelectedIcon('Calendar');
-      setSelectedColor(COLOR_PRESETS[0]);
+      setName(initialName ?? '');
+      setDescription(initialDescription ?? '');
+      setSelectedIcon(initialIconId ?? 'Calendar');
+      setSelectedColor((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
       setShowIconPicker(false);
     }
-  }, [open]);
+  }, [open, initialName, initialDescription, initialIconId, initialColor]);
 
   const handleIconSelect = (iconId: string) => {
     setSelectedIcon(iconId);
@@ -100,7 +113,7 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Calendar</DialogTitle>
+          <DialogTitle>{titleLabel || 'Create New Calendar'}</DialogTitle>
             <DialogDescription>
               Create a new calendar to organize your events and appointments.
             </DialogDescription>
@@ -194,11 +207,8 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={!name.trim()}
-            >
-              Create Calendar
+            <Button type="submit" disabled={!name.trim()}>
+              {submitLabel || 'Create Calendar'}
             </Button>
           </DialogFooter>
         </form>

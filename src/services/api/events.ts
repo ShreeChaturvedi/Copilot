@@ -141,8 +141,11 @@ export const eventApi = {
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create event');
         const e = body.data as Record<string, unknown>;
+        const calendar = e.calendar as Record<string, unknown> | undefined;
+        const calendarName = (e.calendarName as string | undefined) ?? (calendar?.name as string | undefined) ?? data.calendarName;
         return {
           ...(e as object),
+          calendarName,
           start: new Date(e.start as string),
           end: new Date(e.end as string),
           createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
@@ -191,8 +194,11 @@ export const eventApi = {
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update event');
         const e = body.data as Record<string, unknown>;
+        const calendar = e.calendar as Record<string, unknown> | undefined;
+        const calendarName = (e.calendarName as string | undefined) ?? (calendar?.name as string | undefined);
         return {
           ...(e as object),
+          calendarName,
           start: new Date(e.start as string),
           end: new Date(e.end as string),
           createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,

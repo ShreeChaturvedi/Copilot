@@ -37,6 +37,13 @@ export interface CreateTaskDialogProps {
     iconId: string;
     color: string;
   }) => void;
+  // Optional initial values to support edit reuse
+  initialName?: string;
+  initialDescription?: string;
+  initialEmoji?: string;
+  initialColor?: string;
+  submitLabel?: string;
+  titleLabel?: string;
 }
 
 export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
@@ -44,22 +51,28 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   onOpenChange,
   onCreateTask,
   onCreateCalendar: _onCreateCalendar, // eslint-disable-line @typescript-eslint/no-unused-vars
+  initialName,
+  initialDescription,
+  initialEmoji,
+  initialColor,
+  submitLabel,
+  titleLabel,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [emoji, setEmoji] = useState('📁');
-  const [selectedColor, setSelectedColor] = useState<ColorPreset>(COLOR_PRESETS[0]);
+  const [emoji, setEmoji] = useState(initialEmoji ?? '📁');
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setName('');
-      setDescription('');
-      setEmoji('📁');
-      setSelectedColor(COLOR_PRESETS[0]);
+      setName(initialName ?? '');
+      setDescription(initialDescription ?? '');
+      setEmoji(initialEmoji ?? '📁');
+      setSelectedColor((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
     }
-  }, [open]);
+  }, [open, initialName, initialDescription, initialEmoji, initialColor]);
 
   const handleEmojiSelect = (selectedEmoji: string) => {
     setEmoji(selectedEmoji);
@@ -91,7 +104,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Task List</DialogTitle>
+          <DialogTitle>{titleLabel || 'Create New Task List'}</DialogTitle>
             <DialogDescription>
               Create a new task group to organize your to-dos.
             </DialogDescription>
@@ -115,7 +128,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                       {emoji}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-3" align="start">
+                  <PopoverContent className="w-fit p-0" align="start">
                     <Suspense fallback={<div className="p-4">Loading...</div>}>
                       <EmojiPicker
                         selectedEmoji={emoji}
@@ -181,11 +194,8 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={!name.trim()}
-            >
-              Create Task
+            <Button type="submit" disabled={!name.trim()}>
+              {submitLabel || 'Create Task'}
             </Button>
           </DialogFooter>
         </form>

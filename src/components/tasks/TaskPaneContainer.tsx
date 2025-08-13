@@ -214,7 +214,7 @@ interface TaskPaneProps {
   paneData: TaskPaneData;
   canRemove: boolean;
   onRemove: (paneId: string) => void;
-  taskGroups: Array<{ id: string; name: string }>;
+  taskGroups: Array<{ id: string; name: string; emoji: string; color: string; description?: string }>;
   onUpdateTaskList: (paneId: string, taskListId: string | null) => void;
 }
 
@@ -239,13 +239,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             {/* Task list selector for taskList grouping, plain title for others */}
             {paneConfig.grouping === 'taskList' ? (
               <TaskGroupCombobox
-                taskGroups={taskGroups.map((group) => ({
-                  id: group.id,
-                  name: group.name,
-                  iconId: 'Folder',
-                  color: '#3b82f6',
-                  description: group.name,
-                }))}
+                taskGroups={taskGroups}
                 activeTaskGroupId={paneConfig.selectedTaskListId || 'all'}
                 onSelectTaskGroup={(groupId) =>
                   onUpdateTaskList(
@@ -314,26 +308,27 @@ const TaskPane: React.FC<TaskPaneProps> = ({
               No tasks match the current filters
             </div>
           </div>
-        ) : (
-          <TaskList
-            tasks={paneData.tasks}
-            taskGroups={taskManagement.taskGroups}
-            activeTaskGroupId={taskManagement.activeTaskGroupId}
-            onToggleTask={taskManagement.handleToggleTask}
-            onEditTask={taskManagement.handleEditTask}
-            onDeleteTask={taskManagement.handleDeleteTask}
-            onScheduleTask={taskManagement.handleScheduleTask}
-            onRemoveTag={taskManagement.handleRemoveTag}
-            onCreateTaskGroup={taskManagement.handleCreateTaskGroup}
-            onSelectTaskGroup={taskManagement.handleSelectTaskGroup}
-            onUpdateTaskGroupIcon={taskManagement.handleUpdateTaskGroupIcon}
-            onUpdateTaskGroupColor={taskManagement.handleUpdateTaskGroupColor}
-            onDeleteTaskGroup={taskManagement.handleDeleteTaskGroup}
-            showCreateTaskDialog={taskManagement.showCreateTaskDialog}
-            onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
-            hideHeader={true}
-          />
-        )}
+          ) : (
+            <TaskList
+              tasks={paneData.tasks}
+              taskGroups={taskManagement.taskGroups}
+              activeTaskGroupId={'all'}
+              onToggleTask={taskManagement.handleToggleTask}
+              onEditTask={taskManagement.handleEditTask}
+              onDeleteTask={taskManagement.handleDeleteTask}
+              onScheduleTask={taskManagement.handleScheduleTask}
+              onRemoveTag={taskManagement.handleRemoveTag}
+              onCreateTaskGroup={taskManagement.handleCreateTaskGroup}
+              onSelectTaskGroup={taskManagement.handleSelectTaskGroup}
+              onUpdateTaskGroupIcon={taskManagement.handleUpdateTaskGroupIcon}
+              onUpdateTaskGroupColor={taskManagement.handleUpdateTaskGroupColor}
+              onDeleteTaskGroup={taskManagement.handleDeleteTaskGroup}
+              showCreateTaskDialog={taskManagement.showCreateTaskDialog}
+              onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
+              hideHeader={true}
+              showTaskListLabels={paneConfig.selectedTaskListId === null && showTaskListContextInAll}
+            />
+          )}
       </div>
     </div>
   );

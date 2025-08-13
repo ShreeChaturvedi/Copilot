@@ -3,6 +3,7 @@ import { QueryProvider, ThemeProvider } from './components/providers';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
 import { useAuthStore } from './stores/authStore';
 import { useEffect, useState, lazy, Suspense } from 'react';
+import { Toaster } from 'sonner';
 
 const MainLayout = lazy(async () => ({ default: (await import('./components/layout/MainLayout')).MainLayout }));
 const LoginPage = lazy(async () => ({ default: (await import('./pages/Login')).LoginPage }));
@@ -181,6 +182,21 @@ function App() {
         <Router>
           {/* Development auth toggle */}
           {showDevToggle && <DevAuthToggle />}
+          <Toaster
+            position="top-right"
+            closeButton
+            theme="system"
+            richColors
+            toastOptions={{
+              classNames: {
+                toast: 'rounded-md shadow-lg border border-border text-foreground bg-background',
+                description: 'text-muted-foreground',
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-red-600 text-white',
+                warning: 'bg-amber-600 text-white',
+              },
+            }}
+          />
           <Suspense fallback={null}>
           <Routes>
             {/* Public routes */}
