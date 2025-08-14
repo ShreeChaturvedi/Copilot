@@ -16,7 +16,7 @@ export interface CalendarEvent {
 
 export type ViewMode = 'calendar' | 'task';
 export type TaskGrouping = 'taskList' | 'dueDate' | 'priority';
-export type TaskViewMode = 'folder' | 'list';
+export type TaskViewMode = 'folder' | 'list' | 'kanban';
 export type DropZone = 'today' | 'tomorrow' | 'thisWeek' | 'nextWeek' | 'later';
 export type SortBy = 'title' | 'dueDate' | 'priority' | 'createdAt';
 export type SortOrder = 'asc' | 'desc';

@@ -168,7 +168,8 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   const handleFolderClick = useCallback(
     (folderId: string) => {
       handleSelectTaskGroup(folderId);
-      setTaskViewMode('list');
+      // Navigate to kanban view for the selected task list
+      setTaskViewMode('kanban');
     },
     [handleSelectTaskGroup, setTaskViewMode]
   );

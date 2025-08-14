@@ -154,7 +154,22 @@ export const useTasks = (filters: TaskFilters = {}) => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map((task) => (task.id === id ? { ...task, ...updates } : task));
+          return oldData.map((task) => {
+            if (task.id !== id) return task;
+            const merged: any = { ...task, ...updates };
+            // Keep checkbox <-> status linkage optimistic in cache
+            if ((updates as any)?.status) {
+              const s = (updates as any).status as 'not_started' | 'in_progress' | 'done';
+              if (s === 'done') {
+                merged.completed = true;
+                merged.completedAt = new Date();
+              } else if (typeof (updates as any).completed === 'undefined') {
+                merged.completed = false;
+                merged.completedAt = undefined;
+              }
+            }
+            return merged as Task;
+          });
         }
       );
       return { previousTasks };

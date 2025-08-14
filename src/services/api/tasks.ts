@@ -38,6 +38,8 @@ export interface UpdateTaskData {
   completed?: boolean;
   scheduledDate?: Date;
   priority?: 'low' | 'medium' | 'high';
+  /** Frontend status; maps to backend enum. */
+  status?: 'not_started' | 'in_progress' | 'done';
 }
 
 const apiBase = '/api';
@@ -65,6 +67,13 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
     completedAt: task.completedAt ? new Date(task.completedAt as string) : undefined,
     scheduledDate: task.scheduledDate ? new Date(task.scheduledDate as string) : undefined,
   };
+
+  // Normalize status enum from backend (NOT_STARTED|IN_PROGRESS|DONE) to frontend ('not_started'|'in_progress'|'done')
+  const statusRaw = typeof (task as any).status === 'string' ? String((task as any).status) : '';
+  if (statusRaw) {
+    const mapped = statusRaw === 'DONE' ? 'done' : statusRaw === 'IN_PROGRESS' ? 'in_progress' : statusRaw === 'NOT_STARTED' ? 'not_started' : undefined;
+    if (mapped) (revived as any).status = mapped;
+  }
 
   // Attachments normalization (server join shape -> FileAttachment)
   if (Array.isArray(task.attachments)) {
@@ -273,6 +282,11 @@ export const taskApi = {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         ...data,
+        // Map status to backend and normalize completed if not explicitly provided
+        ...(data.status
+          ? { status: data.status === 'done' ? 'DONE' : data.status === 'in_progress' ? 'IN_PROGRESS' : 'NOT_STARTED' }
+          : {}),
+        ...(data.status && data.completed === undefined ? { completed: data.status === 'done' } : {}),
         scheduledDate: data.scheduledDate?.toISOString(),
         priority: data.priority?.toUpperCase(),
       }),

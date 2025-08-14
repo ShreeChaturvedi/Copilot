@@ -77,6 +77,8 @@ export interface Task {
   id: string;
   title: string;
   completed: boolean;
+  /** Frontend canonical task status (mirrors backend status). Derived default when absent: 'not_started' if not completed; 'done' if completed */
+  status?: 'not_started' | 'in_progress' | 'done';
   createdAt: Date;
   updatedAt?: Date;
   completedAt?: Date;

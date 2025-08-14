@@ -15,6 +15,8 @@ export interface TaskEntity extends UserOwnedEntity {
   completedAt: Date | null;
   scheduledDate: Date | null;
   priority: DbPriority;
+  /** Backend canonical status. Stored as NOT_STARTED | IN_PROGRESS | DONE. */
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE';
   originalInput: string | null;
   cleanTitle: string | null;
   taskListId: string;
@@ -74,6 +76,8 @@ export interface UpdateTaskDTO {
   completed?: boolean;
   scheduledDate?: Date;
   priority?: DbPriority;
+  /** Update status; when set to DONE, completed will be set to true. Other statuses clear completed. */
+  status?: 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE';
   taskListId?: string;
   originalInput?: string;
   cleanTitle?: string;
@@ -115,6 +119,35 @@ export interface TaskStats {
  */
 export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTaskDTO, TaskFilters> {
   private tagService?: unknown; // placeholder for DI
+  private static didEnsureStatusColumn = false;
+
+  private async ensureStatusColumnExists(): Promise<void> {
+    if (TaskService.didEnsureStatusColumn) return;
+    try {
+      const checkRes = await query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_name = 'tasks' AND column_name = 'status'
+         ) AS exists`,
+        [],
+        this.db
+      );
+      const exists = Boolean(checkRes.rows[0]?.exists);
+      if (!exists) {
+        await query(`ALTER TABLE tasks ADD COLUMN status TEXT`, [], this.db);
+        // Default values based on completed flag
+        await query(`UPDATE tasks SET status = CASE WHEN completed = true THEN 'DONE' ELSE 'NOT_STARTED' END WHERE status IS NULL`, [], this.db);
+        // Enforce NOT NULL with default going forward
+        await query(`ALTER TABLE tasks ALTER COLUMN status SET DEFAULT 'NOT_STARTED'`, [], this.db);
+        await query(`ALTER TABLE tasks ALTER COLUMN status SET NOT NULL`, [], this.db);
+      }
+      TaskService.didEnsureStatusColumn = true;
+    } catch (e) {
+      // If this fails (e.g., insufficient perms), continue without crashing; transformEntity derives status
+      TaskService.didEnsureStatusColumn = true;
+    }
+  }
 
   protected getTableName(): string {
     return 'tasks';
@@ -199,6 +232,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       completedAt: row.completedAt ? new Date(row.completedAt) : null,
       scheduledDate: row.scheduledDate ? new Date(row.scheduledDate) : null,
       priority: row.priority,
+      status: (row.status as 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE') || (row.completed ? 'DONE' : 'NOT_STARTED'),
       originalInput: row.originalInput ?? null,
       cleanTitle: row.cleanTitle ?? null,
       taskListId: row.taskListId,
@@ -368,6 +402,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
 
       await this.validateCreate(data, context);
       await this.ensureUserExists(context?.userId);
+      await this.ensureStatusColumnExists();
 
       // Get or create default task list if none specified
       let taskListId = data.taskListId;
@@ -379,8 +414,8 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       const created = await withTransaction(async (client) => {
         // Insert task
         const insertRes = await query(
-          `INSERT INTO tasks (id, title, completed, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, false, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+          `INSERT INTO tasks (id, title, completed, status, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, false, 'NOT_STARTED', $2, $3, $4, $5, $6, $7, NOW(), NOW())
            RETURNING *`,
           [
             data.title.trim(),
@@ -433,6 +468,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
    * Update task
    */
   async update(id: string, data: UpdateTaskDTO, context?: ServiceContext): Promise<TaskEntity | null> {
+    await this.ensureStatusColumnExists();
     await this.validateUpdate(id, data, context);
     const sets: string[] = [];
     const params: any[] = [];
@@ -442,6 +478,23 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       sets.push(`completed = $${params.length}`);
       params.push(data.completed ? new Date() : null);
       sets.push(`"completedAt" = $${params.length}`);
+      if (data.status === undefined) {
+        const impliedStatus = data.completed ? 'DONE' : 'NOT_STARTED';
+        params.push(impliedStatus);
+        sets.push(`status = $${params.length}`);
+      }
+    }
+    if (data.status !== undefined) {
+      // Normalize completed based on status unless explicitly provided
+      const isDone = data.status === 'DONE';
+      params.push(data.status);
+      sets.push(`status = $${params.length}`);
+      if (data.completed === undefined) {
+        params.push(isDone);
+        sets.push(`completed = $${params.length}`);
+        params.push(isDone ? new Date() : null);
+        sets.push(`"completedAt" = $${params.length}`);
+      }
     }
     if (data.scheduledDate !== undefined) { params.push(data.scheduledDate); sets.push(`"scheduledDate" = $${params.length}`); }
     if (data.priority !== undefined) { params.push(data.priority); sets.push(`priority = $${params.length}`); }
@@ -485,6 +538,7 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
   async toggleCompletion(id: string, context?: ServiceContext): Promise<TaskEntity> {
     try {
       this.log('toggleCompletion', { id }, context);
+      await this.ensureStatusColumnExists();
 
       if (context?.userId) {
         const hasAccess = await this.checkOwnership(id, context.userId);
@@ -496,14 +550,16 @@ export class TaskService extends BaseService<TaskEntity, CreateTaskDTO, UpdateTa
       const currentRes = await query<{ completed: boolean }>(`SELECT completed FROM tasks WHERE id = $1`, [id], this.db);
       if (currentRes.rowCount === 0) throw new Error('NOT_FOUND: Task not found');
       const current = currentRes.rows[0].completed;
+      const nowCompleted = !current;
       const updatedRes = await query(
         `UPDATE tasks
          SET completed = $1,
-             "completedAt" = $2,
+             status = $2,
+             "completedAt" = $3,
              "updatedAt" = NOW()
-         WHERE id = $3
+         WHERE id = $4
          RETURNING *`,
-        [!current, !current ? new Date() : null, id],
+        [nowCompleted, nowCompleted ? 'DONE' : 'NOT_STARTED', nowCompleted ? new Date() : null, id],
         this.db
       );
       const base = this.transformEntity(updatedRes.rows[0]);

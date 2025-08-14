@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, CornerDownRight } from 'lucide-react';
+import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, CornerDownRight, PlayCircle, Circle } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,9 @@ import { TaskActionMenuItems } from './TaskActionMenuItems';
 import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
 import TaskDetailSheet from './TaskDetailSheet';
+import StatusBadge from './StatusBadge';
+
+// StatusBadge now a separate component
 
 export interface TaskItemProps {
   task: Task;
@@ -317,7 +320,14 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             customColor={task.completed ? groupColor : undefined}
           />
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            {/* Inline status tag to the left of title (hidden when done, and hidden in left-pane calendar summary) */}
+            {(!task.completed && !calendarMode) && (
+              <StatusBadge
+                task={task}
+                onChange={(status) => updateTask.mutate({ id: task.id, updates: { status } as any })}
+              />
+            )}
             {uiState.isEditing ? (
               <input
                 ref={inputRef}
@@ -336,7 +346,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 aria-label="Edit task title"
               />
             ) : (
-              <div
+               <div
                 onClick={handleEditStart}
                 className={cn(
                   'cursor-pointer text-sm font-medium transition-colors duration-200',

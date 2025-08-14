@@ -132,6 +132,12 @@ export default createCrudHandler({
         default: {
           // Regular patch update
           const updateData: UpdateTaskDTO = req.body;
+          // Normalize status/checkbox linkage: if status provided without explicit completed,
+          // map DONE->completed true; others->completed false
+          if ((updateData as any).status && (updateData as any).completed === undefined) {
+            const s = String((updateData as any).status);
+            (updateData as any).completed = s === 'DONE';
+          }
           result = await taskService.update(taskId, updateData, {
             userId,
             requestId: req.headers['x-request-id'] as string,

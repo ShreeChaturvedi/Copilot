@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import type { UploadedFile } from '@/components/smart-input/components/FileUploadZone';
@@ -10,6 +10,7 @@ import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { cn } from '@/lib/utils';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useSettingsStore } from '@/stores/settingsStore';
+const KanbanBoard = lazy(() => import('@/components/tasks/TaskKanbanBoard'));
 
 interface TaskFocusPaneProps {
   className?: string;
@@ -206,6 +207,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       <div className="flex-1 overflow-hidden">
         {taskViewMode === 'folder' ? (
           <TaskFolderGrid />
+        ) : taskViewMode === 'kanban' ? (
+          <Suspense fallback={null}>
+            <KanbanBoard />
+          </Suspense>
         ) : (
           <TaskPaneContainer searchValue={searchValue} />
         )}

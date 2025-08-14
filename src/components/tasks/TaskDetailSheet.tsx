@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock as ClockIcon, MapPin, Tag as TagIcon, FileText } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock as ClockIcon, MapPin, Tag as TagIcon, FileText, Loader } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,8 @@ import { taskQueryKeys } from '@/hooks/useTasks';
 
 // Reuse the compact file preview UI from EnhancedTaskInput
 import { DefaultPreview } from '@/components/smart-input/components/previews/DefaultPreview';
+import { useTasks } from '@/hooks/useTasks';
+import StatusBadge from './StatusBadge';
 
 // Local utils
 function getTagIcon(type: string) {
@@ -51,6 +53,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   className,
 }) => {
   const { peekMode, setPeekMode } = useUIStore();
+  const { updateTask } = useTasks();
   const queryClient = useQueryClient();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeAttachment, setActiveAttachment] = useState<FileAttachment | null>(null);
@@ -133,6 +136,15 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
         </div>
 
         <div className="space-y-6 mt-4">
+          {/* Status property at top */}
+          <div className="flex items-center gap-3">
+            <div className="text-muted-foreground flex-shrink-0">
+              <Loader className="h-4 w-4" />
+            </div>
+            <div className="flex-1">
+              <StatusBadge task={task} onChange={(status) => updateTask.mutate({ id: task.id, updates: { status } as any })} />
+            </div>
+          </div>
           {/* Description */}
           {(task as any).description || task.parsedMetadata?.originalInput ? (
             <div className="flex items-start gap-3">

@@ -34,7 +34,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = memo(
       [onEmojiSelect]
     );
 
-  return (
+    return (
       <Picker
         data={data}
         onEmojiSelect={handleSelect}
