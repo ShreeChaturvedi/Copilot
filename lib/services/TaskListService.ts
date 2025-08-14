@@ -222,6 +222,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       await this.validateCreate(data, context);
 
+      // Ensure a user row exists in development to satisfy FK constraints
+      await this.ensureUserExists(context?.userId);
+
       const inserted = await query(
         `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW(), NOW())

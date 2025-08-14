@@ -60,6 +60,8 @@ export interface EnhancedTaskInputLayoutProps {
   secondaryInputRef?: React.RefObject<HTMLInputElement>;
   /** Whether the secondary input should be visible and interactive */
   secondaryEnabled?: boolean;
+  /** Optional custom inline tag row content to always show under inputs */
+  customTagRow?: React.ReactNode;
 }
 
 export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
@@ -91,6 +93,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
   onSecondaryKeyDown,
   secondaryInputRef,
   secondaryEnabled = false,
+  customTagRow,
 }) => {
   const controls = (
     <>
@@ -204,13 +207,18 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
           )}
         </div>
 
-        {showInlineTags && tags.length > 0 && (
-          <ParsedTags
-            tags={tags}
-            removable={inlineTagsRemovable}
-            onRemoveTag={onInlineTagRemove}
-          />
-        )}
+        {/* Tag row: always visible; due date + other tags on the same line */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {customTagRow}
+          {showInlineTags && tags.length > 0 && (
+            <ParsedTags
+              tags={tags}
+              removable={inlineTagsRemovable}
+              onRemoveTag={onInlineTagRemove}
+              className="mt-0"
+            />
+          )}
+        </div>
       </div>
     </EnhancedLayoutWrapper>
   );

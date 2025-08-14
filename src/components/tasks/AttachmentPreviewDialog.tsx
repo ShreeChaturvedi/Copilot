@@ -270,7 +270,7 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
         </div>
 
         {/* Preview */}
-        <div className="mt-2">
+        <div className="mt-4 mb-5">
           {isImage ? (
             <div className="rounded-lg border overflow-hidden bg-black/5 p-2">
               <div className="flex items-center justify-center">

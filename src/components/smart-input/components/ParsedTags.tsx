@@ -49,7 +49,7 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
 
   return (
     <div
-      className={cn('flex flex-wrap items-center gap-2 mt-2', className)}
+      className={cn('flex flex-wrap items-center gap-2', className)}
       data-testid="parsed-tags"
     >
       {displayTags.map((tag) => (
@@ -120,9 +120,7 @@ const TagBadge: React.FC<TagBadgeProps> = ({
     <Badge
       variant={getBadgeVariant()}
       className={cn(
-        // Match TaskItem badge styling with moderate padding
         'text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag',
-        // Click/interactive behaviors
         (onClick || removable) && 'cursor-pointer'
       )}
       style={
@@ -133,14 +131,9 @@ const TagBadge: React.FC<TagBadgeProps> = ({
               backgroundColor: `${tag.color}1A`,
             }
           : {
-              // Give non-colored tags a subtle background based on the current text color
-              // 1A ~= 10% alpha on hex; using a neutral foreground tint via CSS currentColor
-              // Since we can't alpha currentColor directly, we fall back to a soft token
-              // that matches other neutral backgrounds.
               backgroundColor: 'color-mix(in srgb, currentColor 10%, transparent)',
             }
       }
-      // If removable, clicking the badge removes the tag (mirrors TaskItem UX)
       onClick={removable ? handleRemove : handleClick}
       title={`${tag.type}: ${tag.displayText}${showConfidence ? ` (${Math.round(tag.confidence * 100)}% confidence)` : ''}`}
       aria-label={`${removable ? 'Remove' : 'View'} ${tag.displayText} tag`}

@@ -9,6 +9,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { cn } from '@/lib/utils';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 interface TaskFocusPaneProps {
   className?: string;
@@ -102,7 +103,8 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const canAddPane = taskPanes.length < maxTaskPanes && taskViewMode === 'list';
 
   // Show/Hide enhanced input on demand
-  const [showEnhancedInput, setShowEnhancedInput] = useState(false);
+  const { enhancedInputVisible, setEnhancedInputVisible, enhancedInputTaskListId, setEnhancedInputTaskListId } = useSettingsStore();
+  const [showEnhancedInput, setShowEnhancedInput] = useState(enhancedInputVisible);
   const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
   const handleHideAddTaskInput = () => setShowEnhancedInput(false);
 
@@ -141,6 +143,11 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       });
     }
   }, [showEnhancedInput]);
+
+  // Persist enhanced input visibility to settings
+  useEffect(() => {
+    setEnhancedInputVisible(showEnhancedInput);
+  }, [showEnhancedInput, setEnhancedInputVisible]);
 
   return (
     <div
@@ -242,9 +249,12 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                   handleHideAddTaskInput();
                 }}
                 taskGroups={taskGroups}
-                activeTaskGroupId={activeTaskGroupId}
+                activeTaskGroupId={enhancedInputTaskListId || activeTaskGroupId}
                 onCreateTaskGroup={() => setShowCreateTaskDialog(true)}
-                onSelectTaskGroup={handleSelectTaskGroup}
+                onSelectTaskGroup={(groupId) => {
+                  setEnhancedInputTaskListId(groupId);
+                  handleSelectTaskGroup(groupId);
+                }}
                 disabled={tasksLoading || addTask.isPending}
                 enableSmartParsing={true}
                 showConfidence={false}

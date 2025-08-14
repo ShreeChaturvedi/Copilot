@@ -105,6 +105,8 @@ export interface AppSettings {
   showCompletedTasks: boolean;
   defaultCalendar: string;
   showNotesEditor: boolean;
+  /** Controls how dates are displayed inside tags */
+  dateDisplayMode: 'relative' | 'absolute';
 }
 
 export interface GoogleAuthState {

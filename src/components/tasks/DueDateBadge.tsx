@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Bell, BellRing } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,17 +10,25 @@ import { Button } from '@/components/ui/Button';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { formatRelative } from '@/utils/date';
 
 interface DueDateBadgeProps {
   taskId: string;
   date?: Date;
   onChange: (date: Date | undefined) => void;
+  /** Optional: hide the removable hover-X for manual due date badge */
+  hideRemove?: boolean;
+  /** Optional: label when no date is set */
+  emptyLabel?: string;
 }
 
 export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
   taskId,
   date,
   onChange,
+  hideRemove,
+  emptyLabel = 'Add due date',
 }) => {
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(date);
@@ -36,20 +44,31 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
   });
   const [remind, setRemind] = useState<string>('none');
 
+  // Global date display preference
+  const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode);
+
   useEffect(() => {
     setSelectedDate(date);
     setIncludeTime(date ? !(date.getHours() === 0 && date.getMinutes() === 0) : false);
     setTimeValue(date ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : '12:00');
   }, [date]);
 
-  const formatDisplay = (d?: Date) => {
-    if (!d) return 'Add due date';
-    const base = format(d, 'MM/dd/yyyy');
-    if (includeTime) {
-      return `${base} @ ${format(d, 'h:mm a')}`;
-    }
-    return base;
-  };
+  const formatDisplay = useMemo(() => {
+    return (d?: Date) => {
+      if (!d) return emptyLabel;
+      if (dateDisplayMode === 'relative') {
+        if (includeTime) return formatRelative(d);
+        // relative date without time
+        const rel = formatRelative(d);
+        return rel.replace(/\s+at\s+.*/i, '');
+      }
+      const base = format(d, 'MM/dd/yyyy');
+      if (includeTime) {
+        return `${base} @ ${format(d, 'h:mm a')}`;
+      }
+      return base;
+    };
+  }, [dateDisplayMode, includeTime, emptyLabel]);
 
   const apply = (next?: Date) => {
     onChange(next);
@@ -95,12 +114,15 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
           )}
           style={(() => {
             const hasReminder = remind !== 'none';
-            if (!hasReminder) return undefined;
+            if (!hasReminder) {
+              return { backgroundColor: 'color-mix(in srgb, currentColor 10%, transparent)' } as React.CSSProperties;
+            }
             const overdue = selectedDate ? selectedDate.getTime() < Date.now() : false;
             const hex = overdue ? '#ef4444' : '#3b82f6';
             return { backgroundColor: `${hex}1A`, borderColor: hex, color: hex } as React.CSSProperties;
           })()}
           aria-label="Edit due date"
+          data-testid="due-date-badge"
         >
           {(() => {
             const hasReminder = remind !== 'none';
@@ -135,7 +157,7 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
             selected={selectedDate}
             onSelect={handleCalendarSelect}
             captionLayout="dropdown"
-            className="[--cell-size:--spacing(7)]"
+            className="[--cell-size:--spacing(7)] w-full"
           />
 
           {/* Include time switch */}
@@ -155,6 +177,20 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
                 }
               }}
             />
+          </div>
+
+          {/* Display mode selector */}
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Display</Label>
+            <Select value={dateDisplayMode} onValueChange={(v) => useSettingsStore.getState().setDateDisplayMode(v as any)}>
+              <SelectTrigger size="sm" className="min-w-[150px]">
+                <SelectValue placeholder="Relative" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="relative">Relative</SelectItem>
+                <SelectItem value="absolute">Absolute</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Remind dropdown - UI only */}

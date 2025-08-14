@@ -94,13 +94,15 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   const handleCreateFromDialog = (data: {
     name: string;
     description: string;
-    iconId: string;
+    iconId?: string;
+    emoji?: string;
     color: string;
   }) => {
+    const selectedEmoji = (data.emoji || data.iconId || '📁');
     if (editingItem) {
       onEditTaskGroup(editingItem.id, {
         name: data.name,
-        emoji: data.iconId,
+        emoji: selectedEmoji,
         color: data.color,
         description: data.description,
       });
@@ -109,7 +111,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
     } else {
       onAddTaskGroup({
         name: data.name,
-        emoji: '📁',
+        emoji: selectedEmoji,
         color: data.color,
         description: data.description,
       });

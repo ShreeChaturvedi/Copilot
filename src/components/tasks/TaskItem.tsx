@@ -473,28 +473,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                   const isVideo = att.type?.startsWith('video/');
                   const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
                   
-                  // Get file extension and corresponding color for hover effect
+                  // Get file extension for icon type
                   const extension = getFileExtension(att.name);
-                  const iconColor = FILE_TYPE_COLORS[extension as keyof typeof FILE_TYPE_COLORS] || FILE_TYPE_COLORS.default;
-                  
-                  // Convert Tailwind color class to CSS color value
-                  const getColorValue = (colorClass: string) => {
-                    const colorMap: Record<string, string> = {
-                      'text-red-500': '#ef4444',
-                      'text-red-600': '#dc2626',
-                      'text-blue-500': '#3b82f6',
-                      'text-blue-600': '#2563eb',
-                      'text-green-500': '#22c55e',
-                      'text-green-600': '#16a34a',
-                      'text-orange-500': '#f97316',
-                      'text-orange-600': '#ea580c',
-                      'text-purple-500': '#a855f7',
-                      'text-purple-600': '#9333ea',
-                      'text-gray-500': '#6b7280',
-                      'text-gray-600': '#4b5563',
-                    };
-                    return colorMap[colorClass] || colorMap['text-gray-500'];
-                  };
                   
                   return (
                     <Badge
@@ -502,16 +482,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                       variant="outline"
                       className={cn(
                         "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 cursor-pointer",
-                        "hover:border-muted-foreground/50 transition-all duration-150 group/attachment badge-shine-border"
+                        "hover:border-muted-foreground/50 transition-all duration-150 group/attachment"
                       )}
                       onClick={(e) => { e.stopPropagation(); openAttachment(att); }}
                       title={`Preview ${att.name}`}
-                      style={{
-                        '--hover-color': getColorValue(iconColor)
-                      } as React.CSSProperties & { '--hover-color': string }}
                     >
                       <Icon 
-                        className="w-3 h-3 transition-colors duration-150 group-hover/attachment:[color:var(--hover-color)]" 
+                        className="w-3 h-3" 
                       />
                       <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
                     </Badge>

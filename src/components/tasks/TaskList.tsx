@@ -78,6 +78,10 @@ export interface TaskListProps {
     iconId: string;
     color: string;
   }) => void;
+  onEditTaskGroup?: (
+    id: string,
+    updates: { name: string; emoji: string; color: string; description?: string }
+  ) => void;
   onSelectTaskGroup?: (groupId: string) => void;
   onUpdateTaskGroupIcon?: (groupId: string, iconId: string) => void;
   onUpdateTaskGroupColor?: (groupId: string, color: string) => void;
@@ -127,6 +131,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   const [isTasksOpen, setIsTasksOpen] = useState(true);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [recentColors, setRecentColors] = useState<string[]>([]);
 
   // Default task group if none exist
@@ -497,7 +502,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowEditDialog(true)}
+                  >
                     <Edit className="mr-2 h-4 w-4" />
                     <span>Edit</span>
                   </DropdownMenuItem>
@@ -599,6 +606,27 @@ const TaskListComponent: React.FC<TaskListProps> = ({
         open={showCreateTaskDialog}
         onOpenChange={(open) => onShowCreateTaskDialog?.(open)}
         onCreateTask={handleCreateTaskGroup}
+      />
+
+      {/* Edit Task List Dialog */}
+      <CreateTaskDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        initialName={activeTaskGroup.name}
+        initialDescription={activeTaskGroup.description || ''}
+        initialEmoji={activeTaskGroup.emoji}
+        initialColor={activeTaskGroup.color}
+        submitLabel="Save Changes"
+        titleLabel="Edit Task List"
+        onCreateTask={(data) => {
+          onEditTaskGroup?.(activeTaskGroup.id, {
+            name: data.name,
+            emoji: data.emoji,
+            color: data.color,
+            description: data.description,
+          });
+          setShowEditDialog(false);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

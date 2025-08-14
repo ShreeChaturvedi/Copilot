@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showCompletedTasks: true,
   defaultCalendar: 'Personal',
   showNotesEditor: false,
+  dateDisplayMode: 'relative',
 };
 
 /**

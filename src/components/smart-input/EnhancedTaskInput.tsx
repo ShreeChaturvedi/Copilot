@@ -36,6 +36,8 @@ type TaskGroup = {
   description?: string;
 };
 import { cn } from '@/lib/utils';
+import { DueDateBadge } from '@/components/tasks/DueDateBadge';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export interface EnhancedTaskInputProps {
   onAddTask: (title: string, groupId?: string, smartData?: SmartTaskData) => void;
@@ -88,15 +90,19 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const descriptionInputRef = useRef<HTMLInputElement>(null);
   // Track tags the user dismissed (we hide these without modifying the input text)
   const [dismissedTagSignatures, setDismissedTagSignatures] = useState<Set<string>>(new Set());
+  // Manual due date state for this input session
+  const [manualDueDate, setManualDueDate] = useState<Date | undefined>(undefined);
+  const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode);
 
   // Initialize text parser
   const {
     error,
-    tags,
+    tags: parsedTags,
     confidence,
     hasConflicts,
     clear,
   } = useTextParser(inputText, {
+    // If manual due date is set, suppress date/time detection but allow other tags
     enabled: smartParsingEnabled,
     debounceMs: 100,
     minLength: 2,
@@ -228,9 +234,11 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Derived: tags after applying user dismissals (used for highlighting, UI, and submission)
   const filteredTags = useMemo(() => {
-    if (!tags || dismissedTagSignatures.size === 0) return tags;
-    return tags.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
-  }, [tags, dismissedTagSignatures, makeTagSignature]);
+    // Always hide date/time tags from the inline tag list; the Due Date badge replaces them
+    let base = (parsedTags || []).filter((t) => t.type !== 'date' && t.type !== 'time');
+    if (dismissedTagSignatures.size === 0) return base;
+    return base.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
+  }, [parsedTags, dismissedTagSignatures, makeTagSignature]);
 
   // Handle form submission
   const handleSubmit = useCallback((e?: React.FormEvent) => {
@@ -248,8 +256,8 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         const priorityTag = filteredTags.find(tag => tag.type === 'priority');
         const priority = priorityTag?.value as 'low' | 'medium' | 'high' | undefined;
         
-        const dateTag = filteredTags.find(tag => tag.type === 'date' || tag.type === 'time');
-        const scheduledDate = dateTag?.value as Date | undefined;
+        const parsedDateTag = parsedTags?.find(tag => tag.type === 'date' || tag.type === 'time');
+        const scheduledDate = manualDueDate || (parsedDateTag?.value as Date | undefined);
         
         smartData = {
           title: capitalizedTitle,
@@ -274,8 +282,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       setUploadedFiles([]);
       clear();
       setDismissedTagSignatures(new Set());
+      setManualDueDate(undefined);
     }
-  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear]);
+  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear, parsedTags, manualDueDate]);
 
   // Handle key press in title field: Enter sends; Shift+Enter focuses description
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -304,6 +313,27 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Check if we have content to submit (only finalized text, not interim)
   const hasContent = inputText.trim().length > 0;
   const showTags = smartParsingEnabled && filteredTags.length > 0 && hasContent;
+
+  // Compute auto-detected due date (only if no manual due date)
+  const autoDueTag = useMemo(() => {
+    if (manualDueDate) return undefined;
+    const dt = parsedTags?.find((t) => t.type === 'date' || t.type === 'time');
+    return dt;
+  }, [parsedTags, manualDueDate]);
+
+  // Normalize auto-detected date to midnight when it's a date-only tag (no explicit time)
+  const effectiveDueDate = useMemo(() => {
+    if (manualDueDate) return manualDueDate;
+    if (!autoDueTag) return undefined;
+    const raw = autoDueTag.value as Date | undefined;
+    if (!raw) return undefined;
+    if (autoDueTag.type === 'date') {
+      const normalized = new Date(raw);
+      normalized.setHours(0, 0, 0, 0);
+      return normalized;
+    }
+    return raw;
+  }, [manualDueDate, autoDueTag]);
   
   // File preview component
   const filePreview = useMemo(() => (
@@ -389,14 +419,14 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Remove a tag visually (do not alter input text). Hide tag and its highlight.
   const handleRemoveInlineTag = useCallback((tagId: string) => {
-    const tagToRemove = tags.find((t) => t.id === tagId);
+    const tagToRemove = filteredTags.find((t) => t.id === tagId);
     if (!tagToRemove) return;
     setDismissedTagSignatures((prev) => {
       const next = new Set(prev);
       next.add(makeTagSignature(tagToRemove));
       return next;
     });
-  }, [tags, makeTagSignature]);
+  }, [filteredTags, makeTagSignature]);
 
   return (
     <div className={cn('max-w-2xl mx-auto', className)}>
@@ -430,6 +460,16 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           onSecondaryKeyDown={handleDescriptionKeyDown}
           secondaryInputRef={descriptionInputRef}
           secondaryEnabled={hasContent}
+          customTagRow={
+            <DueDateBadge
+              taskId="new-task"
+              date={effectiveDueDate}
+              onChange={(next) => {
+                setManualDueDate(next);
+              }}
+              emptyLabel="Due Date"
+            />
+          }
         />
       </form>
 

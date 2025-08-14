@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { useSettingsStore } from './settingsStore';
 
 export interface CalendarEvent {
   id: string;
@@ -203,7 +204,15 @@ export const useUIStore = create<UIState>()(
       setPeekMode: (mode) => set({ peekMode: mode }, false, 'setPeekMode'),
 
       setCurrentView: (view) =>
-        set({ currentView: view }, false, 'setCurrentView'),
+        set((state) => {
+          // Persist to settings store for cross-session memory
+          try {
+            // Access settings store without creating a React hook dependency
+            const { setAppViewMode } = useSettingsStore.getState();
+            setAppViewMode(view);
+          } catch {}
+          return { currentView: view };
+        }, false, 'setCurrentView'),
 
       setTaskGrouping: (grouping) =>
         set({ taskGrouping: grouping }, false, 'setTaskGrouping'),

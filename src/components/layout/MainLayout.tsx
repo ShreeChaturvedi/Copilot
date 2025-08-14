@@ -4,6 +4,7 @@ const LeftPane = lazy(async () => ({ default: (await import('./LeftPane')).LeftP
 const RightPane = lazy(async () => ({ default: (await import('./RightPane')).RightPane }));
 const TaskFocusPane = lazy(async () => ({ default: (await import('./TaskFocusPane')).TaskFocusPane }));
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { useSettingsStore } from '@/stores/settingsStore';
 const SettingsDialog = lazy(async () => ({ default: (await import('@/components/settings/SettingsDialog')).SettingsDialog }));
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsDialog } from '@/hooks/useSettingsDialog';
@@ -38,8 +39,9 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
 };
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { currentView, dragState } = useUIStore();
+  const { currentView, dragState, setCurrentView } = useUIStore();
   const { logout } = useAuthStore();
+  const { sidebarExpanded, appViewMode } = useSettingsStore();
   
   // Settings dialog management
   const { 
@@ -68,8 +70,16 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     return () => window.removeEventListener('app:open-settings', handler as EventListener);
   }, [openSettings]);
 
+  // Initialize UI view from settings on mount
+  useEffect(() => {
+    if (appViewMode && currentView !== appViewMode) {
+      setCurrentView(appViewMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={sidebarExpanded}>
       <TopProgressBar />
       <div 
         className={cn(

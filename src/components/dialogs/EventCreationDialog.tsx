@@ -48,6 +48,7 @@ import { ConditionalDialogHeader } from "./ConditionalDialogHeader"
 import type { RecurrenceEditorOptions } from "@/utils/recurrence"
 import { parseRRule, generateRRule, clampRRuleUntil } from "@/utils/recurrence"
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput'
+import { useSettingsStore } from '@/stores/settingsStore'
 //
 import RecurrenceSection from "./RecurrenceSection"
 import {
@@ -162,6 +163,7 @@ function EventCreationDialogContent({
   initialEventData?: Partial<CalendarEvent>
   onClose: () => void
 }) {
+  const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode)
   const { data: calendars = [] } = useCalendars()
   const createEventMutation = useCreateEvent()
   const updateEventMutation = useUpdateEvent()
@@ -617,6 +619,21 @@ function EventCreationDialogContent({
                 />
               </>
             )}
+          </div>
+
+          {/* Date Display Mode (affects tag text only across app) */
+          }
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Display</Label>
+            <Select value={dateDisplayMode} onValueChange={(v) => useSettingsStore.getState().setDateDisplayMode(v as any)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Relative" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="relative">Relative</SelectItem>
+                <SelectItem value="absolute">Absolute</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* All Day + Repeat + Ends row */

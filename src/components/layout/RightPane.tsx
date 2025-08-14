@@ -1,5 +1,6 @@
-import { ReactNode, useCallback, useState, useRef } from 'react';
+import { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { CalendarView, CalendarViewType } from '../calendar';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { lazy, Suspense } from 'react';
 const LazyConsolidatedCalendarHeader = lazy(async () => ({ default: (await import('../calendar/ConsolidatedCalendarHeader')).ConsolidatedCalendarHeader }));
 const LazyEventCreationDialog = lazy(async () => ({ default: (await import('../dialogs/EventCreationDialog')).EventCreationDialog }));
@@ -16,6 +17,15 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
   const internalCalendarRef = useRef<FullCalendar>(null);
   const calendarRef = externalCalendarRef || internalCalendarRef;
   const [currentView, setCurrentView] = useState<CalendarViewType>('timeGridWeek');
+  const { calendarSubView, setCalendarSubView } = useSettingsStore();
+  
+  // Initialize calendar sub-view from settings on mount and when settings change
+  useEffect(() => {
+    if (calendarSubView && calendarSubView !== currentView) {
+      setCurrentView(calendarSubView);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarSubView]);
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -61,6 +71,9 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
    */
   const handleViewChange = useCallback((view: CalendarViewType) => {
     setCurrentView(view);
+    try {
+      setCalendarSubView(view);
+    } catch {}
   }, []);
 
   /**

@@ -4,6 +4,7 @@ import { cva, VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useSettingsStore } from "@/stores/settingsStore"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
@@ -66,6 +67,7 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const { sidebarExpanded, setSidebarExpanded } = useSettingsStore()
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -82,14 +84,25 @@ function SidebarProvider({
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+
+      // Persist to settings store so it's remembered across sessions and devices when synced
+      setSidebarExpanded(openState)
     },
-    [setOpenProp, open]
+    [setOpenProp, open, setSidebarExpanded]
   )
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
+
+  // Sync initial state from settings store
+  React.useEffect(() => {
+    // Only apply when uncontrolled from props
+    if (openProp === undefined) {
+      _setOpen(sidebarExpanded)
+    }
+  }, [openProp, sidebarExpanded])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {

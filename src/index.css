@@ -1,12 +1,22 @@
 /* Inter as base font per UI requirement */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  font-family:
+    'Inter',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    'Apple Color Emoji',
+    'Segoe UI Emoji';
   line-height: 1.5;
   font-weight: 400;
 
@@ -205,7 +215,9 @@ h1 {
     border: 1px solid hsl(var(--rte-border));
     background: var(--rte-bg);
     border-radius: var(--radius-md);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
   }
   .dark .rte-root {
     --rte-bg: color-mix(in oklch, var(--card) 75%, transparent);
@@ -237,7 +249,10 @@ h1 {
     background: transparent;
     color: hsl(var(--foreground));
     opacity: 0.9;
-    transition: background-color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+    transition:
+      background-color 0.15s ease,
+      opacity 0.15s ease,
+      border-color 0.15s ease;
     cursor: pointer;
     width: 28px; /* equal button width */
     height: 28px; /* equal height */
@@ -330,7 +345,7 @@ h1 {
   }
 
   /* Force checkbox to maintain proper dimensions */
-  button[role="checkbox"] {
+  button[role='checkbox'] {
     width: 1rem !important;
     height: 1rem !important;
     min-width: 1rem !important;
@@ -348,7 +363,7 @@ h1 {
   }
 
   /* Only set transparent background for unchecked state */
-  button[role="checkbox"]:not([data-state="checked"]) {
+  button[role='checkbox']:not([data-state='checked']) {
     background: transparent !important;
   }
 
@@ -399,13 +414,15 @@ h1 {
   }
 
   /* Keep action icons visible when dropdown is open */
-  .group-hover\:calendar\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+  .group-hover\:calendar\:opacity-100:has([data-slot='dropdown-menu-content']) {
     opacity: 1 !important;
   }
-  .group-hover\:task-list\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+  .group-hover\:task-list\:opacity-100:has(
+    [data-slot='dropdown-menu-content']
+  ) {
     opacity: 1 !important;
   }
-  .group-hover\:task\:opacity-100:has([data-slot="dropdown-menu-content"]) {
+  .group-hover\:task\:opacity-100:has([data-slot='dropdown-menu-content']) {
     opacity: 1 !important;
   }
 
@@ -467,19 +484,21 @@ h1 {
 
   /* Hide scrollbar while keeping functionality */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* Internet Explorer 10+ */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+    scrollbar-width: none; /* Firefox */
   }
-  
-  .scrollbar-hide::-webkit-scrollbar { 
-    display: none;  /* Safari and Chrome */
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
   }
 
   /* Gradient text utilities using chart colors */
   .gradient-text-blue-red {
-    background: linear-gradient(135deg, 
-      oklch(var(--chart-3)) 0%, 
-      oklch(var(--chart-1)) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(var(--chart-3)) 0%,
+      oklch(var(--chart-1)) 100%
+    );
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -488,23 +507,29 @@ h1 {
   }
 
   .gradient-bg-blue-red {
-    background: linear-gradient(135deg, 
-      oklch(var(--chart-3)) 0%, 
-      oklch(var(--chart-1)) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(var(--chart-3)) 0%,
+      oklch(var(--chart-1)) 100%
+    );
     background-size: 200% 200%;
     /* animation: gradient-shift 3s ease infinite; */ /* Disabled to prevent drag interference */
   }
 
   /* WORKING GRADIENT EFFECTS - Using the debug structure that works */
-  
+
   /* Schedule text - hover state with better gradient colors using color-interpolation-method */
   .debug-dropdown-item:hover .debug-text {
-    background: linear-gradient(in oklch 90deg, oklch(85% 0.09 236.25), oklch(85% 0.09 145.71)) !important;
-    -webkit-background-clip: text !important;  
+    background: linear-gradient(
+      in oklch 90deg,
+      oklch(85% 0.09 236.25),
+      oklch(85% 0.09 145.71)
+    ) !important;
+    -webkit-background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
     background-clip: text !important;
   }
-  
+
   /* Clock icon - hover state (blue only on hover) */
   .debug-dropdown-item:hover .debug-icon {
     color: oklch(85% 0.09 236.25) !important;
@@ -513,8 +538,12 @@ h1 {
   /* Light mode gradient colors (darker for better contrast on light background) using color-interpolation-method */
   @media (prefers-color-scheme: light) {
     .debug-dropdown-item:hover .debug-text {
-      background: linear-gradient(in oklch 90deg, oklch(45% 0.12 236.25), oklch(45% 0.12 145.71)) !important;
-      -webkit-background-clip: text !important;  
+      background: linear-gradient(
+        in oklch 90deg,
+        oklch(45% 0.12 236.25),
+        oklch(45% 0.12 145.71)
+      ) !important;
+      -webkit-background-clip: text !important;
       -webkit-text-fill-color: transparent !important;
       background-clip: text !important;
     }
@@ -530,7 +559,11 @@ h1 {
     border: 1px solid oklch(85% 0.09 236.25) !important;
     border-radius: var(--radius-sm) !important;
     color: transparent !important;
-    background-image: linear-gradient(in oklch 90deg, oklch(85% 0.09 236.25), oklch(85% 0.09 145.71)) !important;
+    background-image: linear-gradient(
+      in oklch 90deg,
+      oklch(85% 0.09 236.25),
+      oklch(85% 0.09 145.71)
+    ) !important;
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
@@ -544,7 +577,11 @@ h1 {
       border: 1px solid oklch(45% 0.12 236.25) !important;
       border-radius: var(--radius-sm) !important;
       color: transparent !important;
-      background-image: linear-gradient(in oklch 90deg, oklch(45% 0.12 236.25), oklch(45% 0.12 145.71)) !important;
+      background-image: linear-gradient(
+        in oklch 90deg,
+        oklch(45% 0.12 236.25),
+        oklch(45% 0.12 145.71)
+      ) !important;
       -webkit-background-clip: text !important;
       background-clip: text !important;
       -webkit-text-fill-color: transparent !important;
@@ -553,7 +590,9 @@ h1 {
 
   .dropdown-gradient-text,
   .dropdown-gradient-icon {
-    transition: color 0.3s ease, background 0.3s ease;
+    transition:
+      color 0.3s ease,
+      background 0.3s ease;
   }
 
   /* Disable transitions on draggable task elements */
@@ -567,17 +606,15 @@ h1 {
     transition: background-color 0.2s ease !important;
   }
 
-
-
   @keyframes gradient-shift {
-    0%, 100% {
+    0%,
+    100% {
       background-position: 0% 50%;
     }
     50% {
       background-position: 100% 50%;
     }
   }
-
 }
 
 /* ==========================================
@@ -598,26 +635,28 @@ h1 {
     isolation: isolate;
   }
   .auth-gradient-bg::before {
-    content: "";
+    content: '';
     position: fixed;
     inset: -35%;
     z-index: 0;
     /* Smooth, continuous hues across the full spectrum in OKLCH */
     background-image: conic-gradient(
       in oklch from var(--auth-angle),
-      oklch(0.90 0.12 0) 0deg,
-      oklch(0.90 0.12 60) 60deg,
-      oklch(0.90 0.12 120) 120deg,
-      oklch(0.90 0.12 180) 180deg,
-      oklch(0.90 0.12 240) 240deg,
-      oklch(0.90 0.12 300) 300deg,
-      oklch(0.90 0.12 360) 360deg
+      oklch(0.9 0.12 0) 0deg,
+      oklch(0.9 0.12 60) 60deg,
+      oklch(0.9 0.12 120) 120deg,
+      oklch(0.9 0.12 180) 180deg,
+      oklch(0.9 0.12 240) 240deg,
+      oklch(0.9 0.12 300) 300deg,
+      oklch(0.9 0.12 360) 360deg
     );
     filter: blur(120px) saturate(115%);
     opacity: 0.55;
-    transform: translate3d(0,0,0) scale(1.06);
+    transform: translate3d(0, 0, 0) scale(1.06);
     /* Two animations: a very slow, continuous angle rotation; and a subtle breathing scale */
-    animation: auth-angle-rotate 90s linear infinite, auth-breathe 24s ease-in-out infinite;
+    animation:
+      auth-angle-rotate 90s linear infinite,
+      auth-breathe 24s ease-in-out infinite;
     pointer-events: none;
   }
   .dark .auth-gradient-bg::before {
@@ -635,14 +674,25 @@ h1 {
 
   /* Continuous rotation of the conic gradient's angle (no element rotation, so no corners) */
   @keyframes auth-angle-rotate {
-    to { --auth-angle: 1turn; }
+    to {
+      --auth-angle: 1turn;
+    }
   }
 
   /* Gentle scale breathing */
   @keyframes auth-breathe {
-    0% { transform: translate3d(0,0,0) scale(1.06); filter: blur(120px) saturate(110%); }
-    50% { transform: translate3d(0,0,0) scale(1.10); filter: blur(120px) saturate(118%); }
-    100% { transform: translate3d(0,0,0) scale(1.06); filter: blur(120px) saturate(110%); }
+    0% {
+      transform: translate3d(0, 0, 0) scale(1.06);
+      filter: blur(120px) saturate(110%);
+    }
+    50% {
+      transform: translate3d(0, 0, 0) scale(1.1);
+      filter: blur(120px) saturate(118%);
+    }
+    100% {
+      transform: translate3d(0, 0, 0) scale(1.06);
+      filter: blur(120px) saturate(110%);
+    }
   }
 
   /* Frosted glass panel for light and dark modes */
@@ -655,7 +705,7 @@ h1 {
   }
   .dark .frosted-panel {
     background: color-mix(in oklch, oklch(0.16 0.02 260) 60%, transparent);
-    border: 1px solid oklch(1 0 0 / 0.10);
+    border: 1px solid oklch(1 0 0 / 0.1);
     box-shadow: 0 12px 36px oklch(0 0 0 / 0.45);
   }
 
@@ -665,82 +715,39 @@ h1 {
     isolation: isolate;
   }
   .cursor-glow-border::before {
-    content: "";
+    content: '';
     position: absolute;
     inset: -1px;
     border-radius: inherit;
     padding: 1px; /* border width */
     /* Radial gradient in OKLCH centered at cursor position, only visible on border area via mask */
-    background:
-      radial-gradient(
-        in oklch var(--glow-radius, 200px) circle at 
-          var(--glow-x, var(--glow-page-x, 50%)) 
+    background: radial-gradient(
+        in oklch var(--glow-radius, 200px) circle at
+          var(--glow-x, var(--glow-page-x, 50%))
           var(--glow-y, var(--glow-page-y, 50%)),
-        oklch(0.80 0.19 150 / 0.85) 0%,
-        oklch(0.80 0.19 150 / 0.40) 35%,
-        oklch(0.80 0.19 150 / 0.10) 60%,
+        oklch(0.8 0.19 150 / 0.85) 0%,
+        oklch(0.8 0.19 150 / 0.4) 35%,
+        oklch(0.8 0.19 150 / 0.1) 60%,
         transparent 70%
-      ) border-box;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      )
+      border-box;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
     pointer-events: none;
     opacity: 0.9;
     transition: opacity 150ms ease;
     z-index: -1; /* keep it behind button content */
   }
-  .cursor-glow-border:hover::before { 
-    opacity: 1; 
+  .cursor-glow-border:hover::before {
+    opacity: 1;
     /* On hover, stronger and wider glow all around the button */
     --glow-radius: 340px;
   }
 
-  /* Metallic shine border utility for compact badges (performant, masked to border ring) */
-  .badge-shine-border {
-    position: relative;
-    isolation: isolate; /* ensure pseudo-element layering doesn't bleed */
-  }
-  .badge-shine-border::before {
-    content: "";
-    position: absolute;
-    inset: 0; /* fit element box; masked to border ring below */
-    border-radius: inherit;
-    padding: var(--shine-border-width, 1px); /* ring thickness */
-    pointer-events: none;
-    opacity: 0; /* appear on hover only */
-    /* Metallic gradient built from the element-provided --hover-color; fall back to ring color */
-    --_base: var(--hover-color, hsl(var(--ring)));
-    --_c1: color-mix(in srgb, var(--_base) 16%, #ffffff); /* subtle tinted edge */
-    --_c2: color-mix(in srgb, var(--_base) 55%, #d9d9d9); /* mid tone */
-    --_c3: color-mix(in srgb, var(--_base) 24%, #ffffff); /* highlight */
-    background: linear-gradient(120deg,
-      transparent 0%,
-      var(--_c1) 10%,
-      var(--_c2) 28%,
-      #ffffff 49%,
-      var(--_c3) 62%,
-      var(--_c2) 78%,
-      transparent 95%
-    );
-    background-size: 240% 240%;
-    background-position: -60% 0; /* start off-canvas for shimmer sweep */
-    /* Mask gradient to only occupy the border ring */
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
-    z-index: 1; /* render above element border, below content */
-    transition: opacity 150ms ease-out, background-position 600ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-  }
-  .badge-shine-border:hover::before,
-  .badge-shine-border:focus-visible::before {
-    opacity: 1;
-    background-position: 120% 0; /* quick shimmer sweep */
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .badge-shine-border::before { transition: opacity 150ms ease-out !important; }
-    .badge-shine-border:hover::before,
-    .badge-shine-border:focus-visible::before { background-position: 0 0; }
-  }
 }

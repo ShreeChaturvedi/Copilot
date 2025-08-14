@@ -2,7 +2,7 @@
  * TaskPaneContainer - Multi-pane resizable task display
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import {
   ResizablePanelGroup,
@@ -21,6 +21,7 @@ import { TaskList } from './TaskList';
 import { cn } from '@/lib/utils';
 import { Task, TaskPaneData } from "@shared/types";
 import { useUIStore, TaskPaneConfig, TaskGrouping } from '@/stores/uiStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 
 export interface TaskPaneContainerProps {
@@ -341,8 +342,64 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
   className,
   searchValue,
 }) => {
-  const { taskPanes, sortBy, sortOrder, removeTaskPane, updateTaskPane } =
+  const { taskPanes, sortBy, sortOrder, removeTaskPane, updateTaskPane, addTaskPane } =
     useUIStore();
+  const { taskPaneSetup, setTaskPaneSetup } = useSettingsStore();
+
+  // Robust hydration loop: keep adjusting until UI matches saved config
+  const hydrationDoneRef = useRef(false);
+  useEffect(() => {
+    if (hydrationDoneRef.current) return;
+    if (!Array.isArray(taskPaneSetup) || taskPaneSetup.length === 0) {
+      hydrationDoneRef.current = true;
+      return;
+    }
+    const currentCount = taskPanes.length;
+    const savedCount = taskPaneSetup.length;
+    if (savedCount !== currentCount) {
+      if (savedCount > currentCount) {
+        // Add panes until counts match
+        const nextIndex = currentCount;
+        const saved = taskPaneSetup[nextIndex];
+        addTaskPane({
+          grouping: saved.grouping as TaskGrouping,
+          filterValue: saved.filterValue,
+          selectedTaskListId: saved.selectedTaskListId,
+          showCompleted: saved.showCompleted,
+        });
+      } else {
+        // Remove extra panes from end
+        const paneId = taskPanes[currentCount - 1]?.id;
+        if (paneId) removeTaskPane(paneId);
+      }
+      return; // wait for next render to continue
+    }
+    // Counts match: apply configs
+    let needsAnotherPass = false;
+    for (let i = 0; i < savedCount; i++) {
+      const pane = taskPanes[i];
+      const saved = taskPaneSetup[i];
+      if (
+        pane && (
+          pane.grouping !== saved.grouping ||
+          pane.selectedTaskListId !== saved.selectedTaskListId ||
+          pane.showCompleted !== saved.showCompleted ||
+          pane.filterValue !== saved.filterValue
+        )
+      ) {
+        needsAnotherPass = true;
+        updateTaskPane(pane.id, {
+          grouping: saved.grouping as TaskGrouping,
+          selectedTaskListId: saved.selectedTaskListId,
+          showCompleted: saved.showCompleted,
+          filterValue: saved.filterValue,
+        });
+      }
+    }
+    if (!needsAnotherPass) {
+      hydrationDoneRef.current = true;
+    }
+  }, [taskPaneSetup, taskPanes, addTaskPane, removeTaskPane, updateTaskPane]);
 
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
 
@@ -400,20 +457,34 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
 
   const canRemovePane = taskPanes.length > 1;
 
+  // Persist pane configurations when taskPanes change
+  useEffect(() => {
+    if (!hydrationDoneRef.current) return;
+    const saved = taskPanes.map((p) => ({
+      id: p.id,
+      grouping: p.grouping as 'taskList' | 'dueDate' | 'priority',
+      filterValue: p.filterValue,
+      selectedTaskListId: p.selectedTaskListId ?? null,
+      showCompleted: p.showCompleted,
+    }));
+    setTaskPaneSetup(saved);
+  }, [taskPanes, setTaskPaneSetup]);
+
+  // Sizes are intentionally not persisted per user instruction; default evenly
+
   return (
     <div className={cn('h-full', className)}>
       {/* Resizable Panes */}
       <ResizablePanelGroup
         direction="horizontal"
         className="h-full"
-        autoSaveId="task-pane-group"
       >
         {paneData.map((pane, index) => (
           <React.Fragment key={pane.id}>
             <ResizablePanel
               id={pane.id}
               order={index}
-              defaultSize={100 / paneData.length}
+              defaultSize={(100 / paneData.length)}
               minSize={25}
               className="min-w-0"
             >

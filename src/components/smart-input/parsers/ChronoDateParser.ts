@@ -39,8 +39,8 @@ export class ChronoDateParser implements Parser {
     const results = chrono.parse(text, new Date(), { forwardDate: true });
 
     for (const result of results) {
-      const startDate = result.start.date();
-      const endDate = result.end?.date();
+      const rawStart = result.start.date();
+      const rawEnd = result.end?.date();
 
       // Determine if this is a date-only or date+time expression
       const hasTime =
@@ -48,12 +48,21 @@ export class ChronoDateParser implements Parser {
       const isDateRange = !!result.end;
 
       // Create date tag
-      if (startDate) {
+      if (rawStart) {
+        // Normalize date-only results to midnight so we don't accidentally include current time
+        const normalizedStart = new Date(rawStart);
+        const normalizedEnd = rawEnd ? new Date(rawEnd) : undefined;
+        if (!hasTime) {
+          normalizedStart.setHours(0, 0, 0, 0);
+          if (normalizedEnd) {
+            normalizedEnd.setHours(0, 0, 0, 0);
+          }
+        }
         const dateTag: ParsedTag = {
           id: uuidv4(),
           type: hasTime ? 'time' : 'date',
-          value: startDate,
-          displayText: this.formatDisplayText(startDate, hasTime),
+          value: normalizedStart,
+          displayText: this.formatDisplayText(normalizedStart, hasTime),
           iconName: hasTime ? 'Clock' : 'Calendar',
           startIndex: result.index,
           endIndex: result.index + result.text.length,
@@ -68,14 +77,14 @@ export class ChronoDateParser implements Parser {
         // If it's a date range, create a separate end date tag
         if (
           isDateRange &&
-          endDate &&
-          endDate.getTime() !== startDate.getTime()
+          normalizedEnd &&
+          normalizedEnd.getTime() !== normalizedStart.getTime()
         ) {
           const endTag: ParsedTag = {
             id: uuidv4(),
             type: hasTime ? 'time' : 'date',
-            value: endDate,
-            displayText: `Until ${this.formatDisplayText(endDate, hasTime)}`,
+            value: normalizedEnd,
+            displayText: `Until ${this.formatDisplayText(normalizedEnd, hasTime)}`,
             iconName: hasTime ? 'Clock' : 'Calendar',
             startIndex: result.index,
             endIndex: result.index + result.text.length,

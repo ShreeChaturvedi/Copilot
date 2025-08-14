@@ -91,9 +91,9 @@ export function SettingsDialog({
           <DialogTitle className="text-xl font-semibold">Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 overflow-hidden">
           {/* Navigation Sidebar */}
-          <aside className="w-64 border-r bg-muted/30 p-4">
+          <aside className="w-64 border-r bg-muted/30 p-4 overflow-auto">
             <div className="space-y-1">
               <SettingsNav
                 activeSection={activeSection}
@@ -103,7 +103,7 @@ export function SettingsDialog({
           </aside>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 min-h-0 overflow-auto">
             <div className="p-6">
               <div className="mb-2 space-y-1">
                 <h2 className="text-lg font-semibold">{getSectionTitle()}</h2>
