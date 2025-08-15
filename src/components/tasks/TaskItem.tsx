@@ -41,6 +41,8 @@ export interface TaskItemProps {
   calendarMode?: boolean; // Hide tags when in calendar view
   /** Whether to show the task list label (emoji + name) inline with the title */
   showTaskListLabel?: boolean;
+  /** Whether to hide status badges (for kanban view) */
+  hideStatusBadge?: boolean;
 }
 
 // Constants
@@ -130,6 +132,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   className,
   calendarMode = false,
   showTaskListLabel = false,
+  hideStatusBadge = false,
 }) => {
   // Consolidated UI state for better performance
   const [uiState, setUiState] = useState({
@@ -321,8 +324,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           />
 
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            {/* Inline status tag to the left of title (hidden when done, and hidden in left-pane calendar summary) */}
-            {(!task.completed && !calendarMode) && (
+            {/* Inline status tag to the left of title (hidden when done, in calendar mode, or explicitly hidden) */}
+            {(!task.completed && !calendarMode && !hideStatusBadge) && (
               <StatusBadge
                 task={task}
                 onChange={(status) => updateTask.mutate({ id: task.id, updates: { status } as any })}
