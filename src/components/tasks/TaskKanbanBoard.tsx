@@ -1,21 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useTasks } from '@/hooks/useTasks';
+import { useUIStore } from '@/stores/uiStore';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import type { Task } from '@shared/types';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import TaskItem from './TaskItem';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Circle, PlayCircle, Flag } from 'lucide-react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
 } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 type ColumnKey = 'not_started' | 'in_progress' | 'done';
 
@@ -74,27 +78,93 @@ function getStatusConfig(status: ColumnKey) {
 export const TaskKanbanBoard: React.FC = () => {
   const { tasks, activeTaskGroupId } = useTaskManagement({ includeTaskOperations: true }) as any;
   const { updateTask } = useTasks();
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const { selectedKanbanTaskListId } = useUIStore();
+  const [dragState, setDragState] = useState<{
+    activeId: string | null;
+    originalColumn: ColumnKey | null;
+    activeTask: Task | null;
+    targetColumn: ColumnKey | null; // For optimistic updates
+  }>({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+
+  const selectedListId = selectedKanbanTaskListId ?? activeTaskGroupId;
 
   const grouped = useMemo(() => {
     const result: Record<ColumnKey, Task[]> = { not_started: [], in_progress: [], done: [] };
     for (const t of tasks) {
-      if (activeTaskGroupId && activeTaskGroupId !== 'default' && t.taskListId !== activeTaskGroupId) continue;
-      result[getTaskStatus(t)].push(t);
+      if (selectedListId) {
+        if (selectedListId === 'default') {
+          // Only include tasks not assigned to a specific list
+          if (t.taskListId) continue;
+        } else if (t.taskListId !== selectedListId) {
+          continue;
+        }
+      }
+      
+      // OPTIMISTIC UPDATE: Use target column if this task is being moved
+      let targetColumn = getTaskStatus(t);
+      if (dragState.targetColumn && dragState.activeId === t.id) {
+        targetColumn = dragState.targetColumn;
+      }
+      
+      result[targetColumn].push(t);
     }
     // Sort for stable display
     (Object.keys(result) as ColumnKey[]).forEach((k) => {
       result[k].sort((a, b) => (a.completed === b.completed ? (b.createdAt as any) - (a.createdAt as any) : a.completed ? 1 : -1));
     });
     return result;
-  }, [tasks, activeTaskGroupId]);
-
-  const activeTask = activeTaskId ? tasks.find((t: Task) => t.id === activeTaskId) : null;
+  }, [tasks, selectedListId, dragState]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   
-  const commitMove = (taskId: string, to: ColumnKey) => {
-    updateTask.mutate({ id: taskId, updates: { status: to === 'done' ? 'done' : to, completed: to === 'done' } as any });
+  const handleDragStart = (event: DragStartEvent) => {
+    const taskId = String(event.active?.data?.current?.taskId || event.active?.id || '');
+    const task = tasks.find((t: Task) => t.id === taskId);
+    if (task) {
+      const originalColumn = getTaskStatus(task);
+      setDragState({ activeId: taskId, originalColumn, activeTask: task, targetColumn: null });
+    }
+  };
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { activeId, originalColumn } = dragState;
+    const overKey = (event.over?.data?.current as any)?.columnKey as ColumnKey | undefined;
+    
+    // Validate move
+    if (!activeId || !overKey || !originalColumn) {
+      // Clear drag state for invalid moves
+      setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+      return;
+    }
+    
+    // Prevent unnecessary API calls for same-column drops
+    if (originalColumn === overKey) {
+      // Clear drag state for same-column drops
+      setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+      return;
+    }
+    
+    // OPTIMISTIC UPDATE: Set target column immediately for smooth transition
+    setDragState(prev => ({ ...prev, targetColumn: overKey }));
+    
+    // Prepare status updates
+    const updates: any = { status: overKey };
+    if (overKey === 'done') {
+      updates.completed = true;
+    } else if (originalColumn === 'done') {
+      updates.completed = false;
+    }
+    
+    // Make API call - clear drag state when complete
+    updateTask.mutate({ id: activeId, updates }, {
+      onSettled: () => {
+        // Clear all drag state after API call completes (success or failure)
+        setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+      },
+      onError: () => {
+        toast.error('Failed to move task. Please try again.');
+      }
+    });
   };
 
   const Column: React.FC<{ keyId: ColumnKey }> = ({ keyId }) => {
@@ -104,7 +174,11 @@ export const TaskKanbanBoard: React.FC = () => {
     const Icon = statusConfig.icon;
     
     return (
-      <div className="h-full flex flex-col border-r border-border last:border-r-0">
+      <div className={cn(
+        "h-full flex flex-col border-r border-border last:border-r-0",
+        // Mobile: make columns horizontally scrollable with snap
+        "snap-start md:snap-none min-w-[min(85vw,24rem)] md:min-w-0"
+      )}>
         {/* Color-coded Header with Icon */}
         <div className="border-b border-border px-4 py-2 bg-muted/10">
           <div className="flex items-center justify-between">
@@ -129,7 +203,7 @@ export const TaskKanbanBoard: React.FC = () => {
           className="flex-1 overflow-auto px-4 py-2" 
           data-column-key={keyId}
         >
-          <div className="space-y-1 min-h-[60vh]">
+          <div className="space-y-2 md:space-y-3 min-h-[60vh]">
             {grouped[keyId].map((task) => (
               <DraggableCard key={task.id} task={task} keyId={keyId} />
             ))}
@@ -148,25 +222,35 @@ export const TaskKanbanBoard: React.FC = () => {
   };
 
   const DraggableCard: React.FC<{ task: Task; keyId: ColumnKey }> = ({ task, keyId }) => {
-    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ 
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ 
       id: task.id, 
       data: { taskId: task.id } 
     });
     const statusConfig = getStatusConfig(keyId);
     
+    // DragOverlay pattern: hide original during drag, overlay handles the visual
+    const style = {
+      transform: CSS.Translate.toString(transform),
+      // Hide original element during drag - overlay takes over
+      opacity: isDragging ? 0 : 1,
+    };
+    
     return (
-      <div 
-        ref={setNodeRef} 
+      <Card
+        ref={setNodeRef as any}
+        style={style}
         className={cn(
-          'rounded-md shadow-sm border cursor-grab transition-all duration-200',
+          // Base card visual consistent with app
+          'shadow-sm border rounded-md py-2 px-2 sm:px-3',
+          // Status accents
           statusConfig.backgroundColor,
           statusConfig.borderColor,
           statusConfig.darkBackgroundColor,
           statusConfig.darkBorderColor,
-          // Remove transform and z-index here since DragOverlay handles it
-          isDragging && 'opacity-50'
-        )} 
-        {...listeners} 
+          // Cursor states
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        )}
+        {...listeners}
         {...attributes}
       >
         <TaskItem
@@ -175,68 +259,72 @@ export const TaskKanbanBoard: React.FC = () => {
           onEdit={(id, title) => updateTask.mutate({ id, updates: { title } })}
           onDelete={() => { /* hidden in kanban */ }}
           onSchedule={() => void 0}
-          className="px-2 py-2"
-          calendarMode={false} // Show tags and attachments
-          showTaskListLabel={false}
-          hideStatusBadge={true} // Hide status badges in kanban
-        />
-      </div>
-    );
-  };
-
-  const TaskCardOverlay: React.FC<{ task: Task }> = ({ task }) => {
-    const taskStatus = getTaskStatus(task);
-    const statusConfig = getStatusConfig(taskStatus);
-    
-    return (
-      <div 
-        className={cn(
-          'rounded-md shadow-lg border-2 transform rotate-3 cursor-grabbing z-[9999]',
-          statusConfig.backgroundColor,
-          statusConfig.borderColor,
-          statusConfig.darkBackgroundColor,
-          statusConfig.darkBorderColor,
-        )}
-      >
-        <TaskItem
-          task={task}
-          onToggle={() => {}}
-          onEdit={() => {}}
-          onDelete={() => {}}
-          onSchedule={() => void 0}
-          className="px-2 py-2"
+          className="p-0"
           calendarMode={false}
           showTaskListLabel={false}
-          hideStatusBadge={true} // Hide status badges in drag overlay
+            hideCheckbox={true}
         />
-      </div>
+      </Card>
     );
   };
 
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={(event: DragStartEvent) => {
-        const taskId = String(event.active?.data?.current?.taskId || event.active?.id || '');
-        setActiveTaskId(taskId);
-      }}
-      onDragEnd={(event: DragEndEvent) => {
-        const activeId = String(event.active?.data?.current?.taskId || event.active?.id || '');
-        const overKey = (event.over?.data?.current as any)?.columnKey as ColumnKey | undefined;
-        if (activeId && overKey) commitMove(activeId, overKey);
-        setActiveTaskId(null);
-      }}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
-      {/* Remove gap and use border-r on columns for proper separation */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 h-full">
+      {/* Responsive columns: flex horizontal scroll on mobile, 3 fixed grid columns on md+ */}
+      <div
+        className={cn(
+          // Mobile-first: flex row + horizontal scroll + snap
+          'flex overflow-x-auto gap-4 px-2 sm:px-4 snap-x snap-mandatory h-full',
+          // Desktop: switch to grid with fixed 3 columns, no horizontal scroll
+          'md:grid md:grid-cols-3 md:gap-0 md:overflow-x-visible'
+        )}
+      >
         <Column keyId="not_started" />
         <Column keyId="in_progress" />
         <Column keyId="done" />
       </div>
-      
-      {/* DragOverlay for smooth drag experience */}
+
+      {/* DragOverlay - portals the dragged item to document body level */}
       <DragOverlay>
-        {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
+        {dragState.activeTask ? (() => {
+          // Apply same status styling as DraggableCard
+          const taskStatus = getTaskStatus(dragState.activeTask);
+          const statusConfig = getStatusConfig(taskStatus);
+          
+          return (
+            <Card
+              className={cn(
+                'shadow-lg border rounded-md py-2 px-2 sm:px-3',
+                'transform-gpu scale-105',
+                'shadow-2xl ring-1 ring-black/5',
+                // Apply status-specific styling
+                statusConfig.backgroundColor,
+                statusConfig.borderColor,
+                statusConfig.darkBackgroundColor,
+                statusConfig.darkBorderColor
+              )}
+              style={{
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              }}
+            >
+              <TaskItem
+                task={dragState.activeTask}
+                onToggle={() => {}} // Disabled in overlay
+                onEdit={() => {}} // Disabled in overlay
+                onDelete={() => {}} // Disabled in overlay
+                onSchedule={() => void 0}
+                className="p-0 cursor-grabbing"
+                calendarMode={false}
+                showTaskListLabel={false}
+                hideCheckbox={true}
+              />
+            </Card>
+          );
+        })() : null}
       </DragOverlay>
     </DndContext>
   );

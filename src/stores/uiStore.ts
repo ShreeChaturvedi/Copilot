@@ -63,6 +63,8 @@ interface UIState {
   showTaskListContextInAll: boolean;
   sortBy: SortBy;
   sortOrder: SortOrder;
+  // Selected task list id for Kanban view
+  selectedKanbanTaskListId: string | null;
 
   // Drag & drop state
   dragState: DragState;
@@ -94,6 +96,7 @@ interface UIState {
   setSortBy: (sort: SortBy) => void;
   setSortOrder: (order: SortOrder) => void;
   setShowTaskListContextInAll: (show: boolean) => void;
+  setSelectedKanbanTaskListId: (id: string | null) => void;
 
   resetUI: () => void;
 }
@@ -128,6 +131,7 @@ const initialState = {
     taskId: null,
     dropZone: null,
   } as DragState,
+  selectedKanbanTaskListId: null as string | null,
 };
 
 export const useUIStore = create<UIState>()(
@@ -204,7 +208,7 @@ export const useUIStore = create<UIState>()(
       setPeekMode: (mode) => set({ peekMode: mode }, false, 'setPeekMode'),
 
       setCurrentView: (view) =>
-        set((state) => {
+        set(() => {
           // Persist to settings store for cross-session memory
           try {
             // Access settings store without creating a React hook dependency
@@ -293,6 +297,9 @@ export const useUIStore = create<UIState>()(
 
       setShowTaskListContextInAll: (show) =>
         set({ showTaskListContextInAll: show }, false, 'setShowTaskListContextInAll'),
+
+      setSelectedKanbanTaskListId: (id) =>
+        set({ selectedKanbanTaskListId: id }, false, 'setSelectedKanbanTaskListId'),
 
       resetUI: () => set(initialState, false, 'resetUI'),
     }),

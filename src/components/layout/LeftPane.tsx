@@ -7,6 +7,7 @@ import { SmartTaskInput, type SmartTaskData } from '@/components/smart-input/Sma
 import { TaskList } from '@/components/tasks/TaskList';
 import { CalendarList } from '@/components/calendar/CalendarList';
 import { TaskGroupList } from '@/components/tasks/TaskGroupList';
+import { TaskAnalyticsSummary } from '@/components/tasks/TaskAnalyticsSummary';
 import { EventOverview } from '@/components/calendar/EventOverview';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useCalendarManagement } from '@/hooks/useCalendarManagement';
@@ -106,6 +107,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     toggleTaskViewMiniCalendar,
     leftSmartInputTaskListId,
     setLeftSmartInputTaskListId,
+    showSidebarTaskAnalytics,
   } = useSettingsStore();
 
   // Sync persisted SmartTaskInput list selection to TaskList active selection on load
@@ -422,14 +424,17 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         onDeleteCalendar={memoizedHandleDeleteCalendar}
       />
     ) : (
-      <TaskGroupList
-        taskGroups={taskGroups}
-        activeTaskGroupId={activeTaskGroupId}
-        onAddTaskGroup={memoizedHandleAddTaskGroupForList}
-        onEditTaskGroup={memoizedHandleEditTaskGroupForList}
-        onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
-        onSelectTaskGroup={memoizedHandleSelectTaskGroup}
-      />
+      <div className="space-y-2">
+        {showSidebarTaskAnalytics && <TaskAnalyticsSummary />}
+        <TaskGroupList
+          taskGroups={taskGroups}
+          activeTaskGroupId={activeTaskGroupId}
+          onAddTaskGroup={memoizedHandleAddTaskGroupForList}
+          onEditTaskGroup={memoizedHandleEditTaskGroupForList}
+          onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
+          onSelectTaskGroup={memoizedHandleSelectTaskGroup}
+        />
+      </div>
     );
   }, [
     currentView,
@@ -444,6 +449,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     memoizedHandleEditTaskGroupForList,
     memoizedHandleDeleteTaskGroup,
     memoizedHandleSelectTaskGroup,
+    showSidebarTaskAnalytics,
   ]);
 
   return (

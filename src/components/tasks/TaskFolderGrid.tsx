@@ -18,7 +18,7 @@ function createTaskFolders(
   taskGroups: Array<{
     id: string;
     name: string;
-    iconId: string;
+    emoji: string; // from useTaskManagement
     color: string;
     description?: string;
   }>,
@@ -40,7 +40,7 @@ function createTaskFolders(
       id: group.id,
       name: group.name,
       color: group.color,
-      iconId: group.iconId,
+  iconId: group.emoji,
       taskCount: showCompleted ? groupTasks.length : activeTasks.length,
       completedCount: completedTasks.length,
       tasks: previewTasks,
@@ -155,7 +155,7 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
 export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   className,
 }) => {
-  const { globalShowCompleted, setTaskViewMode } = useUIStore();
+  const { globalShowCompleted, setTaskViewMode, setSelectedKanbanTaskListId } = useUIStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { tasks, taskGroups, handleSelectTaskGroup, handleCreateTaskGroup } =
     useTaskManagement({ includeTaskOperations: true });
@@ -170,8 +170,10 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
       handleSelectTaskGroup(folderId);
       // Navigate to kanban view for the selected task list
       setTaskViewMode('kanban');
+      // Persist which list Kanban should display
+      setSelectedKanbanTaskListId(folderId);
     },
-    [handleSelectTaskGroup, setTaskViewMode]
+    [handleSelectTaskGroup, setTaskViewMode, setSelectedKanbanTaskListId]
   );
 
   const handleAddFolder = useCallback(() => setShowCreateDialog(true), []);
@@ -180,10 +182,16 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
     (data: {
       name: string;
       description: string;
-      iconId: string;
+      emoji: string;
       color: string;
     }) => {
-      handleCreateTaskGroup(data);
+      // useTaskManagement expects an object with emoji for creation
+      handleCreateTaskGroup({
+        name: data.name,
+        description: data.description,
+        emoji: data.emoji,
+        color: data.color,
+      });
       setShowCreateDialog(false);
     },
     [handleCreateTaskGroup]

@@ -3,11 +3,12 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, CornerDownRight, PlayCircle, Circle } from 'lucide-react';
+import { MoreVertical, MapPin, User, Tag, Flag, X, File as FileIcon, Image as ImageIcon, Music as MusicIcon, Video as VideoIcon, CornerDownRight } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
 import TaskDetailSheet from './TaskDetailSheet';
 import StatusBadge from './StatusBadge';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 // StatusBadge now a separate component
 
@@ -41,61 +43,15 @@ export interface TaskItemProps {
   calendarMode?: boolean; // Hide tags when in calendar view
   /** Whether to show the task list label (emoji + name) inline with the title */
   showTaskListLabel?: boolean;
-  /** Whether to hide status badges (for kanban view) */
-  hideStatusBadge?: boolean;
+  /** Whether to hide checkboxes (for kanban view) */
+  hideCheckbox?: boolean;
 }
 
 // Constants
 const CONTEXT_MENU_OFFSET = 8;
 const COMPLETED_TASK_OPACITY = 0.6;
 
-// File type colors matching DefaultPreview for consistent theming
-const FILE_TYPE_COLORS = {
-  // Documents
-  pdf: 'text-red-500',
-  doc: 'text-blue-600',
-  docx: 'text-blue-600',
-  xls: 'text-green-600',
-  xlsx: 'text-green-600',
-  ppt: 'text-orange-600',
-  pptx: 'text-orange-600',
-  txt: 'text-gray-600',
-  csv: 'text-green-500',
-  
-  // Images
-  jpg: 'text-blue-500',
-  jpeg: 'text-blue-500',
-  png: 'text-blue-500',
-  gif: 'text-blue-500',
-  webp: 'text-blue-500',
-  svg: 'text-purple-500',
-  
-  // Audio
-  mp3: 'text-purple-500',
-  m4a: 'text-purple-500',
-  wav: 'text-purple-500',
-  webm: 'text-purple-600',
-  ogg: 'text-purple-600',
-  
-  // Video
-  mp4: 'text-red-500',
-  mov: 'text-red-500',
-  avi: 'text-red-600',
-  mkv: 'text-red-600',
-  
-  // Archives
-  zip: 'text-orange-500',
-  rar: 'text-orange-600',
-  '7z': 'text-orange-600',
-  
-  // Fallback
-  default: 'text-gray-500',
-} as const;
-
-// Get file extension from filename
-function getFileExtension(filename: string): string {
-  return filename.toLowerCase().split('.').pop() || '';
-}
+// (file type color helpers removed; handled elsewhere)
 
 // Helper function to get the appropriate icon for each tag type
 const getTagIcon = (type: string) => {
@@ -132,7 +88,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   className,
   calendarMode = false,
   showTaskListLabel = false,
-  hideStatusBadge = false,
+  hideCheckbox = false,
 }) => {
   // Consolidated UI state for better performance
   const [uiState, setUiState] = useState({
@@ -146,6 +102,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const { data: calendars = [] } = useCalendars();
   const { updateTask } = useTasks();
   const { taskGroups } = useTaskManagement({ includeTaskOperations: false });
+  const taskCompletionControl = useSettingsStore((s) => s.taskCompletionControl);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeAttachment, setActiveAttachment] = useState<NonNullable<Task['attachments']>[number] | null>(null);
   const queryClient = useQueryClient();
@@ -315,22 +272,28 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       >
         {/* Top row: checkbox, title, actions */}
         <div className="flex items-center gap-3">
-          <Checkbox
-            checked={task.completed}
-            onCheckedChange={handleToggle}
-            aria-label={`Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
-            className="flex-shrink-0"
-            customColor={task.completed ? groupColor : undefined}
-          />
-
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            {/* Inline status tag to the left of title (hidden when done, in calendar mode, or explicitly hidden) */}
-            {(!task.completed && !calendarMode && !hideStatusBadge) && (
+          {/* Completion control: either checkbox or status icon (icon-only badge), depending on settings. */}
+          {!hideCheckbox && (
+            taskCompletionControl === 'checkbox' ? (
+              <Checkbox
+                checked={task.completed}
+                onCheckedChange={handleToggle}
+                aria-label={`Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
+                className="flex-shrink-0"
+                customColor={task.completed ? groupColor : undefined}
+              />
+            ) : (
               <StatusBadge
                 task={task}
+                iconOnly
+                className="flex-shrink-0"
                 onChange={(status) => updateTask.mutate({ id: task.id, updates: { status } as any })}
               />
-            )}
+            )
+          )}
+
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            {/* No secondary inline status badge when using list view controls. The primary control is either the checkbox or the icon-only status badge rendered on the left. */}
             {uiState.isEditing ? (
               <input
                 ref={inputRef}
@@ -422,95 +385,105 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
         {/* Tags - Hidden in calendar mode */}
         {!calendarMode && (
-          <div className="mt-1 ml-7 space-y-1">
-            {/* First row: Due date and other tags */}
-            <div className="flex flex-wrap gap-1">
-              {/* Canonical Due Date tag - only render when set */}
-              {task.scheduledDate && (
-                <DueDateBadge
-                  taskId={task.id}
-                  date={task.scheduledDate}
-                  onChange={(newDate) => updateTask.mutate({ id: task.id, updates: { scheduledDate: newDate } })}
-                />
-              )}
+          <div className={cn("mt-1 space-y-1", !hideCheckbox && "ml-7")}>
+            {/* First row: Due date and other tags - Horizontal scrolling */}
+            <ScrollArea className="w-full" orientation="horizontal">
+              <div 
+                className="flex flex-nowrap gap-1 pb-1 min-w-max"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                {/* Canonical Due Date tag - only render when set */}
+                {task.scheduledDate && (
+                  <div className="flex-shrink-0">
+                    <DueDateBadge
+                      taskId={task.id}
+                      date={task.scheduledDate}
+                      onChange={(newDate) => updateTask.mutate({ id: task.id, updates: { scheduledDate: newDate } })}
+                    />
+                  </div>
+                )}
 
-              {/* Show non-date/time smart tags */}
-              {task.tags?.filter(tag => tag.type !== 'date' && tag.type !== 'time').map((tag) => {
-                const IconComponent = getTagIcon(tag.type) as React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-                return (
-                  <Badge
-                    key={`${tag.id}_${String(tag.value)}`}
-                    variant="outline"
-                    className={cn(
-                      "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
-                      onRemoveTag && "cursor-pointer",
-                      tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
-                    )}
-                    style={tag.color ? { 
-                      borderColor: `${tag.color}30`, 
-                      color: tag.color,
-                      backgroundColor: `${tag.color}1A`
-                    } : undefined}
-                    onClick={onRemoveTag ? (e) => {
-                      e.stopPropagation();
-                      onRemoveTag(task.id, tag.id);
-                    } : undefined}
-                  >
-                    {/* Icon that becomes X on hover - same size, no layout shift */}
-                    <div className="w-3 h-3 relative">
-                      {IconComponent && (
-                        <IconComponent 
-                          className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
-                          style={{ color: tag.color }}
-                        />
-                      )}
-                      {onRemoveTag && (
-                        <X 
-                          className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
-                          style={{ color: tag.color }}
-                        />
-                      )}
-                    </div>
-                    {tag.displayText}
-                  </Badge>
-                );
-              })}
-            </div>
-            
-            {/* Second row: Attachments preview (compact) */}
-            {task.attachments && task.attachments.length > 0 && (
-              <div className="flex items-center gap-1">
-                {task.attachments.slice(0, 3).map((att) => {
-                  const isImage = att.type?.startsWith('image/');
-                  const isAudio = att.type?.startsWith('audio/');
-                  const isVideo = att.type?.startsWith('video/');
-                  const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
-                  
-                  // Get file extension for icon type
-                  const extension = getFileExtension(att.name);
-                  
+                {/* Show non-date/time smart tags */}
+                {task.tags?.filter(tag => tag.type !== 'date' && tag.type !== 'time').map((tag) => {
+                  const IconComponent = getTagIcon(tag.type) as React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
                   return (
-                    <Badge
-                      key={att.id}
-                      variant="outline"
-                      className={cn(
-                        "text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30 cursor-pointer",
-                        "hover:border-muted-foreground/50 transition-all duration-150 group/attachment"
-                      )}
-                      onClick={(e) => { e.stopPropagation(); openAttachment(att); }}
-                      title={`Preview ${att.name}`}
-                    >
-                      <Icon 
-                        className="w-3 h-3" 
-                      />
-                      <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
-                    </Badge>
+                    <div key={`${tag.id}_${String(tag.value)}`} className="flex-shrink-0">
+                      <Badge
+                        variant="outline"
+                        size="md"
+                        className={cn(
+                          "text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag",
+                          onRemoveTag && "cursor-pointer",
+                          tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
+                        )}
+                        style={tag.color ? { 
+                          borderColor: `${tag.color}30`, 
+                          color: tag.color,
+                          backgroundColor: `${tag.color}1A`
+                        } : undefined}
+                        onClick={onRemoveTag ? (e) => {
+                          e.stopPropagation();
+                          onRemoveTag(task.id, tag.id);
+                        } : undefined}
+                      >
+                        {/* Icon that becomes X on hover - same size, no layout shift */}
+                        <div className="w-3 h-3 relative">
+                          {IconComponent && (
+                            <IconComponent 
+                              className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" 
+                              style={{ color: tag.color }}
+                            />
+                          )}
+                          {onRemoveTag && (
+                            <X 
+                              className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" 
+                              style={{ color: tag.color }}
+                            />
+                          )}
+                        </div>
+                        {tag.displayText}
+                      </Badge>
+                    </div>
                   );
                 })}
-                {task.attachments.length > 3 && (
-                  <Badge variant="outline" className="text-xs px-2 py-1">+{task.attachments.length - 3}</Badge>
-                )}
               </div>
+            </ScrollArea>
+            
+            {/* Second row: Attachments preview (compact) - Horizontal scrolling */}
+            {task.attachments && task.attachments.length > 0 && (
+              <ScrollArea className="w-full">
+                <div 
+                  className="flex flex-nowrap items-center gap-1 pb-1 min-w-max"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  {task.attachments.map((att) => {
+                    const isImage = att.type?.startsWith('image/');
+                    const isAudio = att.type?.startsWith('audio/');
+                    const isVideo = att.type?.startsWith('video/');
+                    const Icon = isImage ? ImageIcon : isAudio ? MusicIcon : isVideo ? VideoIcon : FileIcon;
+                    
+                    return (
+                      <div key={att.id} className="flex-shrink-0">
+                        <Badge
+                          variant="outline"
+                          size="md"
+                          className={cn(
+                            "text-muted-foreground border-muted-foreground/30 cursor-pointer",
+                            "hover:border-muted-foreground/50 transition-all duration-150 group/attachment"
+                          )}
+                          onClick={(e) => { e.stopPropagation(); openAttachment(att); }}
+                          title={`Preview ${att.name}`}
+                        >
+                          <Icon 
+                            className="w-3 h-3 flex-shrink-0" 
+                          />
+                          <span className="max-w-[120px] truncate inline-block align-middle">{att.name}</span>
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             )}
 
             {/* Intentionally remove the legacy auto-created creation date badge */}

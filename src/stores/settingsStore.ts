@@ -5,6 +5,7 @@ export type DateDisplayMode = 'relative' | 'absolute';
 export type AppViewMode = 'calendar' | 'task';
 export type CalendarSubView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
 export type SavedTaskGrouping = 'taskList' | 'dueDate' | 'priority';
+export type TaskCompletionControl = 'checkbox' | 'status-tag';
 
 export interface SavedTaskPaneConfig {
   id: string;
@@ -36,6 +37,10 @@ interface SettingsState {
   enhancedInputTaskListId: string | null;
   /** Selected task list for the left pane SmartTaskInput (calendar view) */
   leftSmartInputTaskListId: string | null;
+  /** How task completion is controlled/rendered in list view */
+  taskCompletionControl: TaskCompletionControl;
+  /** Whether to show the sidebar task analytics summary */
+  showSidebarTaskAnalytics: boolean;
 
   // Actions
   setDateDisplayMode: (mode: DateDisplayMode) => void;
@@ -52,6 +57,8 @@ interface SettingsState {
   setEnhancedInputVisible: (visible: boolean) => void;
   setEnhancedInputTaskListId: (taskListId: string | null) => void;
   setLeftSmartInputTaskListId: (taskListId: string | null) => void;
+  setTaskCompletionControl: (mode: TaskCompletionControl) => void;
+  setShowSidebarTaskAnalytics: (visible: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -76,6 +83,8 @@ export const useSettingsStore = create<SettingsState>()(
         enhancedInputVisible: false,
         enhancedInputTaskListId: null,
         leftSmartInputTaskListId: null,
+        taskCompletionControl: 'checkbox',
+        showSidebarTaskAnalytics: true,
 
         setDateDisplayMode: (mode) => set({ dateDisplayMode: mode }, false, 'setDateDisplayMode'),
         setCalendarViewInputExpanded: (expanded) =>
@@ -105,6 +114,8 @@ export const useSettingsStore = create<SettingsState>()(
         setEnhancedInputVisible: (visible) => set({ enhancedInputVisible: visible }, false, 'setEnhancedInputVisible'),
         setEnhancedInputTaskListId: (taskListId) => set({ enhancedInputTaskListId: taskListId }, false, 'setEnhancedInputTaskListId'),
         setLeftSmartInputTaskListId: (taskListId) => set({ leftSmartInputTaskListId: taskListId }, false, 'setLeftSmartInputTaskListId'),
+        setTaskCompletionControl: (mode) => set({ taskCompletionControl: mode }, false, 'setTaskCompletionControl'),
+        setShowSidebarTaskAnalytics: (visible) => set({ showSidebarTaskAnalytics: visible }, false, 'setShowSidebarTaskAnalytics'),
       }),
       {
         name: 'settings-store',
@@ -120,6 +131,8 @@ export const useSettingsStore = create<SettingsState>()(
           enhancedInputVisible: state.enhancedInputVisible,
           enhancedInputTaskListId: state.enhancedInputTaskListId,
           leftSmartInputTaskListId: state.leftSmartInputTaskListId,
+          taskCompletionControl: state.taskCompletionControl,
+          showSidebarTaskAnalytics: state.showSidebarTaskAnalytics,
         }),
       }
     ),

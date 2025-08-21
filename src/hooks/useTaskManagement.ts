@@ -69,7 +69,7 @@ interface TaskManagementWithOperations {
   handleCreateTaskGroup: (data: {
     name: string;
     description: string;
-    iconId: string;
+  emoji: string;
     color: string;
   }) => void;
   handleUpdateTaskGroupIcon: (groupId: string, iconId: string) => void;
@@ -93,7 +93,7 @@ interface TaskManagementWithoutOperations {
   handleCreateTaskGroup: (data: {
     name: string;
     description: string;
-    iconId: string;
+  emoji: string;
     color: string;
   }) => void;
   handleUpdateTaskGroupIcon: (groupId: string, iconId: string) => void;
