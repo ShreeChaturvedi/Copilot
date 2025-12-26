@@ -3,10 +3,14 @@
  * Tests the complete flow from API routes to database operations
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import tasksHandler from '../index';
 import taskHandler from '../[id]';
 import { getAllServices } from '../../../lib/services/index';
+import {
+  createMockAuthRequest,
+  createMockResponse,
+  mockUser,
+} from '../../../lib/__tests__/helpers';
 import type { CreateTaskDTO, UpdateTaskDTO } from '../../../lib/services/TaskService';
 
 // Mock the services
@@ -67,24 +71,7 @@ const mockTask = {
   attachments: [],
 };
 
-const createMockRequest = (overrides: Partial<VercelRequest> = {}): VercelRequest => ({
-  method: 'GET',
-  url: '/api/tasks',
-  headers: {
-    'x-request-id': 'test-request-123',
-  },
-  query: {},
-  body: {},
-  user: mockUser,
-  ...overrides,
-} as unknown as VercelRequest);
-
-const createMockResponse = (): VercelResponse => ({
-  status: vi.fn().mockReturnThis(),
-  json: vi.fn().mockReturnThis(),
-  end: vi.fn().mockReturnThis(),
-  setHeader: vi.fn().mockReturnThis(),
-} as unknown as VercelResponse);
+// Mock helpers now imported from shared helpers
 
 describe('Tasks API Integration Tests', () => {
   beforeEach(() => {
@@ -97,7 +84,7 @@ describe('Tasks API Integration Tests', () => {
 
   describe('GET /api/tasks', () => {
     it('should fetch all tasks for authenticated user', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: {},
       });
@@ -118,7 +105,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should apply filters from query parameters', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: {
           completed: 'true',
@@ -162,7 +149,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should use pagination when requested', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: {
           page: '2',
@@ -198,7 +185,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 401 for unauthenticated requests', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         user: undefined,
       });
@@ -214,7 +201,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should handle service errors gracefully', async () => {
-      const req = createMockRequest({ method: 'GET' });
+      const req = createMockAuthRequest(mockUser, { method: 'GET' });
       const res = createMockResponse();
 
       mockTaskService.findAll.mockRejectedValue(new Error('Database connection failed'));
@@ -250,7 +237,7 @@ describe('Tasks API Integration Tests', () => {
     };
 
     it('should create a new task successfully', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: createTaskData,
       });
@@ -272,7 +259,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 400 for missing title', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: { ...createTaskData, title: '' },
       });
@@ -288,7 +275,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should handle validation errors from service', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: createTaskData,
       });
@@ -308,7 +295,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 401 for unauthenticated requests', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: createTaskData,
         user: undefined,
@@ -327,7 +314,7 @@ describe('Tasks API Integration Tests', () => {
 
   describe('GET /api/tasks/[id]', () => {
     it('should fetch a specific task by ID', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { id: 'task-123' },
       });
@@ -348,7 +335,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent task', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { id: 'non-existent' },
       });
@@ -366,7 +353,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 400 for missing task ID', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: {},
       });
@@ -382,7 +369,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should handle authorization errors', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { id: 'task-123' },
       });
@@ -411,7 +398,7 @@ describe('Tasks API Integration Tests', () => {
     };
 
     it('should update a task successfully', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PUT',
         query: { id: 'task-123' },
         body: updateData,
@@ -435,7 +422,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent task', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PUT',
         query: { id: 'non-existent' },
         body: updateData,
@@ -454,7 +441,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should handle validation errors', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PUT',
         query: { id: 'task-123' },
         body: updateData,
@@ -477,7 +464,7 @@ describe('Tasks API Integration Tests', () => {
 
   describe('PATCH /api/tasks/[id]', () => {
     it('should toggle task completion', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PATCH',
         query: { id: 'task-123', action: 'toggle' },
       });
@@ -500,7 +487,7 @@ describe('Tasks API Integration Tests', () => {
 
     it('should perform regular patch update when no action specified', async () => {
       const patchData = { title: 'Patched Title' };
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PATCH',
         query: { id: 'task-123' },
         body: patchData,
@@ -526,7 +513,7 @@ describe('Tasks API Integration Tests', () => {
 
   describe('DELETE /api/tasks/[id]', () => {
     it('should delete a task successfully', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'DELETE',
         query: { id: 'task-123' },
       });
@@ -547,7 +534,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent task', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'DELETE',
         query: { id: 'non-existent' },
       });
@@ -565,7 +552,7 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should handle authorization errors', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'DELETE',
         query: { id: 'task-123' },
       });

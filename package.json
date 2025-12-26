@@ -8,15 +8,16 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "shared"
+    "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-    "dev:frontend": "vite",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
+    "dev:vite": "vite",
+    "dev:api": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/react_calendar_dev npx tsx scripts/dev-server.ts",
+    "dev:vercel": "vercel dev",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build:shared && npm run build:frontend && npm run build:backend",
-    "build:shared": "npm run build --workspace=shared",
+    "build:shared": "npm run build --workspace=packages/shared",
     "build:frontend": "tsc -b && vite build",
     "build:backend": "npm run build --workspace=packages/backend",
     "lint": "eslint . --ext .ts,.tsx",
@@ -120,6 +121,7 @@
     "@types/date-fns": "^2.6.3",
     "@types/dom-speech-recognition": "^0.0.6",
     "@types/node": "^24.1.0",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vercel/node": "^5.3.11",

@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+// Module declaration for pell (WYSIWYG editor without types)
+declare module 'pell';
+
 // Test-time globals for voice recognition event types
 // Provide minimal ambient declarations to satisfy TS in Vitest context
 interface SpeechRecognitionEvent extends Event {
@@ -30,7 +33,7 @@ interface SpeechRecognitionErrorEvent extends Event {
 import type { TestingLibraryMatchers } from '@testing-library/jest-dom/matchers';
 
 declare module 'vitest' {
-  interface Assertion<T = unknown> extends jest.Matchers<void, T>, TestingLibraryMatchers<T, void> {}
+  interface Assertion<T = unknown> extends jest.Matchers<void, T>, TestingLibraryMatchers<T, void> { }
 }
 
 // Web Speech API type declarations

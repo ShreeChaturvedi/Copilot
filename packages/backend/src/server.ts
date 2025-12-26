@@ -1,28 +1,339 @@
-// Placeholder backend server - will be implemented in later tasks
+/**
+ * Local development backend server
+ * Serves API routes using the lib/services layer connected to PostgreSQL
+ */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// ES module __dirname workaround
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
-app.use(morgan('combined'));
+app.use(morgan('dev'));
 app.use(express.json());
+
+// Dev user context (simulates authenticated user)
+const devUser = {
+  id: 'dev-user-id',
+  email: 'dev@example.com',
+  name: 'Dev User',
+};
+
+const devContext = {
+  userId: devUser.id,
+  requestId: 'dev-request',
+};
+
+// Dynamic import of services (ESM compatible)
+let getAllServices: () => any;
+
+async function initServices() {
+  try {
+    // Dynamic import from lib/services
+    const servicesModule = await import('../../../lib/services/index.js');
+    getAllServices = servicesModule.getAllServices;
+    console.log('✅ Services initialized');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize services:', error);
+    return false;
+  }
+}
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Placeholder API routes
-app.get('/api', (_req, res) => {
-  res.json({ message: 'Backend API is running' });
+app.get('/api/health', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: 'development',
+    }
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+// Tasks routes
+app.get('/api/tasks', async (_req, res) => {
+  try {
+    const { task: taskService } = getAllServices();
+    const tasks = await taskService.findAll({}, devContext);
+    res.json({ success: true, data: tasks });
+  } catch (error: any) {
+    console.error('GET /api/tasks error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
 });
+
+app.post('/api/tasks', async (req, res) => {
+  try {
+    const { task: taskService } = getAllServices();
+    const task = await taskService.create(req.body, devContext);
+    res.status(201).json({ success: true, data: task });
+  } catch (error: any) {
+    console.error('POST /api/tasks error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.patch('/api/tasks/:id', async (req, res) => {
+  try {
+    const { task: taskService } = getAllServices();
+    const task = await taskService.update(req.params.id, req.body, devContext);
+    res.json({ success: true, data: task });
+  } catch (error: any) {
+    console.error('PATCH /api/tasks error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.delete('/api/tasks/:id', async (req, res) => {
+  try {
+    const { task: taskService } = getAllServices();
+    await taskService.delete(req.params.id, devContext);
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error: any) {
+    console.error('DELETE /api/tasks error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+// Task Lists routes
+app.get('/api/task-lists', async (_req, res) => {
+  try {
+    const { taskList: taskListService } = getAllServices();
+    const lists = await taskListService.findAll({}, devContext);
+    res.json({ success: true, data: lists });
+  } catch (error: any) {
+    console.error('GET /api/task-lists error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.post('/api/task-lists', async (req, res) => {
+  try {
+    const { taskList: taskListService } = getAllServices();
+    const list = await taskListService.create(req.body, devContext);
+    res.status(201).json({ success: true, data: list });
+  } catch (error: any) {
+    console.error('POST /api/task-lists error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.patch('/api/task-lists/:id', async (req, res) => {
+  try {
+    const { taskList: taskListService } = getAllServices();
+    const list = await taskListService.update(req.params.id, req.body, devContext);
+    if (!list) {
+      return res.status(404).json({ success: false, error: { message: 'Task list not found' } });
+    }
+    res.json({ success: true, data: list });
+  } catch (error: any) {
+    console.error('PATCH /api/task-lists/:id error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.delete('/api/task-lists/:id', async (req, res) => {
+  try {
+    const { taskList: taskListService } = getAllServices();
+    const success = await taskListService.delete(req.params.id, devContext);
+    if (!success) {
+      return res.status(404).json({ success: false, error: { message: 'Task list not found' } });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error: any) {
+    console.error('DELETE /api/task-lists/:id error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+// Calendars routes
+app.get('/api/calendars', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const withEventCounts = req.query.withEventCounts === 'true';
+    const calendars = await calendarService.findAll({ withEventCounts }, devContext);
+    res.json({ success: true, data: calendars });
+  } catch (error: any) {
+    console.error('GET /api/calendars error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.post('/api/calendars', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const calendar = await calendarService.create(req.body, devContext);
+    res.status(201).json({ success: true, data: calendar });
+  } catch (error: any) {
+    console.error('POST /api/calendars error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.get('/api/calendars/:id', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const calendar = await calendarService.findById(req.params.id, devContext);
+    if (!calendar) {
+      return res.status(404).json({ success: false, error: { message: 'Calendar not found' } });
+    }
+    res.json({ success: true, data: calendar });
+  } catch (error: any) {
+    console.error('GET /api/calendars/:id error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.put('/api/calendars/:id', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const calendar = await calendarService.update(req.params.id, req.body, devContext);
+    if (!calendar) {
+      return res.status(404).json({ success: false, error: { message: 'Calendar not found' } });
+    }
+    res.json({ success: true, data: calendar });
+  } catch (error: any) {
+    console.error('PUT /api/calendars/:id error:', error);
+    if (error.message?.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({ success: false, error: { message: error.message.replace('VALIDATION_ERROR: ', '') } });
+    }
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.patch('/api/calendars/:id', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const { action } = req.query;
+    let result;
+
+    switch (action) {
+      case 'toggle-visibility':
+        result = await calendarService.toggleVisibility(req.params.id, devContext);
+        break;
+      case 'set-default':
+        result = await calendarService.setDefault(req.params.id, devContext);
+        break;
+      default:
+        result = await calendarService.update(req.params.id, req.body, devContext);
+    }
+
+    if (!result) {
+      return res.status(404).json({ success: false, error: { message: 'Calendar not found' } });
+    }
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('PATCH /api/calendars/:id error:', error);
+    if (error.message?.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({ success: false, error: { message: error.message.replace('VALIDATION_ERROR: ', '') } });
+    }
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.delete('/api/calendars/:id', async (req, res) => {
+  try {
+    const { calendar: calendarService } = getAllServices();
+    const success = await calendarService.delete(req.params.id, devContext);
+    if (!success) {
+      return res.status(404).json({ success: false, error: { message: 'Calendar not found' } });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error: any) {
+    console.error('DELETE /api/calendars/:id error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+// Events routes
+app.get('/api/events', async (_req, res) => {
+  try {
+    const { event: eventService } = getAllServices();
+    const events = await eventService.findAll({}, devContext);
+    res.json({ success: true, data: events });
+  } catch (error: any) {
+    console.error('GET /api/events error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.post('/api/events', async (req, res) => {
+  try {
+    const { event: eventService } = getAllServices();
+    const event = await eventService.create(req.body, devContext);
+    res.status(201).json({ success: true, data: event });
+  } catch (error: any) {
+    console.error('POST /api/events error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.patch('/api/events/:id', async (req, res) => {
+  try {
+    const { event: eventService } = getAllServices();
+    const event = await eventService.update(req.params.id, req.body, devContext);
+    res.json({ success: true, data: event });
+  } catch (error: any) {
+    console.error('PATCH /api/events error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.delete('/api/events/:id', async (req, res) => {
+  try {
+    const { event: eventService } = getAllServices();
+    await eventService.delete(req.params.id, devContext);
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error: any) {
+    console.error('DELETE /api/events error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+// Tags routes
+app.get('/api/tags', async (_req, res) => {
+  try {
+    const { tag: tagService } = getAllServices();
+    const tags = await tagService.findAll({}, devContext);
+    res.json({ success: true, data: tags });
+  } catch (error: any) {
+    console.error('GET /api/tags error:', error);
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+// Start server
+async function start() {
+  const servicesOk = await initServices();
+  if (!servicesOk) {
+    console.error('⚠️  Server starting without service layer - API routes will fail');
+  }
+
+  app.listen(PORT, () => {
+    console.log(`
+🚀 Local backend server running on port ${PORT}
+   Health: http://localhost:${PORT}/health
+   API:    http://localhost:${PORT}/api
+   
+   Make sure PostgreSQL is running (docker-compose up -d)
+   `);
+  });
+}
+
+start();

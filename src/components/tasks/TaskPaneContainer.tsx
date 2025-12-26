@@ -2,7 +2,7 @@
  * TaskPaneContainer - Multi-pane resizable task display
  */
 
-import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import {
   ResizablePanelGroup,
@@ -258,15 +258,15 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             <Badge variant="outline" className="text-xs h-5">
               {paneData.tasks.length}
             </Badge>
-            
+
             {/* Eye toggle - only show when "All Tasks" is selected (not a specific task list) */}
             {paneConfig.selectedTaskListId === null && paneConfig.grouping === 'taskList' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                      onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
+                    onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
                     className={cn(
                       'h-6 w-6 p-0 ml-1',
                       showTaskListContextInAll
@@ -281,7 +281,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                       <EyeOff className="w-3.5 h-3.5" />
                     )}
                   </Button>
-                  </TooltipTrigger>
+                </TooltipTrigger>
                 <TooltipContent>
                   <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
                 </TooltipContent>
@@ -309,27 +309,27 @@ const TaskPane: React.FC<TaskPaneProps> = ({
               No tasks match the current filters
             </div>
           </div>
-          ) : (
-            <TaskList
-              tasks={paneData.tasks}
-              taskGroups={taskManagement.taskGroups}
-              activeTaskGroupId={'all'}
-              onToggleTask={taskManagement.handleToggleTask}
-              onEditTask={taskManagement.handleEditTask}
-              onDeleteTask={taskManagement.handleDeleteTask}
-              onScheduleTask={taskManagement.handleScheduleTask}
-              onRemoveTag={taskManagement.handleRemoveTag}
-              onCreateTaskGroup={taskManagement.handleCreateTaskGroup}
-              onSelectTaskGroup={taskManagement.handleSelectTaskGroup}
-              onUpdateTaskGroupIcon={taskManagement.handleUpdateTaskGroupIcon}
-              onUpdateTaskGroupColor={taskManagement.handleUpdateTaskGroupColor}
-              onDeleteTaskGroup={taskManagement.handleDeleteTaskGroup}
-              showCreateTaskDialog={taskManagement.showCreateTaskDialog}
-              onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
-              hideHeader={true}
-              showTaskListLabels={paneConfig.selectedTaskListId === null && showTaskListContextInAll}
-            />
-          )}
+        ) : (
+          <TaskList
+            tasks={paneData.tasks}
+            taskGroups={taskManagement.taskGroups}
+            activeTaskGroupId={'all'}
+            onToggleTask={taskManagement.handleToggleTask}
+            onEditTask={taskManagement.handleEditTask}
+            onDeleteTask={taskManagement.handleDeleteTask}
+            onScheduleTask={taskManagement.handleScheduleTask}
+            onRemoveTag={taskManagement.handleRemoveTag}
+            onCreateTaskGroup={taskManagement.handleCreateTaskGroup}
+            onSelectTaskGroup={taskManagement.handleSelectTaskGroup}
+            onUpdateTaskGroupIcon={taskManagement.handleUpdateTaskGroupIcon}
+            onUpdateTaskGroupColor={taskManagement.handleUpdateTaskGroupColor}
+            onDeleteTaskGroup={taskManagement.handleDeleteTaskGroup}
+            showCreateTaskDialog={taskManagement.showCreateTaskDialog}
+            onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
+            hideHeader={true}
+            showTaskListLabels={paneConfig.selectedTaskListId === null && showTaskListContextInAll}
+          />
+        )}
       </div>
     </div>
   );

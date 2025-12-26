@@ -3,10 +3,15 @@
  * Tests tag system integration with task management
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import tagsHandler from '../index';
 import tagHandler from '../[id]';
 import { getAllServices } from '../../../lib/services/index';
+import {
+  createMockAuthRequest,
+  createMockResponse,
+  mockUser,
+  testTags,
+} from '../../../lib/__tests__/helpers';
 
 // Mock the services
 vi.mock('../../../lib/services/index');
@@ -39,51 +44,7 @@ vi.mocked(sendSuccess).mockImplementation(mockSendSuccess);
 vi.mocked(sendError).mockImplementation(mockSendError);
 
 // Test data
-const mockUser = {
-  id: 'user-123',
-  email: 'test@example.com',
-  name: 'Test User',
-};
-
-const mockTag = {
-  id: 'tag-123',
-  name: 'high',
-  type: 'PRIORITY',
-  color: '#FF0000',
-  createdAt: new Date('2024-01-14T10:00:00Z'),
-  updatedAt: new Date('2024-01-14T10:00:00Z'),
-  _count: {
-    tasks: 5,
-  },
-};
-
-// const mockTaskTag = {
-//   taskId: 'task-123',
-//   tagId: 'tag-123',
-//   value: 'HIGH',
-//   displayText: 'High Priority',
-//   iconName: 'priority-high',
-//   tag: mockTag,
-// };
-
-const createMockRequest = (overrides: Partial<VercelRequest> = {}): VercelRequest => ({
-  method: 'GET',
-  url: '/api/tags',
-  headers: {
-    'x-request-id': 'test-request-123',
-  },
-  query: {},
-  body: {},
-  user: mockUser,
-  ...overrides,
-} as unknown as VercelRequest);
-
-const createMockResponse = (): VercelResponse => ({
-  status: vi.fn().mockReturnThis(),
-  json: vi.fn().mockReturnThis(),
-  end: vi.fn().mockReturnThis(),
-  setHeader: vi.fn().mockReturnThis(),
-} as unknown as VercelResponse);
+const mockTag = testTags.priority;
 
 describe('Tags API Integration Tests', () => {
   beforeEach(() => {
@@ -96,7 +57,7 @@ describe('Tags API Integration Tests', () => {
 
   describe('Requirement 7.1: Tag CRUD Operations', () => {
     it('should fetch all tags for authenticated user', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: {},
       });
@@ -117,7 +78,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should filter tags by type', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { type: 'PRIORITY' },
       });
@@ -137,7 +98,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should search tags by name', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { search: 'priority' },
       });
@@ -157,7 +118,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should include usage counts when requested', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { withUsageCount: 'true' },
       });
@@ -178,7 +139,7 @@ describe('Tags API Integration Tests', () => {
         color: '#FF5722',
       };
 
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: tagData,
       });
@@ -200,7 +161,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should return 401 for unauthenticated requests', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         user: undefined,
       });
@@ -247,7 +208,7 @@ describe('Tags API Integration Tests', () => {
       ];
 
       for (const scenario of filteringScenarios) {
-        const req = createMockRequest({
+        const req = createMockAuthRequest(mockUser, {
           method: 'GET',
           query: scenario.query,
         });
@@ -270,7 +231,7 @@ describe('Tags API Integration Tests', () => {
 
   describe('Requirement 7.3: Tag Cleanup and Maintenance', () => {
     it('should cleanup unused tags', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         url: '/api/tags/cleanup',
         query: { action: 'cleanup' },
@@ -299,7 +260,7 @@ describe('Tags API Integration Tests', () => {
         targetTagId: 'tag-3',
       };
 
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         url: '/api/tags/merge',
         body: mergeData,
@@ -330,7 +291,7 @@ describe('Tags API Integration Tests', () => {
 
   describe('Requirement 7.4: Tag Statistics and Analytics', () => {
     it('should provide tag usage statistics', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         url: '/api/tags/stats',
       });
@@ -368,7 +329,7 @@ describe('Tags API Integration Tests', () => {
 
   describe('Individual Tag Operations', () => {
     it('should fetch a specific tag by ID', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { id: 'tag-123' },
       });
@@ -394,7 +355,7 @@ describe('Tags API Integration Tests', () => {
         color: '#00FF00',
       };
 
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'PUT',
         query: { id: 'tag-123' },
         body: updateData,
@@ -418,7 +379,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should delete a tag', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'DELETE',
         query: { id: 'tag-123' },
       });
@@ -439,7 +400,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent tag', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'GET',
         query: { id: 'non-existent' },
       });
@@ -485,7 +446,7 @@ describe('Tags API Integration Tests', () => {
       // This would typically be handled by the TaskService, but we're testing
       // that the tag system can support this integration
       for (const tagData of taskWithNewTags.tags) {
-        const req = createMockRequest({
+        const req = createMockAuthRequest(mockUser, {
           method: 'POST',
           body: tagData,
         });
@@ -524,7 +485,7 @@ describe('Tags API Integration Tests', () => {
       ];
 
       for (const queryTest of tagBasedQueries) {
-        const req = createMockRequest({
+        const req = createMockAuthRequest(mockUser, {
           method: 'GET',
           query: queryTest.query,
         });
@@ -547,7 +508,7 @@ describe('Tags API Integration Tests', () => {
         color: 'not-a-hex-color',
       };
 
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'POST',
         body: invalidTagData,
       });
@@ -567,7 +528,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should handle authorization errors', async () => {
-      const req = createMockRequest({
+      const req = createMockAuthRequest(mockUser, {
         method: 'DELETE',
         query: { id: 'tag-123' },
       });
@@ -587,7 +548,7 @@ describe('Tags API Integration Tests', () => {
     });
 
     it('should handle service errors gracefully', async () => {
-      const req = createMockRequest({ method: 'GET' });
+      const req = createMockAuthRequest(mockUser, { method: 'GET' });
       const res = createMockResponse();
 
       mockTagService.findAll.mockRejectedValue(new Error('Database connection failed'));

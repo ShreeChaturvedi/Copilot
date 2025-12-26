@@ -59,7 +59,7 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
   const revived: Record<string, unknown> = {
     ...task,
     // Normalize priority enum from backend (LOW|MEDIUM|HIGH) to frontend ('low'|'medium'|'high')
-    priority: typeof task.priority === 'string' 
+    priority: typeof task.priority === 'string'
       ? String(task.priority).toLowerCase()
       : task.priority,
     createdAt: task.createdAt ? new Date(task.createdAt as string) : new Date(),
@@ -106,7 +106,7 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
     });
   }
 
-  return revived as Task;
+  return revived as unknown as Task;
 }
 
 // Lightweight random id for client-only normalization fallbacks
@@ -344,7 +344,11 @@ export const taskApi = {
       const tasks = taskStorage.getTasks();
       const task = tasks.find(t => t.id === id);
       if (!task) throw new Error('Task not found');
-      const ok = taskStorage.updateTask(id, { completed: !task.completed });
+      const willBeCompleted = !task.completed;
+      const ok = taskStorage.updateTask(id, {
+        completed: willBeCompleted,
+        completedAt: willBeCompleted ? new Date() : undefined
+      });
       if (!ok) throw new Error('Failed to toggle task');
       const refreshed = taskStorage.getTasks();
       const updated = refreshed.find(t => t.id === id)!;

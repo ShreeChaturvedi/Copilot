@@ -44,7 +44,7 @@ function getStatusConfig(status: ColumnKey) {
       };
     case 'in_progress':
       return {
-        label: 'In Progress', 
+        label: 'In Progress',
         icon: PlayCircle,
         iconColor: 'text-amber-500',
         backgroundColor: 'bg-amber-500/10',
@@ -99,13 +99,13 @@ export const TaskKanbanBoard: React.FC = () => {
           continue;
         }
       }
-      
+
       // OPTIMISTIC UPDATE: Use target column if this task is being moved
       let targetColumn = getTaskStatus(t);
       if (dragState.targetColumn && dragState.activeId === t.id) {
         targetColumn = dragState.targetColumn;
       }
-      
+
       result[targetColumn].push(t);
     }
     // Sort for stable display
@@ -116,7 +116,7 @@ export const TaskKanbanBoard: React.FC = () => {
   }, [tasks, selectedListId, dragState]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  
+
   const handleDragStart = (event: DragStartEvent) => {
     const taskId = String(event.active?.data?.current?.taskId || event.active?.id || '');
     const task = tasks.find((t: Task) => t.id === taskId);
@@ -125,28 +125,28 @@ export const TaskKanbanBoard: React.FC = () => {
       setDragState({ activeId: taskId, originalColumn, activeTask: task, targetColumn: null });
     }
   };
-  
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { activeId, originalColumn } = dragState;
     const overKey = (event.over?.data?.current as any)?.columnKey as ColumnKey | undefined;
-    
+
     // Validate move
     if (!activeId || !overKey || !originalColumn) {
       // Clear drag state for invalid moves
       setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
       return;
     }
-    
+
     // Prevent unnecessary API calls for same-column drops
     if (originalColumn === overKey) {
       // Clear drag state for same-column drops
       setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
       return;
     }
-    
+
     // OPTIMISTIC UPDATE: Set target column immediately for smooth transition
     setDragState(prev => ({ ...prev, targetColumn: overKey }));
-    
+
     // Prepare status updates
     const updates: any = { status: overKey };
     if (overKey === 'done') {
@@ -154,7 +154,7 @@ export const TaskKanbanBoard: React.FC = () => {
     } else if (originalColumn === 'done') {
       updates.completed = false;
     }
-    
+
     // Make API call - clear drag state when complete
     updateTask.mutate({ id: activeId, updates }, {
       onSettled: () => {
@@ -172,7 +172,7 @@ export const TaskKanbanBoard: React.FC = () => {
     const taskCount = grouped[keyId].length;
     const statusConfig = getStatusConfig(keyId);
     const Icon = statusConfig.icon;
-    
+
     return (
       <div className={cn(
         "h-full flex flex-col border-r border-border last:border-r-0",
@@ -198,9 +198,9 @@ export const TaskKanbanBoard: React.FC = () => {
         </div>
 
         {/* Column Content - Droppable Area */}
-        <div 
-          ref={setNodeRef} 
-          className="flex-1 overflow-auto px-4 py-2" 
+        <div
+          ref={setNodeRef}
+          className="flex-1 overflow-auto px-4 py-2"
           data-column-key={keyId}
         >
           <div className="space-y-2 md:space-y-3 min-h-[60vh]">
@@ -222,19 +222,19 @@ export const TaskKanbanBoard: React.FC = () => {
   };
 
   const DraggableCard: React.FC<{ task: Task; keyId: ColumnKey }> = ({ task, keyId }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ 
-      id: task.id, 
-      data: { taskId: task.id } 
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: task.id,
+      data: { taskId: task.id }
     });
     const statusConfig = getStatusConfig(keyId);
-    
+
     // DragOverlay pattern: hide original during drag, overlay handles the visual
     const style = {
       transform: CSS.Translate.toString(transform),
       // Hide original element during drag - overlay takes over
       opacity: isDragging ? 0 : 1,
     };
-    
+
     return (
       <Card
         ref={setNodeRef as any}
@@ -262,7 +262,7 @@ export const TaskKanbanBoard: React.FC = () => {
           className="p-0"
           calendarMode={false}
           showTaskListLabel={false}
-            hideCheckbox={true}
+          hideCheckbox={true}
         />
       </Card>
     );
@@ -294,7 +294,7 @@ export const TaskKanbanBoard: React.FC = () => {
           // Apply same status styling as DraggableCard
           const taskStatus = getTaskStatus(dragState.activeTask);
           const statusConfig = getStatusConfig(taskStatus);
-          
+
           return (
             <Card
               className={cn(
@@ -313,9 +313,9 @@ export const TaskKanbanBoard: React.FC = () => {
             >
               <TaskItem
                 task={dragState.activeTask}
-                onToggle={() => {}} // Disabled in overlay
-                onEdit={() => {}} // Disabled in overlay
-                onDelete={() => {}} // Disabled in overlay
+                onToggle={() => { }} // Disabled in overlay
+                onEdit={() => { }} // Disabled in overlay
+                onDelete={() => { }} // Disabled in overlay
                 onSchedule={() => void 0}
                 className="p-0 cursor-grabbing"
                 calendarMode={false}

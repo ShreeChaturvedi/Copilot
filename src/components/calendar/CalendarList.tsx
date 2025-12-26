@@ -58,14 +58,14 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
 
   const handleDelete = onDeleteCalendar
     ? (item: CheckboxModeItem) => {
-        onDeleteCalendar(item.name);
-      }
+      onDeleteCalendar(item.name);
+    }
     : undefined;
 
   const handleCreateFromDialog = (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => {
     if (editingItem) {

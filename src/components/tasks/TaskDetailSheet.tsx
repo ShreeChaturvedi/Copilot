@@ -115,7 +115,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className={cn('w-full sm:max-w-md md:max-w-lg p-6 [&>button]:hidden', className)}>
+      <SheetContent side="right" className={cn('w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden', className)}>
         <SheetDescription className="sr-only">Task details for {task.title}</SheetDescription>
         {/* Header: Title + action bar (Edit / Delete / Peek toggle / Close) */}
         <div className="flex items-start justify-between gap-2">
@@ -233,8 +233,8 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                   const isImage = (att.type || '').startsWith('image/');
                   const fileLike = new File([], att.name, { type: att.type || 'application/octet-stream' });
                   return (
-                    <div 
-                      key={att.id} 
+                    <div
+                      key={att.id}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-background cursor-pointer hover:bg-muted transition-colors"
                       onClick={() => openAttachment(att)}
                       title={`Preview ${att.name}`}

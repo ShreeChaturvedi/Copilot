@@ -87,7 +87,7 @@ export interface BaseListProps<T extends BaseListItem> {
   onCreateDialogSubmit?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   CreateDialogComponent?: React.ComponentType<{
@@ -96,13 +96,13 @@ export interface BaseListProps<T extends BaseListItem> {
     onCreateCalendar?: (data: {
       name: string;
       description: string;
-      iconId: string;
+      emoji: string;
       color: string;
     }) => void;
     onCreateTask?: (data: {
       name: string;
       description: string;
-      iconId: string;
+      emoji: string;
       color: string;
     }) => void;
     initialName?: string;
@@ -180,7 +180,7 @@ export function BaseList<T extends BaseListItem>({
   const handleCreateFromDialog = (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => {
     onCreateDialogSubmit?.(data);
@@ -541,9 +541,9 @@ function BaseListItem<T extends BaseListItem>({
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => (onStartEdit ? onStartEdit(item) : setIsEditing(true))}>
-              <Edit className="mr-2 h-4 w-4" />
-              <span>Edit</span>
-            </DropdownMenuItem>
+                <Edit className="mr-2 h-4 w-4" />
+                <span>Edit</span>
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 <div
                   className="mr-2 h-4 w-4 rounded-full flex-shrink-0 border-2 border-border"

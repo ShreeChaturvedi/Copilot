@@ -27,6 +27,16 @@ export const getUserTimezone = (): string => {
 };
 
 /**
+ * Parse a date-only string (YYYY-MM-DD) as local midnight, not UTC.
+ * This fixes the issue where `new Date("2024-12-19")` creates UTC midnight
+ * instead of local midnight, causing events to shift by timezone offset.
+ */
+export const parseLocalDate = (dateString: string): Date => {
+  // Adding T00:00:00 without a timezone suffix forces local time interpretation
+  return new Date(`${dateString}T00:00:00`);
+};
+
+/**
  * Convert a local date to UTC for storage
  */
 export const toUTC = (date: Date): Date => {
@@ -68,25 +78,25 @@ export const formatRelative = (date: Date): string => {
   }
 
   const localDate = toLocal(date);
-  
+
   if (isToday(localDate)) {
     return `Today at ${format(localDate, 'p')}`;
   }
-  
+
   if (isTomorrow(localDate)) {
     return `Tomorrow at ${format(localDate, 'p')}`;
   }
-  
+
   if (isYesterday(localDate)) {
     return `Yesterday at ${format(localDate, 'p')}`;
   }
-  
+
   const daysDiff = differenceInDays(localDate, new Date());
-  
+
   if (Math.abs(daysDiff) <= 7) {
     return format(localDate, 'EEEE \'at\' p');
   }
-  
+
   return format(localDate, 'PPP \'at\' p');
 };
 
@@ -101,11 +111,11 @@ export const parseToUTC = (dateString: string, timeString: string = '00:00'): Da
       'yyyy-MM-dd HH:mm',
       new Date()
     );
-    
+
     if (!isValid(localDateTime)) {
       throw new Error('Invalid date/time format');
     }
-    
+
     // For now, return as-is. In production, would convert to UTC
     return localDateTime;
   } catch (error) {
@@ -147,10 +157,10 @@ export const isSameDay = (date1: Date, date2: Date): boolean => {
   if (!isValid(date1) || !isValid(date2)) {
     return false;
   }
-  
+
   const local1 = toLocal(date1);
   const local2 = toLocal(date2);
-  
+
   return format(local1, 'yyyy-MM-dd') === format(local2, 'yyyy-MM-dd');
 };
 
@@ -161,18 +171,18 @@ export const getDuration = (start: Date, end: Date): string => {
   if (!isValid(start) || !isValid(end)) {
     return 'Invalid duration';
   }
-  
+
   const hours = differenceInHours(end, start);
   const minutes = differenceInMinutes(end, start) % 60;
-  
+
   if (hours === 0) {
     return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
   }
-  
+
   if (minutes === 0) {
     return `${hours} hour${hours !== 1 ? 's' : ''}`;
   }
-  
+
   return `${hours}h ${minutes}m`;
 };
 
@@ -183,7 +193,7 @@ export const createDateRange = (start: Date, days: number): Date[] => {
   if (!isValid(start) || days <= 0) {
     return [];
   }
-  
+
   const range: Date[] = [];
   for (let i = 0; i < days; i++) {
     range.push(addDays(start, i));
@@ -244,11 +254,11 @@ export const getWeekStart = (date: Date): Date => {
   if (!isValid(date)) {
     throw new Error('Invalid date provided to getWeekStart');
   }
-  
+
   const localDate = toLocal(date);
   const dayOfWeek = localDate.getDay();
   const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Monday as start of week
-  
+
   return addDays(localDate, diff);
 };
 
