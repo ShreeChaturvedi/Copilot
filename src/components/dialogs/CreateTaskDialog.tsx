@@ -34,7 +34,7 @@ export interface CreateTaskDialogProps {
   onCreateCalendar?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   // Optional initial values to support edit reuse
@@ -81,7 +81,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
@@ -104,7 +104,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-          <DialogTitle>{titleLabel || 'Create New Task List'}</DialogTitle>
+            <DialogTitle>{titleLabel || 'Create New Task List'}</DialogTitle>
             <DialogDescription>
               Create a new task group to organize your to-dos.
             </DialogDescription>
@@ -137,7 +137,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     </Suspense>
                   </PopoverContent>
                 </Popover>
-                
+
                 {/* Name Input */}
                 <Input
                   id="task-name"
@@ -163,11 +163,10 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     key={color}
                     type="button"
                     onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      selectedColor === color
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === color
                         ? 'border-foreground scale-110'
                         : 'border-transparent hover:border-border'
-                    }`}
+                      }`}
                     style={{ backgroundColor: color }}
                     aria-label={`Select color ${color}`}
                   />

@@ -42,8 +42,13 @@ export function useTaskStats(tasks: Task[], scope?: TaskStatsScope): TaskStatusC
   return useMemo(() => {
     // Filter tasks by scope if provided
     let filteredTasks = tasks;
-    if (scope?.taskListId) {
-      filteredTasks = tasks.filter(task => task.taskListId === scope.taskListId);
+    if (scope?.taskListId !== undefined && scope?.taskListId !== null) {
+      if (scope.taskListId === 'default') {
+        // Special handling: 'default' represents tasks not assigned to a specific list
+        filteredTasks = tasks.filter(task => !task.taskListId);
+      } else {
+        filteredTasks = tasks.filter(task => task.taskListId === scope.taskListId);
+      }
     }
 
     // Initialize counters

@@ -15,7 +15,7 @@ export interface CalendarEntity extends UserOwnedEntity {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Relations (optional for different query contexts)
   events?: Array<{
     id: string;
@@ -202,10 +202,10 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       // Check if this should be the first/default calendar
       let isDefault = data.isDefault || false;
-      
+
       if (context?.userId) {
         const existingCalendars = await this.count({}, context);
-        
+
         // If no calendars exist, make this the default
         if (existingCalendars === 0) {
           isDefault = true;
@@ -230,6 +230,77 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
       return this.transformEntity(result);
     } catch (error) {
       this.log('create:error', { error: error.message, data }, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Update calendar by ID
+   */
+  async update(id: string, data: UpdateCalendarDTO, context?: ServiceContext): Promise<CalendarEntity | null> {
+    try {
+      this.log('update', { id, data }, context);
+
+      await this.validateUpdate(id, data, context);
+
+      // Build dynamic update query
+      const updates: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (data.name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        params.push(data.name.trim());
+      }
+      if (data.color !== undefined) {
+        updates.push(`color = $${paramIndex++}`);
+        params.push(data.color);
+      }
+      if (data.description !== undefined) {
+        updates.push(`description = $${paramIndex++}`);
+        params.push(data.description?.trim() || null);
+      }
+      if (data.isVisible !== undefined) {
+        updates.push(`"isVisible" = $${paramIndex++}`);
+        params.push(data.isVisible);
+      }
+      if (data.isDefault !== undefined) {
+        updates.push(`"isDefault" = $${paramIndex++}`);
+        params.push(data.isDefault);
+
+        // If setting as default, unset other calendars first
+        if (data.isDefault && context?.userId) {
+          await query(
+            'UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true AND id <> $2',
+            [context.userId, id],
+            this.db
+          );
+        }
+      }
+
+      if (updates.length === 0) {
+        // No updates to make, just return current calendar
+        return this.findById(id, context);
+      }
+
+      updates.push(`"updatedAt" = NOW()`);
+      params.push(id);
+
+      const result = await query(
+        `UPDATE calendars SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        params,
+        this.db
+      );
+
+      const row = result.rows[0];
+      if (!row) {
+        return null;
+      }
+
+      this.log('update:success', { id }, context);
+      return this.transformEntity(row);
+    } catch (error) {
+      this.log('update:error', { error: error.message, id, data }, context);
       throw error;
     }
   }

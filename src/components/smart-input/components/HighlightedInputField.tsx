@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { ParsedTag } from "../../../../shared/types/tasks";
+import type { ParsedTag } from "@shared/types";
 import { cn } from '@/lib/utils';
 
 export interface HighlightedInputFieldProps {
@@ -78,7 +78,7 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
   const syncScroll = useCallback(() => {
     const input = inputRef.current;
     const overlay = overlayRef.current;
-    
+
     if (input && overlay) {
       // Use requestAnimationFrame for smooth synchronization
       requestAnimationFrame(() => {
@@ -90,18 +90,18 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
   // Set up scroll synchronization
   useEffect(() => {
     const input = inputRef.current;
-    
+
     if (input) {
       // Sync on all relevant events
       const events = ['scroll', 'input', 'focus', 'keydown', 'keyup'];
-      
+
       events.forEach(event => {
         input.addEventListener(event, syncScroll);
       });
-      
+
       // Initial sync
       syncScroll();
-      
+
       return () => {
         events.forEach(event => {
           input.removeEventListener(event, syncScroll);
@@ -129,10 +129,10 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       // Add highlighted tag with precise styling
       const tagText = value.substring(tag.startIndex, tag.endIndex);
       const color = tag.color || '#3b82f6';
-      
+
       // EXACT fix from Enhanced textarea: no border or margin, vertical padding only via CSS
       html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; color: inherit;">${escapeHtml(tagText)}</mark>`;
-      
+
       lastIndex = tag.endIndex;
     }
 
@@ -260,11 +260,11 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       {/* Confidence indicator */}
       {showConfidence && confidence < 1 && tags.length > 0 && (
         <div className="absolute -bottom-1 right-1 flex items-center gap-1 z-20">
-          <div 
+          <div
             className={cn(
               'w-2 h-2 rounded-full',
-              confidence >= 0.8 ? 'bg-green-400' : 
-              confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
+              confidence >= 0.8 ? 'bg-green-400' :
+                confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />

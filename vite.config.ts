@@ -69,7 +69,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // vercel dev default port
+        target: 'http://localhost:3001', // Local Express backend
         changeOrigin: true,
         secure: false,
       },

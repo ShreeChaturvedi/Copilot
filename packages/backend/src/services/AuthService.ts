@@ -36,7 +36,7 @@ export interface PasswordResetConfirm {
 
 class AuthService {
   private readonly saltRounds = 12;
-  constructor() {}
+  constructor() { }
 
   /**
    * Register a new user with email and password
@@ -46,7 +46,7 @@ class AuthService {
 
     // Check if user already exists
     const existingUser = await query<{ id: string }>(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [email.toLowerCase()]);
-    if (existingUser.rowCount > 0) {
+    if (existingUser.rowCount && existingUser.rowCount > 0) {
       throw new Error('USER_ALREADY_EXISTS');
     }
 
@@ -145,24 +145,50 @@ class AuthService {
    * Get user by ID
    */
   async getUserById(userId: string) {
-    return await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true
-      }
-    });
+    const result = await query<{
+      id: string;
+      email: string;
+      name: string | null;
+      createdAt: Date;
+      timezone: string | null;
+    }>(
+      `SELECT u.id, u.email, u.name, u."createdAt", p.timezone
+       FROM users u
+       LEFT JOIN user_profiles p ON p."userId" = u.id
+       WHERE u.id = $1 LIMIT 1`,
+      [userId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      profile: row.timezone ? { timezone: row.timezone } : null
+    };
   }
 
   /**
    * Get user by email
    */
   async getUserByEmail(email: string) {
-    return await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        profile: true
-      }
-    });
+    const result = await query<{
+      id: string;
+      email: string;
+      name: string | null;
+      createdAt: Date;
+      timezone: string | null;
+    }>(
+      `SELECT u.id, u.email, u.name, u."createdAt", p.timezone
+       FROM users u
+       LEFT JOIN user_profiles p ON p."userId" = u.id
+       WHERE LOWER(u.email) = LOWER($1) LIMIT 1`,
+      [email]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      profile: row.timezone ? { timezone: row.timezone } : null
+    };
   }
 
   /**
@@ -170,7 +196,7 @@ class AuthService {
    */
   async updatePassword(userId: string, newPassword: string): Promise<void> {
     const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
-    
+
     await query(`UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`, [hashedPassword, userId]);
   }
 
@@ -192,9 +218,11 @@ class AuthService {
    * Request password reset (generates reset token)
    */
   async requestPasswordReset(email: string): Promise<string> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
-    });
+    const result = await query<{ id: string }>(
+      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email]
+    );
+    const user = result.rows[0];
 
     if (!user) {
       // Don't reveal if user exists or not
@@ -203,12 +231,12 @@ class AuthService {
 
     // Generate a secure reset token (in production, this should be stored in database)
     const resetToken = this.generateSecureToken();
-    
+
     // In a real implementation, you would:
     // 1. Store the reset token in database with expiration
     // 2. Send email with reset link
     // For now, we'll just return the token
-    
+
     return resetToken;
   }
 
@@ -222,7 +250,7 @@ class AuthService {
     // 2. Check if token is not expired
     // 3. Update user password
     // 4. Invalidate the reset token
-    
+
     // For now, this is a placeholder
     throw new Error('PASSWORD_RESET_NOT_IMPLEMENTED');
   }

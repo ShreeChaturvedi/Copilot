@@ -305,7 +305,7 @@ export const useTask = (id: string) => {
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string}>({
+  return useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string }>({
     mutationFn: taskApi.createTask,
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
@@ -370,7 +370,19 @@ export const useUpdateTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map((task) => (task.id === id ? { ...task, ...data } : task));
+          return oldData.map((task) => {
+            if (task.id !== id) return task;
+            const merged = { ...task, ...data };
+            // Handle completedAt when completed flag changes
+            if ('completed' in data) {
+              if (data.completed) {
+                merged.completedAt = merged.completedAt || new Date();
+              } else {
+                merged.completedAt = undefined;
+              }
+            }
+            return merged;
+          });
         }
       );
       return { previousTasks };
@@ -436,9 +448,15 @@ export const useToggleTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map((task) =>
-            task.id === taskId ? { ...task, completed: !task.completed } : task
-          );
+          return oldData.map((task) => {
+            if (task.id !== taskId) return task;
+            const willBeCompleted = !task.completed;
+            return {
+              ...task,
+              completed: willBeCompleted,
+              completedAt: willBeCompleted ? new Date() : undefined
+            };
+          });
         }
       );
 

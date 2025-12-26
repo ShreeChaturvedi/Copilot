@@ -27,13 +27,13 @@ export interface CreateCalendarDialogProps {
   onCreateCalendar?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   onCreateTask?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   // Optional initial values to support edit reuse
@@ -88,7 +88,7 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
     const data = {
       name: trimmedName,
       description: description.trim(),
-      iconId: selectedIcon,
+      emoji: selectedIcon,
       color: selectedColor
     };
 
@@ -113,7 +113,7 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-          <DialogTitle>{titleLabel || 'Create New Calendar'}</DialogTitle>
+            <DialogTitle>{titleLabel || 'Create New Calendar'}</DialogTitle>
             <DialogDescription>
               Create a new calendar to organize your events and appointments.
             </DialogDescription>

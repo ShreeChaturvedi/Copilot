@@ -75,7 +75,7 @@ export interface TaskListProps {
   onCreateTaskGroup?: (data: {
     name: string;
     description: string;
-    iconId: string;
+    emoji: string;
     color: string;
   }) => void;
   onEditTaskGroup?: (
@@ -116,6 +116,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   onScheduleTask,
   onRemoveTag,
   onCreateTaskGroup,
+  onEditTaskGroup,
   onUpdateTaskGroupIcon,
   onUpdateTaskGroupColor,
   onDeleteTaskGroup,
@@ -205,12 +206,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     emoji: string;
     color: string;
   }) => {
-    onCreateTaskGroup?.({
-      name: data.name,
-      description: data.description,
-      iconId: data.emoji, // keep prop name for downstream compatibility
-      color: data.color,
-    });
+    onCreateTaskGroup?.(data);
   };
 
   const handleUpdateEmoji = (emoji: string) => {
@@ -297,7 +293,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
               {activeTaskGroupId === 'all' ? 'All Tasks' : 'Upcoming Tasks'}
             </h3>
           </div>
-          
+
           <div className="text-center py-4 text-muted-foreground">
             <CheckSquare className="w-6 h-6 mx-auto mb-2 opacity-50" />
             <p className="text-xs">No upcoming tasks</p>
@@ -325,10 +321,10 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   </span>
                 </Button>
               </PopoverTrigger>
-                <PopoverContent className="w-fit p-0" align="start">
+              <PopoverContent className="w-fit p-0" align="start">
                 <Suspense fallback={null}>
                   <EmojiPicker
-                     selectedEmoji={activeTaskGroup.emoji}
+                    selectedEmoji={activeTaskGroup.emoji}
                     onEmojiSelect={handleUpdateEmoji}
                   />
                 </Suspense>
@@ -356,36 +352,36 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem
-              onClick={() =>
-                onEditTaskGroup?.(activeTaskGroup.id, {
-                  name: activeTaskGroup.name,
-                  emoji: activeTaskGroup.emoji,
-                  color: activeTaskGroup.color,
-                  description: activeTaskGroup.description,
-                })
-              }
-            >
+                <DropdownMenuItem
+                  onClick={() =>
+                    onEditTaskGroup?.(activeTaskGroup.id, {
+                      name: activeTaskGroup.name,
+                      emoji: activeTaskGroup.emoji,
+                      color: activeTaskGroup.color,
+                      description: activeTaskGroup.description,
+                    })
+                  }
+                >
                   <span className="mr-2" style={{ color: activeTaskGroup.color }}>
                     <Settings className="h-4 w-4" />
                   </span>
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                onEditTaskGroup?.(activeTaskGroup.id, {
-                  name: activeTaskGroup.name,
-                  emoji: activeTaskGroup.emoji,
-                  color: activeTaskGroup.color,
-                  description: activeTaskGroup.description,
-                })
-              }
-            >
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onEditTaskGroup?.(activeTaskGroup.id, {
+                      name: activeTaskGroup.name,
+                      emoji: activeTaskGroup.emoji,
+                      color: activeTaskGroup.color,
+                      description: activeTaskGroup.description,
+                    })
+                  }
+                >
                   <span className="mr-2" style={{ color: activeTaskGroup.color }}>
                     <Edit className="h-4 w-4" />
                   </span>
-              <span>Edit</span>
-            </DropdownMenuItem>
+                  <span>Edit</span>
+                </DropdownMenuItem>
                 <ColorMenuItem />
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -464,7 +460,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     </span>
                   </Button>
                 </PopoverTrigger>
-              <PopoverContent className="w-fit p-0" align="start">
+                <PopoverContent className="w-fit p-0" align="start">
                   <Suspense fallback={null}>
                     <EmojiPicker
                       selectedEmoji={activeTaskGroup.emoji}
@@ -542,9 +538,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 <div key={dayKey} className="space-y-2">
                   {/* Day heading with improved styling */}
                   <div className="flex items-center gap-2 mb-3">
-                    <span className={`text-xs font-semibold uppercase tracking-wider ${
-                      dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
-                    }`}>
+                    <span className={`text-xs font-semibold uppercase tracking-wider ${dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
+                      }`}>
                       {dayKey}
                     </span>
                     <Badge variant="outline" className="text-xs h-5">
@@ -570,7 +565,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   </div>
                 </div>
               ))}
-              
+
               {/* Show count if there are more tasks */}
               {totalTaskCount > maxTasks && (
                 <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">

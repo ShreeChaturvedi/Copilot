@@ -150,9 +150,8 @@ class GoogleOAuthService {
     let isNewUser = false;
 
     if (!user) {
-      // Try to find user by email (existing email/password user)
-      userRow = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
-        `SELECT id, email, name, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      userRow = await query<{ id: string; email: string; name: string | null; googleId: string | null; createdAt: Date }>(
+        `SELECT id, email, name, "createdAt", "googleId" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
         [email.toLowerCase()]
       );
       user = userRow.rows[0];
@@ -233,9 +232,11 @@ class GoogleOAuthService {
    * Unlink Google account from user
    */
   async unlinkAccount(userId: string): Promise<void> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const result = await query<{ id: string; googleId: string | null; password: string | null }>(
+      `SELECT id, "googleId", password FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const user = result.rows[0];
 
     if (!user) {
       throw new Error('USER_NOT_FOUND');

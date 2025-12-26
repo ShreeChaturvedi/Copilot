@@ -57,7 +57,7 @@ export interface EnhancedTaskInputLayoutProps {
   /** Key handler for secondary input */
   onSecondaryKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   /** Optional ref to focus description programmatically */
-  secondaryInputRef?: React.RefObject<HTMLInputElement>;
+  secondaryInputRef?: React.RefObject<HTMLInputElement | null>;
   /** Whether the secondary input should be visible and interactive */
   secondaryEnabled?: boolean;
   /** Optional custom inline tag row content to always show under inputs */
@@ -121,59 +121,59 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
           </div>
         )}
         <div className="relative">
-        {enableSmartParsing ? (
-          <HighlightedTextareaField
-            id="enhanced-task-input-textarea"
-            name="enhanced-task-input-textarea"
-            value={value}
-            onChange={onChange}
-            tags={tags}
-            placeholder={placeholder}
-            disabled={disabled}
-            onKeyPress={onKeyPress}
-            onKeyDown={onKeyPress as any}
-            onBlur={onBlur}
-            onFocus={onFocus}
-            confidence={confidence}
-            showConfidence={showConfidence}
-            minHeight={minHeight}
-            maxHeight={maxHeight}
-            isRecording={isRecording}
-          />
-        ) : (
-          <textarea
-            id="enhanced-task-input-textarea-fallback"
-            name="enhanced-task-input-textarea-fallback"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyPress={onKeyPress}
-            onBlur={onBlur}
-            onFocus={onFocus}
-            placeholder={placeholder}
-            disabled={disabled}
-            className={cn(
-              'w-full border-none outline-none bg-transparent resize-none',
-              'text-base md:text-sm leading-relaxed',
-              'placeholder:text-muted-foreground',
-              'focus:outline-none',
-              disabled && 'cursor-not-allowed',
-              'p-0',
-              'font-[inherit]',
-            )}
-            style={{
-              minHeight,
-              maxHeight,
-              overflowX: 'hidden',
-              overflowY: 'auto',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              lineHeight: 'inherit',
-              letterSpacing: 'inherit',
-              caretColor: isRecording ? '#3b82f6' : 'inherit',
-            }}
-            aria-label="Task input"
-          />
-        )}
+          {enableSmartParsing ? (
+            <HighlightedTextareaField
+              id="enhanced-task-input-textarea"
+              name="enhanced-task-input-textarea"
+              value={value}
+              onChange={onChange}
+              tags={tags}
+              placeholder={placeholder}
+              disabled={disabled}
+              onKeyPress={onKeyPress}
+              onKeyDown={onKeyPress as any}
+              onBlur={onBlur}
+              onFocus={onFocus}
+              confidence={confidence}
+              showConfidence={showConfidence}
+              minHeight={minHeight}
+              maxHeight={maxHeight}
+              isRecording={isRecording}
+            />
+          ) : (
+            <textarea
+              id="enhanced-task-input-textarea-fallback"
+              name="enhanced-task-input-textarea-fallback"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyPress={onKeyPress}
+              onBlur={onBlur}
+              onFocus={onFocus}
+              placeholder={placeholder}
+              disabled={disabled}
+              className={cn(
+                'w-full border-none outline-none bg-transparent resize-none',
+                'text-base md:text-sm leading-relaxed',
+                'placeholder:text-muted-foreground',
+                'focus:outline-none',
+                disabled && 'cursor-not-allowed',
+                'p-0',
+                'font-[inherit]',
+              )}
+              style={{
+                minHeight,
+                maxHeight,
+                overflowX: 'hidden',
+                overflowY: 'auto',
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit',
+                letterSpacing: 'inherit',
+                caretColor: isRecording ? '#3b82f6' : 'inherit',
+              }}
+              aria-label="Task input"
+            />
+          )}
 
           {/* Optional description input below the title field (visual-only) */}
           {typeof secondaryValue !== 'undefined' && onSecondaryChange && (

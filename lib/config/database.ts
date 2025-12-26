@@ -1,7 +1,17 @@
 /**
  * Database configuration for Vercel API routes (Pure SQL via pg)
  */
-import { Pool, type PoolClient, type QueryResult } from 'pg';
+import { Pool, types, type PoolClient, type QueryResult } from 'pg';
+
+// Configure pg to parse TIMESTAMP WITHOUT TIME ZONE as UTC
+// PostgreSQL TIMESTAMP WITHOUT TIME ZONE strips timezone info.
+// By default, pg interprets returned timestamps as local time, which is incorrect.
+// We need to interpret them as UTC since that's what we store.
+// Type OID 1114 = TIMESTAMP (without time zone)
+types.setTypeParser(1114, (stringValue: string) => {
+  // Append 'Z' to indicate UTC when parsing
+  return new Date(stringValue + 'Z');
+});
 
 // Database configuration object
 export const databaseConfig = {

@@ -1,11 +1,11 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
-import { Download, Trash2, FileText, FileSpreadsheet, Presentation, Music, Video, FileImage, FileCode, Archive, Calendar, X } from 'lucide-react';
+import { Download, Trash2, FileText, Music, Video, FileImage, Archive, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { FileAttachment } from '@shared/types';
 import { formatFileSize } from '@shared/config/fileTypes';
-import { truncateMiddle } from '@shared/utils';
+
 
 export interface AttachmentPreviewDialogProps {
   open: boolean;
@@ -33,7 +33,7 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
   const FileSheets = () => {
     const type = attachment.type || '';
     const ext = (attachment.name.split('.').pop() || '').toLowerCase();
-    
+
     // Brand-like file type representation
     const getFileTypeDisplay = () => {
       if (ext === 'pdf') {
@@ -139,8 +139,8 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
 
     return (
       <div className="flex justify-center max-w-fit mx-auto">
-        <div 
-          className="relative select-none group" 
+        <div
+          className="relative select-none group"
           style={{ width: 200, height: 260 }}
           onMouseEnter={(e) => {
             const backSheet = e.currentTarget.children[0] as HTMLElement;
@@ -156,25 +156,25 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
           }}
         >
           {/* Back sheet - furthest back */}
-          <div 
+          <div
             className="absolute inset-0 rounded-lg shadow-sm transition-all duration-300 ease-out bg-card border border-border"
-            style={{ 
+            style={{
               transform: 'rotate(-4deg) translateX(-2px) translateY(2px)',
               transformOrigin: 'center bottom',
               zIndex: 1
-            }} 
+            }}
           />
-          
+
           {/* Middle sheet */}
-          <div 
+          <div
             className="absolute inset-0 rounded-lg shadow-md transition-all duration-300 ease-out bg-card border border-border"
-            style={{ 
+            style={{
               transform: 'rotate(3deg) translateX(1px) translateY(-1px)',
               transformOrigin: 'center bottom',
               zIndex: 2
-            }} 
+            }}
           />
-          
+
           {/* Top sheet - interactive */}
           <div
             className="absolute inset-0 rounded-lg shadow-lg border border-border cursor-pointer transition-all duration-300 ease-out will-change-transform group-hover:shadow-xl bg-card"
@@ -192,7 +192,7 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
               e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
             }}
           >
-            
+
             {/* Content area */}
             <div className="absolute inset-0 flex items-center justify-center rounded-lg">
               <div className="flex flex-col items-center gap-4">
@@ -205,16 +205,16 @@ export const AttachmentPreviewDialog: React.FC<AttachmentPreviewDialogProps> = (
                 </Badge>
               </div>
             </div>
-            
+
             {/* Page edge effect */}
-            <div 
+            <div
               className="absolute right-0 top-0 bottom-0 w-2 rounded-r-lg pointer-events-none"
               style={{
                 background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.05) 100%)'
               }}
             />
           </div>
-          
+
           {/* Additional hover effects handled via CSS variables and onMouseEnter/Leave */}
         </div>
       </div>

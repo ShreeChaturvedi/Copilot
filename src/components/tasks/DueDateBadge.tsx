@@ -27,7 +27,7 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
   taskId,
   date,
   onChange,
-  hideRemove,
+  hideRemove: _hideRemoveUnused,
   emptyLabel = 'Add due date',
 }) => {
   const [open, setOpen] = useState(false);

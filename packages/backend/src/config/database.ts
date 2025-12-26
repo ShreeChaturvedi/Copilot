@@ -55,14 +55,14 @@ export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>)
     await client.query('COMMIT');
     return res;
   } catch (e) {
-    try { await client.query('ROLLBACK'); } catch {}
+    try { await client.query('ROLLBACK'); } catch { }
     throw e;
   } finally {
     client.release();
   }
 }
 
-export async function query<T = any>(sql: string, params: any[] = [], client?: SqlClient): Promise<QueryResult<T>> {
+export async function query<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, params: unknown[] = [], client?: SqlClient): Promise<QueryResult<T>> {
   if (client && 'query' in client) {
     return (client as PoolClient).query<T>(sql, params);
   }

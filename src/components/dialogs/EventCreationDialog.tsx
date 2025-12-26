@@ -1,7 +1,8 @@
 import * as React from "react"
 import { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import { addHours, format } from "date-fns"
-import { MapPin, FileText, ArrowRight, Calendar, AtSign } from "lucide-react"
+import { parseLocalDate } from "@/utils/date"
+import { MapPin, ArrowRight, Calendar, AtSign } from "lucide-react"
 
 import {
   Dialog,
@@ -24,7 +25,6 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from "@/components/ui/RichTextEditor"
 import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -40,7 +40,7 @@ import {
   SelectSeparator,
 } from "@/components/ui/Select"
 
-import type { CalendarEvent } from "../../../shared/types"
+import type { CalendarEvent } from "@shared/types"
 import { useCalendars } from "@/hooks/useCalendars"
 import { useCreateEvent, useUpdateEvent } from "@/hooks/useEvents"
 import { useUIStore } from "@/stores/uiStore"
@@ -117,7 +117,8 @@ export function CustomDateInput({ value, onChange, className }: {
     setShowPicker(false)
   }
 
-  const selectedDate = value ? new Date(value) : undefined
+  // Use parseLocalDate to avoid UTC midnight interpretation of YYYY-MM-DD strings
+  const selectedDate = value ? parseLocalDate(value) : undefined
 
   return (
     <div className="relative">
@@ -168,7 +169,7 @@ function EventCreationDialogContent({
   const createEventMutation = useCreateEvent()
   const updateEventMutation = useUpdateEvent()
   const { peekMode, setPeekMode } = useUIStore()
-  
+
   // Check if we're editing an existing event
   const isEditing = Boolean(initialEventData?.id)
 
@@ -181,7 +182,7 @@ function EventCreationDialogContent({
   const [formData, setFormData] = useState<EventFormData>(() => {
     const now = new Date()
     const oneHourLater = addHours(now, 1)
-    
+
     const startBase = (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) || now
     const endBase = (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) || oneHourLater
 
@@ -216,10 +217,10 @@ function EventCreationDialogContent({
       exceptions?: string[],
     }
   }>(null)
-  
+
   // Ref for the title input to focus it when creating
   const titleInputRef = useRef<HTMLInputElement>(null)
-  
+
   // Focus the title input when creating a new event (not editing)
   useEffect(() => {
     if (!isEditing && titleInputRef.current) {
@@ -238,7 +239,7 @@ function EventCreationDialogContent({
 
     const startBase = (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) || now
     const endBase = (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) || oneHourLater
-    
+
     setFormData({
       title: initialEventData?.title || "",
       startDate: startBase,
@@ -263,7 +264,7 @@ function EventCreationDialogContent({
       icon: (
         <div
           className="w-3 h-3 rounded-sm border"
-          style={{ 
+          style={{
             backgroundColor: calendar.color,
             borderColor: calendar.color,
           }}
@@ -275,16 +276,16 @@ function EventCreationDialogContent({
   // Calculate width based on longest calendar name
   const calendarSelectWidth = useMemo(() => {
     if (calendars.length === 0) return "w-48" // Default fallback
-    
-    const longestName = calendars.reduce((longest, calendar) => 
+
+    const longestName = calendars.reduce((longest, calendar) =>
       calendar.name.length > longest.length ? calendar.name : longest, ""
     )
-    
+
     // Estimate width: ~0.6rem per character + padding + icon space
     const estimatedChars = longestName.length + 8 // Extra for padding and icon
-    
+
     if (estimatedChars <= 16) return "w-32"
-    if (estimatedChars <= 20) return "w-40" 
+    if (estimatedChars <= 20) return "w-40"
     if (estimatedChars <= 24) return "w-48"
     if (estimatedChars <= 28) return "w-56"
     if (estimatedChars <= 32) return "w-64"
@@ -303,9 +304,10 @@ function EventCreationDialogContent({
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const dateValue = e.target.value
     if (dateValue) {
-      const newStartDate = new Date(dateValue)
+      // Use parseLocalDate to parse as local midnight, not UTC midnight
+      const newStartDate = parseLocalDate(dateValue)
       updateFormData("startDate", newStartDate)
-      
+
       // If start date is after end date, adjust end date
       if (formData.endDate && newStartDate > formData.endDate) {
         updateFormData("endDate", newStartDate)
@@ -316,7 +318,8 @@ function EventCreationDialogContent({
   const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const dateValue = e.target.value
     if (dateValue) {
-      const newEndDate = new Date(dateValue)
+      // Use parseLocalDate to parse as local midnight, not UTC midnight
+      const newEndDate = parseLocalDate(dateValue)
       // Prevent end date from being before start date
       if (formData.startDate && newEndDate < formData.startDate) {
         return
@@ -328,7 +331,7 @@ function EventCreationDialogContent({
   const handleStartTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const timeValue = e.target.value
     updateFormData("startTime", timeValue)
-    
+
     // Auto-adjust end time if start time is after end time
     if (timeValue && formData.endTime && timeValue >= formData.endTime) {
       const startTime = new Date(`1970-01-01T${timeValue}:00`)
@@ -368,7 +371,7 @@ function EventCreationDialogContent({
   // Create start and end Date objects for submission with multi-day support
   const getStartDateTime = useCallback(() => {
     if (!formData.startDate) return undefined
-    
+
     if (formData.allDay) {
       const startOfDay = new Date(formData.startDate)
       startOfDay.setHours(0, 0, 0, 0)
@@ -429,7 +432,7 @@ function EventCreationDialogContent({
       updateFormData('recurrence', undefined)
       return
     }
-    
+
     // Create a basic recurrence rule with sensible defaults
     const startDateTime = getStartDateTime() || new Date()
     const opts: RecurrenceEditorOptions = {
@@ -443,7 +446,7 @@ function EventCreationDialogContent({
       until: null,
       count: null,
     }
-    
+
     const rrule = generateRRule(opts, startDateTime)
     updateFormData('recurrence', rrule)
   }, [updateFormData, getStartDateTime])
@@ -453,11 +456,11 @@ function EventCreationDialogContent({
     const hasTitle = formData.title.trim().length > 0
     const hasCalendar = Boolean(formData.calendarName)
     const hasStartDate = Boolean(formData.startDate)
-    
+
     if (formData.allDay) {
       const hasEndDate = Boolean(formData.endDate)
-      const validDateRange = formData.startDate && formData.endDate && 
-                            formData.endDate >= formData.startDate
+      const validDateRange = formData.startDate && formData.endDate &&
+        formData.endDate >= formData.startDate
       return hasTitle && hasCalendar && hasStartDate && hasEndDate && validDateRange
     } else {
       const hasValidTimes = Boolean(formData.startTime && formData.endTime)
@@ -471,11 +474,11 @@ function EventCreationDialogContent({
 
     const startDateTime = getStartDateTime()
     const endDateTime = getEndDateTime()
-    
+
     if (!startDateTime || !endDateTime) return
 
     setIsSubmitting(true)
-    
+
     try {
       if (isEditing && initialEventData?.id) {
         // If original event is recurring, show scope dialog AFTER save
@@ -549,7 +552,7 @@ function EventCreationDialogContent({
     <>
       {/* Hidden element to receive initial focus instead of form elements */}
       <div tabIndex={0} className="sr-only" />
-      
+
       <ConditionalDialogHeader
         isEditing={isEditing}
         activeTab={activeTab}
@@ -741,7 +744,7 @@ function EventCreationDialogContent({
             />
           </div>
 
-          
+
         </TabsContent>
 
         <TabsContent value="task" className={`space-y-4 ${isEditing ? 'mt-0' : 'mt-6'}`}>
@@ -870,12 +873,17 @@ export function EventCreationDialog({
     onOpenChange(false)
   }
 
-  if (peekMode === 'right') {
-    return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
+  // Render both Sheet and Dialog, but only one is open at a time
+  // This prevents the flicker caused by unmounting one before mounting the other
+  const isSheetMode = peekMode === 'right';
+
+  return (
+    <>
+      {/* Sheet (right panel) - only open when open=true AND peekMode='right' */}
+      <Sheet open={open && isSheetMode} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
-          className="w-fit max-w-[calc(100%-2rem)] sm:!max-w-none p-6 overflow-y-auto [&>button]:hidden"
+          className="w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>{initialEventData?.id ? 'Edit Event' : 'Create Event'}</SheetTitle>
@@ -891,24 +899,23 @@ export function EventCreationDialog({
           />
         </SheetContent>
       </Sheet>
-    )
-  }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-h-[90vh] overflow-y-auto"
-        showCloseButton={false}
-      >
-        <DialogTitle className="sr-only">Create Event</DialogTitle>
-        <DialogDescription className="sr-only">
-          Create a new event with title, date, time, location, and description
-        </DialogDescription>
-        <EventCreationDialogContent
-          initialEventData={initialEventData}
-          onClose={handleClose}
-        />
-      </DialogContent>
-    </Dialog>
+      {/* Dialog (center modal) - only open when open=true AND peekMode='center' */}
+      <Dialog open={open && !isSheetMode} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto"
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">Create Event</DialogTitle>
+          <DialogDescription className="sr-only">
+            Create a new event with title, date, time, location, and description
+          </DialogDescription>
+          <EventCreationDialogContent
+            initialEventData={initialEventData}
+            onClose={handleClose}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

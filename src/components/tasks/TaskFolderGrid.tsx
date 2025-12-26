@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { Folder, Plus, MoreHorizontal } from 'lucide-react';
+import { Folder, Plus } from 'lucide-react';
 import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -40,7 +40,7 @@ function createTaskFolders(
       id: group.id,
       name: group.name,
       color: group.color,
-  iconId: group.emoji,
+      iconId: group.emoji,
       taskCount: showCompleted ? groupTasks.length : activeTasks.length,
       completedCount: completedTasks.length,
       tasks: previewTasks,
@@ -91,7 +91,6 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
                     <IconComponent className="w-6 h-6" />
                   </span>
                 </div>
-                <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg text-foreground truncate">

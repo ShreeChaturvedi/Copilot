@@ -13,8 +13,8 @@ import './calendar.css';
 
 import { useEvents, useUpdateEvent, useSwipeDetection } from '../../hooks';
 import { useCalendars } from '../../hooks';
-import type { CalendarEvent } from "../../../shared/types";
-import { toLocal, toUTC } from '../../utils/date';
+import type { CalendarEvent } from "@shared/types";
+import { toLocal } from '../../utils/date';
 import { expandOccurrences } from '@/utils/recurrence';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useCalendarSettingsStore } from '@/stores/calendarSettingsStore';
@@ -155,11 +155,11 @@ export const CalendarView = ({
     // Get the drop date/time from FullCalendar
     const dropDate = info.event.start;
     const eventData = info.event.extendedProps;
-    
+
     if (dropDate && eventData?.isFromTask && eventData?.originalTask && onEventCreate) {
       // Find default calendar or first visible calendar
       const defaultCalendar = calendars.find(cal => cal.isDefault) || visibleCalendars[0];
-      
+
       if (defaultCalendar) {
         const newEvent = {
           title: eventData.originalTask.title,
@@ -169,10 +169,10 @@ export const CalendarView = ({
           calendarName: defaultCalendar.name,
           color: defaultCalendar.color,
         };
-        
+
         // Remove the temporary event since we'll create it through the dialog
         info.event.remove();
-        
+
         // Trigger create event dialog with correct date/time
         onEventCreate(newEvent);
       }
@@ -242,8 +242,10 @@ export const CalendarView = ({
 
     const newEvent: Partial<CalendarEvent> = {
       title: '',
-      start: toUTC(start),
-      end: toUTC(end),
+      // Don't convert to UTC here - FullCalendar provides dates in local time
+      // The conversion to UTC happens in the API layer when storing
+      start: start,
+      end: end,
       allDay,
       calendarName: defaultCalendar.name,
       color: defaultCalendar.color,
@@ -262,8 +264,9 @@ export const CalendarView = ({
   const handleEventClick = useCallback((clickInfo: EventClickArg) => {
     const originalEvent = clickInfo.event.extendedProps.originalEvent as CalendarEvent;
     // If this is a recurring occurrence, preserve the instance times on the object we pass
-    const instanceStart = clickInfo.event.start ? toUTC(clickInfo.event.start) : undefined;
-    const instanceEnd = clickInfo.event.end ? toUTC(clickInfo.event.end) : undefined;
+    // Don't convert - FullCalendar already provides the correct times
+    const instanceStart = clickInfo.event.start ?? undefined;
+    const instanceEnd = clickInfo.event.end ?? undefined;
     const enriched: CalendarEvent = {
       ...originalEvent,
       occurrenceInstanceStart: instanceStart,
@@ -299,8 +302,9 @@ export const CalendarView = ({
         {
           id: originalEvent.id,
           data: {
-            start: toUTC(event.start!),
-            end: toUTC(event.end!),
+            // Pass dates directly - API layer handles UTC conversion
+            start: event.start!,
+            end: event.end!,
             allDay: event.allDay,
           },
         },
@@ -323,7 +327,7 @@ export const CalendarView = ({
       // Swipe left = next page
       if (onNextClick) {
         onNextClick();
-      } else {  
+      } else {
         const calendarApi = calendarRef.current?.getApi();
         calendarApi?.next();
       }
@@ -345,7 +349,7 @@ export const CalendarView = ({
       // Add wheel event listener for trackpad
       const element = combinedRef.current;
       element.addEventListener('wheel', swipeHandlers.onWheel, { passive: false });
-      
+
       return () => {
         element.removeEventListener('wheel', swipeHandlers.onWheel);
       };
@@ -399,17 +403,17 @@ export const CalendarView = ({
   return (
     <div className={clsx('h-full flex flex-col bg-card', className)} style={{ overscrollBehavior: 'none' }}>
       {/* Calendar Content */}
-      <div 
+      <div
         ref={combinedRef}
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
         className={clsx(
           "flex-1 relative bg-card transition-all duration-200"
-        )} 
+        )}
         style={{ overscrollBehavior: 'none' }}
       >
-        
+
         <div className="h-full" style={{ overscrollBehavior: 'none' }}>
           <FullCalendar
             key={calendarKey}

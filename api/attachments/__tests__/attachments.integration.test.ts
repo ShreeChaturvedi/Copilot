@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import listHandler from '../index';
 import itemHandler from '../[id]';
 import statsHandler from '../stats';
 import { getAllServices } from '../../../lib/services/index';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  createMockAuthRequest,
+  createMockResponse,
+} from '../../../lib/__tests__/helpers';
 
 vi.mock('../../../lib/services/index', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/services/index')>('../../../lib/services/index');
@@ -62,24 +66,14 @@ const mockSendError = vi.fn();
 const mockUser = { id: 'user-1' };
 
 function req(overrides: Partial<VercelRequest> = {}): VercelRequest {
-  return {
-    method: 'GET',
+  return createMockAuthRequest(mockUser as any, {
     url: '/api/attachments',
-    query: {},
-    headers: { 'x-request-id': 'req-1' },
-    body: {},
-    user: mockUser as any,
     ...overrides,
-  } as any;
+  });
 }
 
 function res(): VercelResponse {
-  return {
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
-    end: vi.fn().mockReturnThis(),
-    setHeader: vi.fn().mockReturnThis(),
-  } as any;
+  return createMockResponse() as any;
 }
 
 describe('Attachments API', () => {

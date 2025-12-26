@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface CreateTaskData {
   title: string;
-  groupId?: string;
+  taskListId?: string;
   priority?: 'low' | 'medium' | 'high';
   scheduledDate?: Date;
   tags?: TaskTag[];
@@ -69,7 +69,7 @@ interface TaskManagementWithOperations {
   handleCreateTaskGroup: (data: {
     name: string;
     description: string;
-  emoji: string;
+    emoji: string;
     color: string;
   }) => void;
   handleUpdateTaskGroupIcon: (groupId: string, iconId: string) => void;
@@ -93,7 +93,7 @@ interface TaskManagementWithoutOperations {
   handleCreateTaskGroup: (data: {
     name: string;
     description: string;
-  emoji: string;
+    emoji: string;
     color: string;
   }) => void;
   handleUpdateTaskGroupIcon: (groupId: string, iconId: string) => void;
@@ -186,90 +186,90 @@ export function useTaskManagement(
   // Task CRUD handlers (only when includeTaskOperations is true)
   const handleAddTask = includeTaskOperations
     ? (title: string, _groupId?: string, smartData?: SmartTaskData) => {
-        // Extract scheduled date from smart data (already provided by parser)
-        const scheduledDate = smartData?.scheduledDate;
+      // Extract scheduled date from smart data (already provided by parser)
+      const scheduledDate = smartData?.scheduledDate;
 
-        // Convert auto-created natural language date/time tags into the canonical due date
-        // representation by removing them from the tags array. We will surface the due date via
-        // the task's scheduledDate property and a unified editable badge in the UI.
-        const nonDateTimeTags = smartData?.tags
-          ?.filter((tag) => {
-            const type = String((tag as unknown as { type?: string }).type || '').toLowerCase();
-            return type !== 'date' && type !== 'time';
-          })
-          .map((tag) => ({
-            id: tag.id,
-            type: tag.type,
-            value: tag.value,
-            displayText: tag.displayText,
-            iconName: tag.iconName,
-            color: tag.color,
-          }));
+      // Convert auto-created natural language date/time tags into the canonical due date
+      // representation by removing them from the tags array. We will surface the due date via
+      // the task's scheduledDate property and a unified editable badge in the UI.
+      const nonDateTimeTags = smartData?.tags
+        ?.filter((tag) => {
+          const type = String((tag as unknown as { type?: string }).type || '').toLowerCase();
+          return type !== 'date' && type !== 'time';
+        })
+        .map((tag) => ({
+          id: tag.id,
+          type: tag.type,
+          value: tag.value,
+          displayText: tag.displayText,
+          iconName: tag.iconName,
+          color: tag.color,
+        }));
 
-        // Normalize special group ids
-        const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
+      // Normalize special group ids
+      const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
 
-        addTask.mutate({
-          title,
-          taskListId,
-          priority: smartData?.priority,
-          scheduledDate,
-          tags: nonDateTimeTags,
-          parsedMetadata: smartData
-            ? {
-                originalInput: smartData.originalInput,
-                cleanTitle: smartData.title,
-              }
-            : undefined,
-        });
-      }
+      addTask.mutate({
+        title,
+        taskListId,
+        priority: smartData?.priority,
+        scheduledDate,
+        tags: nonDateTimeTags,
+        parsedMetadata: smartData
+          ? {
+            originalInput: smartData.originalInput,
+            cleanTitle: smartData.title,
+          }
+          : undefined,
+      });
+    }
     : undefined;
 
   const handleToggleTask = includeTaskOperations
     ? (id: string) => {
-        const task = tasks.find((t) => t.id === id);
-        if (task) {
-          updateTask.mutate({
-            id,
-            updates: { completed: !task.completed },
-          });
-        }
+      const task = tasks.find((t) => t.id === id);
+      if (task) {
+        updateTask.mutate({
+          id,
+          updates: { completed: !task.completed },
+        });
       }
+    }
     : undefined;
 
   const handleEditTask = includeTaskOperations
     ? (id: string, title: string) => {
-        updateTask.mutate({
-          id,
-          updates: { title },
-        });
-      }
+      updateTask.mutate({
+        id,
+        updates: { title },
+      });
+    }
     : undefined;
 
   const handleDeleteTask = includeTaskOperations
     ? (id: string) => {
-        deleteTask.mutate(id);
-      }
+      deleteTask.mutate(id);
+    }
     : undefined;
 
   const handleScheduleTask = includeTaskOperations
     ? (id: string, scheduledDate: Date) => {
-        scheduleTask.mutate({ id, scheduledDate });
-      }
+      scheduleTask.mutate({ id, scheduledDate });
+    }
     : undefined;
 
   const handleRemoveTag = includeTaskOperations
     ? (taskId: string, tagId: string) => {
-        updateTask.mutate({
-          id: taskId,
-          updates: {
-            tags:
-              tasks
-                .find((t) => t.id === taskId)
-                ?.tags?.filter((tag) => tag.id !== tagId) || [],
-          },
-        });
-      }
+      updateTask.mutate({
+        id: taskId,
+        updates: {
+          tags:
+            tasks
+              .find((t) => t.id === taskId)
+              ?.tags?.filter((tag) => tag.id !== tagId) || [],
+        },
+      });
+    }
     : undefined;
 
   // Task group handlers (shared across all components)

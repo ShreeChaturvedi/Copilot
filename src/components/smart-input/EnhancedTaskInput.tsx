@@ -37,7 +37,7 @@ type TaskGroup = {
 };
 import { cn } from '@/lib/utils';
 import { DueDateBadge } from '@/components/tasks/DueDateBadge';
-import { useSettingsStore } from '@/stores/settingsStore';
+
 
 export interface EnhancedTaskInputProps {
   onAddTask: (title: string, groupId?: string, smartData?: SmartTaskData) => void;
@@ -92,7 +92,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const [dismissedTagSignatures, setDismissedTagSignatures] = useState<Set<string>>(new Set());
   // Manual due date state for this input session
   const [manualDueDate, setManualDueDate] = useState<Date | undefined>(undefined);
-  const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode);
+
 
   // Initialize text parser
   const {
@@ -118,7 +118,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) || 
+  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Handle voice transcript (final results)
@@ -211,18 +211,18 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const handleFileRemove = useCallback((fileId: string) => {
     setUploadedFiles(prev => {
       const updated = prev.filter(file => file.id !== fileId);
-      
+
       // Clean up object URLs for removed image previews
       const removedFile = prev.find(file => file.id === fileId);
       if (removedFile?.preview && removedFile.preview.startsWith('blob:')) {
         URL.revokeObjectURL(removedFile.preview);
       }
-      
+
       // Notify parent component if callback provided
       if (onFilesAdded) {
         onFilesAdded(updated);
       }
-      
+
       return updated;
     });
   }, [onFilesAdded]);
@@ -243,22 +243,22 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   // Handle form submission
   const handleSubmit = useCallback((e?: React.FormEvent) => {
     e?.preventDefault();
-    
+
     const titleToUse = inputText.trim();
-    
+
     if (titleToUse) {
       // Capitalize first letter
       const capitalizedTitle = titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
-      
+
       // Extract smart data if parsing is enabled
       let smartData: SmartTaskData | undefined;
       if (smartParsingEnabled && filteredTags.length > 0) {
         const priorityTag = filteredTags.find(tag => tag.type === 'priority');
         const priority = priorityTag?.value as 'low' | 'medium' | 'high' | undefined;
-        
+
         const parsedDateTag = parsedTags?.find(tag => tag.type === 'date' || tag.type === 'time');
         const scheduledDate = manualDueDate || (parsedDateTag?.value as Date | undefined);
-        
+
         smartData = {
           title: capitalizedTitle,
           originalInput: inputText,
@@ -268,14 +268,14 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           confidence,
         };
       }
-      
+
       // Prefer file-aware callback if provided
       if (onAddTaskWithFiles) {
         onAddTaskWithFiles(capitalizedTitle, activeTaskGroup.id, smartData, uploadedFiles);
       } else {
         onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
       }
-      
+
       // Clear input and parsing state
       setInputText('');
       setDescriptionText('');
@@ -334,7 +334,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     }
     return raw;
   }, [manualDueDate, autoDueTag]);
-  
+
   // File preview component
   const filePreview = useMemo(() => (
     uploadedFiles.length > 0 ? (
@@ -361,7 +361,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const leftControls = (
     <>
       {taskGroupSelector}
-      
+
       {/* File Upload Button */}
       {enableFileUpload && (
         <FileUploadButton
@@ -393,7 +393,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           <span className="ml-1">for description</span>
         </div>
       )}
-      
+
       {/* Voice Input Button - moved to right side next to send button */}
       <VoiceInputButton
         onTranscriptChange={handleVoiceTranscript}
@@ -403,7 +403,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         continuous={false} // Use non-continuous mode for single task input
         size="sm"
       />
-      
+
       <Button
         type="submit"
         disabled={disabled || !hasContent}
