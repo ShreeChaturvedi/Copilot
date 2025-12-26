@@ -48,8 +48,14 @@ docker-compose.override.yml
 .kiro/
 .shree/
 CLAUDE.md
+
+# Compiled output
+lib/**/*.js
+lib/**/*.map
+*.tsbuildinfo
+
+# Other
 screenshots/
 test-scroll.html
-*.tsbuildinfo
 .vercel
 .env*.local
