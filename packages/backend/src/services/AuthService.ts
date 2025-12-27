@@ -36,7 +36,7 @@ export interface PasswordResetConfirm {
 
 class AuthService {
   private readonly saltRounds = 12;
-  constructor() { }
+  constructor() {}
 
   /**
    * Register a new user with email and password
@@ -45,12 +45,11 @@ class AuthService {
     const { email, password, name } = userData;
 
     // Check if user already exists
-    const existingUser = await query<{ id: string }>(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [email.toLowerCase()]);
+    const existingUser = await query<{ id: string }>(
+      `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+      [email.toLowerCase()]
+    );
     if (existingUser.rowCount && existingUser.rowCount > 0) {
-      throw new Error('USER_ALREADY_EXISTS');
-    }
-
-    if (existingUser) {
       throw new Error('USER_ALREADY_EXISTS');
     }
 
@@ -59,7 +58,12 @@ class AuthService {
 
     // Create user
     const user = await withTransaction(async (tx) => {
-      const insert = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
+      const insert = await query<{
+        id: string;
+        email: string;
+        name: string | null;
+        createdAt: Date;
+      }>(
         `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
          RETURNING id, email, name, "createdAt"`,
@@ -67,7 +71,11 @@ class AuthService {
         tx
       );
       const u = insert.rows[0];
-      await query(`INSERT INTO user_profiles (id, "userId", timezone) VALUES (gen_random_uuid()::text, $1, 'UTC')`, [u.id], tx);
+      await query(
+        `INSERT INTO user_profiles (id, "userId", timezone) VALUES (gen_random_uuid()::text, $1, 'UTC')`,
+        [u.id],
+        tx
+      );
       return u;
     });
 
@@ -86,9 +94,9 @@ class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
       },
-      tokens
+      tokens,
     };
   }
 
@@ -99,7 +107,13 @@ class AuthService {
     const { email, password } = credentials;
 
     // Find user by email
-    const res = await query<{ id: string; email: string; name: string | null; password: string | null; createdAt: Date }>(
+    const res = await query<{
+      id: string;
+      email: string;
+      name: string | null;
+      password: string | null;
+      createdAt: Date;
+    }>(
       `SELECT id, email, name, password, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email.toLowerCase()]
     );
@@ -135,9 +149,9 @@ class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
       },
-      tokens
+      tokens,
     };
   }
 
@@ -162,7 +176,7 @@ class AuthService {
     if (!row) return null;
     return {
       ...row,
-      profile: row.timezone ? { timezone: row.timezone } : null
+      profile: row.timezone ? { timezone: row.timezone } : null,
     };
   }
 
@@ -187,7 +201,7 @@ class AuthService {
     if (!row) return null;
     return {
       ...row,
-      profile: row.timezone ? { timezone: row.timezone } : null
+      profile: row.timezone ? { timezone: row.timezone } : null,
     };
   }
 
@@ -197,14 +211,20 @@ class AuthService {
   async updatePassword(userId: string, newPassword: string): Promise<void> {
     const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
 
-    await query(`UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`, [hashedPassword, userId]);
+    await query(
+      `UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`,
+      [hashedPassword, userId]
+    );
   }
 
   /**
    * Verify password for a user
    */
   async verifyPassword(userId: string, password: string): Promise<boolean> {
-    const res = await query<{ id: string; password: string | null }>(`SELECT id, password FROM users WHERE id = $1 LIMIT 1`, [userId]);
+    const res = await query<{ id: string; password: string | null }>(
+      `SELECT id, password FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
     const user = res.rows[0];
 
     if (!user || !user.password) {
@@ -244,7 +264,10 @@ class AuthService {
    * Confirm password reset with token
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async confirmPasswordReset(_token: string, _newPassword: string): Promise<void> {
+  async confirmPasswordReset(
+    _token: string,
+    _newPassword: string
+  ): Promise<void> {
     // In a real implementation, you would:
     // 1. Verify the reset token from database
     // 2. Check if token is not expired
@@ -290,7 +313,7 @@ class AuthService {
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 

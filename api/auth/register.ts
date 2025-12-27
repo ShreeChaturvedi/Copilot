@@ -1,5 +1,5 @@
 /**
- * POST /api/auth/login - User login endpoint
+ * POST /api/auth/register - User registration endpoint
  */
 import { createMethodHandler } from '../../lib/utils/apiHandler.js';
 import { HttpMethod } from '../../lib/types/api.js';
@@ -8,36 +8,46 @@ import type { VercelResponse } from '@vercel/node';
 import { authService } from '../../packages/backend/src/services/AuthService.js';
 import { z } from 'zod';
 
-const loginSchema = z.object({
+const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
+  name: z.string().min(1, 'Name is required').optional(),
 });
 
 export default createMethodHandler({
   [HttpMethod.POST]: async (req: AuthenticatedRequest, res: VercelResponse) => {
     try {
       // Validate request body
-      const validationResult = loginSchema.safeParse(req.body);
+      const validationResult = registerSchema.safeParse(req.body);
 
       if (!validationResult.success) {
         return res.status(400).json({
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'Invalid login credentials',
+            message: 'Invalid registration data',
             details: validationResult.error.errors,
             timestamp: new Date().toISOString(),
           },
         });
       }
 
-      const { email, password } = validationResult.data;
+      const { email, password, name } = validationResult.data;
 
-      // Authenticate user
-      const authResult = await authService.loginUser({ email, password });
+      // Register user
+      const authResult = await authService.registerUser({
+        email,
+        password,
+        name,
+      });
 
       // Return user and tokens
-      return res.status(200).json({
+      return res.status(201).json({
         success: true,
         data: authResult,
         meta: {
@@ -47,36 +57,24 @@ export default createMethodHandler({
     } catch (error) {
       const err = error as Error;
 
-      if (err.message === 'INVALID_CREDENTIALS') {
-        return res.status(401).json({
+      if (err.message === 'USER_ALREADY_EXISTS') {
+        return res.status(409).json({
           success: false,
           error: {
-            code: 'INVALID_CREDENTIALS',
-            message: 'Invalid email or password',
-            timestamp: new Date().toISOString(),
-          },
-        });
-      }
-
-      if (err.message === 'OAUTH_USER_NO_PASSWORD') {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'OAUTH_USER_NO_PASSWORD',
-            message:
-              'This account uses Google OAuth. Please sign in with Google.',
+            code: 'USER_ALREADY_EXISTS',
+            message: 'An account with this email already exists',
             timestamp: new Date().toISOString(),
           },
         });
       }
 
       // Generic server error
-      console.error('Login error:', err);
+      console.error('Registration error:', err);
       return res.status(500).json({
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'An error occurred during login',
+          message: 'An error occurred during registration',
           timestamp: new Date().toISOString(),
         },
       });

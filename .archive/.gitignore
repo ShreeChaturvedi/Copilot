@@ -1,0 +1,6 @@
+# Archive directory - not part of the build
+# Contains legacy code and development documentation
+
+*
+!.gitignore
+!README.md

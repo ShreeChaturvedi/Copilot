@@ -1,39 +1,63 @@
 /**
- * Authentication middleware - placeholder implementation
- * Full implementation will be completed in task 4.1
+ * Authentication middleware - JWT token verification
  */
 import type { VercelResponse } from '@vercel/node';
 import type { AuthenticatedRequest, Middleware } from '../types/api.js';
 import { UnauthorizedError } from '../types/api.js';
+import {
+  verifyToken,
+  extractTokenFromHeader,
+} from '../../packages/backend/src/utils/jwt.js';
 
 /**
- * JWT authentication middleware (placeholder)
- * This will be fully implemented in task 4.1
+ * JWT authentication middleware
+ * Verifies JWT token and attaches user context to request
  */
 export function authenticateJWT(): Middleware {
-  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
-    // Placeholder implementation - will be completed in task 4.1
+  return async (
+    req: AuthenticatedRequest,
+    res: VercelResponse,
+    next: () => void
+  ) => {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedError('Missing or invalid authorization header');
     }
-    
-    const token = authHeader.substring(7);
-    
+
+    const token = extractTokenFromHeader(authHeader);
+
     if (!token) {
       throw new UnauthorizedError('Missing JWT token');
     }
-    
-    // TODO: Implement JWT verification in task 4.1
-    // For now, just set a placeholder user
-    req.user = {
-      id: 'placeholder-user-id',
-      email: 'placeholder@example.com',
-      name: 'Placeholder User',
-    };
-    
-    next();
+
+    try {
+      // Verify JWT token
+      const decoded = await verifyToken(token);
+
+      // Ensure it's an access token
+      if (decoded.type !== 'access') {
+        throw new UnauthorizedError('Invalid token type');
+      }
+
+      // Attach user context to request
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email,
+        name: decoded.email.split('@')[0], // Extract name from email as fallback
+      };
+
+      next();
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'TOKEN_EXPIRED') {
+          throw new UnauthorizedError('Token expired');
+        } else if (error.message === 'TOKEN_INVALID') {
+          throw new UnauthorizedError('Invalid token');
+        }
+      }
+      throw new UnauthorizedError('Authentication failed');
+    }
   };
 }
 
@@ -42,26 +66,40 @@ export function authenticateJWT(): Middleware {
  * Adds user context if token is present, but doesn't require it
  */
 export function optionalAuth(): Middleware {
-  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
+  return async (
+    req: AuthenticatedRequest,
+    res: VercelResponse,
+    next: () => void
+  ) => {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        
+        const token = extractTokenFromHeader(authHeader);
+
         if (token) {
-          // TODO: Implement JWT verification in task 4.1
-          req.user = {
-            id: 'placeholder-user-id',
-            email: 'placeholder@example.com',
-            name: 'Placeholder User',
-          };
+          try {
+            // Verify JWT token
+            const decoded = await verifyToken(token);
+
+            // Ensure it's an access token
+            if (decoded.type === 'access') {
+              // Attach user context to request
+              req.user = {
+                id: decoded.userId,
+                email: decoded.email,
+                name: decoded.email.split('@')[0],
+              };
+            }
+          } catch {
+            // Silently ignore verification errors for optional auth
+          }
         }
       }
     } catch {
       // Ignore auth errors for optional auth
     }
-    
+
     next();
   };
 }
@@ -71,7 +109,11 @@ export function optionalAuth(): Middleware {
  * In development, attach a default user so endpoints can run without full JWT.
  */
 export function devAuth(): Middleware {
-  return async (req: AuthenticatedRequest, _res: VercelResponse, next: () => void) => {
+  return async (
+    req: AuthenticatedRequest,
+    _res: VercelResponse,
+    next: () => void
+  ) => {
     if (process.env.NODE_ENV !== 'production' && !req.user) {
       req.user = {
         id: 'dev-user-id',
@@ -88,11 +130,15 @@ export function devAuth(): Middleware {
  * Will be implemented if needed in future tasks
  */
 export function requireRole(_role: string): Middleware {
-  return async (_req: AuthenticatedRequest, _res: VercelResponse, next: () => void) => {
+  return async (
+    _req: AuthenticatedRequest,
+    _res: VercelResponse,
+    next: () => void
+  ) => {
     if (!_req.user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     // Reference parameter to satisfy linter until roles are implemented
     void _role;
 
@@ -109,17 +155,21 @@ export function requireRole(_role: string): Middleware {
 export function requireOwnership(
   getResourceUserId: (req: AuthenticatedRequest) => string | Promise<string>
 ): Middleware {
-  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
+  return async (
+    req: AuthenticatedRequest,
+    res: VercelResponse,
+    next: () => void
+  ) => {
     if (!req.user) {
       throw new UnauthorizedError('Authentication required');
     }
-    
+
     const resourceUserId = await getResourceUserId(req);
-    
+
     if (resourceUserId !== req.user.id) {
       throw new UnauthorizedError('Access denied');
     }
-    
+
     next();
   };
 }
