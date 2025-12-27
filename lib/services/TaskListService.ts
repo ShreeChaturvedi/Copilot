@@ -1,8 +1,13 @@
 /**
  * TaskList Service - Concrete implementation of BaseService for TaskList operations
  */
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import {
+  BaseService,
+  type ServiceContext,
+  type UserOwnedEntity,
+} from './BaseService.js';
 import { query } from '../config/database.js';
+import { taskListCache, createCacheKey } from '../utils/cache.js';
 
 /**
  * TaskList entity interface extending base
@@ -14,7 +19,7 @@ export interface TaskListEntity extends UserOwnedEntity {
   description: string | null;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Relations (optional for different query contexts)
   tasks?: Array<{
     id: string;
@@ -68,8 +73,15 @@ export interface TaskListWithCounts extends TaskListEntity {
 /**
  * TaskListService - Handles all task list-related operations
  */
-export class TaskListService extends BaseService<TaskListEntity, CreateTaskListDTO, UpdateTaskListDTO, TaskListFilters> {
-  protected getTableName(): string { return 'task_lists'; }
+export class TaskListService extends BaseService<
+  TaskListEntity,
+  CreateTaskListDTO,
+  UpdateTaskListDTO,
+  TaskListFilters
+> {
+  protected getTableName(): string {
+    return 'task_lists';
+  }
 
   protected getEntityName(): string {
     return 'TaskList';
@@ -78,11 +90,16 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
   /**
    * Update task list by ID
    */
-  async update(id: string, data: UpdateTaskListDTO, context?: ServiceContext): Promise<TaskListEntity | null> {
+  async update(
+    id: string,
+    data: UpdateTaskListDTO,
+    context?: ServiceContext
+  ): Promise<TaskListEntity | null> {
     await this.validateUpdate(id, data, context);
 
     const sets: string[] = [];
-    const params: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params: any[] = []; // Mixed types for SQL parameters
 
     if (data.name !== undefined) {
       params.push(data.name.trim());
@@ -108,36 +125,73 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     const sql = `UPDATE task_lists SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
     const res = await query(sql, params, this.db);
     if (res.rowCount === 0) return null;
+
+    // Invalidate cache after updating a task list
+    if (context?.userId) {
+      const cacheKey = createCacheKey('task-lists', context.userId);
+      taskListCache.invalidate(cacheKey);
+    }
+
     return this.transformEntity(res.rows[0]);
   }
 
-  protected buildWhereClause(filters: TaskListFilters, context?: ServiceContext): { sql: string; params: any[] } {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected buildWhereClause(
+    filters: TaskListFilters,
+    context?: ServiceContext
+  ): { sql: string; params: any[] } {
     const clauses: string[] = [];
-    const params: any[] = [];
-    if (context?.userId) { params.push(context.userId); clauses.push('"userId" = $' + params.length); }
-    if (filters.search) { params.push('%' + filters.search + '%'); const idx = params.length; clauses.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`); }
-    if (filters.hasActiveTasks) { clauses.push('EXISTS (SELECT 1 FROM tasks t WHERE t."taskListId" = task_lists.id AND t.completed = false)'); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params: any[] = []; // Mixed types for SQL parameters
+    if (context?.userId) {
+      params.push(context.userId);
+      clauses.push('"userId" = $' + params.length);
+    }
+    if (filters.search) {
+      params.push('%' + filters.search + '%');
+      const idx = params.length;
+      clauses.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
+    }
+    if (filters.hasActiveTasks) {
+      clauses.push(
+        'EXISTS (SELECT 1 FROM tasks t WHERE t."taskListId" = task_lists.id AND t.completed = false)'
+      );
+    }
     const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
     return { sql, params };
   }
 
-  async findAll(filters: TaskListFilters = {}, context?: ServiceContext): Promise<TaskListEntity[]> {
+  async findAll(
+    filters: TaskListFilters = {},
+    context?: ServiceContext
+  ): Promise<TaskListEntity[]> {
     try {
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
-      const res = await query(`SELECT * FROM task_lists ${sql} ORDER BY name ASC`, params, this.db);
-      return res.rows.map((r: any) => this.transformEntity(r));
-    } catch (error: any) {
+      const res = await query(
+        `SELECT * FROM task_lists ${sql} ORDER BY name ASC`,
+        params,
+        this.db
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return res.rows.map((r: any) => this.transformEntity(r)); // Database row
+    } catch (error) {
       this.log('findAll:error', { error: error.message, filters }, context);
       throw error;
     }
   }
 
-  protected async enrichEntities(entities: TaskListEntity[], context?: ServiceContext): Promise<TaskListEntity[]> {
+  protected async enrichEntities(
+    entities: TaskListEntity[]
+  ): Promise<TaskListEntity[]> {
     if (!entities.length) return entities;
     const ids = entities.map((l) => l.id);
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-    const counts = await query<{ id: string; total: string; completed: string }>(
+    const counts = await query<{
+      id: string;
+      total: string;
+      completed: string;
+    }>(
       `SELECT tl.id,
               COUNT(t.*)::bigint AS total,
               COUNT(CASE WHEN t.completed THEN 1 END)::bigint AS completed
@@ -149,7 +203,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       this.db
     );
     const map = new Map<string, { total: number; completed: number }>();
-    counts.rows.forEach((r) => map.set(r.id, { total: Number(r.total), completed: Number(r.completed) }));
+    counts.rows.forEach((r) =>
+      map.set(r.id, { total: Number(r.total), completed: Number(r.completed) })
+    );
     return entities.map((e) => ({
       ...e,
       _count: { tasks: map.get(e.id)?.total ?? 0 },
@@ -160,14 +216,21 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
   /**
    * Validate task list creation
    */
-  protected async validateCreate(data: CreateTaskListDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(
+    data: CreateTaskListDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     if (!data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Task list name is required');
     }
 
     // Check for duplicate task list name for the user
     if (context?.userId) {
-      const existingTaskList = await query('SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 LIMIT 1', [data.name.trim(), context.userId], this.db);
+      const existingTaskList = await query(
+        'SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 LIMIT 1',
+        [data.name.trim(), context.userId],
+        this.db
+      );
 
       if (existingTaskList.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
@@ -176,7 +239,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Validate color format (basic hex color validation)
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
   }
 
@@ -201,7 +266,11 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Check for duplicate name if name is being updated
     if (data.name && context?.userId) {
-      const existingTaskList = await query('SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 AND id <> $3 LIMIT 1', [data.name.trim(), context.userId, id], this.db);
+      const existingTaskList = await query(
+        'SELECT id FROM task_lists WHERE name = $1 AND "userId" = $2 AND id <> $3 LIMIT 1',
+        [data.name.trim(), context.userId, id],
+        this.db
+      );
       if (existingTaskList.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
       }
@@ -209,14 +278,19 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
     // Validate color format if provided
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
   }
 
   /**
    * Create task list with proper defaults
    */
-  async create(data: CreateTaskListDTO, context?: ServiceContext): Promise<TaskListEntity> {
+  async create(
+    data: CreateTaskListDTO,
+    context?: ServiceContext
+  ): Promise<TaskListEntity> {
     try {
       this.log('create', { data }, context);
 
@@ -229,11 +303,24 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
         `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW(), NOW())
          RETURNING *`,
-        [data.name.trim(), data.color, data.icon || null, data.description?.trim() || null, context!.userId!],
+        [
+          data.name.trim(),
+          data.color,
+          data.icon || null,
+          data.description?.trim() || null,
+          context!.userId!,
+        ],
         this.db
       );
       const row = inserted.rows[0];
       this.log('create:success', { id: row.id }, context);
+
+      // Invalidate cache after creating a new task list
+      if (context?.userId) {
+        const cacheKey = createCacheKey('task-lists', context.userId);
+        taskListCache.invalidate(cacheKey);
+      }
+
       return this.transformEntity(row);
     } catch (error) {
       this.log('create:error', { error: error.message, data }, context);
@@ -253,12 +340,20 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       this.log('getDefault', {}, context);
 
       // Try to find "General" task list first
-      const generalRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 LIMIT 1', [context.userId!, 'General'], this.db);
+      const generalRes = await query(
+        'SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 LIMIT 1',
+        [context.userId!, 'General'],
+        this.db
+      );
       let defaultTaskList = generalRes.rows[0];
 
       // If no "General" list, get the first task list
       if (!defaultTaskList) {
-        const firstRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1', [context.userId!], this.db);
+        const firstRes = await query(
+          'SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1',
+          [context.userId!],
+          this.db
+        );
         defaultTaskList = firstRes.rows[0];
       }
 
@@ -287,7 +382,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
   /**
    * Get task lists with task counts
    */
-  async getWithTaskCount(context?: ServiceContext): Promise<TaskListWithCounts[]> {
+  async getWithTaskCount(
+    context?: ServiceContext
+  ): Promise<TaskListWithCounts[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -308,7 +405,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
         this.db
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results: TaskListWithCounts[] = res.rows.map((r: any) => ({
+        // Database row
         id: r.id,
         name: r.name,
         color: r.color,
@@ -341,7 +440,11 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
     try {
       this.log('getWithTasks', {}, context);
 
-      const listsRes = await query('SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY name ASC', [context.userId!], this.db);
+      const listsRes = await query(
+        'SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY name ASC',
+        [context.userId!],
+        this.db
+      );
       const listIds = listsRes.rows.map((r) => r.id);
       const placeholders = listIds.map((_, i) => `$${i + 1}`).join(',');
       const tasksRes = listIds.length
@@ -352,14 +455,27 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
             listIds,
             this.db
           )
-        : { rows: [] } as any;
-      const tasksByList = new Map<string, any[]>();
+        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ({ rows: [] } as any); // Empty result set for no task lists
+      interface TaskRow {
+        id: string;
+        title: string;
+        completed: boolean;
+        scheduledDate: Date | null;
+        priority: string;
+        taskListId: string;
+      }
+      const tasksByList = new Map<string, TaskRow[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (tasksRes.rows as any[]).forEach((t) => {
+        // Database rows
         const arr = tasksByList.get(t.taskListId) || [];
         if (arr.length < 10) arr.push(t);
         tasksByList.set(t.taskListId, arr);
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results = listsRes.rows.map((l: any) => ({
+        // Database row
         id: l.id,
         name: l.name,
         color: l.color,
@@ -389,7 +505,10 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
   /**
    * Reorder task lists
    */
-  async reorder(taskListIds: string[], context?: ServiceContext): Promise<TaskListEntity[]> {
+  async reorder(
+    taskListIds: string[],
+    context?: ServiceContext
+  ): Promise<TaskListEntity[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -399,16 +518,26 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
       // Validate all task lists belong to user
       const placeholders = taskListIds.map((_, i) => `$${i + 1}`).join(',');
-      const res = await query(`SELECT id FROM task_lists WHERE id IN (${placeholders}) AND "userId" = $${taskListIds.length + 1}`, [...taskListIds, context.userId!], this.db);
+      const res = await query(
+        `SELECT id FROM task_lists WHERE id IN (${placeholders}) AND "userId" = $${taskListIds.length + 1}`,
+        [...taskListIds, context.userId!],
+        this.db
+      );
       if (res.rowCount !== taskListIds.length) {
-        throw new Error('VALIDATION_ERROR: Some task lists not found or access denied');
+        throw new Error(
+          'VALIDATION_ERROR: Some task lists not found or access denied'
+        );
       }
 
       // For now, just return the task lists in the requested order
       // In a full implementation, you might add an `order` field to the database
       const orderedTaskLists = await Promise.all(
         taskListIds.map(async (id) => {
-          const r = await query('SELECT * FROM task_lists WHERE id = $1', [id], this.db);
+          const r = await query(
+            'SELECT * FROM task_lists WHERE id = $1',
+            [id],
+            this.db
+          );
           return r.rows[0];
         })
       );
@@ -449,12 +578,22 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
 
         // Move all tasks to the default task list if they're not already there
         if (defaultTaskList.id !== id) {
-          await query('UPDATE tasks SET "taskListId" = $1 WHERE "taskListId" = $2 AND "userId" = $3', [defaultTaskList.id, id, context.userId!], this.db);
+          await query(
+            'UPDATE tasks SET "taskListId" = $1 WHERE "taskListId" = $2 AND "userId" = $3',
+            [defaultTaskList.id, id, context.userId!],
+            this.db
+          );
         }
       }
 
       // Delete the task list
       await query('DELETE FROM task_lists WHERE id = $1', [id], this.db);
+
+      // Invalidate cache after deleting a task list
+      if (context?.userId) {
+        const cacheKey = createCacheKey('task-lists', context.userId);
+        taskListCache.invalidate(cacheKey);
+      }
 
       this.log('delete:success', { id }, context);
       return true;
@@ -482,16 +621,35 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
       this.log('getStatistics', {}, context);
 
       const [listsRes, tasksRes, completedRes] = await Promise.all([
-        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM task_lists WHERE "userId" = $1', [context.userId!], this.db),
-        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1', [context.userId!], this.db),
-        query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true', [context.userId!], this.db),
+        query<{ count: string }>(
+          'SELECT COUNT(*)::bigint AS count FROM task_lists WHERE "userId" = $1',
+          [context.userId!],
+          this.db
+        ),
+        query<{ count: string }>(
+          'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1',
+          [context.userId!],
+          this.db
+        ),
+        query<{ count: string }>(
+          'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true',
+          [context.userId!],
+          this.db
+        ),
       ]);
       const totalLists = Number(listsRes.rows[0].count);
       const totalTasks = Number(tasksRes.rows[0].count);
       const completedTasks = Number(completedRes.rows[0].count);
       const pendingTasks = totalTasks - completedTasks;
-      const averageTasksPerList = totalLists > 0 ? Math.round((totalTasks / totalLists) * 100) / 100 : 0;
-      const stats = { totalLists, totalTasks, completedTasks, pendingTasks, averageTasksPerList };
+      const averageTasksPerList =
+        totalLists > 0 ? Math.round((totalTasks / totalLists) * 100) / 100 : 0;
+      const stats = {
+        totalLists,
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        averageTasksPerList,
+      };
 
       this.log('getStatistics:success', stats, context);
       return stats;
@@ -508,7 +666,9 @@ export class TaskListService extends BaseService<TaskListEntity, CreateTaskListD
   async archive(): Promise<TaskListEntity> {
     // This is a placeholder for future archiving functionality
     // Would require schema changes to add `isActive` or `archivedAt` fields
-    throw new Error('NOT_IMPLEMENTED: Archive functionality not yet implemented');
+    throw new Error(
+      'NOT_IMPLEMENTED: Archive functionality not yet implemented'
+    );
   }
 
   /**
