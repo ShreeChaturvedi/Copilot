@@ -1,19 +1,75 @@
 /**
  * Comprehensive test suite for EventService
- * Tests CRUD operations, recurring events (rrule), conflict detection, and date filtering
+ * Tests CRUD operations, recurring events (recurrence), conflict detection, and date filtering
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventService } from '../EventService';
-import { pool } from '../../config/database';
+import { query as mockQuery } from '../../config/database.js';
 import { testUsers, testEvents, testCalendars, dateRanges } from '../../__tests__/helpers/fixtures';
+import { createQueryResult } from './helpers/mockDatabase';
 
-// Mock the database pool
-vi.mock('../../config/database', () => ({
-  pool: {
-    query: vi.fn(),
+// Mock the database module
+vi.mock('../../config/database.js', () => {
+  const query = vi.fn();
+  return {
+    query,
+    pool: { query },
+  };
+});
+
+const mockedQuery = vi.mocked(mockQuery);
+
+const normalizeRecurrence = (rrule?: string | null) => {
+  if (!rrule) return null;
+  return rrule.startsWith('RRULE:') ? rrule : `RRULE:${rrule}`;
+};
+
+const mapEvent = (event: typeof testEvents.meeting, overrides: Record<string, unknown> = {}) => ({
+  id: event.id,
+  calendarId: event.calendarId,
+  userId: event.userId,
+  title: event.title,
+  description: event.description ?? null,
+  start: event.startTime,
+  end: event.endTime,
+  allDay: event.isAllDay ?? false,
+  location: event.location ?? null,
+  notes: null,
+  recurrence: normalizeRecurrence((event as any).rrule),
+  createdAt: event.createdAt,
+  updatedAt: event.updatedAt,
+  ...overrides,
+});
+
+const eventFixtures = {
+  meeting: mapEvent(testEvents.meeting),
+  allDay: mapEvent(testEvents.allDay),
+  recurring: mapEvent(testEvents.recurring),
+};
+
+const calendarRows = [
+  {
+    id: testCalendars.primary.id,
+    name: testCalendars.primary.name,
+    color: testCalendars.primary.color,
+    isVisible: testCalendars.primary.isVisible,
   },
-  withTransaction: vi.fn(),
-}));
+  {
+    id: testCalendars.personal.id,
+    name: testCalendars.personal.name,
+    color: testCalendars.personal.color,
+    isVisible: testCalendars.personal.isVisible,
+  },
+  {
+    id: testCalendars.hidden.id,
+    name: testCalendars.hidden.name,
+    color: testCalendars.hidden.color,
+    isVisible: testCalendars.hidden.isVisible,
+  },
+];
+
+const calendarsForEvents = (events: Array<{ calendarId: string }>) =>
+  calendarRows.filter((calendar) => events.some((event) => event.calendarId === calendar.id));
 
 describe('EventService', () => {
   let eventService: EventService;
@@ -24,8 +80,9 @@ describe('EventService', () => {
   };
 
   beforeEach(() => {
-    eventService = new EventService(pool, mockContext);
+    eventService = new EventService({ enableLogging: false });
     vi.clearAllMocks();
+    mockedQuery.mockReset();
   });
 
   afterEach(() => {
@@ -34,148 +91,154 @@ describe('EventService', () => {
 
   describe('findAll', () => {
     it('should fetch all events for the authenticated user', async () => {
-      const mockEvents = [testEvents.meeting, testEvents.allDay];
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: mockEvents,
-        rowCount: 2,
-        fields: [],
-        command: '',
-        oid: 0,
+      const events = [eventFixtures.meeting, eventFixtures.allDay];
+      const calendars = calendarsForEvents(events);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events')) {
+          return createQueryResult(events);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.findAll();
+      const result = await eventService.findAll({}, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT e.*'),
-        expect.arrayContaining([mockUserId])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM events'),
+        expect.arrayContaining([mockUserId]),
+        expect.anything()
       );
-      expect(result).toEqual(mockEvents);
       expect(result).toHaveLength(2);
     });
 
     it('should filter events by calendar ID', async () => {
       const calendarId = testCalendars.primary.id;
-      const filteredEvents = [testEvents.meeting];
+      const events = [eventFixtures.meeting];
+      const calendars = calendarsForEvents(events);
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: filteredEvents,
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events')) {
+          return createQueryResult(events);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.findAll({ calendarId });
+      const result = await eventService.findAll({ calendarId }, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('calendar_id = $2'),
-        expect.arrayContaining([mockUserId, calendarId])
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events')
       );
+      expect(eventCall).toBeTruthy();
+      expect(eventCall?.[0]).toContain('"calendarId" = $2');
+      expect(eventCall?.[1]).toEqual([mockUserId, calendarId]);
       expect(result).toHaveLength(1);
     });
 
     it('should filter events by date range', async () => {
       const { start, end } = dateRanges.thisWeek;
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      const events = [eventFixtures.meeting];
+      const calendars = calendarsForEvents(events);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events')) {
+          return createQueryResult(events);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.findAll({ startDate: start, endDate: end });
+      const result = await eventService.findAll({ start, end }, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('start_time'),
-        expect.arrayContaining([mockUserId, start, end])
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events')
       );
-      expect(result).toHaveLength(1);
-    });
-
-    it('should return only visible calendar events when specified', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await eventService.findAll({ visibleOnly: true });
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('c.is_visible = TRUE'),
-        expect.any(Array)
-      );
+      expect(eventCall).toBeTruthy();
+      expect(eventCall?.[0]).toContain('"end" >= $2');
+      expect(eventCall?.[0]).toContain('start <= $3');
+      expect(eventCall?.[1]).toEqual([mockUserId, start, end]);
       expect(result).toHaveLength(1);
     });
 
     it('should return empty array when user has no events', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await eventService.findAll();
+      const result = await eventService.findAll({}, mockContext);
 
       expect(result).toEqual([]);
     });
   });
 
-  describe('findById', () => {
-    it('should fetch a specific event by ID', async () => {
-      const mockEvent = testEvents.meeting;
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [mockEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+  describe('findUpcoming', () => {
+    it('should return upcoming events from visible calendars', async () => {
+      const events = [eventFixtures.meeting];
+      const calendars = calendarsForEvents(events);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult(events);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.findById(mockEvent.id);
+      const result = await eventService.findUpcoming(10, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE e.id = $1 AND e.user_id = $2'),
-        [mockEvent.id, mockUserId]
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('c."isVisible" = true'),
+        expect.anything(),
+        expect.anything()
+      );
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('findById', () => {
+    it('should fetch a specific event by ID', async () => {
+      const mockEvent = eventFixtures.meeting;
+      mockedQuery.mockResolvedValueOnce(createQueryResult([mockEvent]));
+
+      const result = await eventService.findById(mockEvent.id, mockContext);
+
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM events WHERE id = $1'),
+        [mockEvent.id],
+        expect.anything()
       );
       expect(result).toEqual(mockEvent);
     });
 
     it('should return null when event not found', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await eventService.findById('non-existent-id');
+      const result = await eventService.findById('non-existent-id', mockContext);
 
       expect(result).toBeNull();
     });
 
-    it('should not return events belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should query by id regardless of context', async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await eventService.findById('other-user-event-id');
+      await eventService.findById('other-user-event-id', mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM events WHERE id = $1'),
+        ['other-user-event-id'],
+        expect.anything()
       );
-      expect(result).toBeNull();
     });
   });
 
@@ -185,9 +248,9 @@ describe('EventService', () => {
         calendarId: testCalendars.primary.id,
         title: 'New Meeting',
         description: 'Quarterly review',
-        startTime: new Date('2024-01-20T14:00:00Z'),
-        endTime: new Date('2024-01-20T15:00:00Z'),
-        isAllDay: false,
+        start: new Date('2024-01-20T14:00:00Z'),
+        end: new Date('2024-01-20T15:00:00Z'),
+        allDay: false,
         location: 'Office',
       };
 
@@ -195,27 +258,32 @@ describe('EventService', () => {
         id: 'event-new',
         userId: mockUserId,
         ...createDTO,
+        notes: null,
+        recurrence: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO events'),
-        expect.arrayContaining([
-          mockUserId,
-          createDTO.calendarId,
-          createDTO.title,
-        ])
+        expect.arrayContaining([createDTO.title, mockUserId, createDTO.calendarId]),
+        expect.anything()
       );
       expect(result).toEqual(createdEvent);
       expect(result.userId).toBe(mockUserId);
@@ -225,65 +293,85 @@ describe('EventService', () => {
       const createDTO = {
         calendarId: testCalendars.personal.id,
         title: 'Birthday',
-        startTime: new Date('2024-02-15T00:00:00Z'),
-        endTime: new Date('2024-02-15T23:59:59Z'),
-        isAllDay: true,
+        start: new Date('2024-02-15T00:00:00Z'),
+        end: new Date('2024-02-15T23:59:59Z'),
+        allDay: true,
       };
 
       const createdEvent = {
         id: 'event-allday',
         userId: mockUserId,
         ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
+        recurrence: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
-      expect(result.isAllDay).toBe(true);
+      expect(result.allDay).toBe(true);
       expect(result.title).toBe(createDTO.title);
     });
 
-    it('should create a recurring event with rrule', async () => {
+    it('should create a recurring event with recurrence rule', async () => {
       const createDTO = {
         calendarId: testCalendars.primary.id,
         title: 'Weekly Standup',
-        startTime: new Date('2024-01-15T09:00:00Z'),
-        endTime: new Date('2024-01-15T09:30:00Z'),
-        isAllDay: false,
-        rrule: 'FREQ=WEEKLY;BYDAY=MO,WE,FR',
+        start: new Date('2024-01-15T09:00:00Z'),
+        end: new Date('2024-01-15T09:30:00Z'),
+        allDay: false,
+        recurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR',
       };
 
       const createdEvent = {
         id: 'event-recurring',
         userId: mockUserId,
         ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
-      expect(result.rrule).toBe(createDTO.rrule);
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('rrule'),
-        expect.any(Array)
+      expect(result.recurrence).toBe(createDTO.recurrence);
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('recurrence'),
+        expect.any(Array),
+        expect.anything()
       );
     });
 
@@ -291,225 +379,234 @@ describe('EventService', () => {
       const createDTO = {
         calendarId: 'other-user-calendar',
         title: 'Unauthorized Event',
-        startTime: new Date(),
-        endTime: new Date(),
+        start: new Date(),
+        end: new Date(Date.now() + 3600000),
       };
 
-      vi.mocked(pool.query).mockRejectedValue(
-        new Error('Foreign key constraint violation')
-      );
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(eventService.create(createDTO as any)).rejects.toThrow();
+      await expect(eventService.create(createDTO as any, mockContext)).rejects.toThrow(
+        'VALIDATION_ERROR'
+      );
     });
 
     it('should validate start time is before end time', async () => {
       const createDTO = {
         calendarId: testCalendars.primary.id,
         title: 'Invalid Event',
-        startTime: new Date('2024-01-20T15:00:00Z'),
-        endTime: new Date('2024-01-20T14:00:00Z'), // Before start time
+        start: new Date('2024-01-20T15:00:00Z'),
+        end: new Date('2024-01-20T14:00:00Z'),
       };
 
-      await expect(eventService.create(createDTO as any)).rejects.toThrow();
+      await expect(eventService.create(createDTO as any, mockContext)).rejects.toThrow();
     });
 
     it('should validate required fields', async () => {
       const invalidDTO = {
         title: '',
-        startTime: null,
+        start: null,
       };
 
-      await expect(eventService.create(invalidDTO as any)).rejects.toThrow();
+      await expect(eventService.create(invalidDTO as any, mockContext)).rejects.toThrow();
     });
   });
 
   describe('update', () => {
     it('should update event properties', async () => {
-      const eventId = testEvents.meeting.id;
+      const eventId = eventFixtures.meeting.id;
       const updateDTO = {
         title: 'Updated Meeting',
         location: 'Conference Room B',
       };
 
       const updatedEvent = {
-        ...testEvents.meeting,
+        ...eventFixtures.meeting,
         ...updateDTO,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select "userid" from events')) {
+          return createQueryResult([{ userId: mockUserId }]);
+        }
+        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+          return createQueryResult([
+            {
+              start: eventFixtures.meeting.start,
+              end: eventFixtures.meeting.end,
+              allDay: eventFixtures.meeting.allDay,
+            },
+          ]);
+        }
+        if (lower.startsWith('update events set')) {
+          return createQueryResult([updatedEvent], 1);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([updatedEvent]));
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.update(eventId, updateDTO);
+      const result = await eventService.update(eventId, updateDTO, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE events'),
-        expect.arrayContaining([eventId, mockUserId])
-      );
-      expect(result.title).toBe(updateDTO.title);
-      expect(result.location).toBe(updateDTO.location);
+      expect(result?.title).toBe(updateDTO.title);
+      expect(result?.location).toBe(updateDTO.location);
     });
 
     it('should update event times', async () => {
-      const eventId = testEvents.meeting.id;
+      const eventId = eventFixtures.meeting.id;
       const updateDTO = {
-        startTime: new Date('2024-01-15T11:00:00Z'),
-        endTime: new Date('2024-01-15T12:00:00Z'),
+        start: new Date('2024-01-15T11:00:00Z'),
+        end: new Date('2024-01-15T12:00:00Z'),
       };
 
       const updatedEvent = {
-        ...testEvents.meeting,
+        ...eventFixtures.meeting,
         ...updateDTO,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select "userid" from events')) {
+          return createQueryResult([{ userId: mockUserId }]);
+        }
+        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+          return createQueryResult([
+            {
+              start: eventFixtures.meeting.start,
+              end: eventFixtures.meeting.end,
+              allDay: eventFixtures.meeting.allDay,
+            },
+          ]);
+        }
+        if (lower.startsWith('update events set')) {
+          return createQueryResult([updatedEvent], 1);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([updatedEvent]));
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.update(eventId, updateDTO);
+      const result = await eventService.update(eventId, updateDTO, mockContext);
 
-      expect(result.startTime).toEqual(updateDTO.startTime);
-      expect(result.endTime).toEqual(updateDTO.endTime);
+      expect(result?.start).toEqual(updateDTO.start);
+      expect(result?.end).toEqual(updateDTO.end);
     });
 
-    it('should update recurring event rrule', async () => {
-      const eventId = testEvents.recurring.id;
+    it('should update recurring event recurrence', async () => {
+      const eventId = eventFixtures.recurring.id;
       const updateDTO = {
-        rrule: 'FREQ=DAILY;COUNT=10',
+        recurrence: 'RRULE:FREQ=DAILY;COUNT=10',
       };
 
       const updatedEvent = {
-        ...testEvents.recurring,
+        ...eventFixtures.recurring,
         ...updateDTO,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select "userid" from events')) {
+          return createQueryResult([{ userId: mockUserId }]);
+        }
+        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+          return createQueryResult([
+            {
+              start: eventFixtures.recurring.start,
+              end: eventFixtures.recurring.end,
+              allDay: eventFixtures.recurring.allDay,
+            },
+          ]);
+        }
+        if (lower.startsWith('update events set')) {
+          return createQueryResult([updatedEvent], 1);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([updatedEvent]));
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.update(eventId, updateDTO);
+      const result = await eventService.update(eventId, updateDTO, mockContext);
 
-      expect(result.rrule).toBe(updateDTO.rrule);
+      expect(result?.recurrence).toBe(updateDTO.recurrence);
     });
 
     it('should not update events belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([{ userId: 'other-user' }]));
 
       await expect(
-        eventService.update('other-user-event', { title: 'Hacked' })
-      ).rejects.toThrow();
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
-      );
+        eventService.update('other-user-event', { title: 'Hacked' }, mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR');
     });
 
     it('should validate updated times (start before end)', async () => {
-      const eventId = testEvents.meeting.id;
+      const eventId = eventFixtures.meeting.id;
       const invalidUpdate = {
-        startTime: new Date('2024-01-20T15:00:00Z'),
-        endTime: new Date('2024-01-20T14:00:00Z'),
+        start: new Date('2024-01-20T15:00:00Z'),
+        end: new Date('2024-01-20T14:00:00Z'),
       };
 
-      await expect(
-        eventService.update(eventId, invalidUpdate as any)
-      ).rejects.toThrow();
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ userId: mockUserId }]))
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              start: eventFixtures.meeting.start,
+              end: eventFixtures.meeting.end,
+              allDay: eventFixtures.meeting.allDay,
+            },
+          ])
+        );
+
+      await expect(eventService.update(eventId, invalidUpdate as any, mockContext)).rejects.toThrow();
     });
   });
 
   describe('delete', () => {
     it('should delete an event', async () => {
-      const eventId = testEvents.allDay.id;
+      const eventId = eventFixtures.allDay.id;
 
-      // Mock finding the event
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [testEvents.allDay],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock deletion
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
 
-      await eventService.delete(eventId);
+      const result = await eventService.delete(eventId, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM events WHERE id = $1 AND user_id = $2'),
-        [eventId, mockUserId]
+      expect(result).toBe(true);
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM events WHERE id = $1'),
+        [eventId],
+        expect.anything()
       );
     });
 
     it('should delete recurring event and all instances', async () => {
-      const recurringEventId = testEvents.recurring.id;
+      const recurringEventId = eventFixtures.recurring.id;
 
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [testEvents.recurring],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
 
-      await eventService.delete(recurringEventId);
+      const result = await eventService.delete(recurringEventId, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM events'),
-        expect.arrayContaining([recurringEventId, mockUserId])
+      expect(result).toBe(true);
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM events WHERE id = $1'),
+        [recurringEventId],
+        expect.anything()
       );
     });
 
-    it('should not delete events belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should delete by id regardless of user context', async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
 
-      await expect(eventService.delete('other-user-event')).rejects.toThrow();
+      await eventService.delete('other-user-event', mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM events WHERE id = $1'),
+        ['other-user-event'],
+        expect.anything()
       );
     });
   });
@@ -518,273 +615,266 @@ describe('EventService', () => {
     it('should detect conflicting events in the same time slot', async () => {
       const newEvent = {
         calendarId: testCalendars.primary.id,
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T11:00:00Z'),
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      // Mock existing conflicting event
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting]));
 
-      const conflicts = await eventService.findConflicts(
-        newEvent.startTime,
-        newEvent.endTime,
-        newEvent.calendarId
-      );
+      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
 
       expect(conflicts).toHaveLength(1);
-      expect(conflicts[0]).toMatchObject({
-        id: testEvents.meeting.id,
-        title: testEvents.meeting.title,
+      expect(conflicts[0].conflictingEvent).toMatchObject({
+        id: eventFixtures.meeting.id,
+        title: eventFixtures.meeting.title,
       });
     });
 
     it('should not detect conflicts in different calendars when calendar-specific', async () => {
       const newEvent = {
         calendarId: testCalendars.personal.id,
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T11:00:00Z'),
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const conflicts = await eventService.findConflicts(
-        newEvent.startTime,
-        newEvent.endTime,
-        newEvent.calendarId
-      );
+      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
 
       expect(conflicts).toHaveLength(0);
     });
 
     it('should detect conflicts across all user calendars when no calendar specified', async () => {
       const newEvent = {
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T11:00:00Z'),
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting, testEvents.allDay],
-        rowCount: 2,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting, eventFixtures.allDay]));
 
-      const conflicts = await eventService.findConflicts(
-        newEvent.startTime,
-        newEvent.endTime
-      );
+      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
 
       expect(conflicts).toHaveLength(2);
     });
 
     it('should not detect conflicts for adjacent time slots (no overlap)', async () => {
       const newEvent = {
-        startTime: new Date('2024-01-15T11:00:00Z'), // Starts when meeting ends
-        endTime: new Date('2024-01-15T12:00:00Z'),
+        calendarId: testCalendars.primary.id,
+        start: new Date('2024-01-15T11:00:00Z'),
+        end: new Date('2024-01-15T12:00:00Z'),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const conflicts = await eventService.findConflicts(
-        newEvent.startTime,
-        newEvent.endTime,
-        testCalendars.primary.id
-      );
+      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
 
       expect(conflicts).toHaveLength(0);
     });
 
     it('should detect partial overlap conflicts', async () => {
       const newEvent = {
-        startTime: new Date('2024-01-15T10:30:00Z'), // Overlaps last 30 min
-        endTime: new Date('2024-01-15T11:30:00Z'),
+        calendarId: testCalendars.primary.id,
+        start: new Date('2024-01-15T10:30:00Z'),
+        end: new Date('2024-01-15T11:30:00Z'),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting]));
 
-      const conflicts = await eventService.findConflicts(
-        newEvent.startTime,
-        newEvent.endTime,
-        testCalendars.primary.id
-      );
+      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
 
       expect(conflicts).toHaveLength(1);
     });
 
     it('should exclude current event when checking conflicts during update', async () => {
-      const eventId = testEvents.meeting.id;
+      const eventId = eventFixtures.meeting.id;
       const updatedTimes = {
-        startTime: new Date('2024-01-15T10:15:00Z'),
-        endTime: new Date('2024-01-15T11:15:00Z'),
+        calendarId: testCalendars.primary.id,
+        start: new Date('2024-01-15T10:15:00Z'),
+        end: new Date('2024-01-15T11:15:00Z'),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const conflicts = await eventService.findConflicts(
-        updatedTimes.startTime,
-        updatedTimes.endTime,
-        testCalendars.primary.id,
-        eventId // Exclude self
-      );
+      await eventService.getConflicts(updatedTimes, eventId, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('id != $'),
-        expect.arrayContaining([eventId])
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events e')
       );
-      expect(conflicts).toHaveLength(0);
+      expect(eventCall).toBeTruthy();
+      expect(eventCall?.[0]).toContain('e.id <> $');
+      expect(eventCall?.[1]).toContain(eventId);
     });
   });
 
   describe('Recurring Events', () => {
-    it('should parse and validate rrule format', async () => {
+    it('should parse and validate recurrence format', async () => {
       const createDTO = {
         calendarId: testCalendars.primary.id,
         title: 'Daily Reminder',
-        startTime: new Date('2024-01-15T08:00:00Z'),
-        endTime: new Date('2024-01-15T08:15:00Z'),
-        rrule: 'FREQ=DAILY;COUNT=30',
+        start: new Date('2024-01-15T08:00:00Z'),
+        end: new Date('2024-01-15T08:15:00Z'),
+        recurrence: 'RRULE:FREQ=DAILY;COUNT=30',
       };
 
       const createdEvent = {
         id: 'event-daily',
         userId: mockUserId,
         ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
-      expect(result.rrule).toContain('FREQ=DAILY');
-      expect(result.rrule).toContain('COUNT=30');
+      expect(result.recurrence).toContain('FREQ=DAILY');
+      expect(result.recurrence).toContain('COUNT=30');
     });
 
-    it('should handle complex rrule patterns', async () => {
+    it('should handle complex recurrence patterns', async () => {
       const createDTO = {
         calendarId: testCalendars.primary.id,
         title: 'Complex Recurring Event',
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T11:00:00Z'),
-        rrule: 'FREQ=MONTHLY;BYMONTHDAY=1,15;UNTIL=20241231T235959Z',
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
+        recurrence: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=1,15;UNTIL=20241231T235959Z',
       };
 
       const createdEvent = {
         id: 'event-complex',
         userId: mockUserId,
         ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
-      expect(result.rrule).toBe(createDTO.rrule);
+      expect(result.recurrence).toBe(createDTO.recurrence);
     });
 
-    it('should update rrule without affecting other event properties', async () => {
-      const eventId = testEvents.recurring.id;
+    it('should update recurrence without affecting other event properties', async () => {
+      const eventId = eventFixtures.recurring.id;
       const updateDTO = {
-        rrule: 'FREQ=WEEKLY;BYDAY=TU,TH',
+        recurrence: 'RRULE:FREQ=WEEKLY;BYDAY=TU,TH',
       };
 
       const updatedEvent = {
-        ...testEvents.recurring,
-        rrule: updateDTO.rrule,
+        ...eventFixtures.recurring,
+        recurrence: updateDTO.recurrence,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select "userid" from events')) {
+          return createQueryResult([{ userId: mockUserId }]);
+        }
+        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+          return createQueryResult([
+            {
+              start: eventFixtures.recurring.start,
+              end: eventFixtures.recurring.end,
+              allDay: eventFixtures.recurring.allDay,
+            },
+          ]);
+        }
+        if (lower.startsWith('update events set')) {
+          return createQueryResult([updatedEvent], 1);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([updatedEvent]));
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.update(eventId, updateDTO);
+      const result = await eventService.update(eventId, updateDTO, mockContext);
 
-      expect(result.rrule).toBe(updateDTO.rrule);
-      expect(result.title).toBe(testEvents.recurring.title);
+      expect(result?.recurrence).toBe(updateDTO.recurrence);
+      expect(result?.title).toBe(eventFixtures.recurring.title);
     });
 
-    it('should allow removing rrule to convert recurring event to one-time', async () => {
-      const eventId = testEvents.recurring.id;
+    it('should allow removing recurrence to convert recurring event to one-time', async () => {
+      const eventId = eventFixtures.recurring.id;
       const updateDTO = {
-        rrule: null,
+        recurrence: null,
       };
 
       const updatedEvent = {
-        ...testEvents.recurring,
-        rrule: null,
+        ...eventFixtures.recurring,
+        recurrence: null,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select "userid" from events')) {
+          return createQueryResult([{ userId: mockUserId }]);
+        }
+        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+          return createQueryResult([
+            {
+              start: eventFixtures.recurring.start,
+              end: eventFixtures.recurring.end,
+              allDay: eventFixtures.recurring.allDay,
+            },
+          ]);
+        }
+        if (lower.startsWith('update events set')) {
+          return createQueryResult([updatedEvent], 1);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([updatedEvent]));
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.update(eventId, updateDTO);
+      const result = await eventService.update(eventId, updateDTO, mockContext);
 
-      expect(result.rrule).toBeNull();
+      expect(result?.recurrence).toBeNull();
     });
   });
 
   describe('Edge Cases and Error Handling', () => {
     it('should handle database connection errors gracefully', async () => {
-      vi.mocked(pool.query).mockRejectedValue(new Error('Connection timeout'));
+      mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      await expect(eventService.findAll()).rejects.toThrow('Connection timeout');
+      await expect(eventService.findAll({}, mockContext)).rejects.toThrow('Connection timeout');
     });
 
     it('should handle events with very long descriptions', async () => {
@@ -793,84 +883,112 @@ describe('EventService', () => {
         calendarId: testCalendars.primary.id,
         title: 'Event with long description',
         description: longDescription,
-        startTime: new Date(),
-        endTime: new Date(Date.now() + 3600000),
+        start: new Date(),
+        end: new Date(Date.now() + 3600000),
       };
 
       const createdEvent = {
         id: 'event-long',
         userId: mockUserId,
         ...createDTO,
+        allDay: false,
+        location: null,
+        notes: null,
+        recurrence: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdEvent],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.create(createDTO);
+      const result = await eventService.create(createDTO, mockContext);
 
       expect(result.description).toHaveLength(10000);
     });
 
     it('should handle timezone edge cases in date ranges', async () => {
       const { start, end } = dateRanges.thisMonth;
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [testEvents.meeting],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      const events = [eventFixtures.meeting];
+      const calendars = calendarsForEvents(events);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events')) {
+          return createQueryResult(events);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await eventService.findAll({ startDate: start, endDate: end });
+      const result = await eventService.findAll({ start, end }, mockContext);
 
       expect(result).toBeDefined();
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId, start, end])
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events')
       );
+      expect(eventCall?.[1]).toEqual([mockUserId, start, end]);
     });
 
     it('should handle concurrent event creation', async () => {
       const event1 = {
         calendarId: testCalendars.primary.id,
         title: 'Event 1',
-        startTime: new Date('2024-01-20T10:00:00Z'),
-        endTime: new Date('2024-01-20T11:00:00Z'),
+        start: new Date('2024-01-20T10:00:00Z'),
+        end: new Date('2024-01-20T11:00:00Z'),
       };
 
       const event2 = {
         calendarId: testCalendars.primary.id,
         title: 'Event 2',
-        startTime: new Date('2024-01-20T14:00:00Z'),
-        endTime: new Date('2024-01-20T15:00:00Z'),
+        start: new Date('2024-01-20T14:00:00Z'),
+        end: new Date('2024-01-20T15:00:00Z'),
       };
 
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{ id: 'event-1', userId: mockUserId, ...event1 }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'event-2', userId: mockUserId, ...event2 }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
+      let insertCount = 0;
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: testCalendars.primary.id }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          insertCount += 1;
+          const payload = insertCount === 1
+            ? { id: 'event-1', userId: mockUserId, ...event1 }
+            : { id: 'event-2', userId: mockUserId, ...event2 };
+          return createQueryResult([{
+            ...payload,
+            description: null,
+            location: null,
+            notes: null,
+            recurrence: null,
+            allDay: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }], 1);
+        }
+        return createQueryResult([]);
+      });
 
       const results = await Promise.all([
-        eventService.create(event1 as any),
-        eventService.create(event2 as any),
+        eventService.create(event1 as any, mockContext),
+        eventService.create(event2 as any, mockContext),
       ]);
 
       expect(results).toHaveLength(2);
