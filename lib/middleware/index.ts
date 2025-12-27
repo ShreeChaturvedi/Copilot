@@ -53,17 +53,18 @@ export class MiddlewarePipeline {
     finalHandler: () => void
   ): Promise<void> {
     let index = 0;
+    const middlewares = this.middlewares;
 
     async function next(): Promise<void> {
-      if (index >= this.middlewares.length) {
+      if (index >= middlewares.length) {
         return finalHandler();
       }
 
-      const middleware = this.middlewares[index++];
+      const middleware = middlewares[index++];
       await middleware(req, res, next);
     }
 
-    await next.call(this);
+    await next();
   }
 }
 
