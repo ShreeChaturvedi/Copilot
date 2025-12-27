@@ -31,10 +31,15 @@ class GoogleOAuthService {
   constructor() {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/auth/google/callback';
+    const redirectUri =
+      process.env.GOOGLE_REDIRECT_URI ||
+      'http://localhost:3001/auth/google/callback';
 
     if (!clientId || !clientSecret) {
-      throw new Error('Google OAuth credentials not configured');
+      // Don't throw - just create a non-functional client
+      // isConfigured() will return false
+      this.oauth2Client = new OAuth2Client('', '', redirectUri);
+      return;
     }
 
     this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
@@ -46,13 +51,13 @@ class GoogleOAuthService {
   getAuthUrl(): string {
     const scopes = [
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/userinfo.profile',
     ];
 
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent'
+      prompt: 'consent',
     });
   }
 
@@ -85,7 +90,7 @@ class GoogleOAuthService {
     try {
       const ticket = await this.oauth2Client.verifyIdToken({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: process.env.GOOGLE_CLIENT_ID,
       });
 
       const payload = ticket.getPayload();
@@ -98,7 +103,7 @@ class GoogleOAuthService {
         email: payload.email!,
         name: payload.name!,
         picture: payload.picture,
-        verified_email: payload.email_verified || false
+        verified_email: payload.email_verified || false,
       };
 
       // Find or create user in database
@@ -116,11 +121,14 @@ class GoogleOAuthService {
    */
   private async getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
     try {
-      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
+      const response = await fetch(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch user info from Google');
@@ -137,20 +145,42 @@ class GoogleOAuthService {
   /**
    * Find existing user or create new user from Google info
    */
-  private async findOrCreateUser(googleUserInfo: GoogleUserInfo): Promise<GoogleAuthResult> {
+  private async findOrCreateUser(
+    googleUserInfo: GoogleUserInfo
+  ): Promise<GoogleAuthResult> {
     const { id: googleId, email, name, picture } = googleUserInfo;
 
     // First, try to find user by Google ID
-    let userRow = await query<{ id: string; email: string; name: string | null; googleId: string | null; createdAt: Date }>(
+    let userRow = await query<{
+      id: string;
+      email: string;
+      name: string | null;
+      googleId: string | null;
+      createdAt: Date;
+    }>(
       `SELECT id, email, name, "createdAt", "googleId" FROM users WHERE "googleId" = $1 LIMIT 1`,
       [googleId]
     );
-    let user = userRow.rows[0] as any;
+    let user:
+      | {
+          id: string;
+          email: string;
+          name: string | null;
+          googleId: string | null;
+          createdAt: Date;
+        }
+      | undefined = userRow.rows[0];
 
     let isNewUser = false;
 
     if (!user) {
-      userRow = await query<{ id: string; email: string; name: string | null; googleId: string | null; createdAt: Date }>(
+      userRow = await query<{
+        id: string;
+        email: string;
+        name: string | null;
+        googleId: string | null;
+        createdAt: Date;
+      }>(
         `SELECT id, email, name, "createdAt", "googleId" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
         [email.toLowerCase()]
       );
@@ -158,19 +188,36 @@ class GoogleOAuthService {
 
       if (user) {
         // Link Google account to existing user
-        await query(`UPDATE users SET "googleId" = $1, "updatedAt" = NOW() WHERE id = $2`, [googleId, user.id]);
+        await query(
+          `UPDATE users SET "googleId" = $1, "updatedAt" = NOW() WHERE id = $2`,
+          [googleId, user.id]
+        );
 
         // Update profile with Google info if not set
-        await query(`UPDATE user_profiles SET "avatarUrl" = COALESCE($1, "avatarUrl") WHERE "userId" = $2`, [picture || null, user.id]);
+        await query(
+          `UPDATE user_profiles SET "avatarUrl" = COALESCE($1, "avatarUrl") WHERE "userId" = $2`,
+          [picture || null, user.id]
+        );
       } else {
         // Create new user
         const created = await withTransaction(async (tx) => {
-          const ins = await query<{ id: string; email: string; name: string | null; createdAt: Date }>(
+          const ins = await query<{
+            id: string;
+            email: string;
+            name: string | null;
+            createdAt: Date;
+          }>(
             `INSERT INTO users (id, email, name, "googleId", "createdAt", "updatedAt")
              VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW()) RETURNING id, email, name, "createdAt"`,
-            [email.toLowerCase(), name || null, googleId], tx);
+            [email.toLowerCase(), name || null, googleId],
+            tx
+          );
           const u = ins.rows[0];
-          await query(`INSERT INTO user_profiles (id, "userId", "avatarUrl", timezone) VALUES (gen_random_uuid()::text, $1, $2, 'UTC')`, [u.id, picture || null], tx);
+          await query(
+            `INSERT INTO user_profiles (id, "userId", "avatarUrl", timezone) VALUES (gen_random_uuid()::text, $1, $2, 'UTC')`,
+            [u.id, picture || null],
+            tx
+          );
           return u;
         });
         user = created;
@@ -181,13 +228,19 @@ class GoogleOAuthService {
       const updates: { name?: string } = {};
       if (name && name !== user.name) {
         updates.name = name;
-        await query(`UPDATE users SET name = $1, "updatedAt" = NOW() WHERE id = $2`, [name, user.id]);
+        await query(
+          `UPDATE users SET name = $1, "updatedAt" = NOW() WHERE id = $2`,
+          [name, user.id]
+        );
         user.name = name;
       }
 
       // Update avatar if changed
       if (picture) {
-        await query(`UPDATE user_profiles SET "avatarUrl" = $1 WHERE "userId" = $2`, [picture, user.id]);
+        await query(
+          `UPDATE user_profiles SET "avatarUrl" = $1 WHERE "userId" = $2`,
+          [picture, user.id]
+        );
       }
     }
 
@@ -207,10 +260,10 @@ class GoogleOAuthService {
         email: user.email,
         name: user.name,
         avatarUrl: picture || undefined,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
       },
       tokens,
-      isNewUser
+      isNewUser,
     };
   }
 
@@ -232,10 +285,13 @@ class GoogleOAuthService {
    * Unlink Google account from user
    */
   async unlinkAccount(userId: string): Promise<void> {
-    const result = await query<{ id: string; googleId: string | null; password: string | null }>(
-      `SELECT id, "googleId", password FROM users WHERE id = $1 LIMIT 1`,
-      [userId]
-    );
+    const result = await query<{
+      id: string;
+      googleId: string | null;
+      password: string | null;
+    }>(`SELECT id, "googleId", password FROM users WHERE id = $1 LIMIT 1`, [
+      userId,
+    ]);
     const user = result.rows[0];
 
     if (!user) {
@@ -255,7 +311,10 @@ class GoogleOAuthService {
     await this.revokeTokens(user.googleId);
 
     // Remove Google ID from user
-    await query(`UPDATE users SET "googleId" = NULL, "updatedAt" = NOW() WHERE id = $1`, [userId]);
+    await query(
+      `UPDATE users SET "googleId" = NULL, "updatedAt" = NOW() WHERE id = $1`,
+      [userId]
+    );
   }
 
   /**
