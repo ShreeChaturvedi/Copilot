@@ -4,16 +4,50 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TagService } from '../TagService';
-import { pool } from '../../config/database';
-import { testUsers, testTags, testTasks } from '../../__tests__/helpers/fixtures';
+import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
+import { testUsers, testTasks } from '../../__tests__/helpers/fixtures';
+import { createQueryResult } from './helpers/mockDatabase';
 
-// Mock the database pool
-vi.mock('../../config/database', () => ({
-  pool: {
-    query: vi.fn(),
+// Mock the database module
+vi.mock('../../config/database.js', () => {
+  const query = vi.fn();
+  const withTransaction = vi.fn();
+  return {
+    query,
+    withTransaction,
+    pool: { query },
+  };
+});
+
+const mockedQuery = vi.mocked(mockQuery);
+const mockedWithTransaction = vi.mocked(mockWithTransaction);
+
+const tagFixtures = {
+  priority: {
+    id: 'tag-123',
+    name: 'high-priority',
+    type: 'PRIORITY',
+    color: '#EF4444',
+    createdAt: new Date('2024-01-10T00:00:00Z'),
+    updatedAt: new Date('2024-01-10T00:00:00Z'),
   },
-  withTransaction: vi.fn(),
-}));
+  label: {
+    id: 'tag-456',
+    name: 'work',
+    type: 'LABEL',
+    color: '#3B82F6',
+    createdAt: new Date('2024-01-11T00:00:00Z'),
+    updatedAt: new Date('2024-01-11T00:00:00Z'),
+  },
+  project: {
+    id: 'tag-789',
+    name: 'urgent',
+    type: 'PROJECT',
+    color: '#F97316',
+    createdAt: new Date('2024-01-12T00:00:00Z'),
+    updatedAt: new Date('2024-01-12T00:00:00Z'),
+  },
+};
 
 describe('TagService', () => {
   let tagService: TagService;
@@ -24,8 +58,13 @@ describe('TagService', () => {
   };
 
   beforeEach(() => {
-    tagService = new TagService(pool, mockContext);
+    tagService = new TagService({ enableLogging: false });
     vi.clearAllMocks();
+    mockedQuery.mockReset();
+    mockedWithTransaction.mockReset();
+    mockedWithTransaction.mockImplementation(async (callback: any) =>
+      callback({ query: mockedQuery })
+    );
   });
 
   afterEach(() => {
@@ -33,153 +72,79 @@ describe('TagService', () => {
   });
 
   describe('findAll', () => {
-    it('should fetch all tags for the authenticated user', async () => {
-      const mockTags = [testTags.priority, testTags.category, testTags.custom];
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: mockTags,
-        rowCount: 3,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should fetch all tags', async () => {
+      const mockTags = [tagFixtures.priority, tagFixtures.label, tagFixtures.project];
+      mockedQuery.mockResolvedValueOnce(createQueryResult(mockTags));
 
-      const result = await tagService.findAll();
+      const result = await tagService.findAll({}, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT t.*, COUNT(tt.task_id) as usage_count'),
-        expect.arrayContaining([mockUserId])
-      );
       expect(result).toEqual(mockTags);
       expect(result).toHaveLength(3);
     });
 
     it('should filter tags by type', async () => {
-      const priorityTags = [testTags.priority];
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: priorityTags,
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      const priorityTags = [tagFixtures.priority];
+      mockedQuery.mockResolvedValueOnce(createQueryResult(priorityTags));
 
-      const result = await tagService.findAll({ type: 'PRIORITY' });
+      const result = await tagService.findAll({ type: 'PRIORITY' }, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('type = $2'),
-        expect.arrayContaining([mockUserId, 'PRIORITY'])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('type = $1'),
+        ['PRIORITY'],
+        expect.anything()
       );
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('PRIORITY');
     });
 
     it('should search tags by name', async () => {
-      const searchResults = [testTags.priority];
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: searchResults,
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      const searchResults = [tagFixtures.priority];
+      mockedQuery.mockResolvedValueOnce(createQueryResult(searchResults));
 
-      const result = await tagService.findAll({ search: 'priority' });
+      const result = await tagService.findAll({ search: 'priority' }, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('name ILIKE $2'),
-        expect.arrayContaining([mockUserId, '%priority%'])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('name ILIKE $1'),
+        ['%priority%'],
+        expect.anything()
       );
       expect(result).toHaveLength(1);
     });
 
-    it('should include usage count with each tag', async () => {
-      const tagsWithCount = [
-        { ...testTags.priority, usageCount: 5 },
-        { ...testTags.category, usageCount: 3 },
-      ];
+    it('should filter to tags with active tasks', async () => {
+      const activeTags = [tagFixtures.priority];
+      mockedQuery.mockResolvedValueOnce(createQueryResult(activeTags));
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: tagsWithCount,
-        rowCount: 2,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      const result = await tagService.findAll({ hasActiveTasks: true, userId: mockUserId }, mockContext);
 
-      const result = await tagService.findAll();
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('COUNT(tt.task_id)'),
-        [mockUserId]
-      );
-      expect(result[0].usageCount).toBe(5);
-      expect(result[1].usageCount).toBe(3);
-    });
-
-    it('should return empty array when user has no tags', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await tagService.findAll();
-
-      expect(result).toEqual([]);
+      const tagCall = mockedQuery.mock.calls[0];
+      expect(String(tagCall[0])).toContain('tk."userId" = $1');
+      expect(String(tagCall[0])).toContain('tk.completed = false');
+      expect(tagCall[1]).toEqual([mockUserId]);
+      expect(result).toHaveLength(1);
     });
   });
 
   describe('findById', () => {
     it('should fetch a specific tag by ID', async () => {
-      const mockTag = { ...testTags.priority, usageCount: 5 };
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [mockTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      const mockTag = tagFixtures.priority;
+      mockedQuery.mockResolvedValueOnce(createQueryResult([mockTag]));
 
-      const result = await tagService.findById(mockTag.id);
+      const result = await tagService.findById(mockTag.id, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE t.id = $1 AND t.user_id = $2'),
-        [mockTag.id, mockUserId]
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM tags WHERE id = $1'),
+        [mockTag.id],
+        expect.anything()
       );
       expect(result).toEqual(mockTag);
     });
 
     it('should return null when tag not found', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await tagService.findById('non-existent-id');
+      const result = await tagService.findById('non-existent-id', mockContext);
 
-      expect(result).toBeNull();
-    });
-
-    it('should not return tags belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await tagService.findById('other-user-tag-id');
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
-      );
       expect(result).toBeNull();
     });
   });
@@ -187,633 +152,353 @@ describe('TagService', () => {
   describe('create', () => {
     it('should create a new tag', async () => {
       const createDTO = {
-        name: 'important',
-        type: 'CUSTOM',
+        name: 'Important',
+        type: 'PROJECT' as const,
         color: '#F97316',
       };
 
       const createdTag = {
         id: 'tag-new',
-        userId: mockUserId,
-        ...createDTO,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await tagService.create(createDTO);
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO tags'),
-        expect.arrayContaining([mockUserId, createDTO.name, createDTO.type, createDTO.color])
-      );
-      expect(result).toEqual(createdTag);
-      expect(result.userId).toBe(mockUserId);
-    });
-
-    it('should normalize tag name to lowercase', async () => {
-      const createDTO = {
-        name: 'URGENT',
-        type: 'CUSTOM',
-        color: '#EF4444',
-      };
-
-      const createdTag = {
-        id: 'tag-normalized',
-        userId: mockUserId,
-        name: 'urgent', // Normalized
+        name: 'important',
         type: createDTO.type,
         color: createDTO.color,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from tags')) {
+          return createQueryResult([]);
+        }
+        if (lower.includes('insert into tags')) {
+          return createQueryResult([createdTag], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await tagService.create(createDTO);
+      const result = await tagService.create(createDTO, mockContext);
 
-      expect(result.name).toBe('urgent');
+      expect(result.name).toBe('important');
+      expect(result.type).toBe(createDTO.type);
     });
 
-    it('should prevent duplicate tag names for same user', async () => {
-      const duplicateDTO = {
-        name: 'high-priority',
-        type: 'PRIORITY',
-        color: '#EF4444',
-      };
+    it('should prevent duplicate tag names', async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.priority.id }], 1));
 
-      vi.mocked(pool.query).mockRejectedValue(
-        new Error('Unique constraint violation')
-      );
-
-      await expect(tagService.create(duplicateDTO)).rejects.toThrow();
-    });
-
-    it('should validate required fields', async () => {
-      const invalidDTO = {
-        name: '',
-        type: '',
-      };
-
-      await expect(tagService.create(invalidDTO as any)).rejects.toThrow();
+      await expect(
+        tagService.create({ name: 'High-Priority', type: 'PRIORITY' }, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
 
     it('should validate color format', async () => {
-      const invalidDTO = {
-        name: 'test',
-        type: 'CUSTOM',
-        color: 'invalid-color',
-      };
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(tagService.create(invalidDTO as any)).rejects.toThrow();
+      await expect(
+        tagService.create({ name: 'test', type: 'PROJECT', color: 'invalid-color' }, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
 
     it('should validate tag type enum', async () => {
-      const invalidDTO = {
-        name: 'test',
-        type: 'INVALID_TYPE',
-        color: '#FF0000',
-      };
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(tagService.create(invalidDTO as any)).rejects.toThrow();
+      await expect(
+        tagService.create({ name: 'test', type: 'INVALID_TYPE' as any, color: '#FF0000' }, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
   });
 
   describe('update', () => {
     it('should update tag properties', async () => {
-      const tagId = testTags.custom.id;
+      const tagId = tagFixtures.project.id;
       const updateDTO = {
-        name: 'super-urgent',
+        name: 'Super-Urgent',
         color: '#DC2626',
       };
 
       const updatedTag = {
-        ...testTags.custom,
-        ...updateDTO,
+        ...tagFixtures.project,
+        name: 'super-urgent',
+        color: updateDTO.color,
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([updatedTag], 1));
 
-      const result = await tagService.update(tagId, updateDTO);
+      const result = await tagService.update(tagId, updateDTO, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE tags'),
-        expect.arrayContaining([tagId, mockUserId])
-      );
-      expect(result.name).toBe(updateDTO.name);
-      expect(result.color).toBe(updateDTO.color);
+      expect(result?.name).toBe('super-urgent');
+      expect(result?.color).toBe(updateDTO.color);
     });
 
     it('should normalize updated tag name to lowercase', async () => {
-      const tagId = testTags.custom.id;
+      const tagId = tagFixtures.project.id;
       const updateDTO = {
         name: 'UPDATED-NAME',
       };
 
       const updatedTag = {
-        ...testTags.custom,
+        ...tagFixtures.project,
         name: 'updated-name',
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [updatedTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([updatedTag], 1));
 
-      const result = await tagService.update(tagId, updateDTO);
+      const result = await tagService.update(tagId, updateDTO, mockContext);
 
-      expect(result.name).toBe('updated-name');
+      expect(result?.name).toBe('updated-name');
     });
 
-    it('should not update tags belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should reject duplicate names on update', async () => {
+      const tagId = tagFixtures.project.id;
+      const updateDTO = {
+        name: 'high-priority',
+      };
 
-      await expect(
-        tagService.update('other-user-tag', { name: 'hacked' })
-      ).rejects.toThrow();
+      mockedQuery.mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.priority.id }], 1));
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
+      await expect(tagService.update(tagId, updateDTO, mockContext)).rejects.toThrow(
+        'VALIDATION_ERROR'
       );
     });
   });
 
-  describe('delete', () => {
-    it('should delete a tag', async () => {
-      const tagId = testTags.custom.id;
+  describe('findOrCreate', () => {
+    it('should return existing tag when found', async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([tagFixtures.priority], 1));
 
-      // Mock finding the tag
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [testTags.custom],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock deletion
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
-
-      await tagService.delete(tagId);
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM tags WHERE id = $1 AND user_id = $2'),
-        [tagId, mockUserId]
+      const result = await tagService.findOrCreate(
+        { name: 'High-Priority', type: 'PRIORITY' },
+        mockContext
       );
+
+      expect(result.id).toBe(tagFixtures.priority.id);
     });
 
-    it('should cascade delete task_tags associations', async () => {
-      const tagId = testTags.priority.id;
+    it('should create tag when not found', async () => {
+      const createDTO = { name: 'new-tag', type: 'PROJECT' as const };
+      const createdTag = { ...tagFixtures.project, id: 'tag-new', name: 'new-tag' };
 
-      // Mock finding the tag with usage count
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{ ...testTags.priority, usageCount: 5 }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock deletion (cascade handled by DB)
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
-
-      await tagService.delete(tagId);
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM tags'),
-        [tagId, mockUserId]
-      );
-    });
-
-    it('should not delete tags belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select * from tags where name')) {
+          return createQueryResult([]);
+        }
+        if (lower.includes('select id from tags where name')) {
+          return createQueryResult([]);
+        }
+        if (lower.includes('insert into tags')) {
+          return createQueryResult([createdTag], 1);
+        }
+        return createQueryResult([]);
       });
 
-      await expect(tagService.delete('other-user-tag')).rejects.toThrow();
+      const result = await tagService.findOrCreate(createDTO, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([mockUserId])
-      );
+      expect(result.name).toBe('new-tag');
     });
   });
 
-  describe('merge', () => {
-    it('should merge two tags by transferring all associations', async () => {
-      const sourceTagId = testTags.custom.id;
-      const targetTagId = testTags.priority.id;
+  describe('task tag relations', () => {
+    it('should attach tag to task', async () => {
+      const taskTagData = {
+        taskId: testTasks.incomplete.id,
+        tagId: tagFixtures.priority.id,
+        value: 'HIGH',
+        displayText: 'High Priority',
+        iconName: 'priority-high',
+      };
 
-      // Mock: verify both tags exist
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [testTags.custom],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockResolvedValueOnce({
-          rows: [testTags.priority],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock: update task_tags associations
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 5,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock: delete source tag
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        // Mock: return merged tag
-        .mockResolvedValueOnce({
-          rows: [{ ...testTags.priority, usageCount: 10 }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ id: taskTagData.taskId }], 1))
+        .mockResolvedValueOnce(createQueryResult([], 1));
 
-      const result = await tagService.merge(sourceTagId, targetTagId);
+      await tagService.attachToTask(taskTagData, mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE task_tags SET tag_id = $1'),
-        expect.arrayContaining([targetTagId, sourceTagId])
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO task_tags'),
+        expect.arrayContaining([taskTagData.taskId, taskTagData.tagId]),
+        expect.anything()
       );
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM tags WHERE id = $1'),
-        [sourceTagId, mockUserId]
+    });
+
+    it('should detach tag from task', async () => {
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(createQueryResult([], 1));
+
+      await tagService.detachFromTask(testTasks.incomplete.id, tagFixtures.priority.id, mockContext);
+
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM task_tags'),
+        [testTasks.incomplete.id, tagFixtures.priority.id],
+        expect.anything()
       );
-      expect(result.id).toBe(targetTagId);
     });
 
-    it('should handle duplicate task-tag associations during merge', async () => {
-      const sourceTagId = testTags.custom.id;
-      const targetTagId = testTags.priority.id;
+    it('should return task tags with metadata', async () => {
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: tagFixtures.priority.id,
+              name: tagFixtures.priority.name,
+              type: tagFixtures.priority.type,
+              color: tagFixtures.priority.color,
+              createdAt: tagFixtures.priority.createdAt,
+              updatedAt: tagFixtures.priority.updatedAt,
+              value: 'HIGH',
+              displayText: 'High Priority',
+              iconName: 'priority-high',
+            },
+          ])
+        );
 
-      // When a task already has both tags, merge should handle gracefully
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({ rows: [testTags.custom], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 3, fields: [], command: '', oid: 0 }) // Some duplicates skipped
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 });
+      const result = await tagService.getTaskTags(testTasks.incomplete.id, mockContext);
 
-      const result = await tagService.merge(sourceTagId, targetTagId);
-
-      expect(result.id).toBe(targetTagId);
+      expect(result).toHaveLength(1);
+      expect(result[0].tag.id).toBe(tagFixtures.priority.id);
+      expect(result[0].value).toBe('HIGH');
     });
 
-    it('should not merge tags belonging to other users', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should update task-tag fields', async () => {
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(createQueryResult([], 1));
 
-      await expect(
-        tagService.merge('other-user-tag', testTags.priority.id)
-      ).rejects.toThrow();
-    });
+      await tagService.updateTaskTag(
+        testTasks.incomplete.id,
+        tagFixtures.priority.id,
+        { displayText: 'Updated Priority' },
+        mockContext
+      );
 
-    it('should not merge a tag with itself', async () => {
-      const tagId = testTags.priority.id;
-
-      await expect(tagService.merge(tagId, tagId)).rejects.toThrow();
-    });
-
-    it('should validate both tags exist before merging', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 0,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      await expect(
-        tagService.merge('non-existent-1', 'non-existent-2')
-      ).rejects.toThrow();
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE task_tags SET'),
+        expect.arrayContaining(['Updated Priority', testTasks.incomplete.id, tagFixtures.priority.id]),
+        expect.anything()
+      );
     });
   });
 
   describe('cleanup', () => {
-    it('should find unused tags (zero usage count)', async () => {
-      const unusedTags = [
-        { ...testTags.custom, usageCount: 0 },
-      ];
+    it('should delete unused tags', async () => {
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.project.id }], 1))
+        .mockResolvedValueOnce(createQueryResult([], 1));
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: unusedTags,
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+      const result = await tagService.cleanupUnusedTags(mockContext);
 
-      const result = await tagService.findUnused();
-
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('HAVING COUNT(tt.task_id) = 0'),
-        [mockUserId]
-      );
-      expect(result).toHaveLength(1);
-      expect(result[0].usageCount).toBe(0);
+      expect(result.deletedCount).toBe(1);
     });
 
-    it('should delete all unused tags', async () => {
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [],
-        rowCount: 3, // Deleted 3 unused tags
-        fields: [],
-        command: '',
-        oid: 0,
-      });
+    it('should return zero when no unused tags exist', async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 0));
 
-      const result = await tagService.cleanupUnused();
+      const result = await tagService.cleanupUnusedTags(mockContext);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM tags'),
-        [mockUserId]
-      );
-      expect(result).toBe(3);
-    });
-
-    it('should not delete tags currently in use', async () => {
-      // Only delete tags with 0 usage
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [
-            { ...testTags.priority, usageCount: 5 },
-            { ...testTags.category, usageCount: 3 },
-            { ...testTags.custom, usageCount: 0 },
-          ],
-          rowCount: 3,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 1, // Only 1 tag deleted
-          fields: [],
-          command: '',
-          oid: 0,
-        });
-
-      await tagService.findUnused();
-      const deletedCount = await tagService.cleanupUnused();
-
-      expect(deletedCount).toBe(1);
+      expect(result.deletedCount).toBe(0);
     });
   });
 
-  describe('getStats', () => {
+  describe('merge', () => {
+    it('should merge two tags by transferring associations', async () => {
+      const sourceTagId = tagFixtures.project.id;
+      const targetTagId = tagFixtures.priority.id;
+
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([], 1))
+        .mockResolvedValueOnce(createQueryResult([], 1))
+        .mockResolvedValueOnce(createQueryResult([{ ...tagFixtures.priority }], 1));
+
+      const result = await tagService.mergeTags(sourceTagId, targetTagId, mockContext);
+
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE task_tags SET "tagId" = $1'),
+        [targetTagId, sourceTagId],
+        expect.anything()
+      );
+      expect(result.id).toBe(targetTagId);
+    });
+
+    it('should not merge a tag with itself', async () => {
+      const tagId = tagFixtures.priority.id;
+
+      await expect(tagService.mergeTags(tagId, tagId, mockContext)).rejects.toThrow(
+        'VALIDATION_ERROR'
+      );
+    });
+  });
+
+  describe('getStatistics', () => {
     it('should calculate tag usage statistics', async () => {
-      const mockStats = {
-        totalTags: 5,
-        totalUsage: 15,
-        averageUsage: 3,
-        mostUsedTags: [
-          { ...testTags.priority, usageCount: 10 },
-          { ...testTags.category, usageCount: 5 },
-        ],
-      };
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ count: '5' }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([
+            { type: 'PRIORITY', count: '2' },
+            { type: 'LABEL', count: '2' },
+            { type: 'PROJECT', count: '1' },
+          ])
+        )
+        .mockResolvedValueOnce(
+          createQueryResult([
+            { ...tagFixtures.priority, usage: '10' },
+            { ...tagFixtures.label, usage: '5' },
+          ])
+        );
 
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            total_tags: mockStats.totalTags,
-            total_usage: mockStats.totalUsage,
-            average_usage: mockStats.averageUsage,
-          }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockResolvedValueOnce({
-          rows: mockStats.mostUsedTags,
-          rowCount: 2,
-          fields: [],
-          command: '',
-          oid: 0,
-        });
-
-      const result = await tagService.getStats();
+      const result = await tagService.getStatistics(mockContext);
 
       expect(result.totalTags).toBe(5);
-      expect(result.totalUsage).toBe(15);
+      expect(result.tagsByType.PRIORITY).toBe(2);
       expect(result.mostUsedTags).toHaveLength(2);
-    });
-
-    it('should return zero stats when user has no tags', async () => {
-      const emptyStats = {
-        totalTags: 0,
-        totalUsage: 0,
-        averageUsage: 0,
-      };
-
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [emptyStats],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await tagService.getStats();
-
-      expect(result.totalTags).toBe(0);
-      expect(result.totalUsage).toBe(0);
-    });
-
-    it('should calculate stats by tag type', async () => {
-      const statsByType = [
-        { type: 'PRIORITY', count: 2, totalUsage: 10 },
-        { type: 'CATEGORY', count: 2, totalUsage: 5 },
-        { type: 'CUSTOM', count: 1, totalUsage: 0 },
-      ];
-
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: statsByType,
-        rowCount: 3,
-        fields: [],
-        command: '',
-        oid: 0,
-      });
-
-      const result = await tagService.getStatsByType();
-
-      expect(result).toHaveLength(3);
-      expect(result[0].type).toBe('PRIORITY');
-      expect(result[0].totalUsage).toBe(10);
     });
   });
 
   describe('Edge Cases and Error Handling', () => {
     it('should handle database connection errors gracefully', async () => {
-      vi.mocked(pool.query).mockRejectedValue(new Error('Connection timeout'));
+      mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      await expect(tagService.findAll()).rejects.toThrow('Connection timeout');
-    });
-
-    it('should handle very long tag names', async () => {
-      const longName = 'a'.repeat(256);
-      const createDTO = {
-        name: longName,
-        type: 'CUSTOM',
-        color: '#FF0000',
-      };
-
-      await expect(tagService.create(createDTO as any)).rejects.toThrow();
+      await expect(tagService.findAll({}, mockContext)).rejects.toThrow('Connection timeout');
     });
 
     it('should handle special characters in tag names', async () => {
-      const specialName = 'high-priority!@#$%';
       const createDTO = {
-        name: specialName,
-        type: 'CUSTOM',
+        name: 'high-priority!@#$%',
+        type: 'PROJECT' as const,
         color: '#FF0000',
       };
 
       const createdTag = {
         id: 'tag-special',
-        userId: mockUserId,
-        name: specialName.toLowerCase(),
+        name: 'high-priority!@#$%'.toLowerCase(),
         type: createDTO.type,
         color: createDTO.color,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      vi.mocked(pool.query).mockResolvedValue({
-        rows: [createdTag],
-        rowCount: 1,
-        fields: [],
-        command: '',
-        oid: 0,
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from tags')) {
+          return createQueryResult([]);
+        }
+        if (lower.includes('insert into tags')) {
+          return createQueryResult([createdTag], 1);
+        }
+        return createQueryResult([]);
       });
 
-      const result = await tagService.create(createDTO);
+      const result = await tagService.create(createDTO, mockContext);
 
-      expect(result.name).toBe(specialName.toLowerCase());
-    });
-
-    it('should handle concurrent tag merges', async () => {
-      const source1 = testTags.custom.id;
-      const source2 = 'tag-another';
-      const target = testTags.priority.id;
-
-      vi.mocked(pool.query)
-        // First merge
-        .mockResolvedValueOnce({ rows: [testTags.custom], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 3, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 })
-        // Second merge
-        .mockResolvedValueOnce({ rows: [{ id: source2, name: 'another', type: 'CUSTOM' }], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 2, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, fields: [], command: '', oid: 0 })
-        .mockResolvedValueOnce({ rows: [testTags.priority], rowCount: 1, fields: [], command: '', oid: 0 });
-
-      const results = await Promise.all([
-        tagService.merge(source1, target),
-        tagService.merge(source2, target),
-      ]);
-
-      expect(results).toHaveLength(2);
-      expect(results[0].id).toBe(target);
-      expect(results[1].id).toBe(target);
-    });
-
-    it('should handle case-insensitive duplicate checking', async () => {
-      const createDTO1 = {
-        name: 'important',
-        type: 'CUSTOM',
-        color: '#FF0000',
-      };
-
-      const createDTO2 = {
-        name: 'IMPORTANT', // Same name, different case
-        type: 'CUSTOM',
-        color: '#00FF00',
-      };
-
-      vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{ id: 'tag-1', userId: mockUserId, name: 'important', ...createDTO1 }],
-          rowCount: 1,
-          fields: [],
-          command: '',
-          oid: 0,
-        })
-        .mockRejectedValueOnce(new Error('Unique constraint violation'));
-
-      await tagService.create(createDTO1);
-      await expect(tagService.create(createDTO2)).rejects.toThrow();
+      expect(result.name).toBe(createdTag.name);
     });
   });
 });

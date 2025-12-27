@@ -15,6 +15,7 @@ export interface TagEntity extends BaseEntity {
   color: string | null;
   createdAt: Date;
   updatedAt: Date;
+  usageCount?: number;
   
   // Relations (optional for different query contexts)
   tasks?: Array<{
@@ -59,6 +60,10 @@ export interface TagFilters {
   search?: string;
   hasActiveTasks?: boolean;
   userId?: string; // For filtering task associations by user
+  color?: string;
+  unused?: boolean;
+  minUsageCount?: number;
+  withUsageCount?: boolean;
 }
 
 /**
@@ -116,6 +121,110 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         },
       },
     };
+  }
+
+  /**
+   * Find tags with optional filtering
+   */
+  async findAll(filters: TagFilters = {}, context?: ServiceContext): Promise<TagEntity[]> {
+    try {
+      this.log('findAll', { filters }, context);
+      const scopedFilters: TagFilters = {
+        ...filters,
+        userId: filters.userId ?? context?.userId,
+      };
+
+      const params: Array<string | number | boolean> = [];
+      const whereClauses: string[] = [];
+      const userId = scopedFilters.userId;
+
+      if (scopedFilters.type) {
+        params.push(scopedFilters.type);
+        whereClauses.push(`t.type = $${params.length}`);
+      }
+      if (scopedFilters.search) {
+        params.push(`%${scopedFilters.search}%`);
+        whereClauses.push(`t.name ILIKE $${params.length}`);
+      }
+      if (scopedFilters.color) {
+        params.push(scopedFilters.color);
+        whereClauses.push(`t.color = $${params.length}`);
+      }
+      if (scopedFilters.hasActiveTasks) {
+        if (userId) {
+          params.push(userId);
+          whereClauses.push(
+            `EXISTS (
+              SELECT 1 FROM task_tags tt
+              JOIN tasks tk ON tk.id = tt."taskId"
+              WHERE tt."tagId" = t.id AND tk."userId" = $${params.length} AND tk.completed = false
+            )`
+          );
+        } else {
+          whereClauses.push(
+            `EXISTS (
+              SELECT 1 FROM task_tags tt
+              JOIN tasks tk ON tk.id = tt."taskId"
+              WHERE tt."tagId" = t.id AND tk.completed = false
+            )`
+          );
+        }
+      }
+
+      const needsUsageJoin = Boolean(
+        scopedFilters.withUsageCount ||
+          scopedFilters.minUsageCount !== undefined ||
+          scopedFilters.unused !== undefined
+      );
+      let usageJoin = '';
+      let usageSelect = '';
+
+      if (needsUsageJoin) {
+        if (userId) {
+          params.push(userId);
+          const userIndex = params.length;
+          usageJoin = `LEFT JOIN (
+            SELECT tt."tagId", COUNT(*)::int AS count
+            FROM task_tags tt
+            JOIN tasks tk ON tk.id = tt."taskId"
+            WHERE tk."userId" = $${userIndex}
+            GROUP BY tt."tagId"
+          ) tag_usage ON tag_usage."tagId" = t.id`;
+        } else {
+          usageJoin = `LEFT JOIN (
+            SELECT "tagId", COUNT(*)::int AS count
+            FROM task_tags
+            GROUP BY "tagId"
+          ) tag_usage ON tag_usage."tagId" = t.id`;
+        }
+        usageSelect = ', COALESCE(tag_usage.count, 0)::int AS "usageCount"';
+
+        if (scopedFilters.unused !== undefined) {
+          whereClauses.push(
+            scopedFilters.unused ? 'COALESCE(tag_usage.count, 0) = 0' : 'COALESCE(tag_usage.count, 0) > 0'
+          );
+        }
+        if (scopedFilters.minUsageCount !== undefined) {
+          params.push(scopedFilters.minUsageCount);
+          whereClauses.push(`COALESCE(tag_usage.count, 0) >= $${params.length}`);
+        }
+      }
+
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const res = await query(
+        `SELECT t.id, t.name, t.type, t.color, t."createdAt", t."updatedAt"${usageSelect}
+         FROM tags t
+         ${usageJoin}
+         ${whereSql}
+         ORDER BY t.type ASC, t.name ASC`,
+        params,
+        this.db
+      );
+      return res.rows.map((row: any) => this.transformEntity(row));
+    } catch (error) {
+      this.log('findAll:error', { error: (error as Error).message, filters }, context);
+      throw error;
+    }
   }
 
   /**
@@ -202,6 +311,48 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
       return this.transformEntity(row);
     } catch (error) {
       this.log('create:error', { error: error.message, data }, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Update tag fields with validation and normalization
+   */
+  async update(id: string, data: UpdateTagDTO, context?: ServiceContext): Promise<TagEntity | null> {
+    try {
+      this.log('update', { id, data }, context);
+      await this.validateUpdate(id, data, context);
+
+      const sets: string[] = [];
+      const params: any[] = [];
+
+      if (data.name !== undefined) {
+        params.push(data.name.trim().toLowerCase());
+        sets.push(`name = $${params.length}`);
+      }
+      if (data.type !== undefined) {
+        params.push(data.type);
+        sets.push(`type = $${params.length}`);
+      }
+      if (data.color !== undefined) {
+        params.push(data.color || null);
+        sets.push(`color = $${params.length}`);
+      }
+
+      if (sets.length === 0) {
+        return await this.findById(id, context);
+      }
+
+      params.push(id);
+      const res = await query(
+        `UPDATE tags SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+        params,
+        this.db
+      );
+      const row = res.rows[0];
+      return row ? this.transformEntity(row) : null;
+    } catch (error) {
+      this.log('update:error', { error: (error as Error).message, id, data }, context);
       throw error;
     }
   }
@@ -400,7 +551,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Clean up unused tags (tags with no task relationships)
    */
-  async cleanupUnusedTags(context?: ServiceContext): Promise<{ deletedCount: number }> {
+  async cleanupUnusedTags(context?: ServiceContext): Promise<{ deletedCount: number; deletedTagIds: string[] }> {
     try {
       this.log('cleanupUnusedTags', {}, context);
       const idsRes = await query<{ id: string }>(
@@ -415,7 +566,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         await query('DELETE FROM tags WHERE id = ANY($1::text[])', [ids], this.db);
       }
       this.log('cleanupUnusedTags:success', { deletedCount: ids.length }, context);
-      return { deletedCount: ids.length };
+      return { deletedCount: ids.length, deletedTagIds: ids };
     } catch (error) {
       this.log('cleanupUnusedTags:error', { error: error.message }, context);
       throw error;
@@ -425,17 +576,31 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Merge tags (combine two tags into one)
    */
-  async mergeTags(sourceTagId: string, targetTagId: string, context?: ServiceContext): Promise<TagEntity> {
+  async mergeTags(sourceTagId: string | string[], targetTagId: string, context?: ServiceContext): Promise<TagEntity> {
     try {
-      this.log('mergeTags', { sourceTagId, targetTagId }, context);
+      const sourceTagIds = Array.isArray(sourceTagId) ? sourceTagId : [sourceTagId];
+      this.log('mergeTags', { sourceTagIds, targetTagId }, context);
 
-      if (sourceTagId === targetTagId) {
+      if (sourceTagIds.includes(targetTagId)) {
         throw new Error('VALIDATION_ERROR: Cannot merge tag with itself');
       }
 
       const result = await withTransaction(async (client) => {
-        await query('UPDATE task_tags SET "tagId" = $1 WHERE "tagId" = $2', [targetTagId, sourceTagId], client);
-        await query('DELETE FROM tags WHERE id = $1', [sourceTagId], client);
+        if (sourceTagIds.length === 1) {
+          await query(
+            'UPDATE task_tags SET "tagId" = $1 WHERE "tagId" = $2',
+            [targetTagId, sourceTagIds[0]],
+            client
+          );
+          await query('DELETE FROM tags WHERE id = $1', [sourceTagIds[0]], client);
+        } else {
+          await query(
+            'UPDATE task_tags SET "tagId" = $1 WHERE "tagId" = ANY($2::text[])',
+            [targetTagId, sourceTagIds],
+            client
+          );
+          await query('DELETE FROM tags WHERE id = ANY($1::text[])', [sourceTagIds], client);
+        }
         const res = await query('SELECT * FROM tags WHERE id = $1', [targetTagId], client);
         return res.rows[0];
       });
@@ -446,6 +611,13 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
       this.log('mergeTags:error', { error: error.message, sourceTagId, targetTagId }, context);
       throw error;
     }
+  }
+
+  /**
+   * Alias for tag statistics used by API handlers
+   */
+  async getStats(context?: ServiceContext) {
+    return this.getStatistics(context);
   }
 
   /**
