@@ -17,16 +17,18 @@ describe('SmartTaskInput Enhanced Layout Integration', () => {
         enableSmartParsing={true}
       />
     );
-    
+
     // Should render textarea instead of input
     expect(screen.getByRole('textbox')).toBeInTheDocument();
-    
+
     // Should have the enhanced layout structure (Card container)
     const form = screen.getByRole('textbox').closest('form');
     expect(form).toBeInTheDocument();
-    
+
     // Should have controls area (look for submit button)
-    expect(screen.getByRole('button', { name: /add task/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /add task/i })
+    ).toBeInTheDocument();
   });
 
   it('renders regular layout when useEnhancedLayout is false', () => {
@@ -38,7 +40,7 @@ describe('SmartTaskInput Enhanced Layout Integration', () => {
         enableSmartParsing={false}
       />
     );
-    
+
     // Should render regular input
     const input = screen.getByRole('textbox');
     expect(input.tagName.toLowerCase()).toBe('input');
@@ -54,9 +56,9 @@ describe('SmartTaskInput Enhanced Layout Integration', () => {
         disabled={false}
       />
     );
-    
+
     const textarea = screen.getByRole('textbox');
-    expect(textarea).toHaveAttribute('placeholder', 'Enter a new task...');
+    expect(textarea).toHaveAttribute('placeholder', 'Add Task');
     expect(textarea).not.toBeDisabled();
   });
 
@@ -68,7 +70,7 @@ describe('SmartTaskInput Enhanced Layout Integration', () => {
         disabled={true}
       />
     );
-    
+
     const textarea = screen.getByRole('textbox');
     expect(textarea).toBeDisabled();
   });

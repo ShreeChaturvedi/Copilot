@@ -19,15 +19,15 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       name: 'Work',
       iconId: 'Briefcase',
       color: '#3b82f6',
-      description: 'Work tasks'
+      description: 'Work tasks',
     },
     {
       id: 'personal',
       name: 'Personal',
       iconId: 'User',
       color: '#10b981',
-      description: 'Personal tasks'
-    }
+      description: 'Personal tasks',
+    },
   ];
 
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
   describe('Text Input and Parsing', () => {
     it('handles text input correctly in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -54,7 +54,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('supports multi-line input in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -65,7 +65,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
       const textarea = screen.getByRole('textbox');
       const multiLineText = 'Complete project\nby tomorrow\nwith high priority';
-      
+
       await user.type(textarea, multiLineText);
 
       expect(textarea).toHaveValue(multiLineText);
@@ -73,7 +73,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('parses smart tags in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -97,7 +97,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
   describe('Task Submission', () => {
     it('submits task correctly in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -122,7 +122,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('submits task with Enter key in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -144,12 +144,9 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('clears input after successful submission', async () => {
       const user = userEvent.setup();
-      
+
       render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-        />
+        <SmartTaskInput onAddTask={mockOnAddTask} useEnhancedLayout={true} />
       );
 
       const textarea = screen.getByRole('textbox');
@@ -158,7 +155,9 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       await user.type(textarea, 'Test task');
       await user.click(submitButton);
 
-      expect(textarea).toHaveValue('');
+      await waitFor(() => {
+        expect(textarea).toHaveValue('');
+      });
     });
   });
 
@@ -174,13 +173,15 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       );
 
       // Task group selector should be present (look for the dropdown trigger)
-      const taskGroupButton = screen.getByRole('button', { name: /current task group/i });
+      const taskGroupButton = screen.getByRole('button', {
+        name: /current task group/i,
+      });
       expect(taskGroupButton).toBeInTheDocument();
     });
 
     it('allows task group selection in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -191,19 +192,23 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
         />
       );
 
-      const taskGroupButton = screen.getByRole('button', { name: /current task group/i });
+      const taskGroupButton = screen.getByRole('button', {
+        name: /current task group/i,
+      });
       await user.click(taskGroupButton);
 
       // Should show dropdown with task groups
-      const personalOption = screen.getByText('Personal');
+      const personalOption = await screen.findByText('Personal');
       await user.click(personalOption);
 
-      expect(mockOnSelectTaskGroup).toHaveBeenCalledWith('personal');
+      await waitFor(() => {
+        expect(mockOnSelectTaskGroup).toHaveBeenCalledWith('personal');
+      });
     });
 
     it('allows creating new task group in enhanced layout', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -214,13 +219,17 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
         />
       );
 
-      const taskGroupButton = screen.getByRole('button', { name: /current task group/i });
+      const taskGroupButton = screen.getByRole('button', {
+        name: /current task group/i,
+      });
       await user.click(taskGroupButton);
 
-      const newListOption = screen.getByText('New List');
+      const newListOption = await screen.findByText('New List');
       await user.click(newListOption);
 
-      expect(mockOnCreateTaskGroup).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockOnCreateTaskGroup).toHaveBeenCalled();
+      });
     });
   });
 
@@ -243,7 +252,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('prevents submission when disabled', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -262,7 +271,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
   describe('Smart Parsing Features', () => {
     it('works with smart parsing enabled', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -280,7 +289,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
 
     it('works with smart parsing disabled', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <SmartTaskInput
           onAddTask={mockOnAddTask}
@@ -306,7 +315,9 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
         />
       );
 
-      const container = screen.getByRole('textbox').closest('.space-y-2');
+      const form = screen.getByRole('textbox').closest('form');
+      expect(form).toBeInTheDocument();
+      const container = form?.parentElement;
       expect(container).toHaveClass('custom-class');
     });
 
@@ -328,38 +339,32 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
   describe('Error Handling', () => {
     it('handles empty input gracefully', async () => {
       const user = userEvent.setup();
-      
+
       render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-        />
+        <SmartTaskInput onAddTask={mockOnAddTask} useEnhancedLayout={true} />
       );
 
       const submitButton = screen.getByRole('button', { name: /add task/i });
-      
+
       // Submit button should be disabled when input is empty
       expect(submitButton).toBeDisabled();
-      
+
       await user.click(submitButton);
       expect(mockOnAddTask).not.toHaveBeenCalled();
     });
 
     it('handles whitespace-only input', async () => {
       const user = userEvent.setup();
-      
+
       render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-        />
+        <SmartTaskInput onAddTask={mockOnAddTask} useEnhancedLayout={true} />
       );
 
       const textarea = screen.getByRole('textbox');
       const submitButton = screen.getByRole('button', { name: /add task/i });
 
       await user.type(textarea, '   ');
-      
+
       // Submit button should still be disabled for whitespace-only input
       expect(submitButton).toBeDisabled();
     });

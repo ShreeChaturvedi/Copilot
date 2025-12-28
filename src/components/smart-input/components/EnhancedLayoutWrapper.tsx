@@ -1,6 +1,6 @@
 /**
  * EnhancedLayoutWrapper - Transforms FlexInputGroup layout into Claude AI pattern
- * 
+ *
  * This component wraps the existing SmartTaskInput functionality and transforms
  * the horizontal FlexInputGroup layout into a vertical Claude AI-inspired layout:
  * - Large textarea at the top
@@ -30,7 +30,7 @@ export interface EnhancedLayoutWrapperProps {
 
 /**
  * Enhanced layout wrapper that implements the Claude AI pattern
- * 
+ *
  * Structure:
  * <Card className="enhanced-input-card">
  *   <div className="input-area">
@@ -45,6 +45,7 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
   children,
   controls,
   className,
+  minHeight,
   disabled = false,
   showFocusStates = true,
 }) => {
@@ -80,9 +81,7 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
         'w-full',
         // Focus states - highlight entire card when input is focused
         // Remove outline/ring when the inner input is focused
-        showFocusStates && isFocused && [
-          'outline-none ring-0',
-        ],
+        showFocusStates && isFocused && ['outline-none ring-0'],
         // Disabled state
         disabled && 'opacity-50 cursor-not-allowed',
         className
@@ -94,13 +93,16 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
           // Container for the input with reduced bottom padding
           'relative p-4 pb-0',
           // Explicit background to match controls area
-          'bg-card',
+          'bg-card'
         )}
+        style={
+          minHeight
+            ? ({ '--min-height': minHeight, minHeight } as React.CSSProperties)
+            : undefined
+        }
       >
         {/* Input wrapper - provides the container for HighlightedInputField */}
-        <div className="relative">
-          {children}
-        </div>
+        <div className="relative">{children}</div>
       </div>
 
       {/* Controls Area - Bottom section with all buttons and selectors */}
@@ -112,8 +114,10 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
           'px-4 pt-2 pb-3',
           // Unified background - match input area exactly using bg-card
           'bg-card',
+          // Visual separator between input and controls
+          'border-t border-border/50',
           // Disabled state
-          disabled && 'pointer-events-none',
+          disabled && 'pointer-events-none'
         )}
       >
         {controls}

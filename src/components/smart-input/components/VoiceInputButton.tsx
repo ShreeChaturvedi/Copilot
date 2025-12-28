@@ -59,9 +59,20 @@ const isSpeechRecognitionSupported = (): boolean => {
 type SpeechRecognitionCtor = new () => SpeechRecognition;
 const getSpeechRecognition = (): SpeechRecognitionCtor | null => {
   if (typeof window === 'undefined') return null;
-  return (window as unknown as Window & { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition
-    || (window as unknown as Window & { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition
-    || null;
+  return (
+    (
+      window as unknown as Window & {
+        SpeechRecognition?: SpeechRecognitionCtor;
+        webkitSpeechRecognition?: SpeechRecognitionCtor;
+      }
+    ).SpeechRecognition ||
+    (
+      window as unknown as Window & {
+        webkitSpeechRecognition?: SpeechRecognitionCtor;
+      }
+    ).webkitSpeechRecognition ||
+    null
+  );
 };
 
 /**
@@ -82,6 +93,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalTranscriptRef = useRef('');
 
   // Use refs to avoid stale closure issues with callbacks
   const onTranscriptChangeRef = useRef(onTranscriptChange);
@@ -122,7 +134,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     // Handle results (both interim and final)
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = '';
-      let finalTranscript = '';
+      let finalTranscript = finalTranscriptRef.current;
 
       // Process all results
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -137,7 +149,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       }
 
       // Send final results immediately
-      if (finalTranscript) {
+      if (finalTranscript && finalTranscript !== finalTranscriptRef.current) {
+        finalTranscriptRef.current = finalTranscript;
         onTranscriptChangeRef.current?.(finalTranscript);
       }
 
@@ -152,6 +165,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
       setIsListening(true);
       setError(null);
       setPermissionDenied(false);
+      finalTranscriptRef.current = '';
       onRecordingStateChangeRef.current?.(true);
     };
 

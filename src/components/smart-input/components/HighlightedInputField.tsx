@@ -1,20 +1,26 @@
 /**
  * HighlightedInputField - Input with highlighting overlay constrained to input area
- * 
+ *
  * Proper implementation of input field with syntax highlighting that:
  * 1. Uses transparent input for interaction
  * 2. Overlay positioned within input container only (not full-width)
  * 3. Perfect scroll synchronization
  * 4. No spillover into prefix/suffix areas
- * 
+ *
  * Based on:
  * - regex101.com overlay technique
  * - Stack Overflow input highlighting solutions
  * - Industry best practices for editable syntax highlighting
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { ParsedTag } from "@shared/types";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
+import type { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
 
 export interface HighlightedInputFieldProps {
@@ -48,7 +54,7 @@ export interface HighlightedInputFieldProps {
 
 /**
  * Input field with highlighting overlay properly constrained to input area
- * 
+ *
  * Key differences from previous implementation:
  * - Overlay is constrained to input container boundaries
  * - No absolute positioning relative to form
@@ -95,7 +101,7 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       // Sync on all relevant events
       const events = ['scroll', 'input', 'focus', 'keydown', 'keyup'];
 
-      events.forEach(event => {
+      events.forEach((event) => {
         input.addEventListener(event, syncScroll);
       });
 
@@ -103,7 +109,7 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       syncScroll();
 
       return () => {
-        events.forEach(event => {
+        events.forEach((event) => {
           input.removeEventListener(event, syncScroll);
         });
       };
@@ -131,7 +137,7 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
       const color = tag.color || '#3b82f6';
 
       // EXACT fix from Enhanced textarea: no border or margin, vertical padding only via CSS
-      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; color: inherit;">${escapeHtml(tagText)}</mark>`;
+      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</mark>`;
 
       lastIndex = tag.endIndex;
     }
@@ -145,18 +151,24 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
   }, [value, tags]);
 
   // Handle input changes
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value);
-    // Trigger scroll sync after state update
-    requestAnimationFrame(syncScroll);
-  }, [onChange, syncScroll]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(e.target.value);
+      // Trigger scroll sync after state update
+      requestAnimationFrame(syncScroll);
+    },
+    [onChange, syncScroll]
+  );
 
   // Handle key press events
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    onKeyPress?.(e);
-    // Sync after key events
-    requestAnimationFrame(syncScroll);
-  }, [onKeyPress, syncScroll]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      onKeyPress?.(e);
+      // Sync after key events
+      requestAnimationFrame(syncScroll);
+    },
+    [onKeyPress, syncScroll]
+  );
 
   // Handle focus events
   const handleFocus = useCallback(() => {
@@ -263,8 +275,11 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
           <div
             className={cn(
               'w-2 h-2 rounded-full',
-              confidence >= 0.8 ? 'bg-green-400' :
-                confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
+              confidence >= 0.8
+                ? 'bg-green-400'
+                : confidence >= 0.6
+                  ? 'bg-yellow-400'
+                  : 'bg-red-400'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />

@@ -35,6 +35,9 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogTitle: ({ children }: MockDialogChildProps) => (
     <h2 data-testid="dialog-title">{children}</h2>
   ),
+  DialogDescription: ({ children }: MockDialogChildProps) => (
+    <p data-testid="dialog-description">{children}</p>
+  ),
   DialogTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-trigger">{children}</div>
   ),
@@ -69,14 +72,16 @@ vi.mock('../FileUploadZone', () => ({
           const mockFile = new File(['test content'], 'test.txt', {
             type: 'text/plain',
           });
-          onFilesAdded([{
-            id: '1',
-            file: mockFile,
-            name: 'test.txt',
-            size: mockFile.size,
-            type: 'text/plain',
-            status: 'completed' as const
-          }]);
+          onFilesAdded([
+            {
+              id: '1',
+              file: mockFile,
+              name: 'test.txt',
+              size: mockFile.size,
+              type: 'text/plain',
+              status: 'completed' as const,
+            },
+          ]);
         }}
         data-testid="add-file-button"
       >
@@ -115,7 +120,9 @@ describe('File Upload Integration', () => {
     );
 
     // Should render the file upload button (paperclip icon)
-    const fileUploadButton = screen.getByTestId('tooltip-trigger');
+    const fileUploadButton = screen.getByRole('button', {
+      name: /attach files/i,
+    });
     expect(fileUploadButton).toBeInTheDocument();
 
     // Initially no files should be shown
@@ -132,7 +139,9 @@ describe('File Upload Integration', () => {
     );
 
     // The file upload button should be present
-    const fileUploadButton = screen.getByTestId('tooltip-trigger');
+    const fileUploadButton = screen.getByRole('button', {
+      name: /attach files/i,
+    });
     expect(fileUploadButton).toBeInTheDocument();
 
     // Should show tooltip text
@@ -146,7 +155,9 @@ describe('File Upload Integration', () => {
     );
 
     // File upload button should not be present when disabled
-    expect(screen.queryByTestId('tooltip-trigger')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /attach files/i })
+    ).not.toBeInTheDocument();
   });
 
   it('respects maxFiles prop', () => {
@@ -160,7 +171,9 @@ describe('File Upload Integration', () => {
     );
 
     // Should render without issues
-    expect(screen.getByTestId('tooltip-trigger')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /attach files/i })
+    ).toBeInTheDocument();
   });
 
   it('calls onFilesAdded callback when files are added', () => {
