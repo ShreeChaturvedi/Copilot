@@ -4,13 +4,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Create mock functions that will be used in the mock factory
-const mockQueryFn = vi.fn();
-const mockWithTransactionFn = vi.fn();
-const mockCacheGet = vi.fn();
-const mockCacheSet = vi.fn();
-const mockCacheInvalidate = vi.fn();
-
 // Mock the database module - vi.mock is hoisted so we use a factory
 vi.mock('../../config/database.js', () => {
   const query = vi.fn();
@@ -35,7 +28,10 @@ vi.mock('../../utils/cache.js', () => ({
 // Import after mocks are set up
 import { TaskService } from '../TaskService';
 import type { CreateTaskDTO, UpdateTaskDTO, DbPriority } from '../TaskService';
-import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
+import {
+  query as mockQuery,
+  withTransaction as mockWithTransaction,
+} from '../../config/database.js';
 
 // Helper to create query results
 function createQueryResult<T>(rows: T[], rowCount?: number) {
@@ -91,7 +87,9 @@ describe('TaskService', () => {
     vi.clearAllMocks();
     mockedQuery.mockReset();
     mockedWithTransaction.mockReset();
-    mockedWithTransaction.mockImplementation(async (callback: any) => callback(mockedQuery));
+    mockedWithTransaction.mockImplementation(async (callback: any) =>
+      callback(mockedQuery)
+    );
   });
 
   afterEach(() => {
@@ -117,12 +115,17 @@ describe('TaskService', () => {
     });
 
     it('should filter by completed status', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ ...mockTask, completed: true }]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ ...mockTask, completed: true }])
+      );
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.findAll({ completed: true }, mockContext);
+      const result = await taskService.findAll(
+        { completed: true },
+        mockContext
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].completed).toBe(true);
@@ -134,19 +137,27 @@ describe('TaskService', () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.findAll({ taskListId: 'list-123' }, mockContext);
+      const result = await taskService.findAll(
+        { taskListId: 'list-123' },
+        mockContext
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].taskListId).toBe('list-123');
     });
 
     it('should filter by priority', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ ...mockTask, priority: 'HIGH' }]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ ...mockTask, priority: 'HIGH' }])
+      );
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.findAll({ priority: 'HIGH' }, mockContext);
+      const result = await taskService.findAll(
+        { priority: 'HIGH' },
+        mockContext
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].priority).toBe('HIGH');
@@ -186,7 +197,7 @@ describe('TaskService', () => {
       // findById does not check ownership - it returns any task by ID
       // Ownership checks should be done at the route/API level
       const otherUserTask = { ...mockTask, userId: 'other-user' };
-      
+
       // SELECT query
       mockedQuery.mockResolvedValueOnce(createQueryResult([otherUserTask]));
       // enrichEntities: task lists (uses cache key with context userId)
@@ -236,7 +247,11 @@ describe('TaskService', () => {
         if (sqlLower.includes('insert into users')) {
           return createQueryResult([], 0); // ensureUserExists - no-op
         }
-        if (sqlLower.includes('select') && sqlLower.includes('task_lists') && sqlLower.includes('userid')) {
+        if (
+          sqlLower.includes('select') &&
+          sqlLower.includes('task_lists') &&
+          sqlLower.includes('userid')
+        ) {
           return createQueryResult([mockTaskList]); // validateCreate or enrichEntities
         }
         if (sqlLower.includes('insert into tasks')) {
@@ -253,7 +268,7 @@ describe('TaskService', () => {
         }
         return createQueryResult([]);
       });
-      
+
       // Mock transaction with a mock client that uses our mockedQuery
       const mockClient = { query: mockedQuery };
       mockedWithTransaction.mockImplementationOnce(async (callback: any) => {
@@ -281,7 +296,9 @@ describe('TaskService', () => {
         return createQueryResult([{ exists: true }]);
       });
 
-      await expect(taskService.create(createData, mockContext)).rejects.toThrow('VALIDATION_ERROR');
+      await expect(taskService.create(createData, mockContext)).rejects.toThrow(
+        'VALIDATION_ERROR'
+      );
     });
   });
 
@@ -294,20 +311,28 @@ describe('TaskService', () => {
 
       // Mock ownership check
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTask]));
-      
+
       // Mock UPDATE query
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{
-        ...mockTask,
-        ...updateData,
-        updatedAt: new Date(),
-      }]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            ...mockTask,
+            ...updateData,
+            updatedAt: new Date(),
+          },
+        ])
+      );
 
       // Mock enrichment queries
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.update('task-123', updateData, mockContext);
+      const result = await taskService.update(
+        'task-123',
+        updateData,
+        mockContext
+      );
 
       expect(result).not.toBeNull();
       expect(result?.title).toBe('Updated Task');
@@ -317,22 +342,30 @@ describe('TaskService', () => {
     it('should toggle completion status', async () => {
       // Mock ownership check
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTask]));
-      
+
       // Mock UPDATE query
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{
-        ...mockTask,
-        completed: true,
-        completedAt: new Date(),
-        status: 'DONE',
-        updatedAt: new Date(),
-      }]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            ...mockTask,
+            completed: true,
+            completedAt: new Date(),
+            status: 'DONE',
+            updatedAt: new Date(),
+          },
+        ])
+      );
 
       // Mock enrichment queries
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.update('task-123', { completed: true }, mockContext);
+      const result = await taskService.update(
+        'task-123',
+        { completed: true },
+        mockContext
+      );
 
       expect(result?.completed).toBe(true);
       expect(result?.completedAt).not.toBeNull();
@@ -342,8 +375,9 @@ describe('TaskService', () => {
       // When checkOwnership returns false (no rows), it throws
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(taskService.update('non-existent', { title: 'Updated' }, mockContext))
-        .rejects.toThrow('AUTHORIZATION_ERROR');
+      await expect(
+        taskService.update('non-existent', { title: 'Updated' }, mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR');
     });
   });
 
@@ -371,10 +405,10 @@ describe('TaskService', () => {
     it('should return paginated results', async () => {
       // Mock data query
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTask]));
-      
+
       // Mock count query
       mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '10' }]));
-      
+
       // Mock enrichment queries (task lists, attachments, tags)
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
@@ -404,30 +438,38 @@ describe('TaskService', () => {
   describe('bulkUpdate', () => {
     it('should update multiple tasks', async () => {
       const taskIds = ['task-1', 'task-2', 'task-3'];
-      
+
       // Mock ownership check
-      mockedQuery.mockResolvedValueOnce(createQueryResult([
-        { id: 'task-1' },
-        { id: 'task-2' },
-        { id: 'task-3' },
-      ]));
-      
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([
+          { id: 'task-1' },
+          { id: 'task-2' },
+          { id: 'task-3' },
+        ])
+      );
+
       // Mock UPDATE query
       mockedQuery.mockResolvedValueOnce(createQueryResult([], 3));
-      
+
       // Mock SELECT to get updated tasks
-      mockedQuery.mockResolvedValueOnce(createQueryResult([
-        { ...mockTask, id: 'task-1', completed: true },
-        { ...mockTask, id: 'task-2', completed: true },
-        { ...mockTask, id: 'task-3', completed: true },
-      ]));
-      
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([
+          { ...mockTask, id: 'task-1', completed: true },
+          { ...mockTask, id: 'task-2', completed: true },
+          { ...mockTask, id: 'task-3', completed: true },
+        ])
+      );
+
       // Mock enrichment queries
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.bulkUpdate(taskIds, { completed: true }, mockContext);
+      const result = await taskService.bulkUpdate(
+        taskIds,
+        { completed: true },
+        mockContext
+      );
 
       // bulkUpdate returns TaskEntity[]
       expect(result).toHaveLength(3);
@@ -438,18 +480,19 @@ describe('TaskService', () => {
   describe('bulkDelete', () => {
     it('should delete multiple tasks', async () => {
       const taskIds = ['task-1', 'task-2'];
-      
+
       // Mock ownership check
-      mockedQuery.mockResolvedValueOnce(createQueryResult([
-        { id: 'task-1' },
-        { id: 'task-2' },
-      ]));
-      
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ id: 'task-1' }, { id: 'task-2' }])
+      );
+
       // Mock DELETE query
       mockedQuery.mockResolvedValueOnce(createQueryResult([], 2));
 
       // bulkDelete returns void
-      await expect(taskService.bulkDelete(taskIds, mockContext)).resolves.toBeUndefined();
+      await expect(
+        taskService.bulkDelete(taskIds, mockContext)
+      ).resolves.toBeUndefined();
     });
   });
 

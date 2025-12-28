@@ -13,7 +13,10 @@ import {
 import { UnauthorizedError } from '../../types/api';
 import { createMockRequest, createMockResponse } from '../../__tests__/helpers';
 import type { AuthenticatedRequest } from '../../types/api';
-import { extractTokenFromHeader, verifyToken } from '../../../packages/backend/src/utils/jwt.js';
+import {
+  extractTokenFromHeader,
+  verifyToken,
+} from '../../../packages/backend/src/utils/jwt.js';
 
 vi.mock('../../../packages/backend/src/utils/jwt.js', () => ({
   verifyToken: vi.fn(),
@@ -25,12 +28,14 @@ describe('Authentication Middleware', () => {
 
   beforeEach(() => {
     mockNext = vi.fn();
-    vi.mocked(extractTokenFromHeader).mockImplementation((authHeader?: string) => {
-      if (!authHeader) return null;
-      const parts = authHeader.split(' ');
-      if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
-      return parts[1];
-    });
+    vi.mocked(extractTokenFromHeader).mockImplementation(
+      (authHeader?: string) => {
+        if (!authHeader) return null;
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
+        return parts[1];
+      }
+    );
     vi.mocked(verifyToken).mockImplementation(async (token: string) => {
       if (token.includes('malformed')) {
         throw new Error('TOKEN_INVALID');
@@ -69,7 +74,9 @@ describe('Authentication Middleware', () => {
 
       const middleware = authenticateJWT();
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
       await expect(middleware(req, res, mockNext)).rejects.toThrow(
         'Missing or invalid authorization header'
       );
@@ -86,7 +93,9 @@ describe('Authentication Middleware', () => {
 
       const middleware = authenticateJWT();
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -100,8 +109,12 @@ describe('Authentication Middleware', () => {
 
       const middleware = authenticateJWT();
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
-      await expect(middleware(req, res, mockNext)).rejects.toThrow('Missing JWT token');
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        'Missing JWT token'
+      );
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -276,8 +289,12 @@ describe('Authentication Middleware', () => {
 
       const middleware = requireRole('admin');
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
-      await expect(middleware(req, res, mockNext)).rejects.toThrow('Authentication required');
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        'Authentication required'
+      );
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -325,8 +342,12 @@ describe('Authentication Middleware', () => {
       const getResourceUserId = vi.fn().mockResolvedValue('resource-owner-id');
       const middleware = requireOwnership(getResourceUserId);
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
-      await expect(middleware(req, res, mockNext)).rejects.toThrow('Authentication required');
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        'Authentication required'
+      );
       expect(mockNext).not.toHaveBeenCalled();
       expect(getResourceUserId).not.toHaveBeenCalled();
     });
@@ -362,8 +383,12 @@ describe('Authentication Middleware', () => {
       const getResourceUserId = vi.fn().mockResolvedValue('different-user-456');
       const middleware = requireOwnership(getResourceUserId);
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow(UnauthorizedError);
-      await expect(middleware(req, res, mockNext)).rejects.toThrow('Access denied');
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        UnauthorizedError
+      );
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        'Access denied'
+      );
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -397,7 +422,7 @@ describe('Authentication Middleware', () => {
       const res = createMockResponse();
 
       const getResourceUserId = vi.fn(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         return userId;
       });
       const middleware = requireOwnership(getResourceUserId);
@@ -417,10 +442,14 @@ describe('Authentication Middleware', () => {
       };
       const res = createMockResponse();
 
-      const getResourceUserId = vi.fn().mockRejectedValue(new Error('Database error'));
+      const getResourceUserId = vi
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
       const middleware = requireOwnership(getResourceUserId);
 
-      await expect(middleware(req, res, mockNext)).rejects.toThrow('Database error');
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        'Database error'
+      );
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -452,7 +481,6 @@ describe('Authentication Middleware', () => {
 
   describe('Integration Tests', () => {
     it('should chain authenticateJWT with requireOwnership', async () => {
-      const userId = 'user-123';
       const req = createMockRequest({
         headers: {
           authorization: 'Bearer valid-token',

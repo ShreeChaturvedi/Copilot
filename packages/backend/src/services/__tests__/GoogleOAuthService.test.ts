@@ -11,7 +11,7 @@ vi.mock('google-auth-library', () => {
     generateAuthUrl: vi.fn(),
     getToken: vi.fn(),
     setCredentials: vi.fn(),
-    verifyIdToken: vi.fn()
+    verifyIdToken: vi.fn(),
   };
   return {
     OAuth2Client: vi.fn(() => mockOAuth2Client),
@@ -36,15 +36,15 @@ vi.mock('../../utils/jwt.js', () => ({
   generateTokenPair: vi.fn().mockResolvedValue({
     accessToken: 'mock-access-token',
     refreshToken: 'mock-refresh-token',
-    expiresAt: Date.now() + 900000
-  })
+    expiresAt: Date.now() + 900000,
+  }),
 }));
 
 // Mock refresh token service
 vi.mock('../RefreshTokenService.js', () => ({
   refreshTokenService: {
-    storeRefreshToken: vi.fn()
-  }
+    storeRefreshToken: vi.fn(),
+  },
 }));
 
 // Mock fetch
@@ -52,8 +52,11 @@ global.fetch = vi.fn();
 
 // Import AFTER mocks are set up
 import { googleOAuthService } from '../GoogleOAuthService.js';
-import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
-import { OAuth2Client, __mockOAuth2Client } from 'google-auth-library';
+import {
+  query as mockQuery,
+  withTransaction as mockWithTransaction,
+} from '../../config/database.js';
+import { __mockOAuth2Client } from 'google-auth-library';
 
 // Get the mock client instance
 const mockOAuth2Client = __mockOAuth2Client as {
@@ -84,7 +87,7 @@ describe('GoogleOAuthService', () => {
     email: 'test@example.com',
     name: 'Test User',
     picture: 'https://example.com/avatar.jpg',
-    verified_email: true
+    verified_email: true,
   };
 
   const mockUser = {
@@ -115,9 +118,9 @@ describe('GoogleOAuthService', () => {
         access_type: 'offline',
         scope: [
           'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile'
+          'https://www.googleapis.com/auth/userinfo.profile',
         ],
-        prompt: 'consent'
+        prompt: 'consent',
       });
     });
   });
@@ -127,13 +130,13 @@ describe('GoogleOAuthService', () => {
       const authCode = 'test-auth-code';
       const mockTokens = {
         access_token: 'access-token',
-        refresh_token: 'refresh-token'
+        refresh_token: 'refresh-token',
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockGoogleUserInfo)
+        json: () => Promise.resolve(mockGoogleUserInfo),
       } as Response);
 
       // Mock transaction for user creation - the callback uses the module-level query()
@@ -168,7 +171,7 @@ describe('GoogleOAuthService', () => {
 
       // Mock transaction - just execute the callback with a fake client
       mockedWithTransaction.mockImplementation(async (callback: any) => {
-        return callback({});  // The callback uses module-level query(), not client.query()
+        return callback({}); // The callback uses module-level query(), not client.query()
       });
 
       const result = await googleOAuthService.handleCallback(authCode);
@@ -182,13 +185,13 @@ describe('GoogleOAuthService', () => {
       const authCode = 'test-auth-code';
       const mockTokens = {
         access_token: 'access-token',
-        refresh_token: 'refresh-token'
+        refresh_token: 'refresh-token',
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockGoogleUserInfo)
+        json: () => Promise.resolve(mockGoogleUserInfo),
       } as Response);
 
       // Mock existing user found by Google ID
@@ -215,19 +218,19 @@ describe('GoogleOAuthService', () => {
       const authCode = 'test-auth-code';
       const mockTokens = {
         access_token: 'access-token',
-        refresh_token: 'refresh-token'
+        refresh_token: 'refresh-token',
       };
 
       const existingUser = {
         ...mockUser,
         googleId: null,
-        password: 'hashed-password'
+        password: 'hashed-password',
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockGoogleUserInfo)
+        json: () => Promise.resolve(mockGoogleUserInfo),
       } as Response);
 
       // Mock user not found by Google ID, but found by email
@@ -238,7 +241,11 @@ describe('GoogleOAuthService', () => {
           return createQueryResult([existingUser]);
         }
         // Find user by googleId (SELECT with "googleid" = $1 in WHERE clause)
-        if (sqlLower.includes('select') && sqlLower.includes('where') && sqlLower.includes('"googleid" = $1')) {
+        if (
+          sqlLower.includes('select') &&
+          sqlLower.includes('where') &&
+          sqlLower.includes('"googleid" = $1')
+        ) {
           return createQueryResult([]);
         }
         // Update user with googleId
@@ -263,7 +270,9 @@ describe('GoogleOAuthService', () => {
 
       mockOAuth2Client.getToken.mockRejectedValue(new Error('OAuth failed'));
 
-      await expect(googleOAuthService.handleCallback(authCode)).rejects.toThrow('GOOGLE_OAUTH_FAILED');
+      await expect(googleOAuthService.handleCallback(authCode)).rejects.toThrow(
+        'GOOGLE_OAUTH_FAILED'
+      );
     });
   });
 
@@ -275,11 +284,11 @@ describe('GoogleOAuthService', () => {
         email: mockGoogleUserInfo.email,
         name: mockGoogleUserInfo.name,
         picture: mockGoogleUserInfo.picture,
-        email_verified: true
+        email_verified: true,
       };
 
       mockOAuth2Client.verifyIdToken.mockResolvedValue({
-        getPayload: () => mockPayload
+        getPayload: () => mockPayload,
       });
 
       // Mock existing user found by Google ID
@@ -300,7 +309,7 @@ describe('GoogleOAuthService', () => {
       expect(result.tokens.accessToken).toBe('mock-access-token');
       expect(mockOAuth2Client.verifyIdToken).toHaveBeenCalledWith({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: process.env.GOOGLE_CLIENT_ID,
       });
     });
 
@@ -308,18 +317,24 @@ describe('GoogleOAuthService', () => {
       const idToken = 'invalid-token';
 
       mockOAuth2Client.verifyIdToken.mockResolvedValue({
-        getPayload: () => null
+        getPayload: () => null,
       });
 
-      await expect(googleOAuthService.verifyIdToken(idToken)).rejects.toThrow('GOOGLE_TOKEN_VERIFICATION_FAILED');
+      await expect(googleOAuthService.verifyIdToken(idToken)).rejects.toThrow(
+        'GOOGLE_TOKEN_VERIFICATION_FAILED'
+      );
     });
 
     it('should throw error on token verification failure', async () => {
       const idToken = 'test-id-token';
 
-      mockOAuth2Client.verifyIdToken.mockRejectedValue(new Error('Verification failed'));
+      mockOAuth2Client.verifyIdToken.mockRejectedValue(
+        new Error('Verification failed')
+      );
 
-      await expect(googleOAuthService.verifyIdToken(idToken)).rejects.toThrow('GOOGLE_TOKEN_VERIFICATION_FAILED');
+      await expect(googleOAuthService.verifyIdToken(idToken)).rejects.toThrow(
+        'GOOGLE_TOKEN_VERIFICATION_FAILED'
+      );
     });
   });
 
@@ -329,7 +344,7 @@ describe('GoogleOAuthService', () => {
       const userWithPassword = {
         id: userId,
         googleId: 'google-123',
-        password: 'hashed-password'
+        password: 'hashed-password',
       };
 
       mockedQuery.mockImplementation(async (sql: string) => {
@@ -355,7 +370,9 @@ describe('GoogleOAuthService', () => {
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('USER_NOT_FOUND');
+      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow(
+        'USER_NOT_FOUND'
+      );
     });
 
     it('should throw error if Google account not linked', async () => {
@@ -363,12 +380,14 @@ describe('GoogleOAuthService', () => {
       const userWithoutGoogle = {
         id: userId,
         googleId: null,
-        password: 'hashed-password'
+        password: 'hashed-password',
       };
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([userWithoutGoogle]));
 
-      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('GOOGLE_ACCOUNT_NOT_LINKED');
+      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow(
+        'GOOGLE_ACCOUNT_NOT_LINKED'
+      );
     });
 
     it('should throw error if Google is the only auth method', async () => {
@@ -376,12 +395,14 @@ describe('GoogleOAuthService', () => {
       const googleOnlyUser = {
         id: userId,
         googleId: 'google-123',
-        password: null
+        password: null,
       };
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([googleOnlyUser]));
 
-      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('CANNOT_UNLINK_ONLY_AUTH_METHOD');
+      await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow(
+        'CANNOT_UNLINK_ONLY_AUTH_METHOD'
+      );
     });
   });
 

@@ -11,7 +11,6 @@ import {
   sendError,
 } from '../errorHandler';
 import {
-  ApiError,
   ValidationError,
   NotFoundError,
   UnauthorizedError,
@@ -230,7 +229,11 @@ describe('Error Handler Middleware', () => {
       const res = createMockResponse();
 
       const validationDetails = [
-        { field: 'email', message: 'Invalid email format', code: 'invalid_email' },
+        {
+          field: 'email',
+          message: 'Invalid email format',
+          code: 'invalid_email',
+        },
         { field: 'age', message: 'Must be at least 18', code: 'too_small' },
       ];
       const error = new ValidationError(validationDetails);
@@ -472,9 +475,7 @@ describe('Error Handler Middleware', () => {
 
     it('should include error details if present', () => {
       const res = createMockResponse();
-      const details = [
-        { field: 'email', message: 'Invalid format' },
-      ];
+      const details = [{ field: 'email', message: 'Invalid format' }];
       const error = new ValidationError(details);
 
       sendError(res, error);
