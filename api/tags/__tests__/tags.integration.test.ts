@@ -2,10 +2,13 @@
  * Integration tests for Tags API endpoints
  * Tests tag system integration with task management
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import tagsHandler from '../index';
 import tagHandler from '../[id]';
-import { getAllServices } from '../../../lib/services/index';
+import cleanupHandler from '../cleanup';
+import mergeHandler from '../merge';
+import statsHandler from '../stats';
+import { getAllServices } from '../../../lib/services/index.js';
 import {
   createMockAuthRequest,
   createMockResponse,
@@ -14,8 +17,24 @@ import {
 } from '../../../lib/__tests__/helpers';
 
 // Mock the services
-vi.mock('../../../lib/services/index');
-vi.mock('../../../lib/middleware/errorHandler');
+vi.mock('../../../lib/services/index.js');
+vi.mock('../../../lib/middleware/errorHandler.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    asyncHandler: (handler: any) => handler,
+    sendSuccess: vi.fn(),
+    sendError: vi.fn(),
+  };
+});
+
+vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    devAuth: () => (_req: any, _res: any, next: any) => next(),
+  };
+});
 
 const mockTagService = {
   findAll: vi.fn(),
@@ -23,9 +42,9 @@ const mockTagService = {
   findById: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
-  cleanup: vi.fn(),
-  merge: vi.fn(),
-  getStats: vi.fn(),
+  cleanupUnusedTags: vi.fn(),
+  mergeTags: vi.fn(),
+  getStatistics: vi.fn(),
 };
 
 const mockServices = {
@@ -39,9 +58,15 @@ const mockSendError = vi.fn();
 vi.mocked(getAllServices).mockReturnValue(mockServices as unknown as ReturnType<typeof getAllServices>);
 
 // Import mocked functions
-const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler');
+const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler.js');
 vi.mocked(sendSuccess).mockImplementation(mockSendSuccess);
-vi.mocked(sendError).mockImplementation(mockSendError);
+vi.mocked(sendError).mockImplementation((res, error) => {
+  mockSendError(res, {
+    statusCode: error?.statusCode,
+    code: error?.code,
+    message: error?.message,
+  });
+});
 
 // Test data
 const mockTag = testTags.priority;
@@ -49,10 +74,6 @@ const mockTag = testTags.priority;
 describe('Tags API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
   });
 
   describe('Requirement 7.1: Tag CRUD Operations', () => {
@@ -232,22 +253,26 @@ describe('Tags API Integration Tests', () => {
   describe('Requirement 7.3: Tag Cleanup and Maintenance', () => {
     it('should cleanup unused tags', async () => {
       const req = createMockAuthRequest(mockUser, {
-        method: 'POST',
+        method: 'DELETE',
         url: '/api/tags/cleanup',
-        query: { action: 'cleanup' },
       });
       const res = createMockResponse();
 
       const cleanupResult = {
+        cleaned: true,
         deletedCount: 5,
-        deletedTags: ['unused-tag-1', 'unused-tag-2'],
+        deletedTagIds: ['unused-tag-1', 'unused-tag-2'],
+        message: '5 unused tags were removed',
       };
 
-      mockTagService.cleanup.mockResolvedValue(cleanupResult);
+      mockTagService.cleanupUnusedTags.mockResolvedValue({
+        deletedCount: cleanupResult.deletedCount,
+        deletedTagIds: cleanupResult.deletedTagIds,
+      });
 
-      await tagsHandler(req, res);
+      await cleanupHandler(req, res);
 
-      expect(mockTagService.cleanup).toHaveBeenCalledWith({
+      expect(mockTagService.cleanupUnusedTags).toHaveBeenCalledWith({
         userId: 'user-123',
         requestId: 'test-request-123',
       });
@@ -268,16 +293,16 @@ describe('Tags API Integration Tests', () => {
       const res = createMockResponse();
 
       const mergeResult = {
-        mergedTag: mockTag,
-        mergedCount: 2,
-        affectedTasks: 10,
+        merged: true,
+        targetTag: mockTag,
+        mergedCount: mergeData.sourceTagIds.length,
       };
 
-      mockTagService.merge.mockResolvedValue(mergeResult);
+      mockTagService.mergeTags.mockResolvedValue(mockTag);
 
-      await tagsHandler(req, res);
+      await mergeHandler(req, res);
 
-      expect(mockTagService.merge).toHaveBeenCalledWith(
+      expect(mockTagService.mergeTags).toHaveBeenCalledWith(
         mergeData.sourceTagIds,
         mergeData.targetTagId,
         {
@@ -315,11 +340,11 @@ describe('Tags API Integration Tests', () => {
         averageTagsPerTask: 2.3,
       };
 
-      mockTagService.getStats.mockResolvedValue(tagStats);
+      mockTagService.getStatistics.mockResolvedValue(tagStats);
 
-      await tagsHandler(req, res);
+      await statsHandler(req, res);
 
-      expect(mockTagService.getStats).toHaveBeenCalledWith({
+      expect(mockTagService.getStatistics).toHaveBeenCalledWith({
         userId: 'user-123',
         requestId: 'test-request-123',
       });

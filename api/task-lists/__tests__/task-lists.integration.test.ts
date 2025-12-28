@@ -2,10 +2,10 @@
  * Integration tests for Task Lists API endpoints
  * Tests the complete flow from API routes to database operations
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import taskListsHandler from '../index';
 import taskListHandler from '../[id]';
-import { getAllServices } from '../../../lib/services/index';
+import { getAllServices } from '../../../lib/services/index.js';
 import type { CreateTaskListDTO, UpdateTaskListDTO } from '../../../lib/services/TaskListService';
 import {
   createMockAuthRequest,
@@ -15,8 +15,24 @@ import {
 } from '../../../lib/__tests__/helpers';
 
 // Mock the services
-vi.mock('../../../lib/services/index');
-vi.mock('../../../lib/middleware/errorHandler');
+vi.mock('../../../lib/services/index.js');
+vi.mock('../../../lib/middleware/errorHandler.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    asyncHandler: (handler: any) => handler,
+    sendSuccess: vi.fn(),
+    sendError: vi.fn(),
+  };
+});
+
+vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    devAuth: () => (_req: any, _res: any, next: any) => next(),
+  };
+});
 
 const mockTaskListService = {
   findAll: vi.fn(),
@@ -39,9 +55,15 @@ const mockSendError = vi.fn();
 vi.mocked(getAllServices).mockReturnValue(mockServices as unknown as ReturnType<typeof getAllServices>);
 
 // Import mocked functions
-const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler');
+const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler.js');
 vi.mocked(sendSuccess).mockImplementation(mockSendSuccess);
-vi.mocked(sendError).mockImplementation(mockSendError);
+vi.mocked(sendError).mockImplementation((res, error) => {
+  mockSendError(res, {
+    statusCode: error?.statusCode,
+    code: error?.code,
+    message: error?.message,
+  });
+});
 
 // Test data
 const mockTaskList = testTaskLists.work;
@@ -56,10 +78,6 @@ const mockTaskListWithCounts = {
 describe('Task Lists API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
   });
 
   describe('GET /api/task-lists', () => {

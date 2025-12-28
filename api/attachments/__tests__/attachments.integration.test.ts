@@ -1,28 +1,66 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import listHandler from '../index';
-import itemHandler from '../[id]';
-import statsHandler from '../stats';
-import { getAllServices } from '../../../lib/services/index';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   createMockAuthRequest,
   createMockResponse,
 } from '../../../lib/__tests__/helpers';
 
-vi.mock('../../../lib/services/index', async () => {
-  const actual = await vi.importActual<typeof import('../../../lib/services/index')>('../../../lib/services/index');
+const {
+  mockAttachmentService,
+  mockSendSuccess,
+  mockSendError,
+  mockGetAllServices,
+} = vi.hoisted(() => {
+  const service = {
+    findAll: vi.fn(),
+    findById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    findByCategory: vi.fn(),
+    getStorageStats: vi.fn(),
+  };
+
   return {
-    ...actual,
-    getAllServices: vi.fn(() => ({ attachment: mockAttachmentService } as any)),
-  } as any;
+    mockAttachmentService: service,
+    mockSendSuccess: vi.fn((res, data, statusCode = 200) => {
+      res.status(statusCode).json({ success: true, data });
+    }),
+    mockSendError: vi.fn((res, error) => {
+      const statusCode = error.statusCode ?? 500;
+      res.status(statusCode).json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        },
+      });
+    }),
+    mockGetAllServices: vi.fn(() => ({ attachment: service })),
+  };
 });
-vi.mock('../../../lib/middleware/errorHandler', async () => {
-  const actual = await vi.importActual<typeof import('../../../lib/middleware/errorHandler')>('../../../lib/middleware/errorHandler');
+
+vi.mock('../../../lib/services/index.js', () => ({
+  getAllServices: mockGetAllServices,
+}));
+
+vi.mock('../../../lib/middleware/errorHandler.js', async (importOriginal) => {
+  const actual = await importOriginal();
   return {
     ...actual,
-    sendSuccess: vi.fn(),
-    sendError: vi.fn(),
-  } as typeof actual & { sendSuccess: any; sendError: any };
+    asyncHandler: (handler: any) => handler,
+    sendSuccess: mockSendSuccess,
+    sendError: mockSendError,
+  };
+});
+
+vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    devAuth: () => (_req: any, _res: any, next: any) => next(),
+  };
 });
 vi.mock('@vercel/blob', () => ({
   put: vi.fn(async (_name: string, _data: Buffer, _opts: any) => ({
@@ -45,23 +83,15 @@ vi.mock('sharp', () => ({
   })
 }));
 
-const mockAttachmentService = {
-  findAll: vi.fn(),
-  findById: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
-  findByCategory: vi.fn(),
-  getStorageStats: vi.fn(),
-};
+let listHandler: typeof import('../index').default;
+let itemHandler: typeof import('../[id]').default;
+let statsHandler: typeof import('../stats').default;
 
-vi.mocked(getAllServices).mockReturnValue({ attachment: mockAttachmentService } as any);
-
-const errorModule = await import('../../../lib/middleware/errorHandler');
-const mockSendSuccess = vi.fn();
-const mockSendError = vi.fn();
-(errorModule as any).sendSuccess = mockSendSuccess as any;
-(errorModule as any).sendError = mockSendError as any;
+beforeAll(async () => {
+  listHandler = (await import('../index')).default;
+  itemHandler = (await import('../[id]')).default;
+  statsHandler = (await import('../stats')).default;
+});
 
 const mockUser = { id: 'user-1' };
 
@@ -88,7 +118,7 @@ describe('Attachments API', () => {
 
     await listHandler(r as any, s as any);
 
-    expect(mockAttachmentService.findAll).toHaveBeenCalledWith({ taskId: 't1', limit: 50, offset: 0 }, { userId: 'user-1', requestId: 'req-1' });
+    expect(mockAttachmentService.findAll).toHaveBeenCalledWith({ taskId: 't1', limit: 50, offset: 0 }, { userId: 'user-1', requestId: 'test-request-123' });
     expect(mockSendSuccess).toHaveBeenCalled();
   });
 
@@ -108,7 +138,7 @@ describe('Attachments API', () => {
 
     await itemHandler(r as any, s as any);
 
-    expect(mockAttachmentService.findById).toHaveBeenCalledWith('a1', { userId: 'user-1', requestId: 'req-1' });
+    expect(mockAttachmentService.findById).toHaveBeenCalledWith('a1', { userId: 'user-1', requestId: 'test-request-123' });
     expect(mockSendSuccess).toHaveBeenCalled();
   });
 
@@ -119,12 +149,14 @@ describe('Attachments API', () => {
 
     await itemHandler(r as any, s as any);
 
-    expect(mockAttachmentService.delete).toHaveBeenCalledWith('a1', { userId: 'user-1', requestId: 'req-1' });
+    expect(mockAttachmentService.delete).toHaveBeenCalledWith('a1', { userId: 'user-1', requestId: 'test-request-123' });
     expect(mockSendSuccess).toHaveBeenCalledWith(s, { deleted: true });
   });
 
   it('ensures upload endpoint compresses images and returns thumbnail', async () => {
     const { default: uploadHandler } = await import('../../upload/index');
+    const previousToken = process.env.BLOB_READ_WRITE_TOKEN;
+    process.env.BLOB_READ_WRITE_TOKEN = 'test-token';
     const r = req({ method: 'PUT', url: '/api/upload?filename=test.jpg', headers: { 'content-type': 'image/jpeg', 'x-request-id': 'req-2' } });
     const base64 = '/9j/4AAQSkZJRgABAQABAAD/2wCEAAkGBxISEhUQFRUVFRUVFRUVFRUVFRUVFRUXFxUYFRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGxAQGy0lHyUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAAEAAQMBIgACEQEDEQH/xAAXAAEBAQEAAAAAAAAAAAAAAAAAAQMH/8QAHhABAQABBAMAAAAAAAAAAAAAAQIDBBEABSEiMTH/xAAWAQEBAQAAAAAAAAAAAAAAAAABAgT/xAAZEQABBQAAAAAAAAAAAAAAAAAAARECITH/2gAMAwEAAhEDEQA/ANrVg9z2l2M0y3qGm6oVgU9sA1dZq1p2gq7eXfIc3f+Xo8XkqT1fWc3M5G0qk6sQ8M0xKx3W+Hj7m6w3mA4m2b8zW3FvJ2iH2k3u0Zz9X//Z';
     const buf = Buffer.from(base64, 'base64');
@@ -133,19 +165,23 @@ describe('Attachments API', () => {
     const events: Record<string, Function[]> = {};
     (r as any).on = (ev: string, fn: Function) => { (events[ev] ||= []).push(fn); };
     // Trigger upload handler
-    const p = uploadHandler(r as any, s as any);
-    events['data']?.forEach((fn) => fn(buf));
-    events['end']?.forEach((fn) => fn());
-    await p;
-    const { sendSuccess } = await import('../../../lib/middleware/errorHandler');
-    expect(vi.mocked(sendSuccess)).toHaveBeenCalled();
-    const call = vi.mocked(sendSuccess).mock.calls.find((c) => c[1] && (c[1] as any).data);
-    expect(call).toBeTruthy();
-    const payload = call?.[1] as any;
-    expect(payload.data.url).toContain('https://blob.local');
-    expect(typeof payload.data.thumbnailUrl).toBe('string');
-    expect(payload.data.contentType).toBe('image/jpeg');
-    expect(typeof payload.data.size).toBe('number');
+    try {
+      const p = uploadHandler(r as any, s as any);
+      events['data']?.forEach((fn) => fn(buf));
+      events['end']?.forEach((fn) => fn());
+      await p;
+      const { sendSuccess } = await import('../../../lib/middleware/errorHandler.js');
+      expect(vi.mocked(sendSuccess)).toHaveBeenCalled();
+      const call = vi.mocked(sendSuccess).mock.calls[0];
+      expect(call).toBeTruthy();
+      const payload = call?.[1] as any;
+      expect(payload.url).toContain('https://blob.local');
+      expect(typeof payload.thumbnailUrl).toBe('string');
+      expect(payload.contentType).toBe('image/jpeg');
+      expect(typeof payload.size).toBe('number');
+    } finally {
+      process.env.BLOB_READ_WRITE_TOKEN = previousToken;
+    }
   });
 
   it('returns storage stats via stats route', async () => {
@@ -153,6 +189,6 @@ describe('Attachments API', () => {
     const s = res();
     mockAttachmentService.getStorageStats.mockResolvedValue({ totalFiles: 0, totalSize: 0, totalSizeMB: 0, averageFileSize: 0, filesByType: {}, largestFiles: [] });
     await statsHandler(r as any, s as any);
-    expect(mockAttachmentService.getStorageStats).toHaveBeenCalledWith({ userId: 'user-1', requestId: 'req-1' });
+    expect(mockAttachmentService.getStorageStats).toHaveBeenCalledWith({ userId: 'user-1', requestId: 'test-request-123' });
   });
 });

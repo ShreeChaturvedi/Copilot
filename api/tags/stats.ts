@@ -1,5 +1,5 @@
 /**
- * Tag Cleanup API Route - Remove unused tags
+ * Tag Statistics API Route
  */
 import { createMethodHandler } from '../../lib/utils/apiHandler.js';
 import { getAllServices } from '../../lib/services/index.js';
@@ -10,7 +10,7 @@ import type { VercelResponse } from '@vercel/node';
 import { UnauthorizedError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
 
 export default createMethodHandler({
-  [HttpMethod.DELETE]: async (req: AuthenticatedRequest, res: VercelResponse) => {
+  [HttpMethod.GET]: async (req: AuthenticatedRequest, res: VercelResponse) => {
     try {
       const { tag: tagService } = getAllServices();
       const userId = req.user?.id;
@@ -19,25 +19,20 @@ export default createMethodHandler({
         return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
-      const { deletedCount, deletedTagIds } = await tagService.cleanupUnusedTags({
+      const stats = await tagService.getStatistics({
         userId,
         requestId: req.headers['x-request-id'] as string,
       });
 
-      sendSuccess(res, {
-        cleaned: true,
-        deletedCount,
-        deletedTagIds,
-        message: `${deletedCount} unused tags were removed`,
-      });
+      sendSuccess(res, stats);
     } catch (error) {
-      console.error('DELETE /api/tags/cleanup error:', error);
-      
+      console.error('GET /api/tags/stats error:', error);
+
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, new InternalServerError(error.message || 'Failed to cleanup unused tags'));
+      sendError(res, new InternalServerError(error.message || 'Failed to fetch tag statistics'));
     }
   },
 });

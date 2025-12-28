@@ -82,9 +82,14 @@ async function validateTarget<Output>(
         code: err.code,
       }));
 
+      const message =
+        error.errors.length === 1
+          ? error.errors[0]?.message || `${target} validation failed`
+          : `${target} validation failed`;
+
       throw new ValidationError(
         formattedErrors,
-        `${target} validation failed`
+        message
       );
     }
     throw error;
@@ -147,10 +152,12 @@ export const commonSchemas = {
     limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 20),
     offset: z.string().optional().transform(val => val ? parseInt(val, 10) : 0),
   }).refine(data => {
-    if (data.page && data.page < 1) return false;
-    if (data.limit && (data.limit < 1 || data.limit > 100)) return false;
-    if (data.offset && data.offset < 0) return false;
-    return true;
+    const pageValid = Number.isFinite(data.page) && data.page >= 1;
+    const limitValid =
+      Number.isFinite(data.limit) && data.limit >= 1 && data.limit <= 100;
+    const offsetValid = Number.isFinite(data.offset) && data.offset >= 0;
+
+    return pageValid && limitValid && offsetValid;
   }, {
     message: 'Invalid pagination parameters',
   }),

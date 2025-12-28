@@ -2,60 +2,80 @@
  * Integration tests for Calendar API endpoints
  * Tests the complete request-response cycle with full middleware integration
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import calendarsHandler from '../index';
-import calendarHandler from '../[id]';
-import { getAllServices } from '../../../lib/services/index';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import {
   createMockAuthRequest,
   createMockResponse,
   mockUser,
-  getResponseData,
-  getResponseStatus,
 } from '../../../lib/__tests__/helpers';
 import type { CreateCalendarDTO, UpdateCalendarDTO } from '../../../lib/services/CalendarService';
 
-// Mock the services
-vi.mock('../../../lib/services/index');
-vi.mock('../../../lib/middleware/errorHandler');
+const {
+  mockCalendarService,
+  mockSendSuccess,
+  mockSendError,
+  mockGetAllServices,
+} = vi.hoisted(() => {
+  const service = {
+    findAll: vi.fn(),
+    findById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    toggleVisibility: vi.fn(),
+    setDefault: vi.fn(),
+    getWithEventCounts: vi.fn(),
+  };
 
-const mockCalendarService = {
-  findAll: vi.fn(),
-  findById: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
-  toggleVisibility: vi.fn(),
-  setDefault: vi.fn(),
-  getWithEventCounts: vi.fn(),
-};
-
-const mockServices = {
-  calendar: mockCalendarService,
-};
-
-// Mock error handler functions
-const mockSendSuccess = vi.fn((res, data, statusCode = 200) => {
-  res.status(statusCode).json({ success: true, data });
+  return {
+    mockCalendarService: service,
+    mockSendSuccess: vi.fn((res, data, statusCode = 200) => {
+      res.status(statusCode).json({ success: true, data });
+    }),
+    mockSendError: vi.fn((res, error) => {
+      const statusCode = error.statusCode ?? 500;
+      res.status(statusCode).json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        },
+      });
+    }),
+    mockGetAllServices: vi.fn(() => ({ calendar: service })),
+  };
 });
 
-const mockSendError = vi.fn((res, error) => {
-  res.status(error.statusCode).json({
-    success: false,
-    error: {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-    },
-  });
+vi.mock('../../../lib/services/index.js', () => ({
+  getAllServices: mockGetAllServices,
+}));
+
+vi.mock('../../../lib/middleware/errorHandler.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    asyncHandler: (handler: any) => handler,
+    sendSuccess: mockSendSuccess,
+    sendError: mockSendError,
+  };
 });
 
-vi.mocked(getAllServices).mockReturnValue(mockServices as unknown as ReturnType<typeof getAllServices>);
+vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    devAuth: () => (_req: any, _res: any, next: any) => next(),
+  };
+});
 
-// Import and mock error handlers
-const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler');
-vi.mocked(sendSuccess).mockImplementation(mockSendSuccess);
-vi.mocked(sendError).mockImplementation(mockSendError);
+let calendarsHandler: typeof import('../index').default;
+let calendarHandler: typeof import('../[id]').default;
+
+beforeAll(async () => {
+  calendarsHandler = (await import('../index')).default;
+  calendarHandler = (await import('../[id]')).default;
+});
 
 // Test data
 const mockCalendar = {
@@ -83,10 +103,6 @@ const mockCalendar2 = {
 describe('Calendar API Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
   });
 
   describe('GET /api/calendars', () => {

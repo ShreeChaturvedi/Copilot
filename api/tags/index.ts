@@ -6,7 +6,7 @@ import { getAllServices } from '../../lib/services/index.js';
 import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
-import type { CreateTagDTO, TagFilters } from '../../lib/services/TagService';
+import type { CreateTagDTO, TagFilters, TagType } from '../../lib/services/TagService';
 import { UnauthorizedError, ValidationError, InternalServerError } from '../../lib/types/api.js';
 
 export default createCrudHandler({
@@ -19,7 +19,7 @@ export default createCrudHandler({
         return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
-      const { search, popular } = req.query;
+      const { search, popular, type, color, unused, minUsageCount, withUsageCount, hasActiveTasks } = req.query;
 
       let result;
       
@@ -43,6 +43,27 @@ export default createCrudHandler({
         
         if (search) {
           filters.search = search as string;
+        }
+        if (type) {
+          filters.type = type as TagType;
+        }
+        if (color) {
+          filters.color = color as string;
+        }
+        if (unused !== undefined) {
+          filters.unused = unused === 'true';
+        }
+        if (minUsageCount !== undefined) {
+          const parsed = Number(minUsageCount);
+          if (!Number.isNaN(parsed)) {
+            filters.minUsageCount = parsed;
+          }
+        }
+        if (withUsageCount === 'true') {
+          filters.withUsageCount = true;
+        }
+        if (hasActiveTasks === 'true') {
+          filters.hasActiveTasks = true;
         }
 
         result = await tagService.findAll(filters, {
