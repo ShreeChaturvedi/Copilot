@@ -20,7 +20,9 @@ import {
 import { lazy } from 'react';
 import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
 
-const EmojiPicker = lazy(async () => ({ default: (await import('@/components/ui/emoji-picker')).EmojiPicker }));
+const EmojiPicker = lazy(async () => ({
+  default: (await import('@/components/ui/emoji-picker')).EmojiPicker,
+}));
 
 export interface CreateTaskDialogProps {
   open: boolean;
@@ -50,7 +52,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onOpenChange,
   onCreateTask,
-  onCreateCalendar: _onCreateCalendar, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onCreateCalendar: _onCreateCalendar,
   initialName,
   initialDescription,
   initialEmoji,
@@ -61,7 +63,9 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState(initialEmoji ?? '📁');
-  const [selectedColor, setSelectedColor] = useState<ColorPreset>((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>(
+    (initialColor as ColorPreset) ?? COLOR_PRESETS[0]
+  );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Reset form when dialog opens
@@ -89,7 +93,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       name: trimmedName,
       description: description.trim(),
       emoji,
-      color: selectedColor
+      color: selectedColor,
     });
 
     onOpenChange(false);
@@ -116,14 +120,20 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               <Label htmlFor="task-name">Name</Label>
               <div className="flex items-center gap-3">
                 {/* Emoji Picker */}
-                <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                <Popover
+                  open={showEmojiPicker}
+                  onOpenChange={setShowEmojiPicker}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
                       variant="outline"
                       className="w-12 h-10 text-xl p-0"
                       aria-label="Select emoji"
-                      style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
+                      style={{
+                        backgroundColor: selectedColor + '20',
+                        borderColor: selectedColor,
+                      }}
                     >
                       {emoji}
                     </Button>
@@ -152,21 +162,20 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               </div>
             </div>
 
-
-
             {/* Color Picker */}
             <div className="grid gap-3">
               <Label>Color</Label>
               <div className="flex gap-2 flex-wrap">
-                {COLOR_PRESETS.map(color => (
+                {COLOR_PRESETS.map((color) => (
                   <button
                     key={color}
                     type="button"
                     onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === color
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      selectedColor === color
                         ? 'border-foreground scale-110'
                         : 'border-transparent hover:border-border'
-                      }`}
+                    }`}
                     style={{ backgroundColor: color }}
                     aria-label={`Select color ${color}`}
                   />

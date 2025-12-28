@@ -208,15 +208,21 @@ export const useUIStore = create<UIState>()(
       setPeekMode: (mode) => set({ peekMode: mode }, false, 'setPeekMode'),
 
       setCurrentView: (view) =>
-        set(() => {
-          // Persist to settings store for cross-session memory
-          try {
-            // Access settings store without creating a React hook dependency
-            const { setAppViewMode } = useSettingsStore.getState();
-            setAppViewMode(view);
-          } catch {}
-          return { currentView: view };
-        }, false, 'setCurrentView'),
+        set(
+          () => {
+            // Persist to settings store for cross-session memory
+            try {
+              // Access settings store without creating a React hook dependency
+              const { setAppViewMode } = useSettingsStore.getState();
+              setAppViewMode(view);
+            } catch {
+              // Ignore persistence failures
+            }
+            return { currentView: view };
+          },
+          false,
+          'setCurrentView'
+        ),
 
       setTaskGrouping: (grouping) =>
         set({ taskGrouping: grouping }, false, 'setTaskGrouping'),
@@ -296,10 +302,18 @@ export const useUIStore = create<UIState>()(
       setSortOrder: (order) => set({ sortOrder: order }, false, 'setSortOrder'),
 
       setShowTaskListContextInAll: (show) =>
-        set({ showTaskListContextInAll: show }, false, 'setShowTaskListContextInAll'),
+        set(
+          { showTaskListContextInAll: show },
+          false,
+          'setShowTaskListContextInAll'
+        ),
 
       setSelectedKanbanTaskListId: (id) =>
-        set({ selectedKanbanTaskListId: id }, false, 'setSelectedKanbanTaskListId'),
+        set(
+          { selectedKanbanTaskListId: id },
+          false,
+          'setSelectedKanbanTaskListId'
+        ),
 
       resetUI: () => set(initialState, false, 'resetUI'),
     }),

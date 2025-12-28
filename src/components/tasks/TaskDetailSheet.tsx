@@ -1,8 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock as ClockIcon, MapPin, Tag as TagIcon, FileText, Loader } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  Clock as ClockIcon,
+  MapPin,
+  Tag as TagIcon,
+  FileText,
+  Loader,
+} from 'lucide-react';
 
-import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { IntegratedActionBar } from '@/components/dialogs/IntegratedActionBar';
 import { cn } from '@/lib/utils';
@@ -32,7 +44,9 @@ function getTagIcon(type: string) {
 
 function isSameDay(date: Date) {
   const now = new Date(date);
-  return now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0;
+  return (
+    now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0
+  );
 }
 
 export interface TaskDetailSheetProps {
@@ -56,7 +70,9 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   const { updateTask } = useTasks();
   const queryClient = useQueryClient();
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [activeAttachment, setActiveAttachment] = useState<FileAttachment | null>(null);
+  const [activeAttachment, setActiveAttachment] =
+    useState<FileAttachment | null>(null);
+  const taskWithDescription = task as Task & { description?: string };
 
   const handlePeekToggle = useCallback(() => {
     setPeekMode(peekMode === 'center' ? 'right' : 'center');
@@ -80,28 +96,49 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     }
   }, []);
 
-  const handleDeleteAttachment = useCallback(async (att: FileAttachment) => {
-    try {
-      queryClient.setQueriesData(
-        { queryKey: taskQueryKeys.all },
-        (oldData: Task[] | undefined) => {
-          if (!oldData) return oldData;
-          return oldData.map((t) => t.id === task.id ? { ...t, attachments: (t.attachments || []).filter((a) => a.id !== att.id) } : t);
-        }
-      );
+  const handleDeleteAttachment = useCallback(
+    async (att: FileAttachment) => {
+      try {
+        queryClient.setQueriesData(
+          { queryKey: taskQueryKeys.all },
+          (oldData: Task[] | undefined) => {
+            if (!oldData) return oldData;
+            return oldData.map((t) =>
+              t.id === task.id
+                ? {
+                    ...t,
+                    attachments: (t.attachments || []).filter(
+                      (a) => a.id !== att.id
+                    ),
+                  }
+                : t
+            );
+          }
+        );
 
-      await attachmentsApi.delete(att.id);
+        await attachmentsApi.delete(att.id);
 
-      setPreviewOpen(false);
-      setActiveAttachment(null);
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-    } catch (e) {
-      console.error('Delete attachment failed', e);
-    }
-  }, [task.id, queryClient]);
+        setPreviewOpen(false);
+        setActiveAttachment(null);
+        queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      } catch (e) {
+        console.error('Delete attachment failed', e);
+      }
+    },
+    [task.id, queryClient]
+  );
 
-  const locationTag = useMemo(() => task.tags?.find((t) => t.type === 'location'), [task.tags]);
-  const otherTags = useMemo(() => (task.tags || []).filter((t) => t.type !== 'date' && t.type !== 'time' && t.type !== 'location'), [task.tags]);
+  const locationTag = useMemo(
+    () => task.tags?.find((t) => t.type === 'location'),
+    [task.tags]
+  );
+  const otherTags = useMemo(
+    () =>
+      (task.tags || []).filter(
+        (t) => t.type !== 'date' && t.type !== 'time' && t.type !== 'location'
+      ),
+    [task.tags]
+  );
 
   // No client-side fetching needed for previews; use direct URLs for images
 
@@ -115,11 +152,22 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className={cn('w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden', className)}>
-        <SheetDescription className="sr-only">Task details for {task.title}</SheetDescription>
+      <SheetContent
+        side="right"
+        className={cn(
+          'w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden',
+          className
+        )}
+      >
+        <SheetDescription className="sr-only">
+          Task details for {task.title}
+        </SheetDescription>
         {/* Header: Title + action bar (Edit / Delete / Peek toggle / Close) */}
         <div className="flex items-start justify-between gap-2">
-          <SheetTitle className="text-xl font-semibold leading-tight truncate whitespace-nowrap" title={task.title}>
+          <SheetTitle
+            className="text-xl font-semibold leading-tight truncate whitespace-nowrap"
+            title={task.title}
+          >
             {task.title}
           </SheetTitle>
           <div className="flex-shrink-0">
@@ -142,18 +190,28 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               <Loader className="h-4 w-4" />
             </div>
             <div className="flex-1">
-              <StatusBadge task={task} onChange={(status) => updateTask.mutate({ id: task.id, updates: { status } as any })} />
+              <StatusBadge
+                task={task}
+                onChange={(status) =>
+                  updateTask.mutate({ id: task.id, updates: { status } })
+                }
+              />
             </div>
           </div>
           {/* Description */}
-          {(task as any).description || task.parsedMetadata?.originalInput ? (
+          {taskWithDescription.description ||
+          task.parsedMetadata?.originalInput ? (
             <div className="flex items-start gap-3">
               <div className="text-muted-foreground flex-shrink-0 mt-1">
                 <FileText className="h-4 w-4" />
               </div>
               <div className="flex-1">
                 <div className="text-sm whitespace-pre-wrap">
-                  {String((task as any).description || task.parsedMetadata?.originalInput || '')}
+                  {String(
+                    taskWithDescription.description ||
+                      task.parsedMetadata?.originalInput ||
+                      ''
+                  )}
                 </div>
               </div>
             </div>
@@ -170,9 +228,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                 )}
               </div>
               <div className="flex-1 text-sm font-medium">
-                <span>
-                  {format(task.scheduledDate, 'MMM dd, yyyy')}
-                </span>
+                <span>{format(task.scheduledDate, 'MMM dd, yyyy')}</span>
                 {!isSameDay(task.scheduledDate) && (
                   <span className="ml-2 text-muted-foreground">
                     {format(task.scheduledDate, 'h:mm a')}
@@ -210,11 +266,23 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                         variant="outline"
                         className={cn(
                           'text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30',
-                          tag.color && `border-[${tag.color}]/30 text-[${tag.color}]`
+                          tag.color &&
+                            `border-[${tag.color}]/30 text-[${tag.color}]`
                         )}
-                        style={tag.color ? { borderColor: `${tag.color}30`, color: tag.color, backgroundColor: `${tag.color}1A` } : undefined}
+                        style={
+                          tag.color
+                            ? {
+                                borderColor: `${tag.color}30`,
+                                color: tag.color,
+                                backgroundColor: `${tag.color}1A`,
+                              }
+                            : undefined
+                        }
                       >
-                        <Icon className="w-3 h-3" style={{ color: tag.color }} />
+                        <Icon
+                          className="w-3 h-3"
+                          style={{ color: tag.color }}
+                        />
                         {tag.displayText}
                       </Badge>
                     );
@@ -231,7 +299,9 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               <div className="flex flex-wrap gap-2">
                 {task.attachments.map((att) => {
                   const isImage = (att.type || '').startsWith('image/');
-                  const fileLike = new File([], att.name, { type: att.type || 'application/octet-stream' });
+                  const fileLike = new File([], att.name, {
+                    type: att.type || 'application/octet-stream',
+                  });
                   return (
                     <div
                       key={att.id}
@@ -247,10 +317,16 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                           loading="lazy"
                         />
                       ) : (
-                        <DefaultPreview file={fileLike} size="sm" className="w-8 h-8" />
+                        <DefaultPreview
+                          file={fileLike}
+                          size="sm"
+                          className="w-8 h-8"
+                        />
                       )}
                       <div className="min-w-0">
-                        <div className="text-xs font-medium text-foreground max-w-[180px] truncate">{att.name}</div>
+                        <div className="text-xs font-medium text-foreground max-w-[180px] truncate">
+                          {att.name}
+                        </div>
                       </div>
                     </div>
                   );
@@ -274,5 +350,3 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
 };
 
 export default TaskDetailSheet;
-
-

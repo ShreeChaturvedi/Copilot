@@ -23,9 +23,13 @@ interface ChartData {
 /**
  * Custom tooltip component for the pie chart
  */
-function CustomPieTooltip({ active, payload, total }: {
+function CustomPieTooltip({
+  active,
+  payload,
+  total,
+}: {
   active?: boolean;
-  payload?: Array<any>;
+  payload?: Array<{ payload?: ChartData }>;
   total: number;
 }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -41,7 +45,10 @@ function CustomPieTooltip({ active, payload, total }: {
   return (
     <div className="rounded-md border bg-popover text-popover-foreground shadow-md px-2.5 py-2 text-xs pointer-events-none z-50">
       <div className="flex items-center gap-2">
-        <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
+        <span
+          className="inline-block h-2.5 w-2.5 rounded-sm"
+          style={{ background: color }}
+        />
         <span className="font-medium">{name}</span>
       </div>
       <div className="mt-1 flex items-center gap-3 text-muted-foreground">
@@ -50,7 +57,10 @@ function CustomPieTooltip({ active, payload, total }: {
         </span>
         <span className="opacity-40">|</span>
         <span>
-          Percent: <span className="text-foreground font-medium">{percent.toFixed(1)}%</span>
+          Percent:{' '}
+          <span className="text-foreground font-medium">
+            {percent.toFixed(1)}%
+          </span>
         </span>
       </div>
     </div>
@@ -63,7 +73,9 @@ function CustomPieTooltip({ active, payload, total }: {
 function TaskAnalyticsSummaryComponent() {
   const { data: tasks = [], isLoading } = useAllTasks();
   const { selectedKanbanTaskListId, taskViewMode } = useUIStore();
-  const { taskGroups, activeTaskGroupId } = useTaskManagement({ includeTaskOperations: false });
+  const { taskGroups, activeTaskGroupId } = useTaskManagement({
+    includeTaskOperations: false,
+  });
   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
 
   // Determine the scope for analytics based on current view mode
@@ -83,7 +95,7 @@ function TaskAnalyticsSummaryComponent() {
     }
 
     // Find the task group name
-    const taskGroup = taskGroups.find(g => g.id === scopedListId);
+    const taskGroup = taskGroups.find((g) => g.id === scopedListId);
     if (taskGroup) {
       return taskGroup.name;
     }
@@ -97,11 +109,15 @@ function TaskAnalyticsSummaryComponent() {
   }, [scopedListId, taskGroups]);
 
   // Use actual hex colors - CSS variables don't work in Recharts SVG elements
-  const chartData: ChartData[] = useMemo(() => [
-    { name: 'Done', value: stats.done, color: '#10b981' },
-    { name: 'In Progress', value: stats.inProgress, color: '#f59e0b' },
-    { name: 'Not Started', value: stats.notStarted, color: '#6b7280' },
-  ].filter(item => item.value > 0), [stats.done, stats.inProgress, stats.notStarted]);
+  const chartData: ChartData[] = useMemo(
+    () =>
+      [
+        { name: 'Done', value: stats.done, color: '#10b981' },
+        { name: 'In Progress', value: stats.inProgress, color: '#f59e0b' },
+        { name: 'Not Started', value: stats.notStarted, color: '#6b7280' },
+      ].filter((item) => item.value > 0),
+    [stats.done, stats.inProgress, stats.notStarted]
+  );
 
   const totalCount = stats.done + stats.inProgress + stats.notStarted;
 
@@ -142,7 +158,9 @@ function TaskAnalyticsSummaryComponent() {
 
           {/* Empty state text */}
           <div className="flex-1 min-w-0 space-y-1">
-            <div className="font-semibold text-base text-foreground">{contextLabel}</div>
+            <div className="font-semibold text-base text-foreground">
+              {contextLabel}
+            </div>
             <div className="text-sm text-muted-foreground">No tasks yet</div>
             <div className="text-xs text-muted-foreground">
               Create tasks to see analytics
@@ -221,10 +239,17 @@ function TaskAnalyticsSummaryComponent() {
                 </span>
               </div>
               {/* Progress bar - thin with gradient matching TopProgressBar */}
-              <div className="relative h-[2px] w-full rounded-full bg-border/60 overflow-hidden" aria-hidden="true">
+              <div
+                className="relative h-[2px] w-full rounded-full bg-border/60 overflow-hidden"
+                aria-hidden="true"
+              >
                 <div
                   className="absolute left-0 top-0 bottom-0 rounded-full"
-                  style={{ width: `${stats.completionPct}%`, background: 'linear-gradient(90deg in oklch, oklch(92% 0.26 145) 0%, oklch(60% 0.18 155) 100%)' }}
+                  style={{
+                    width: `${stats.completionPct}%`,
+                    background:
+                      'linear-gradient(90deg in oklch, oklch(92% 0.26 145) 0%, oklch(60% 0.18 155) 100%)',
+                  }}
                 />
               </div>
             </div>
@@ -232,19 +257,28 @@ function TaskAnalyticsSummaryComponent() {
             {/* Breakdown row with status icons */}
             <div className="flex items-center gap-2 text-xs">
               {stats.notStarted > 0 && (
-                <div className="flex items-center gap-1 text-muted-foreground" title={`Not Started: ${stats.notStarted} tasks`}>
+                <div
+                  className="flex items-center gap-1 text-muted-foreground"
+                  title={`Not Started: ${stats.notStarted} tasks`}
+                >
                   <Circle className="w-3 h-3" />
                   <span>{stats.notStarted}</span>
                 </div>
               )}
               {stats.inProgress > 0 && (
-                <div className="flex items-center gap-1 text-amber-500" title={`In Progress: ${stats.inProgress} tasks`}>
+                <div
+                  className="flex items-center gap-1 text-amber-500"
+                  title={`In Progress: ${stats.inProgress} tasks`}
+                >
                   <PlayCircle className="w-3 h-3" />
                   <span>{stats.inProgress}</span>
                 </div>
               )}
               {stats.done > 0 && (
-                <div className="flex items-center gap-1 text-emerald-600" title={`Done: ${stats.done} tasks`}>
+                <div
+                  className="flex items-center gap-1 text-emerald-600"
+                  title={`Done: ${stats.done} tasks`}
+                >
                   <Flag className="w-3 h-3" />
                   <span>{stats.done}</span>
                 </div>
@@ -255,8 +289,10 @@ function TaskAnalyticsSummaryComponent() {
 
         {/* Hidden description for accessibility */}
         <div id="analytics-description" className="sr-only">
-          Task analytics for {contextLabel}: {stats.completed} of {stats.total} tasks completed ({stats.completionPct}% completion rate).
-          Breakdown: {stats.notStarted} not started, {stats.inProgress} in progress, {stats.done} done.
+          Task analytics for {contextLabel}: {stats.completed} of {stats.total}{' '}
+          tasks completed ({stats.completionPct}% completion rate). Breakdown:{' '}
+          {stats.notStarted} not started, {stats.inProgress} in progress,{' '}
+          {stats.done} done.
         </div>
       </section>
 

@@ -27,10 +27,15 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
 }) => {
   const [start, end] = values;
   const trackRef = React.useRef<HTMLDivElement>(null);
-  const [activeThumb, setActiveThumb] = React.useState<'start' | 'end' | null>(null);
+  const [activeThumb, setActiveThumb] = React.useState<'start' | 'end' | null>(
+    null
+  );
   // No measuring – keep layout simple and robust
 
-  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  const clamp = React.useCallback(
+    (n: number) => Math.min(max, Math.max(min, n)),
+    [max, min]
+  );
 
   const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStart = clamp(Number(e.target.value));
@@ -46,32 +51,39 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
 
   // Reserved for future enhancements; left defined for API symmetry
 
-  const positionToValue = (clientX: number) => {
-    const rect = trackRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    const ratio = (clientX - rect.left) / rect.width;
-    const raw = min + ratio * (max - min);
-    const rounded = Math.round(raw / step) * step;
-    return clamp(rounded);
-  };
+  const positionToValue = React.useCallback(
+    (clientX: number) => {
+      const rect = trackRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const ratio = (clientX - rect.left) / rect.width;
+      const raw = min + ratio * (max - min);
+      const rounded = Math.round(raw / step) * step;
+      return clamp(rounded);
+    },
+    [clamp, max, min, step]
+  );
 
-  const onPointerMoveValue = React.useCallback((clientX: number) => {
-    const value = positionToValue(clientX);
-    if (value == null) return;
-    if (activeThumb === 'start') {
-      const adjusted = Math.min(value, end - step);
-      onChange([adjusted, end]);
-    } else if (activeThumb === 'end') {
-      const adjusted = Math.max(value, start + step);
-      onChange([start, adjusted]);
-    }
-  }, [activeThumb, end, onChange, positionToValue, start, step]);
-  const onHandlePointerDown = (thumb: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setActiveThumb(thumb);
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    onPointerMoveValue(e.clientX);
-  };
+  const onPointerMoveValue = React.useCallback(
+    (clientX: number) => {
+      const value = positionToValue(clientX);
+      if (value == null) return;
+      if (activeThumb === 'start') {
+        const adjusted = Math.min(value, end - step);
+        onChange([adjusted, end]);
+      } else if (activeThumb === 'end') {
+        const adjusted = Math.max(value, start + step);
+        onChange([start, adjusted]);
+      }
+    },
+    [activeThumb, end, onChange, positionToValue, start, step]
+  );
+  const onHandlePointerDown =
+    (thumb: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setActiveThumb(thumb);
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      onPointerMoveValue(e.clientX);
+    };
   const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     onPointerMoveValue(e.clientX);
@@ -85,7 +97,8 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
 
   // Keep handles inside by clamping against a fixed half-width
   const LABEL_HALF_PX = 20; // half of min visible label width
-  const clampLeftCss = (percent: number) => `calc(max(${LABEL_HALF_PX}px, min(100% - ${LABEL_HALF_PX}px, ${percent}%)))`;
+  const clampLeftCss = (percent: number) =>
+    `calc(max(${LABEL_HALF_PX}px, min(100% - ${LABEL_HALF_PX}px, ${percent}%)))`;
 
   return (
     <div className={cn('rc-range relative w-full select-none py-2', className)}>
@@ -98,7 +111,10 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
         {/* Track bar with rounded ends; acts as a mask */}
         <div className="absolute inset-0 rounded-full overflow-hidden">
           {/* Passive (inactive) bar */}
-          <div className="absolute inset-0 bg-muted/60 pointer-events-none" aria-hidden />
+          <div
+            className="absolute inset-0 bg-muted/60 pointer-events-none"
+            aria-hidden
+          />
           {/* Active range segment */}
           <div
             className="absolute top-0 h-full bg-primary pointer-events-none"
@@ -115,7 +131,9 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
           value={start}
           onChange={handleStartChange}
           aria-label={ariaLabel[0]}
-          className={cn('absolute top-1/2 -translate-y-1/2 appearance-none bg-transparent thumb-invisible z-10 pointer-events-none')}
+          className={cn(
+            'absolute top-1/2 -translate-y-1/2 appearance-none bg-transparent thumb-invisible z-10 pointer-events-none'
+          )}
           style={{ left: `calc(${startPct}% - 12px)`, width: '24px' }}
         />
         {/* End hidden native thumb (keyboard support) */}
@@ -127,7 +145,9 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
           value={end}
           onChange={handleEndChange}
           aria-label={ariaLabel[1]}
-          className={cn('absolute top-1/2 -translate-y-1/2 appearance-none bg-transparent thumb-invisible z-10 pointer-events-none')}
+          className={cn(
+            'absolute top-1/2 -translate-y-1/2 appearance-none bg-transparent thumb-invisible z-10 pointer-events-none'
+          )}
           style={{ left: `calc(${endPct}% - 12px)`, width: '24px' }}
         />
         {/* Visible draggable labels/handles, OVER the track */}
@@ -175,4 +195,3 @@ function formatHour(hour: number): string {
 }
 
 export default RangeSlider;
-

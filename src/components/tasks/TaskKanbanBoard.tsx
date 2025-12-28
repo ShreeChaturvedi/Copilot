@@ -24,8 +24,9 @@ import { CSS } from '@dnd-kit/utilities';
 type ColumnKey = 'not_started' | 'in_progress' | 'done';
 
 function getTaskStatus(task: Task): ColumnKey {
-  const status = (task as any).status as ColumnKey | undefined;
-  if (status === 'in_progress' || status === 'not_started' || status === 'done') return status;
+  const status = task.status;
+  if (status === 'in_progress' || status === 'not_started' || status === 'done')
+    return status;
   return task.completed ? 'done' : 'not_started';
 }
 
@@ -40,7 +41,7 @@ function getStatusConfig(status: ColumnKey) {
         backgroundColor: 'bg-gray-500/10',
         borderColor: 'border-gray-500',
         darkBackgroundColor: 'dark:bg-gray-400/10',
-        darkBorderColor: 'dark:border-gray-400'
+        darkBorderColor: 'dark:border-gray-400',
       };
     case 'in_progress':
       return {
@@ -50,7 +51,7 @@ function getStatusConfig(status: ColumnKey) {
         backgroundColor: 'bg-amber-500/10',
         borderColor: 'border-amber-500',
         darkBackgroundColor: 'dark:bg-amber-400/10',
-        darkBorderColor: 'dark:border-amber-400'
+        darkBorderColor: 'dark:border-amber-400',
       };
     case 'done':
       return {
@@ -60,7 +61,7 @@ function getStatusConfig(status: ColumnKey) {
         backgroundColor: 'bg-emerald-600/10',
         borderColor: 'border-emerald-600',
         darkBackgroundColor: 'dark:bg-emerald-500/10',
-        darkBorderColor: 'dark:border-emerald-500'
+        darkBorderColor: 'dark:border-emerald-500',
       };
     default:
       return {
@@ -70,13 +71,15 @@ function getStatusConfig(status: ColumnKey) {
         backgroundColor: 'bg-gray-500/10',
         borderColor: 'border-gray-500',
         darkBackgroundColor: 'dark:bg-gray-400/10',
-        darkBorderColor: 'dark:border-gray-400'
+        darkBorderColor: 'dark:border-gray-400',
       };
   }
 }
 
 export const TaskKanbanBoard: React.FC = () => {
-  const { tasks, activeTaskGroupId } = useTaskManagement({ includeTaskOperations: true }) as any;
+  const { tasks, activeTaskGroupId } = useTaskManagement({
+    includeTaskOperations: true,
+  });
   const { updateTask } = useTasks();
   const { selectedKanbanTaskListId } = useUIStore();
   const [dragState, setDragState] = useState<{
@@ -84,12 +87,21 @@ export const TaskKanbanBoard: React.FC = () => {
     originalColumn: ColumnKey | null;
     activeTask: Task | null;
     targetColumn: ColumnKey | null; // For optimistic updates
-  }>({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+  }>({
+    activeId: null,
+    originalColumn: null,
+    activeTask: null,
+    targetColumn: null,
+  });
 
   const selectedListId = selectedKanbanTaskListId ?? activeTaskGroupId;
 
   const grouped = useMemo(() => {
-    const result: Record<ColumnKey, Task[]> = { not_started: [], in_progress: [], done: [] };
+    const result: Record<ColumnKey, Task[]> = {
+      not_started: [],
+      in_progress: [],
+      done: [],
+    };
     for (const t of tasks) {
       if (selectedListId) {
         if (selectedListId === 'default') {
@@ -110,45 +122,72 @@ export const TaskKanbanBoard: React.FC = () => {
     }
     // Sort for stable display
     (Object.keys(result) as ColumnKey[]).forEach((k) => {
-      result[k].sort((a, b) => (a.completed === b.completed ? (b.createdAt as any) - (a.createdAt as any) : a.completed ? 1 : -1));
+      result[k].sort((a, b) => {
+        if (a.completed === b.completed) {
+          return b.createdAt.getTime() - a.createdAt.getTime();
+        }
+        return a.completed ? 1 : -1;
+      });
     });
     return result;
   }, [tasks, selectedListId, dragState]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const taskId = String(event.active?.data?.current?.taskId || event.active?.id || '');
+    const taskId = String(
+      event.active?.data?.current?.taskId || event.active?.id || ''
+    );
     const task = tasks.find((t: Task) => t.id === taskId);
     if (task) {
       const originalColumn = getTaskStatus(task);
-      setDragState({ activeId: taskId, originalColumn, activeTask: task, targetColumn: null });
+      setDragState({
+        activeId: taskId,
+        originalColumn,
+        activeTask: task,
+        targetColumn: null,
+      });
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { activeId, originalColumn } = dragState;
-    const overKey = (event.over?.data?.current as any)?.columnKey as ColumnKey | undefined;
+    const overData = event.over?.data?.current as
+      | { columnKey?: ColumnKey }
+      | undefined;
+    const overKey = overData?.columnKey;
 
     // Validate move
     if (!activeId || !overKey || !originalColumn) {
       // Clear drag state for invalid moves
-      setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+      setDragState({
+        activeId: null,
+        originalColumn: null,
+        activeTask: null,
+        targetColumn: null,
+      });
       return;
     }
 
     // Prevent unnecessary API calls for same-column drops
     if (originalColumn === overKey) {
       // Clear drag state for same-column drops
-      setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
+      setDragState({
+        activeId: null,
+        originalColumn: null,
+        activeTask: null,
+        targetColumn: null,
+      });
       return;
     }
 
     // OPTIMISTIC UPDATE: Set target column immediately for smooth transition
-    setDragState(prev => ({ ...prev, targetColumn: overKey }));
+    setDragState((prev) => ({ ...prev, targetColumn: overKey }));
 
     // Prepare status updates
-    const updates: any = { status: overKey };
+    const updates: Partial<Task> = { status: overKey };
     if (overKey === 'done') {
       updates.completed = true;
     } else if (originalColumn === 'done') {
@@ -156,37 +195,55 @@ export const TaskKanbanBoard: React.FC = () => {
     }
 
     // Make API call - clear drag state when complete
-    updateTask.mutate({ id: activeId, updates }, {
-      onSettled: () => {
-        // Clear all drag state after API call completes (success or failure)
-        setDragState({ activeId: null, originalColumn: null, activeTask: null, targetColumn: null });
-      },
-      onError: () => {
-        toast.error('Failed to move task. Please try again.');
+    updateTask.mutate(
+      { id: activeId, updates },
+      {
+        onSettled: () => {
+          // Clear all drag state after API call completes (success or failure)
+          setDragState({
+            activeId: null,
+            originalColumn: null,
+            activeTask: null,
+            targetColumn: null,
+          });
+        },
+        onError: () => {
+          toast.error('Failed to move task. Please try again.');
+        },
       }
-    });
+    );
   };
 
   const Column: React.FC<{ keyId: ColumnKey }> = ({ keyId }) => {
-    const { setNodeRef } = useDroppable({ id: `col-${keyId}`, data: { columnKey: keyId } });
+    const { setNodeRef } = useDroppable({
+      id: `col-${keyId}`,
+      data: { columnKey: keyId },
+    });
     const taskCount = grouped[keyId].length;
     const statusConfig = getStatusConfig(keyId);
     const Icon = statusConfig.icon;
 
     return (
-      <div className={cn(
-        "h-full flex flex-col border-r border-border last:border-r-0",
-        // Mobile: make columns horizontally scrollable with snap
-        "snap-start md:snap-none min-w-[min(85vw,24rem)] md:min-w-0"
-      )}>
+      <div
+        className={cn(
+          'h-full flex flex-col border-r border-border last:border-r-0',
+          // Mobile: make columns horizontally scrollable with snap
+          'snap-start md:snap-none min-w-[min(85vw,24rem)] md:min-w-0'
+        )}
+      >
         {/* Color-coded Header with Icon */}
         <div className="border-b border-border px-4 py-2 bg-muted/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {/* Status icon with color */}
-              <Icon className={cn("w-4 h-4", statusConfig.iconColor)} />
+              <Icon className={cn('w-4 h-4', statusConfig.iconColor)} />
               {/* Status label */}
-              <h3 className={cn("font-medium text-sm truncate", statusConfig.iconColor)}>
+              <h3
+                className={cn(
+                  'font-medium text-sm truncate',
+                  statusConfig.iconColor
+                )}
+              >
                 {statusConfig.label}
               </h3>
               {/* Task count badge matching TaskPaneContainer */}
@@ -221,11 +278,15 @@ export const TaskKanbanBoard: React.FC = () => {
     );
   };
 
-  const DraggableCard: React.FC<{ task: Task; keyId: ColumnKey }> = ({ task, keyId }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id,
-      data: { taskId: task.id }
-    });
+  const DraggableCard: React.FC<{ task: Task; keyId: ColumnKey }> = ({
+    task,
+    keyId,
+  }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } =
+      useDraggable({
+        id: task.id,
+        data: { taskId: task.id },
+      });
     const statusConfig = getStatusConfig(keyId);
 
     // DragOverlay pattern: hide original during drag, overlay handles the visual
@@ -237,7 +298,7 @@ export const TaskKanbanBoard: React.FC = () => {
 
     return (
       <Card
-        ref={setNodeRef as any}
+        ref={setNodeRef as React.RefCallback<HTMLDivElement>}
         style={style}
         className={cn(
           // Base card visual consistent with app
@@ -255,9 +316,16 @@ export const TaskKanbanBoard: React.FC = () => {
       >
         <TaskItem
           task={task}
-          onToggle={() => updateTask.mutate({ id: task.id, updates: { completed: !task.completed } })}
+          onToggle={() =>
+            updateTask.mutate({
+              id: task.id,
+              updates: { completed: !task.completed },
+            })
+          }
           onEdit={(id, title) => updateTask.mutate({ id, updates: { title } })}
-          onDelete={() => { /* hidden in kanban */ }}
+          onDelete={() => {
+            /* hidden in kanban */
+          }}
           onSchedule={() => void 0}
           className="p-0"
           calendarMode={false}
@@ -290,45 +358,46 @@ export const TaskKanbanBoard: React.FC = () => {
 
       {/* DragOverlay - portals the dragged item to document body level */}
       <DragOverlay>
-        {dragState.activeTask ? (() => {
-          // Apply same status styling as DraggableCard
-          const taskStatus = getTaskStatus(dragState.activeTask);
-          const statusConfig = getStatusConfig(taskStatus);
+        {dragState.activeTask
+          ? (() => {
+              // Apply same status styling as DraggableCard
+              const taskStatus = getTaskStatus(dragState.activeTask);
+              const statusConfig = getStatusConfig(taskStatus);
 
-          return (
-            <Card
-              className={cn(
-                'shadow-lg border rounded-md py-2 px-2 sm:px-3',
-                'transform-gpu scale-105',
-                'shadow-2xl ring-1 ring-black/5',
-                // Apply status-specific styling
-                statusConfig.backgroundColor,
-                statusConfig.borderColor,
-                statusConfig.darkBackgroundColor,
-                statusConfig.darkBorderColor
-              )}
-              style={{
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              }}
-            >
-              <TaskItem
-                task={dragState.activeTask}
-                onToggle={() => { }} // Disabled in overlay
-                onEdit={() => { }} // Disabled in overlay
-                onDelete={() => { }} // Disabled in overlay
-                onSchedule={() => void 0}
-                className="p-0 cursor-grabbing"
-                calendarMode={false}
-                showTaskListLabel={false}
-                hideCheckbox={true}
-              />
-            </Card>
-          );
-        })() : null}
+              return (
+                <Card
+                  className={cn(
+                    'shadow-lg border rounded-md py-2 px-2 sm:px-3',
+                    'transform-gpu scale-105',
+                    'shadow-2xl ring-1 ring-black/5',
+                    // Apply status-specific styling
+                    statusConfig.backgroundColor,
+                    statusConfig.borderColor,
+                    statusConfig.darkBackgroundColor,
+                    statusConfig.darkBorderColor
+                  )}
+                  style={{
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                  }}
+                >
+                  <TaskItem
+                    task={dragState.activeTask}
+                    onToggle={() => {}} // Disabled in overlay
+                    onEdit={() => {}} // Disabled in overlay
+                    onDelete={() => {}} // Disabled in overlay
+                    onSchedule={() => void 0}
+                    className="p-0 cursor-grabbing"
+                    calendarMode={false}
+                    showTaskListLabel={false}
+                    hideCheckbox={true}
+                  />
+                </Card>
+              );
+            })()
+          : null}
       </DragOverlay>
     </DndContext>
   );
 };
 
 export default TaskKanbanBoard;
-
