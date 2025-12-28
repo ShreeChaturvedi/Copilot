@@ -56,7 +56,7 @@ describe('Middleware Composition', () => {
         next();
       };
 
-      const middleware2: Middleware = async (req, res, next) => {
+      const middleware2: Middleware = async (_req, _res, _next) => {
         execOrder.push(2);
         // Does not call next()
       };
@@ -83,7 +83,10 @@ describe('Middleware Composition', () => {
       };
 
       const middleware2: Middleware = async (req, res, next) => {
-        res.setHeader('X-Custom-Header', (req as AuthenticatedRequest).requestId || '');
+        res.setHeader(
+          'X-Custom-Header',
+          (req as AuthenticatedRequest).requestId || ''
+        );
         next();
       };
 
@@ -94,12 +97,15 @@ describe('Middleware Composition', () => {
       await composed(req, res, mockNext);
 
       expect(req.requestId).toBe('test-123');
-      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith('X-Custom-Header', 'test-123');
+      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
+        'X-Custom-Header',
+        'test-123'
+      );
     });
 
     it('should handle async middleware', async () => {
       const middleware1: Middleware = async (req, res, next) => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         if (!(req as AuthenticatedRequest).data) {
           (req as AuthenticatedRequest).data = {};
         }
@@ -108,7 +114,7 @@ describe('Middleware Composition', () => {
       };
 
       const middleware2: Middleware = async (req, res, next) => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         if (!(req as AuthenticatedRequest).data) {
           (req as AuthenticatedRequest).data = {};
         }
@@ -142,7 +148,9 @@ describe('Middleware Composition', () => {
 
       const composed = composeMiddleware(middleware1, middleware2);
 
-      await expect(composed(req, res, mockNext)).rejects.toThrow('Middleware error');
+      await expect(composed(req, res, mockNext)).rejects.toThrow(
+        'Middleware error'
+      );
     });
 
     it('should work with empty middleware array', async () => {
@@ -213,7 +221,9 @@ describe('Middleware Composition', () => {
       const req = createMockRequest() as AuthenticatedRequest;
       const res = createMockResponse();
 
-      const pipeline = new MiddlewarePipeline().use(middleware1).use(middleware2);
+      const pipeline = new MiddlewarePipeline()
+        .use(middleware1)
+        .use(middleware2);
 
       await pipeline.execute(req, res, mockNext);
 
@@ -283,7 +293,9 @@ describe('Middleware Composition', () => {
           throw new Error('Pipeline error');
         });
 
-      await expect(pipeline.execute(req, res, mockNext)).rejects.toThrow('Pipeline error');
+      await expect(pipeline.execute(req, res, mockNext)).rejects.toThrow(
+        'Pipeline error'
+      );
     });
 
     it('should handle empty pipeline', async () => {
@@ -389,7 +401,9 @@ describe('Middleware Composition', () => {
 
       const conditional = conditionalMiddleware(condition, middleware);
 
-      await expect(conditional(req, res, mockNext)).rejects.toThrow('Condition error');
+      await expect(conditional(req, res, mockNext)).rejects.toThrow(
+        'Condition error'
+      );
     });
   });
 
@@ -441,7 +455,9 @@ describe('Middleware Composition', () => {
       expect(middleware).toHaveBeenCalledTimes(1);
 
       // Test POST
-      const req2 = createMockRequest({ method: 'POST' }) as AuthenticatedRequest;
+      const req2 = createMockRequest({
+        method: 'POST',
+      }) as AuthenticatedRequest;
       await methodMw(req2, createMockResponse(), mockNext);
       expect(middleware).toHaveBeenCalledTimes(2);
 
@@ -458,7 +474,9 @@ describe('Middleware Composition', () => {
 
       const methodMw = methodMiddleware(['GET', 'POST'], middleware);
 
-      const req = createMockRequest({ method: 'DELETE' }) as AuthenticatedRequest;
+      const req = createMockRequest({
+        method: 'DELETE',
+      }) as AuthenticatedRequest;
       const res = createMockResponse();
 
       await methodMw(req, res, mockNext);
@@ -474,7 +492,9 @@ describe('Middleware Composition', () => {
 
       const methodMw = methodMiddleware('POST', middleware);
 
-      const req = createMockRequest({ method: undefined }) as AuthenticatedRequest;
+      const req = createMockRequest({
+        method: undefined,
+      }) as AuthenticatedRequest;
       const res = createMockResponse();
 
       await methodMw(req, res, mockNext);
@@ -554,13 +574,17 @@ describe('Middleware Composition', () => {
       const postOnly = methodMiddleware('POST', authConditional);
 
       // Authenticated POST - should execute
-      const req1 = createMockRequest({ method: 'POST' }) as AuthenticatedRequest;
+      const req1 = createMockRequest({
+        method: 'POST',
+      }) as AuthenticatedRequest;
       req1.user = { id: 'user-123', email: 'test@example.com', name: 'Test' };
       await postOnly(req1, createMockResponse(), mockNext);
       expect(middleware).toHaveBeenCalledTimes(1);
 
       // Unauthenticated POST - should not execute
-      const req2 = createMockRequest({ method: 'POST' }) as AuthenticatedRequest;
+      const req2 = createMockRequest({
+        method: 'POST',
+      }) as AuthenticatedRequest;
       await postOnly(req2, createMockResponse(), mockNext);
       expect(middleware).toHaveBeenCalledTimes(1); // Still 1
 
@@ -589,7 +613,7 @@ describe('Middleware Composition', () => {
         })
         .use(
           conditionalMiddleware(
-            req => (req as AuthenticatedRequest).user !== undefined,
+            (req) => (req as AuthenticatedRequest).user !== undefined,
             async (req, res, next) => {
               execOrder.push(2);
               next();
@@ -621,8 +645,8 @@ describe('Middleware Composition', () => {
         })
         .use(
           conditionalMiddleware(
-            req => req.method === 'POST',
-            async (req, res, next) => {
+            (req) => req.method === 'POST',
+            async (_req, _res, _next) => {
               execOrder.push(2);
               // This would terminate if executed
             }
@@ -654,7 +678,10 @@ describe('Middleware Composition', () => {
       const composed = composeMiddleware(middleware);
       await composed(req, res, mockNext);
 
-      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith('X-Custom', 'value');
+      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
+        'X-Custom',
+        'value'
+      );
       expect(vi.mocked(res.status)).toHaveBeenCalledWith(201);
     });
 

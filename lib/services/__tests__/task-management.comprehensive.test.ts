@@ -30,9 +30,12 @@ vi.mock('../../utils/cache.js', () => ({
 // Import after mocks are set up
 import { TaskService } from '../TaskService';
 import { TaskListService } from '../TaskListService';
-import type { CreateTaskDTO, UpdateTaskDTO, DbPriority } from '../TaskService';
+import type { CreateTaskDTO, DbPriority } from '../TaskService';
 import type { CreateTaskListDTO } from '../TaskListService';
-import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
+import {
+  query as mockQuery,
+  withTransaction as mockWithTransaction,
+} from '../../config/database.js';
 
 // Helper to create query results
 function createQueryResult<T>(rows: T[], rowCount?: number) {
@@ -89,7 +92,9 @@ describe('Task Management Comprehensive Tests', () => {
     vi.clearAllMocks();
     mockedQuery.mockReset();
     mockedWithTransaction.mockReset();
-    mockedWithTransaction.mockImplementation(async (callback: any) => callback(mockedQuery));
+    mockedWithTransaction.mockImplementation(async (callback: any) =>
+      callback(mockedQuery)
+    );
   });
 
   afterEach(() => {
@@ -101,7 +106,10 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Main query with filters
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('where')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('where')
+        ) {
           return createQueryResult([mockTask]);
         }
         // Enrichment: task lists
@@ -142,7 +150,10 @@ describe('Task Management Comprehensive Tests', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('limit')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('limit')
+        ) {
           return createQueryResult(mockTasks);
         }
         if (sqlLower.includes('select count(*)')) {
@@ -196,7 +207,11 @@ describe('Task Management Comprehensive Tests', () => {
           return createQueryResult([], 0);
         }
         // Task list validation
-        if (sqlLower.includes('select') && sqlLower.includes('task_lists') && sqlLower.includes('userid')) {
+        if (
+          sqlLower.includes('select') &&
+          sqlLower.includes('task_lists') &&
+          sqlLower.includes('userid')
+        ) {
           return createQueryResult([mockTaskList]);
         }
         // INSERT task
@@ -217,7 +232,9 @@ describe('Task Management Comprehensive Tests', () => {
       });
 
       const mockClient = { query: mockedQuery };
-      mockedWithTransaction.mockImplementationOnce(async (callback: any) => callback(mockClient));
+      mockedWithTransaction.mockImplementationOnce(async (callback: any) =>
+        callback(mockClient)
+      );
 
       const result = await taskService.create(taskData, mockContext);
 
@@ -235,7 +252,10 @@ describe('Task Management Comprehensive Tests', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('ilike')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('ilike')
+        ) {
           return createQueryResult(searchResults);
         }
         if (sqlLower.includes('select * from task_lists')) {
@@ -264,7 +284,10 @@ describe('Task Management Comprehensive Tests', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('completed = false')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('completed = false')
+        ) {
           return createQueryResult([overdueTask]);
         }
         if (sqlLower.includes('select * from task_lists')) {
@@ -298,7 +321,10 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Ownership validation
-        if (sqlLower.includes('select id from tasks') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select id from tasks') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult(taskIds.map((id) => ({ id })));
         }
         // Bulk update
@@ -306,7 +332,10 @@ describe('Task Management Comprehensive Tests', () => {
           return createQueryResult([], taskIds.length);
         }
         // Fetch updated tasks
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult(updatedTasks);
         }
         // Enrichment
@@ -338,7 +367,10 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Ownership validation
-        if (sqlLower.includes('select id from tasks') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select id from tasks') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult(taskIds.map((id) => ({ id })));
         }
         // Bulk delete
@@ -348,7 +380,9 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskService.bulkDelete(taskIds, mockContext)).resolves.toBeUndefined();
+      await expect(
+        taskService.bulkDelete(taskIds, mockContext)
+      ).resolves.toBeUndefined();
     });
 
     it('should prevent bulk operations on unauthorized tasks', async () => {
@@ -357,7 +391,10 @@ describe('Task Management Comprehensive Tests', () => {
       // Mock partial ownership (only 2 out of 3 tasks found)
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select id from tasks') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select id from tasks') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult([{ id: 'task-1' }, { id: 'task-2' }]);
         }
         return createQueryResult([]);
@@ -371,7 +408,11 @@ describe('Task Management Comprehensive Tests', () => {
 
   describe('Requirement 5.4: Task Completion Toggle with Timestamps', () => {
     it('should toggle task from incomplete to complete with timestamp', async () => {
-      const incompleteTask = { ...mockTask, completed: false, completedAt: null };
+      const incompleteTask = {
+        ...mockTask,
+        completed: false,
+        completedAt: null,
+      };
       const completedTask = {
         ...incompleteTask,
         completed: true,
@@ -410,7 +451,10 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskService.toggleCompletion('task-123', mockContext);
+      const result = await taskService.toggleCompletion(
+        'task-123',
+        mockContext
+      );
 
       expect(result.completed).toBe(true);
     });
@@ -460,7 +504,10 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskService.toggleCompletion('task-123', mockContext);
+      const result = await taskService.toggleCompletion(
+        'task-123',
+        mockContext
+      );
 
       expect(result.completed).toBe(false);
       expect(result.completedAt).toBeNull();
@@ -487,7 +534,10 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Uniqueness check
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([]);
         }
         // ensureUserExists
@@ -521,7 +571,9 @@ describe('Task Management Comprehensive Tests', () => {
         completed_count: '4',
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([taskListWithCounts]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([taskListWithCounts])
+      );
 
       const result = await taskListService.getWithTaskCount(mockContext);
 
@@ -536,7 +588,11 @@ describe('Task Management Comprehensive Tests', () => {
     });
 
     it('should handle task list deletion with task reassignment', async () => {
-      const defaultTaskList = { ...mockTaskList, id: 'default-list', name: 'General' };
+      const defaultTaskList = {
+        ...mockTaskList,
+        id: 'default-list',
+        name: 'General',
+      };
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
@@ -549,7 +605,10 @@ describe('Task Management Comprehensive Tests', () => {
           return createQueryResult([{ count: '3' }]);
         }
         // Get default list
-        if (sqlLower.includes('select * from task_lists') && sqlLower.includes('name = $2')) {
+        if (
+          sqlLower.includes('select * from task_lists') &&
+          sqlLower.includes('name = $2')
+        ) {
           return createQueryResult([defaultTaskList]);
         }
         // Task reassignment
@@ -563,7 +622,10 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskListService.delete('list-to-delete', mockContext);
+      const result = await taskListService.delete(
+        'list-to-delete',
+        mockContext
+      );
 
       expect(result).toBe(true);
     });
@@ -582,9 +644,9 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.delete('only-list', mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Cannot delete the only task list'
-      );
+      await expect(
+        taskListService.delete('only-list', mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Cannot delete the only task list');
     });
   });
 
@@ -594,15 +656,24 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async () => {
         queryIndex++;
         switch (queryIndex) {
-          case 1: return createQueryResult([{ count: '100' }]); // total
-          case 2: return createQueryResult([{ count: '60' }]);  // completed
-          case 3: return createQueryResult([{ count: '40' }]);  // pending
-          case 4: return createQueryResult([{ count: '8' }]);   // overdue
-          case 5: return createQueryResult([{ count: '5' }]);   // today
-          case 6: return createQueryResult([{ count: '15' }]);  // this week
-          case 7: return createQueryResult([{ count: '10' }]);  // completed week
-          case 8: return createQueryResult([{ count: '45' }]);  // completed month
-          default: return createQueryResult([{ count: '0' }]);
+          case 1:
+            return createQueryResult([{ count: '100' }]); // total
+          case 2:
+            return createQueryResult([{ count: '60' }]); // completed
+          case 3:
+            return createQueryResult([{ count: '40' }]); // pending
+          case 4:
+            return createQueryResult([{ count: '8' }]); // overdue
+          case 5:
+            return createQueryResult([{ count: '5' }]); // today
+          case 6:
+            return createQueryResult([{ count: '15' }]); // this week
+          case 7:
+            return createQueryResult([{ count: '10' }]); // completed week
+          case 8:
+            return createQueryResult([{ count: '45' }]); // completed month
+          default:
+            return createQueryResult([{ count: '0' }]);
         }
       });
 
@@ -620,10 +691,14 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async () => {
         queryIndex++;
         switch (queryIndex) {
-          case 1: return createQueryResult([{ count: '8' }]);   // total lists
-          case 2: return createQueryResult([{ count: '120' }]); // total tasks
-          case 3: return createQueryResult([{ count: '75' }]);  // completed tasks
-          default: return createQueryResult([{ count: '0' }]);
+          case 1:
+            return createQueryResult([{ count: '8' }]); // total lists
+          case 2:
+            return createQueryResult([{ count: '120' }]); // total tasks
+          case 3:
+            return createQueryResult([{ count: '75' }]); // completed tasks
+          default:
+            return createQueryResult([{ count: '0' }]);
         }
       });
 
@@ -644,7 +719,11 @@ describe('Task Management Comprehensive Tests', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Ownership check
-        if (sqlLower.includes('select') && sqlLower.includes('"userid"') && sqlLower.includes('from tasks')) {
+        if (
+          sqlLower.includes('select') &&
+          sqlLower.includes('"userid"') &&
+          sqlLower.includes('from tasks')
+        ) {
           return createQueryResult([{ userId: 'user-123' }]);
         }
         // Update fails
@@ -687,7 +766,10 @@ describe('Task Management Comprehensive Tests', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select * from tasks') && sqlLower.includes('limit')) {
+        if (
+          sqlLower.includes('select * from tasks') &&
+          sqlLower.includes('limit')
+        ) {
           return createQueryResult([]);
         }
         if (sqlLower.includes('select count(*)')) {
@@ -696,7 +778,12 @@ describe('Task Management Comprehensive Tests', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskService.findPaginated({}, largePage, largePageSize, mockContext);
+      const result = await taskService.findPaginated(
+        {},
+        largePage,
+        largePageSize,
+        mockContext
+      );
 
       expect(result.pagination.totalPages).toBe(50); // 50000 / 1000
     });
@@ -715,7 +802,10 @@ describe('Task Management Comprehensive Tests', () => {
         // Need to mock the duplicate name check that happens before color validation
         mockedQuery.mockImplementation(async (sql: string) => {
           const sqlLower = sql.toLowerCase();
-          if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+          if (
+            sqlLower.includes('select id from task_lists') &&
+            sqlLower.includes('name')
+          ) {
             return createQueryResult([]);
           }
           return createQueryResult([]);
@@ -730,7 +820,13 @@ describe('Task Management Comprehensive Tests', () => {
       }
 
       // Test valid color formats
-      const validColorFormats = ['#FF0000', '#00FF00', '#0000FF', '#FFF', '#000'];
+      const validColorFormats = [
+        '#FF0000',
+        '#00FF00',
+        '#0000FF',
+        '#FFF',
+        '#000',
+      ];
 
       for (const validColor of validColorFormats) {
         const createdTaskList = {
@@ -746,7 +842,10 @@ describe('Task Management Comprehensive Tests', () => {
 
         mockedQuery.mockImplementation(async (sql: string) => {
           const sqlLower = sql.toLowerCase();
-          if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+          if (
+            sqlLower.includes('select id from task_lists') &&
+            sqlLower.includes('name')
+          ) {
             return createQueryResult([]);
           }
           if (sqlLower.includes('insert into users')) {

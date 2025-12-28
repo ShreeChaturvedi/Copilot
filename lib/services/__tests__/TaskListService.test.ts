@@ -26,7 +26,11 @@ vi.mock('../../utils/cache.js', () => ({
 
 // Import after mocks are set up
 import { TaskListService } from '../TaskListService';
-import type { CreateTaskListDTO, UpdateTaskListDTO, TaskListFilters } from '../TaskListService';
+import type {
+  CreateTaskListDTO,
+  UpdateTaskListDTO,
+  TaskListFilters,
+} from '../TaskListService';
 import { query as mockQuery } from '../../config/database.js';
 
 // Helper to create query results
@@ -128,12 +132,19 @@ describe('TaskListService', () => {
     };
 
     it('should create a task list successfully', async () => {
-      const createdTaskList = { ...mockTaskList, ...createTaskListData, id: 'new-list-123' };
+      const createdTaskList = {
+        ...mockTaskList,
+        ...createTaskListData,
+        id: 'new-list-123',
+      };
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Duplicate name check - no existing list with this name
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([]);
         }
         // ensureUserExists
@@ -147,7 +158,10 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskListService.create(createTaskListData, mockContext);
+      const result = await taskListService.create(
+        createTaskListData,
+        mockContext
+      );
 
       expect(result.name).toBe('Work Tasks');
       expect(result.color).toBe('#FF5722');
@@ -156,24 +170,27 @@ describe('TaskListService', () => {
     it('should throw validation error for empty name', async () => {
       const invalidData = { ...createTaskListData, name: '' };
 
-      await expect(taskListService.create(invalidData, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Task list name is required'
-      );
+      await expect(
+        taskListService.create(invalidData, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Task list name is required');
     });
 
     it('should throw validation error for duplicate name', async () => {
       // Mock existing task list with same name
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([{ id: 'existing-list' }]);
         }
         return createQueryResult([]);
       });
 
-      await expect(taskListService.create(createTaskListData, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Task list name already exists'
-      );
+      await expect(
+        taskListService.create(createTaskListData, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Task list name already exists');
     });
 
     it('should throw validation error for invalid color format', async () => {
@@ -182,13 +199,18 @@ describe('TaskListService', () => {
       // Mock the duplicate check that happens before color validation
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([]);
         }
         return createQueryResult([]);
       });
 
-      await expect(taskListService.create(invalidData, mockContext)).rejects.toThrow(
+      await expect(
+        taskListService.create(invalidData, mockContext)
+      ).rejects.toThrow(
         'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
       );
     });
@@ -198,11 +220,18 @@ describe('TaskListService', () => {
 
       for (const color of validColors) {
         const dataWithColor = { ...createTaskListData, color };
-        const createdTaskList = { ...mockTaskList, ...dataWithColor, id: `list-${color}` };
+        const createdTaskList = {
+          ...mockTaskList,
+          ...dataWithColor,
+          id: `list-${color}`,
+        };
 
         mockedQuery.mockImplementation(async (sql: string) => {
           const sqlLower = sql.toLowerCase();
-          if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+          if (
+            sqlLower.includes('select id from task_lists') &&
+            sqlLower.includes('name')
+          ) {
             return createQueryResult([]);
           }
           if (sqlLower.includes('insert into users')) {
@@ -214,7 +243,9 @@ describe('TaskListService', () => {
           return createQueryResult([]);
         });
 
-        await expect(taskListService.create(dataWithColor, mockContext)).resolves.toBeDefined();
+        await expect(
+          taskListService.create(dataWithColor, mockContext)
+        ).resolves.toBeDefined();
       }
     });
   });
@@ -237,7 +268,10 @@ describe('TaskListService', () => {
           return createQueryResult([{ userId: 'user-123' }]);
         }
         // Duplicate name check
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([]);
         }
         // UPDATE query
@@ -247,7 +281,11 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      const result = await taskListService.update('list-123', updateData, mockContext);
+      const result = await taskListService.update(
+        'list-123',
+        updateData,
+        mockContext
+      );
 
       expect(result).not.toBeNull();
       expect(result?.name).toBe('Updated Task List');
@@ -257,9 +295,9 @@ describe('TaskListService', () => {
     it('should throw validation error for empty name', async () => {
       const invalidData = { ...updateData, name: '' };
 
-      await expect(taskListService.update('list-123', invalidData, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Task list name cannot be empty'
-      );
+      await expect(
+        taskListService.update('list-123', invalidData, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Task list name cannot be empty');
     });
 
     it('should throw authorization error for non-owned task list', async () => {
@@ -272,9 +310,9 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.update('list-123', updateData, mockContext)).rejects.toThrow(
-        'AUTHORIZATION_ERROR: Access denied'
-      );
+      await expect(
+        taskListService.update('list-123', updateData, mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR: Access denied');
     });
 
     it('should throw authorization error when task list not found', async () => {
@@ -286,9 +324,9 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.update('non-existent', updateData, mockContext)).rejects.toThrow(
-        'AUTHORIZATION_ERROR: Access denied'
-      );
+      await expect(
+        taskListService.update('non-existent', updateData, mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR: Access denied');
     });
 
     it('should throw validation error for duplicate name', async () => {
@@ -299,15 +337,18 @@ describe('TaskListService', () => {
           return createQueryResult([{ userId: 'user-123' }]);
         }
         // Duplicate name check fails (different list with same name exists)
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([{ id: 'other-list-123' }]);
         }
         return createQueryResult([]);
       });
 
-      await expect(taskListService.update('list-123', updateData, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Task list name already exists'
-      );
+      await expect(
+        taskListService.update('list-123', updateData, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Task list name already exists');
     });
 
     it('should throw validation error for invalid color format', async () => {
@@ -322,7 +363,9 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.update('list-123', invalidData, mockContext)).rejects.toThrow(
+      await expect(
+        taskListService.update('list-123', invalidData, mockContext)
+      ).rejects.toThrow(
         'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
       );
     });
@@ -335,7 +378,10 @@ describe('TaskListService', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // First query looks for General by name = $2
-        if (sqlLower.includes('select * from task_lists') && sqlLower.includes('name = $2')) {
+        if (
+          sqlLower.includes('select * from task_lists') &&
+          sqlLower.includes('name = $2')
+        ) {
           return createQueryResult([generalTaskList]);
         }
         return createQueryResult([]);
@@ -370,12 +416,19 @@ describe('TaskListService', () => {
     });
 
     it('should create General task list if none exist', async () => {
-      const newGeneralList = { ...mockTaskList, name: 'General', id: 'new-general-id' };
+      const newGeneralList = {
+        ...mockTaskList,
+        name: 'General',
+        id: 'new-general-id',
+      };
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Look for General - not found
-        if (sqlLower.includes('select * from task_lists') && sqlLower.includes('name = $2')) {
+        if (
+          sqlLower.includes('select * from task_lists') &&
+          sqlLower.includes('name = $2')
+        ) {
           return createQueryResult([]);
         }
         // Look for any task list - not found
@@ -383,7 +436,10 @@ describe('TaskListService', () => {
           return createQueryResult([]);
         }
         // Check for duplicate name during create
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('name')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('name')
+        ) {
           return createQueryResult([]);
         }
         // ensureUserExists
@@ -424,7 +480,9 @@ describe('TaskListService', () => {
         completed_count: '1',
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([taskListWithCounts]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([taskListWithCounts])
+      );
 
       const result = await taskListService.getWithTaskCount(mockContext);
 
@@ -479,7 +537,10 @@ describe('TaskListService', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Get task lists
-        if (sqlLower.includes('select * from task_lists') && sqlLower.includes('order by name')) {
+        if (
+          sqlLower.includes('select * from task_lists') &&
+          sqlLower.includes('order by name')
+        ) {
           return createQueryResult([taskListRow]);
         }
         // Get tasks for those lists
@@ -510,16 +571,16 @@ describe('TaskListService', () => {
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
         // Ownership validation
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult(taskListIds.map((id) => ({ id })));
         }
         // Individual fetches for ordering
         if (sqlLower.includes('select * from task_lists where id = $1')) {
           // Return the appropriate task list based on the param
-          const matchingList = taskLists.find(tl => {
-            // This is simplified - in real implementation we'd check the actual param
-            return true;
-          });
+          const matchingList = taskLists[0];
           return createQueryResult([matchingList || taskLists[0]]);
         }
         return createQueryResult([]);
@@ -536,27 +597,36 @@ describe('TaskListService', () => {
       // Mock partial ownership (only 2 out of 3 found)
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
-        if (sqlLower.includes('select id from task_lists') && sqlLower.includes('in')) {
+        if (
+          sqlLower.includes('select id from task_lists') &&
+          sqlLower.includes('in')
+        ) {
           return createQueryResult([{ id: 'list-1' }, { id: 'list-2' }]);
         }
         return createQueryResult([]);
       });
 
-      await expect(taskListService.reorder(taskListIds, mockContext)).rejects.toThrow(
+      await expect(
+        taskListService.reorder(taskListIds, mockContext)
+      ).rejects.toThrow(
         'VALIDATION_ERROR: Some task lists not found or access denied'
       );
     });
 
     it('should throw error when no user context provided', async () => {
-      await expect(taskListService.reorder(['list-1'], undefined)).rejects.toThrow(
-        'AUTHORIZATION_ERROR: User ID required'
-      );
+      await expect(
+        taskListService.reorder(['list-1'], undefined)
+      ).rejects.toThrow('AUTHORIZATION_ERROR: User ID required');
     });
   });
 
   describe('delete', () => {
     it('should delete a task list and move tasks to default list', async () => {
-      const defaultTaskList = { ...mockTaskList, id: 'default-list', name: 'General' };
+      const defaultTaskList = {
+        ...mockTaskList,
+        id: 'default-list',
+        name: 'General',
+      };
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const sqlLower = sql.toLowerCase();
@@ -569,7 +639,10 @@ describe('TaskListService', () => {
           return createQueryResult([{ count: '2' }]);
         }
         // Get default task list (General)
-        if (sqlLower.includes('select * from task_lists') && sqlLower.includes('name = $2')) {
+        if (
+          sqlLower.includes('select * from task_lists') &&
+          sqlLower.includes('name = $2')
+        ) {
           return createQueryResult([defaultTaskList]);
         }
         // Task reassignment
@@ -602,9 +675,9 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.delete('list-123', mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR: Cannot delete the only task list'
-      );
+      await expect(
+        taskListService.delete('list-123', mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR: Cannot delete the only task list');
     });
 
     it('should throw authorization error for non-owned task list', async () => {
@@ -616,9 +689,9 @@ describe('TaskListService', () => {
         return createQueryResult([]);
       });
 
-      await expect(taskListService.delete('list-123', mockContext)).rejects.toThrow(
-        'AUTHORIZATION_ERROR: Access denied'
-      );
+      await expect(
+        taskListService.delete('list-123', mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR: Access denied');
     });
   });
 
@@ -629,10 +702,14 @@ describe('TaskListService', () => {
         queryIndex++;
         // The service uses Promise.all with 3 queries in parallel
         switch (queryIndex) {
-          case 1: return createQueryResult([{ count: '5' }]); // total lists
-          case 2: return createQueryResult([{ count: '25' }]); // total tasks
-          case 3: return createQueryResult([{ count: '15' }]); // completed tasks
-          default: return createQueryResult([{ count: '0' }]);
+          case 1:
+            return createQueryResult([{ count: '5' }]); // total lists
+          case 2:
+            return createQueryResult([{ count: '25' }]); // total tasks
+          case 3:
+            return createQueryResult([{ count: '15' }]); // completed tasks
+          default:
+            return createQueryResult([{ count: '0' }]);
         }
       });
 
@@ -690,7 +767,10 @@ describe('TaskListService', () => {
     it('should return null for non-existent task list', async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskListService.findById('non-existent', mockContext);
+      const result = await taskListService.findById(
+        'non-existent',
+        mockContext
+      );
 
       expect(result).toBeNull();
     });
@@ -708,7 +788,9 @@ describe('TaskListService', () => {
 
   describe('exists (inherited from BaseService)', () => {
     it('should return true for existing task list', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ '?column?': 1 }], 1));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ '?column?': 1 }], 1)
+      );
 
       const result = await taskListService.exists('list-123', mockContext);
 

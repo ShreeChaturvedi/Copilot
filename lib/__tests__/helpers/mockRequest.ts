@@ -9,8 +9,9 @@ import { EventEmitter } from 'events';
 /**
  * Creates a mock VercelRequest with EventEmitter support
  */
-export function createMockRequest(overrides: Partial<VercelRequest> = {}): VercelRequest {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createMockRequest(
+  overrides: Partial<VercelRequest> = {}
+): VercelRequest {
   const req = new EventEmitter() as any;
 
   // Default request properties
@@ -35,7 +36,6 @@ export function createMockRequest(overrides: Partial<VercelRequest> = {}): Verce
  * Creates a mock VercelResponse with EventEmitter support and chainable methods
  */
 export function createMockResponse(): VercelResponse {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = new EventEmitter() as any;
 
   // Mock response methods (chainable)
@@ -68,7 +68,7 @@ export function createMockAuthRequest(
     user,
     headers: {
       'x-request-id': 'test-request-123',
-      'authorization': 'Bearer mock-jwt-token',
+      authorization: 'Bearer mock-jwt-token',
       'content-type': 'application/json',
     },
     ...overrides,
@@ -132,7 +132,10 @@ export function assertSuccessResponse(mockResponse: VercelResponse) {
 /**
  * Asserts that response was an error (4xx or 5xx status)
  */
-export function assertErrorResponse(mockResponse: VercelResponse, expectedStatus?: number) {
+export function assertErrorResponse(
+  mockResponse: VercelResponse,
+  expectedStatus?: number
+) {
   const status = getResponseStatus(mockResponse);
   if (status < 400) {
     const data = getResponseData(mockResponse);
