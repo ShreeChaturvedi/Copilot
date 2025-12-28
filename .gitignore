@@ -23,6 +23,14 @@ dist-ssr
 *.sln
 *.sw?
 
+# IDE and LLM tool config (should not be in repo)
+.cursor/
+.cursorignore
+.mcp.json
+.claude/
+AGENTS.md
+tests.md
+
 # Environment variables
 .env
 .env.local
