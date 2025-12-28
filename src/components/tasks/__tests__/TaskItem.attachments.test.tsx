@@ -2,13 +2,35 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { TaskItem } from '../TaskItem';
-import type { Task } from '@shared/types';
+import type { Task, FileAttachment } from '@shared/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { attachmentsApi as mockedAttachmentsApi } from '@/services/api/attachments';
 
 vi.mock('@/services/api/attachments', () => ({
   attachmentsApi: {
     delete: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('../AttachmentPreviewDialog', () => ({
+  default: ({
+    open,
+    attachment,
+    onDelete,
+  }: {
+    open: boolean;
+    attachment?: FileAttachment;
+    onDelete?: (attachment: FileAttachment) => void;
+  }) => {
+    if (!open || !attachment) return null;
+    return (
+      <div>
+        <div>{attachment.name}</div>
+        <button type="button" onClick={() => onDelete?.(attachment)}>
+          Delete attachment
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -60,20 +82,14 @@ describe('TaskItem attachments', () => {
     const chip = await screen.findByText('image.png');
     fireEvent.click(chip);
 
-    // Dialog shows title
-    await screen.findByText('image.png');
-
-    // Click delete button
-    const deleteBtn = screen.getByRole('button', {
+    // Click delete button from preview dialog
+    const deleteBtn = await screen.findByRole('button', {
       name: /delete attachment/i,
     });
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
-      expect(
-        mockedAttachmentsApi.delete as unknown as jest.Mock
-      ).toHaveBeenCalledWith('a1');
+      expect(vi.mocked(mockedAttachmentsApi.delete)).toHaveBeenCalledWith('a1');
     });
   });
 });
-

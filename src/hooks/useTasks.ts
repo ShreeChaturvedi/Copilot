@@ -4,7 +4,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Task } from '@shared/types';
-import { taskApi, type UpdateTaskData, type CreateTaskData } from '../services/api';
+import {
+  taskApi,
+  type UpdateTaskData,
+  type CreateTaskData,
+} from '../services/api';
 import { toast } from 'sonner';
 
 /**
@@ -68,8 +72,6 @@ const filterTasks = (tasks: Task[], filters: TaskFilters): Task[] => {
  * Comprehensive hook for task management - matches LeftPane expectations
  */
 export const useTasks = (filters: TaskFilters = {}) => {
-  // Note: filters functionality not yet implemented
-  void filters;
   const queryClient = useQueryClient();
 
   // Main query for tasks data
@@ -84,7 +86,12 @@ export const useTasks = (filters: TaskFilters = {}) => {
   });
 
   // Create task mutation (optimistic)
-  const addTask = useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string }>({
+  const addTask = useMutation<
+    Task,
+    Error,
+    CreateTaskData,
+    { previousTasks?: Task[]; tempId?: string }
+  >({
     mutationFn: taskApi.createTask,
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
@@ -156,19 +163,23 @@ export const useTasks = (filters: TaskFilters = {}) => {
           if (!oldData) return [];
           return oldData.map((task) => {
             if (task.id !== id) return task;
-            const merged: any = { ...task, ...updates };
+            const merged: Task = { ...task, ...updates };
             // Keep checkbox <-> status linkage optimistic in cache
-            if ((updates as any)?.status) {
-              const s = (updates as any).status as 'not_started' | 'in_progress' | 'done';
-              if (s === 'done') {
+            const status = updates.status;
+            const hasCompletedUpdate = Object.prototype.hasOwnProperty.call(
+              updates,
+              'completed'
+            );
+            if (status) {
+              if (status === 'done') {
                 merged.completed = true;
                 merged.completedAt = new Date();
-              } else if (typeof (updates as any).completed === 'undefined') {
+              } else if (!hasCompletedUpdate) {
                 merged.completed = false;
                 merged.completedAt = undefined;
               }
             }
-            return merged as Task;
+            return merged;
           });
         }
       );
@@ -194,7 +205,8 @@ export const useTasks = (filters: TaskFilters = {}) => {
       const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
-        (oldData: Task[] | undefined) => (oldData || []).filter((task) => task.id !== deletedId)
+        (oldData: Task[] | undefined) =>
+          (oldData || []).filter((task) => task.id !== deletedId)
       );
       return { previousTasks };
     },
@@ -221,7 +233,9 @@ export const useTasks = (filters: TaskFilters = {}) => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map((task) => (task.id === id ? { ...task, scheduledDate } : task));
+          return oldData.map((task) =>
+            task.id === id ? { ...task, scheduledDate } : task
+          );
         }
       );
       return { previousTasks };
@@ -240,7 +254,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
 
   // Return data and mutations in the format LeftPane expects
   return {
-    data: tasksQuery.data || [],
+    data: filterTasks(tasksQuery.data || [], filters),
     isLoading: tasksQuery.isLoading,
     isSuccess: tasksQuery.isSuccess,
     isPending: tasksQuery.isPending,
@@ -305,7 +319,12 @@ export const useTask = (id: string) => {
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<Task, Error, CreateTaskData, { previousTasks?: Task[]; tempId?: string }>({
+  return useMutation<
+    Task,
+    Error,
+    CreateTaskData,
+    { previousTasks?: Task[]; tempId?: string }
+  >({
     mutationFn: taskApi.createTask,
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
@@ -412,7 +431,8 @@ export const useDeleteTask = () => {
       const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
       queryClient.setQueriesData(
         { queryKey: taskQueryKeys.all },
-        (oldData: Task[] | undefined) => (oldData || []).filter((task) => task.id !== deletedId)
+        (oldData: Task[] | undefined) =>
+          (oldData || []).filter((task) => task.id !== deletedId)
       );
       return { previousTasks };
     },
@@ -454,7 +474,7 @@ export const useToggleTask = () => {
             return {
               ...task,
               completed: willBeCompleted,
-              completedAt: willBeCompleted ? new Date() : undefined
+              completedAt: willBeCompleted ? new Date() : undefined,
             };
           });
         }
@@ -492,7 +512,9 @@ export const useScheduleTask = () => {
         { queryKey: taskQueryKeys.all },
         (oldData: Task[] | undefined) => {
           if (!oldData) return [];
-          return oldData.map((task) => (task.id === id ? { ...task, scheduledDate } : task));
+          return oldData.map((task) =>
+            task.id === id ? { ...task, scheduledDate } : task
+          );
         }
       );
       return { previousTasks };

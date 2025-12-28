@@ -14,16 +14,17 @@ import {
   useToggleTask,
   useScheduleTask,
 } from '../useTasks';
-import { taskStorage } from '../../utils/storage';
-import type { Task } from "@shared/types";
+import { taskApi } from '../../services/api';
+import type { Task } from '@shared/types';
 
-// Mock the storage utility
-vi.mock('../../utils/storage', () => ({
-  taskStorage: {
-    getTasks: vi.fn(),
-    addTask: vi.fn(),
+vi.mock('../../services/api', () => ({
+  taskApi: {
+    fetchTasks: vi.fn(),
+    createTask: vi.fn(),
     updateTask: vi.fn(),
     deleteTask: vi.fn(),
+    toggleTask: vi.fn(),
+    scheduleTask: vi.fn(),
   },
 }));
 
@@ -32,12 +33,13 @@ vi.mock('uuid', () => ({
   v4: () => 'test-uuid-123',
 }));
 
-const mockTaskStorage = taskStorage as typeof taskStorage & {
-  addTask: ReturnType<typeof vi.fn>;
-  getTasks: ReturnType<typeof vi.fn>;
-  saveTasks: ReturnType<typeof vi.fn>;
+const mockTaskApi = taskApi as typeof taskApi & {
+  fetchTasks: ReturnType<typeof vi.fn>;
+  createTask: ReturnType<typeof vi.fn>;
   updateTask: ReturnType<typeof vi.fn>;
   deleteTask: ReturnType<typeof vi.fn>;
+  toggleTask: ReturnType<typeof vi.fn>;
+  scheduleTask: ReturnType<typeof vi.fn>;
 };
 
 // Test wrapper with QueryClient
@@ -89,7 +91,7 @@ const mockTasks: Task[] = [
 describe('useTasks Hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockTaskStorage.getTasks.mockResolvedValue([...mockTasks]);
+    mockTaskApi.fetchTasks.mockResolvedValue([...mockTasks]);
   });
 
   describe('useTasks', () => {
@@ -102,7 +104,7 @@ describe('useTasks Hook', () => {
       });
 
       expect(result.current.data).toHaveLength(3);
-      expect(mockTaskStorage.getTasks).toHaveBeenCalledTimes(1);
+      expect(mockTaskApi.fetchTasks).toHaveBeenCalledTimes(1);
     });
 
     it('should filter out completed tasks when showCompleted is false', async () => {
@@ -154,7 +156,16 @@ describe('useTasks Hook', () => {
 
   describe('useCreateTask', () => {
     it('should create a new task successfully', async () => {
-      mockTaskStorage.addTask.mockResolvedValue(true);
+      const createdTask: Task = {
+        id: 'test-uuid-123',
+        title: 'New Test Task',
+        completed: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: 'test-user',
+        priority: 'high',
+      };
+      mockTaskApi.createTask.mockResolvedValue(createdTask);
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useCreateTask(), { wrapper });
@@ -172,11 +183,9 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.addTask).toHaveBeenCalledWith(
+      expect(mockTaskApi.createTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'test-uuid-123',
           title: 'New Test Task',
-          completed: false,
           priority: 'high',
         })
       );
@@ -189,6 +198,8 @@ describe('useTasks Hook', () => {
       const invalidTaskData = {
         title: '', // Empty title should fail validation
       };
+
+      mockTaskApi.createTask.mockRejectedValue(new Error('Title is required'));
 
       await waitFor(() => {
         result.current.mutate(invalidTaskData);
@@ -204,11 +215,10 @@ describe('useTasks Hook', () => {
 
   describe('useUpdateTask', () => {
     it('should update a task successfully', async () => {
-      mockTaskStorage.updateTask.mockResolvedValue(true);
-      mockTaskStorage.getTasks.mockResolvedValue([
-        { ...mockTasks[0], title: 'Updated Task' },
-        ...mockTasks.slice(1),
-      ]);
+      mockTaskApi.updateTask.mockResolvedValue({
+        ...mockTasks[0],
+        title: 'Updated Task',
+      });
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useUpdateTask(), { wrapper });
@@ -226,7 +236,7 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
+      expect(mockTaskApi.updateTask).toHaveBeenCalledWith('1', {
         title: 'Updated Task',
       });
     });
@@ -234,7 +244,7 @@ describe('useTasks Hook', () => {
 
   describe('useDeleteTask', () => {
     it('should delete a task successfully', async () => {
-      mockTaskStorage.deleteTask.mockResolvedValue(true);
+      mockTaskApi.deleteTask.mockResolvedValue(undefined);
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useDeleteTask(), { wrapper });
@@ -247,17 +257,16 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.deleteTask).toHaveBeenCalledWith('1');
+      expect(mockTaskApi.deleteTask).toHaveBeenCalledWith('1');
     });
   });
 
   describe('useToggleTask', () => {
     it('should toggle task completion status', async () => {
-      mockTaskStorage.updateTask.mockResolvedValue(true);
-      mockTaskStorage.getTasks.mockResolvedValue([
-        { ...mockTasks[0], completed: true },
-        ...mockTasks.slice(1),
-      ]);
+      mockTaskApi.toggleTask.mockResolvedValue({
+        ...mockTasks[0],
+        completed: true,
+      });
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useToggleTask(), { wrapper });
@@ -270,20 +279,17 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
-        completed: true,
-      });
+      expect(mockTaskApi.toggleTask).toHaveBeenCalledWith('1');
     });
   });
 
   describe('useScheduleTask', () => {
     it('should schedule a task for a specific date', async () => {
       const scheduledDate = new Date('2024-02-01');
-      mockTaskStorage.updateTask.mockResolvedValue(true);
-      mockTaskStorage.getTasks.mockResolvedValue([
-        { ...mockTasks[0], scheduledDate },
-        ...mockTasks.slice(1),
-      ]);
+      mockTaskApi.scheduleTask.mockResolvedValue({
+        ...mockTasks[0],
+        scheduledDate,
+      });
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useScheduleTask(), { wrapper });
@@ -296,9 +302,7 @@ describe('useTasks Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(mockTaskStorage.updateTask).toHaveBeenCalledWith('1', {
-        scheduledDate,
-      });
+      expect(mockTaskApi.scheduleTask).toHaveBeenCalledWith('1', scheduledDate);
     });
   });
 });
@@ -336,7 +340,7 @@ describe('Task Filtering Logic', () => {
   ];
 
   beforeEach(() => {
-    mockTaskStorage.getTasks.mockResolvedValue([...testTasks]);
+    mockTaskApi.fetchTasks.mockResolvedValue([...testTasks]);
   });
 
   it('should filter by multiple criteria', async () => {
