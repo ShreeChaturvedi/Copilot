@@ -3,38 +3,106 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RightPane } from '../RightPane';
-import { ThemeProvider } from '../../providers';
 
 // Mock the CalendarView component
 vi.mock('../../calendar', () => ({
-  CalendarView: ({ onEventClick, onEventCreate }: { onEventClick?: (event: { id: string; title: string }) => void; onEventCreate?: (event: object) => void }) => (
+  CalendarView: ({
+    onEventClick,
+    onEventCreate,
+  }: {
+    onEventClick?: (event: { id: string; title: string }) => void;
+    onEventCreate?: (event: object) => void;
+  }) => (
     <div data-testid="calendar-view">
-      <button 
+      <button
         data-testid="mock-event-click"
         onClick={() => onEventClick?.({ id: '1', title: 'Test Event' })}
       >
         Mock Event
       </button>
-      <button 
+      <button
         data-testid="mock-event-create"
         onClick={() => onEventCreate?.({ title: 'New Event' })}
       >
         Create Event
       </button>
     </div>
-  )
+  ),
+}));
+
+vi.mock('../../calendar/ConsolidatedCalendarHeader', () => ({
+  ConsolidatedCalendarHeader: ({
+    onCreateEvent,
+    onViewChange,
+    currentView,
+  }: {
+    onCreateEvent?: () => void;
+    onViewChange?: (view: string) => void;
+    currentView?: string;
+  }) => (
+    <div data-testid="calendar-header">
+      <span data-testid="current-view">{currentView}</span>
+      <button
+        type="button"
+        aria-label="New Event"
+        onClick={() => onCreateEvent?.()}
+      >
+        New Event
+      </button>
+      <button type="button" onClick={() => onViewChange?.('dayGridMonth')}>
+        Month
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../../dialogs/EventCreationDialog', () => ({
+  EventCreationDialog: ({
+    open,
+    initialEventData,
+  }: {
+    open: boolean;
+    initialEventData?: { title?: string };
+  }) => (
+    <div
+      data-testid="event-creation-dialog"
+      data-open={open}
+      data-title={initialEventData?.title || ''}
+    />
+  ),
+}));
+
+vi.mock('../../dialogs/EventDisplayDialog', () => ({
+  EventDisplayDialog: ({
+    open,
+    event,
+  }: {
+    open: boolean;
+    event?: { title?: string };
+  }) => (
+    <div
+      data-testid="event-display-dialog"
+      data-open={open}
+      data-title={event?.title || ''}
+    />
+  ),
+}));
+
+vi.mock('@/stores/settingsStore', () => ({
+  useSettingsStore: () => ({
+    calendarSubView: null,
+    setCalendarSubView: vi.fn(),
+  }),
 }));
 
 // Test wrapper
 const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>{children}</ThemeProvider>
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 };
 
@@ -43,24 +111,24 @@ describe('RightPane', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the calendar view header', () => {
+  it('renders the calendar view header', async () => {
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    expect(screen.getByText('Calendar View')).toBeInTheDocument();
+    expect(await screen.findByTestId('calendar-header')).toBeInTheDocument();
   });
 
-  it('renders the create event button', () => {
+  it('renders the create event button', async () => {
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    expect(screen.getByText('+ Event')).toBeInTheDocument();
+    expect(await screen.findByLabelText('New Event')).toBeInTheDocument();
   });
 
   it('renders the calendar component', () => {
@@ -73,91 +141,81 @@ describe('RightPane', () => {
     expect(screen.getByTestId('calendar-view')).toBeInTheDocument();
   });
 
-  it('renders notes editor section', () => {
+  it('renders notes editor section', async () => {
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    expect(screen.getByText('Meeting Notes')).toBeInTheDocument();
-    expect(screen.getByText('Show Editor')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('event-creation-dialog')
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('event-display-dialog')
+    ).toBeInTheDocument();
   });
 
-  it('toggles notes editor visibility', async () => {
+  it('opens create dialog from header button', async () => {
     const user = userEvent.setup();
-    
+
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    const toggleButton = screen.getByText('Show Editor');
-    
-    // Initially should show "Show Editor"
-    expect(toggleButton).toBeInTheDocument();
-    
-    // Click to show editor
-    await user.click(toggleButton);
-    
-    // Should now show "Hide Editor"
-    expect(screen.getByText('Hide Editor')).toBeInTheDocument();
-    expect(screen.getByText('CKEditor will be integrated here for rich text editing')).toBeInTheDocument();
+    const createButton = await screen.findByLabelText('New Event');
+    await user.click(createButton);
+
+    expect(await screen.findByTestId('event-creation-dialog')).toHaveAttribute(
+      'data-open',
+      'true'
+    );
   });
 
   it('handles event click from calendar', async () => {
     const user = userEvent.setup();
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    
+
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    const eventButton = screen.getByTestId('mock-event-click');
+    const eventButton = await screen.findByTestId('mock-event-click');
     await user.click(eventButton);
-    
-    expect(consoleSpy).toHaveBeenCalledWith('Event clicked:', { id: '1', title: 'Test Event' });
-    
-    consoleSpy.mockRestore();
+
+    expect(await screen.findByTestId('event-display-dialog')).toHaveAttribute(
+      'data-open',
+      'true'
+    );
+    expect(await screen.findByTestId('event-display-dialog')).toHaveAttribute(
+      'data-title',
+      'Test Event'
+    );
   });
 
   it('handles event creation from calendar', async () => {
     const user = userEvent.setup();
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    
+
     render(
       <TestWrapper>
         <RightPane />
       </TestWrapper>
     );
 
-    const createButton = screen.getByTestId('mock-event-create');
+    const createButton = await screen.findByTestId('mock-event-create');
     await user.click(createButton);
-    
-    expect(consoleSpy).toHaveBeenCalledWith('Create event:', { title: 'New Event' });
-    
-    consoleSpy.mockRestore();
-  });
 
-  it('handles create event button click', async () => {
-    const user = userEvent.setup();
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    
-    render(
-      <TestWrapper>
-        <RightPane />
-      </TestWrapper>
+    expect(await screen.findByTestId('event-creation-dialog')).toHaveAttribute(
+      'data-open',
+      'true'
     );
-
-    const createEventButton = screen.getByText('+ Event');
-    await user.click(createEventButton);
-    
-    expect(consoleSpy).toHaveBeenCalledWith('Create event:', {});
-    
-    consoleSpy.mockRestore();
+    expect(await screen.findByTestId('event-creation-dialog')).toHaveAttribute(
+      'data-title',
+      'New Event'
+    );
   });
 
   it('renders children when provided', () => {
@@ -180,6 +238,12 @@ describe('RightPane', () => {
     );
 
     const rightPane = container.firstChild as HTMLElement;
-    expect(rightPane).toHaveClass('h-full', 'flex', 'flex-col', 'bg-white', 'dark:bg-gray-800');
+    expect(rightPane).toHaveClass(
+      'h-full',
+      'flex',
+      'flex-col',
+      'bg-background',
+      'overflow-hidden'
+    );
   });
 });

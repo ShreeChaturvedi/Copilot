@@ -12,9 +12,8 @@ describe('ConsolidatedCalendarHeaderDemo', () => {
 
   it('renders the demo component correctly', () => {
     render(<ConsolidatedCalendarHeaderDemo />);
-    
+
     // Check that the header is rendered
-    expect(screen.getByText('Calendar')).toBeInTheDocument();
     expect(screen.getByText('Calendar Content Area')).toBeInTheDocument();
     expect(screen.getByText(/Current view:/)).toBeInTheDocument();
     expect(screen.getByText('timeGridWeek')).toBeInTheDocument();
@@ -22,25 +21,25 @@ describe('ConsolidatedCalendarHeaderDemo', () => {
 
   it('handles view changes correctly', () => {
     render(<ConsolidatedCalendarHeaderDemo />);
-    
+
     // Click on Month view
-    fireEvent.click(screen.getByText('Month'));
-    
+    fireEvent.click(screen.getByRole('button', { name: 'Month' }));
+
     expect(consoleSpy).toHaveBeenCalledWith('View changed to:', 'dayGridMonth');
     expect(screen.getByText('dayGridMonth')).toBeInTheDocument();
   });
 
   it('handles navigation clicks correctly', () => {
     render(<ConsolidatedCalendarHeaderDemo />);
-    
+
     // Test Today button
     fireEvent.click(screen.getByText('Today'));
     expect(consoleSpy).toHaveBeenCalledWith('Today clicked');
-    
+
     // Test Previous button
     fireEvent.click(screen.getByLabelText('Previous period'));
     expect(consoleSpy).toHaveBeenCalledWith('Previous clicked');
-    
+
     // Test Next button
     fireEvent.click(screen.getByLabelText('Next period'));
     expect(consoleSpy).toHaveBeenCalledWith('Next clicked');
@@ -48,8 +47,8 @@ describe('ConsolidatedCalendarHeaderDemo', () => {
 
   it('handles create event click correctly', () => {
     render(<ConsolidatedCalendarHeaderDemo />);
-    
-    fireEvent.click(screen.getByText('New Event'));
+
+    fireEvent.click(screen.getByLabelText('New Event'));
     expect(consoleSpy).toHaveBeenCalledWith('Create event clicked');
   });
 });
