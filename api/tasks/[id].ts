@@ -7,7 +7,13 @@ import { sendSuccess, sendError } from '../../lib/middleware/errorHandler.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import type { UpdateTaskDTO } from '../../lib/services/TaskService';
-import { UnauthorizedError, ValidationError, NotFoundError, ForbiddenError, InternalServerError } from '../../lib/types/api.js';
+import {
+  UnauthorizedError,
+  ValidationError,
+  NotFoundError,
+  ForbiddenError,
+  InternalServerError,
+} from '../../lib/types/api.js';
 
 export default createCrudHandler({
   get: async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -17,15 +23,19 @@ export default createCrudHandler({
       const taskId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, new UnauthorizedError('User authentication required'));
+        return sendError(
+          res,
+          new UnauthorizedError('User authentication required')
+        );
       }
 
       if (!taskId) {
         return sendError(
           res,
-          new ValidationError([
-            { field: 'id', message: 'Task ID is required', code: 'REQUIRED' },
-          ], 'Task ID is required')
+          new ValidationError(
+            [{ field: 'id', message: 'Task ID is required', code: 'REQUIRED' }],
+            'Task ID is required'
+          )
         );
       }
 
@@ -41,12 +51,15 @@ export default createCrudHandler({
       sendSuccess(res, task);
     } catch (error) {
       console.error(`GET /api/tasks/${req.query.id} error:`, error);
-      
+
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, new InternalServerError(error.message || 'Failed to fetch task'));
+      sendError(
+        res,
+        new InternalServerError(error.message || 'Failed to fetch task')
+      );
     }
   },
 
@@ -57,20 +70,24 @@ export default createCrudHandler({
       const taskId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, new UnauthorizedError('User authentication required'));
+        return sendError(
+          res,
+          new UnauthorizedError('User authentication required')
+        );
       }
 
       if (!taskId) {
         return sendError(
           res,
-          new ValidationError([
-            { field: 'id', message: 'Task ID is required', code: 'REQUIRED' },
-          ], 'Task ID is required')
+          new ValidationError(
+            [{ field: 'id', message: 'Task ID is required', code: 'REQUIRED' }],
+            'Task ID is required'
+          )
         );
       }
 
       const updateData: UpdateTaskDTO = req.body;
-      
+
       const task = await taskService.update(taskId, updateData, {
         userId,
         requestId: req.headers['x-request-id'] as string,
@@ -83,17 +100,23 @@ export default createCrudHandler({
       sendSuccess(res, task);
     } catch (error) {
       console.error(`PUT /api/tasks/${req.query.id} error:`, error);
-      
+
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
         const msg = error.message.replace('VALIDATION_ERROR: ', '');
-        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
+        return sendError(
+          res,
+          new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg)
+        );
       }
-      
+
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, new InternalServerError(error.message || 'Failed to update task'));
+      sendError(
+        res,
+        new InternalServerError(error.message || 'Failed to update task')
+      );
     }
   },
 
@@ -105,15 +128,19 @@ export default createCrudHandler({
       const { action } = req.query;
 
       if (!userId) {
-        return sendError(res, new UnauthorizedError('User authentication required'));
+        return sendError(
+          res,
+          new UnauthorizedError('User authentication required')
+        );
       }
 
       if (!taskId) {
         return sendError(
           res,
-          new ValidationError([
-            { field: 'id', message: 'Task ID is required', code: 'REQUIRED' },
-          ], 'Task ID is required')
+          new ValidationError(
+            [{ field: 'id', message: 'Task ID is required', code: 'REQUIRED' }],
+            'Task ID is required'
+          )
         );
       }
 
@@ -134,9 +161,8 @@ export default createCrudHandler({
           const updateData: UpdateTaskDTO = req.body;
           // Normalize status/checkbox linkage: if status provided without explicit completed,
           // map DONE->completed true; others->completed false
-          if ((updateData as any).status && (updateData as any).completed === undefined) {
-            const s = String((updateData as any).status);
-            (updateData as any).completed = s === 'DONE';
+          if (updateData.status && updateData.completed === undefined) {
+            updateData.completed = updateData.status === 'DONE';
           }
           result = await taskService.update(taskId, updateData, {
             userId,
@@ -152,17 +178,23 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error(`PATCH /api/tasks/${req.query.id} error:`, error);
-      
+
       if (error.message?.startsWith('VALIDATION_ERROR:')) {
         const msg = error.message.replace('VALIDATION_ERROR: ', '');
-        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
+        return sendError(
+          res,
+          new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg)
+        );
       }
-      
+
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, new InternalServerError(error.message || 'Failed to update task'));
+      sendError(
+        res,
+        new InternalServerError(error.message || 'Failed to update task')
+      );
     }
   },
 
@@ -173,15 +205,19 @@ export default createCrudHandler({
       const taskId = req.query.id as string;
 
       if (!userId) {
-        return sendError(res, new UnauthorizedError('User authentication required'));
+        return sendError(
+          res,
+          new UnauthorizedError('User authentication required')
+        );
       }
 
       if (!taskId) {
         return sendError(
           res,
-          new ValidationError([
-            { field: 'id', message: 'Task ID is required', code: 'REQUIRED' },
-          ], 'Task ID is required')
+          new ValidationError(
+            [{ field: 'id', message: 'Task ID is required', code: 'REQUIRED' }],
+            'Task ID is required'
+          )
         );
       }
 
@@ -197,12 +233,15 @@ export default createCrudHandler({
       sendSuccess(res, { deleted: true });
     } catch (error) {
       console.error(`DELETE /api/tasks/${req.query.id} error:`, error);
-      
+
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
 
-      sendError(res, new InternalServerError(error.message || 'Failed to delete task'));
+      sendError(
+        res,
+        new InternalServerError(error.message || 'Failed to delete task')
+      );
     }
   },
 
