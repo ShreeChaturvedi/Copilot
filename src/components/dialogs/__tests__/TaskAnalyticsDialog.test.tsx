@@ -76,6 +76,7 @@ vi.mock('recharts', () => ({
   Bar: () => <div data-testid="bar" />,
   XAxis: () => <div data-testid="x-axis" />,
   YAxis: () => <div data-testid="y-axis" />,
+  CartesianGrid: () => <div data-testid="cartesian-grid" />,
 }));
 
 // Test wrapper with React Query
@@ -94,16 +95,20 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 
 describe('TaskAnalyticsDialog', () => {
   let mockOnOpenChange: ReturnType<typeof vi.fn>;
+  let defaultProps: {
+    open: boolean;
+    onOpenChange: ReturnType<typeof vi.fn>;
+    defaultScope: string | null;
+  };
 
   beforeEach(() => {
     mockOnOpenChange = vi.fn();
+    defaultProps = {
+      open: true,
+      onOpenChange: mockOnOpenChange,
+      defaultScope: null,
+    };
   });
-
-  const defaultProps = {
-    open: true,
-    onOpenChange: mockOnOpenChange,
-    defaultScope: null,
-  };
 
   it('should render the dialog when open', () => {
     render(
@@ -112,7 +117,8 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText('Task Analytics')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText('Task Analytics').length).toBeGreaterThan(0);
   });
 
   it('should not render when closed', () => {
@@ -132,7 +138,7 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText('Test List 1')).toBeInTheDocument();
+    expect(screen.getByText(/Test List 1/)).toBeInTheDocument();
   });
 
   it('should render all tab triggers', () => {
@@ -142,67 +148,81 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /trends/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /lists/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /priority/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /tags/i })).toBeInTheDocument();
     expect(
-      screen.getByRole('tab', { name: /attachments/i })
+      screen.getByRole('button', { name: /overview/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /goals/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /trends/i })).toBeInTheDocument();
   });
 
-  it('should have disabled placeholder tabs', () => {
+  it('should not render placeholder tabs', () => {
     render(
       <TestWrapper>
         <TaskAnalyticsDialog {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByRole('tab', { name: /lists/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /priority/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /tags/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /attachments/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /goals/i })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: /lists/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /priority/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /tags/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /attachments/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /goals/i })
+    ).not.toBeInTheDocument();
   });
 
-  it('should render time range controls', () => {
+  it('should render time range controls', async () => {
     render(
       <TestWrapper>
         <TaskAnalyticsDialog {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByText('Range')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /7d/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /30d/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /90d/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ytd/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /7d/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /30d/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /90d/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /ytd/i })).toBeInTheDocument();
+    });
   });
 
-  it('should render grouping controls', () => {
+  it('should render grouping controls', async () => {
     render(
       <TestWrapper>
         <TaskAnalyticsDialog {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByText('Group by')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /day/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /week/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /month/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'D' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'W' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'M' })).toBeInTheDocument();
+    });
   });
 
-  it('should render show completed toggle', () => {
+  it('should render show completed toggle', async () => {
     render(
       <TestWrapper>
         <TaskAnalyticsDialog {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByText('Show completed')).toBeInTheDocument();
-    expect(screen.getByRole('switch')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Hide completed tasks')).toBeInTheDocument();
+    });
   });
 
   it('should switch between tabs', async () => {
@@ -213,18 +233,17 @@ describe('TaskAnalyticsDialog', () => {
     );
 
     // Should start with Overview tab active
-    const overviewTab = screen.getByRole('tab', { name: /overview/i });
-    const trendsTab = screen.getByRole('tab', { name: /trends/i });
+    const overviewTab = screen.getByRole('button', { name: /overview/i });
+    const trendsTab = screen.getByRole('button', { name: /trends/i });
 
-    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
-    expect(trendsTab).toHaveAttribute('aria-selected', 'false');
+    expect(overviewTab).toHaveAttribute('aria-pressed', 'true');
+    expect(trendsTab).toHaveAttribute('aria-pressed', 'false');
 
-    // Click on Trends tab
     fireEvent.click(trendsTab);
 
     await waitFor(() => {
-      expect(trendsTab).toHaveAttribute('aria-selected', 'true');
-      expect(overviewTab).toHaveAttribute('aria-selected', 'false');
+      expect(trendsTab).toHaveAttribute('aria-pressed', 'true');
+      expect(overviewTab).toHaveAttribute('aria-pressed', 'false');
     });
   });
 
@@ -235,16 +254,11 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    // Check for KPI cards
-    expect(screen.getByText('Total Tasks')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
-    expect(screen.getByText('Pending')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('Overdue')).toBeInTheDocument();
 
-    // Check for status distribution
-    expect(screen.getByText('Status Distribution')).toBeInTheDocument();
-
-    // Check for weekly sparkline
+    // Weekly heatmap
     expect(screen.getByText('This Week')).toBeInTheDocument();
   });
 
@@ -256,15 +270,12 @@ describe('TaskAnalyticsDialog', () => {
     );
 
     // Switch to Trends tab
-    const trendsTab = screen.getByRole('tab', { name: /trends/i });
-    fireEvent.click(trendsTab);
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Task Trends')).toBeInTheDocument();
+      expect(screen.getByText('Task Activity')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /bars/i })).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /areas/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /area/i })).toBeInTheDocument();
     });
   });
 
@@ -275,18 +286,18 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    const sevenDayButton = screen.getByRole('button', { name: /7d/i });
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+    const sevenDayButton = await screen.findByRole('button', { name: /7d/i });
     const thirtyDayButton = screen.getByRole('button', { name: /30d/i });
 
     // Should start with 30d selected (default)
-    expect(thirtyDayButton).toHaveClass('bg-background');
+    expect(thirtyDayButton).toHaveAttribute('aria-pressed', 'true');
 
-    // Click on 7d
     fireEvent.click(sevenDayButton);
 
     await waitFor(() => {
-      expect(sevenDayButton).toHaveClass('bg-background');
-      expect(thirtyDayButton).not.toHaveClass('bg-background');
+      expect(sevenDayButton).toHaveAttribute('aria-pressed', 'true');
+      expect(thirtyDayButton).toHaveAttribute('aria-pressed', 'false');
     });
   });
 
@@ -297,18 +308,19 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    const dayButton = screen.getByRole('button', { name: /day/i });
-    const weekButton = screen.getByRole('button', { name: /week/i });
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+    const dayButton = await screen.findByRole('button', { name: 'D' });
+    const weekButton = screen.getByRole('button', { name: 'W' });
 
     // Should start with Day selected (default)
-    expect(dayButton).toHaveClass('bg-background');
+    expect(dayButton).toHaveAttribute('aria-pressed', 'true');
 
     // Click on Week
     fireEvent.click(weekButton);
 
     await waitFor(() => {
-      expect(weekButton).toHaveClass('bg-background');
-      expect(dayButton).not.toHaveClass('bg-background');
+      expect(weekButton).toHaveAttribute('aria-pressed', 'true');
+      expect(dayButton).toHaveAttribute('aria-pressed', 'false');
     });
   });
 
@@ -319,16 +331,13 @@ describe('TaskAnalyticsDialog', () => {
       </TestWrapper>
     );
 
-    const completedSwitch = screen.getByRole('switch');
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
+    const toggleButton = await screen.findByTitle('Hide completed tasks');
 
-    // Should start as checked (default true)
-    expect(completedSwitch).toBeChecked();
-
-    // Click to uncheck
-    fireEvent.click(completedSwitch);
+    fireEvent.click(toggleButton);
 
     await waitFor(() => {
-      expect(completedSwitch).not.toBeChecked();
+      expect(screen.getByTitle('Show completed tasks')).toBeInTheDocument();
     });
   });
 
@@ -353,15 +362,13 @@ describe('TaskAnalyticsDialog', () => {
     );
 
     // Overview tab charts
-    expect(screen.getAllByTestId('responsive-container')).toHaveLength(2); // Status distribution + sparkline
-    expect(screen.getByTestId('pie-chart')).toBeInTheDocument();
+    expect(screen.queryByTestId('area-chart')).not.toBeInTheDocument();
 
     // Switch to Trends tab
-    const trendsTab = screen.getByRole('tab', { name: /trends/i });
-    fireEvent.click(trendsTab);
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+      expect(screen.getByTestId('area-chart')).toBeInTheDocument();
     });
   });
 
@@ -373,19 +380,17 @@ describe('TaskAnalyticsDialog', () => {
     );
 
     // Switch to Trends tab
-    const trendsTab = screen.getByRole('tab', { name: /trends/i });
-    fireEvent.click(trendsTab);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
-    });
-
-    // Switch to Areas mode
-    const areasButton = screen.getByRole('button', { name: /areas/i });
-    fireEvent.click(areasButton);
+    fireEvent.click(screen.getByRole('button', { name: /trends/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+    });
+
+    const barsButton = screen.getByRole('button', { name: /bars/i });
+    fireEvent.click(barsButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
     });
   });
 
@@ -399,9 +404,9 @@ describe('TaskAnalyticsDialog', () => {
     // Check dialog accessibility
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    // Check tabs accessibility
-    expect(screen.getByRole('tablist')).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(7);
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1); // Only active tab panel is rendered
+    // Check view switcher accessibility
+    expect(
+      screen.getByRole('group', { name: /view selection/i })
+    ).toBeInTheDocument();
   });
 });

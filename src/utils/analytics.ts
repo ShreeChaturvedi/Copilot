@@ -307,9 +307,13 @@ export function computeStatusCounts(
     // Use the same status mapping logic as useTaskStats
     // Prefer backend status if present, fallback to completed flag
     const backendStatus = (task as Task & { status?: string }).status;
+    const normalizedStatus =
+      typeof backendStatus === 'string'
+        ? backendStatus.toLowerCase()
+        : undefined;
 
-    if (backendStatus) {
-      switch (backendStatus) {
+    if (normalizedStatus) {
+      switch (normalizedStatus) {
         case 'not_started':
           notStarted++;
           break;
