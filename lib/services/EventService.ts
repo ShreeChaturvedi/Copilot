@@ -1,7 +1,11 @@
 /**
  * Event Service - Concrete implementation of BaseService for Event operations
  */
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import {
+  BaseService,
+  type ServiceContext,
+  type UserOwnedEntity,
+} from './BaseService.js';
 import { query } from '../config/database.js';
 
 /**
@@ -19,7 +23,7 @@ export interface EventEntity extends UserOwnedEntity {
   calendarId: string;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Relations (optional for different query contexts)
   calendar?: {
     id: string;
@@ -85,8 +89,15 @@ export interface EventConflict {
 /**
  * EventService - Handles all event-related operations
  */
-export class EventService extends BaseService<EventEntity, CreateEventDTO, UpdateEventDTO, EventFilters> {
-  protected getTableName(): string { return 'events'; }
+export class EventService extends BaseService<
+  EventEntity,
+  CreateEventDTO,
+  UpdateEventDTO,
+  EventFilters
+> {
+  protected getTableName(): string {
+    return 'events';
+  }
 
   protected getEntityName(): string {
     return 'Event';
@@ -95,7 +106,10 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Override create to satisfy required relations (user, calendar)
    */
-  async create(data: CreateEventDTO, context?: ServiceContext): Promise<EventEntity> {
+  async create(
+    data: CreateEventDTO,
+    context?: ServiceContext
+  ): Promise<EventEntity> {
     try {
       this.log('create', { data }, context);
       await this.validateCreate(data, context);
@@ -124,14 +138,21 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       this.log('create:success', { id: row.id }, context);
       return this.transformEntity(row);
     } catch (error) {
-      this.log('create:error', { error: (error as Error).message, data }, context);
+      this.log(
+        'create:error',
+        { error: (error as Error).message, data },
+        context
+      );
       throw error;
     }
   }
 
-  protected buildWhereClause(filters: EventFilters, context?: ServiceContext): { sql: string; params: any[] } {
+  protected buildWhereClause(
+    filters: EventFilters,
+    context?: ServiceContext
+  ): { sql: string; params: unknown[] } {
     const clauses: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (context?.userId) {
       params.push(context.userId);
       clauses.push('"userId" = $' + params.length);
@@ -141,7 +162,9 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       clauses.push('"calendarId" = $' + params.length);
     }
     if (filters.calendarIds && filters.calendarIds.length > 0) {
-      const placeholders = filters.calendarIds.map((_, i) => '$' + (params.length + i + 1)).join(',');
+      const placeholders = filters.calendarIds
+        .map((_, i) => '$' + (params.length + i + 1))
+        .join(',');
       params.push(...filters.calendarIds);
       clauses.push('"calendarId" IN (' + placeholders + ')');
     }
@@ -156,57 +179,83 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     if (filters.search) {
       params.push('%' + filters.search + '%');
       const idx = params.length;
-      clauses.push(`(title ILIKE $${idx} OR description ILIKE $${idx} OR location ILIKE $${idx} OR notes ILIKE $${idx})`);
+      clauses.push(
+        `(title ILIKE $${idx} OR description ILIKE $${idx} OR location ILIKE $${idx} OR notes ILIKE $${idx})`
+      );
     }
     if (filters.allDay !== undefined) {
       params.push(filters.allDay);
       clauses.push('"allDay" = $' + params.length);
     }
     if (filters.hasRecurrence !== undefined) {
-      clauses.push(filters.hasRecurrence ? 'recurrence IS NOT NULL' : 'recurrence IS NULL');
+      clauses.push(
+        filters.hasRecurrence ? 'recurrence IS NOT NULL' : 'recurrence IS NULL'
+      );
     }
     const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
     return { sql, params };
   }
 
-  async findAll(filters: EventFilters = {}, context?: ServiceContext): Promise<EventEntity[]> {
+  async findAll(
+    filters: EventFilters = {},
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     try {
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
       const order = 'ORDER BY start ASC, "createdAt" DESC';
-      const res = await query(`SELECT * FROM events ${sql} ${order}`, params, this.db);
-      const base = res.rows.map((r: any) => this.transformEntity(r));
+      const res = await query<EventEntity>(
+        `SELECT * FROM events ${sql} ${order}`,
+        params,
+        this.db
+      );
+      const base = res.rows.map((row) => this.transformEntity(row));
       return await this.enrichEntities(base, context);
-    } catch (error: any) {
-      this.log('findAll:error', { error: error.message, filters }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('findAll:error', { error: message, filters }, context);
       throw error;
     }
   }
 
-  protected async enrichEntities(entities: EventEntity[], _context?: ServiceContext): Promise<EventEntity[]> {
+  protected async enrichEntities(
+    entities: EventEntity[],
+    _context?: ServiceContext
+  ): Promise<EventEntity[]> {
     if (!entities.length) return entities;
     const calendarIds = Array.from(new Set(entities.map((e) => e.calendarId)));
     const placeholders = calendarIds.map((_, i) => `$${i + 1}`).join(',');
-    const calendars = await query(
+    type CalendarSummary = {
+      id: string;
+      name: string;
+      color: string;
+      isVisible: boolean;
+    };
+    const calendars = await query<CalendarSummary>(
       `SELECT id, name, color, "isVisible" FROM calendars WHERE id IN (${placeholders})`,
       calendarIds,
       this.db
     );
-    const calMap = new Map<string, any>();
-    calendars.rows.forEach((c: any) => calMap.set(c.id, c));
+    const calMap = new Map<string, CalendarSummary>();
+    calendars.rows.forEach((calendar) => calMap.set(calendar.id, calendar));
     return entities.map((e) => ({ ...e, calendar: calMap.get(e.calendarId) }));
   }
 
   /**
    * Validate event creation
    */
-  protected async validateCreate(data: CreateEventDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(
+    data: CreateEventDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     if (!data.title?.trim()) {
       throw new Error('VALIDATION_ERROR: Event title is required');
     }
 
     if (!data.start || !data.end) {
-      throw new Error('VALIDATION_ERROR: Event start and end dates are required');
+      throw new Error(
+        'VALIDATION_ERROR: Event start and end dates are required'
+      );
     }
 
     // Validate start is before end (unless it's all-day)
@@ -216,9 +265,15 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Validate calendar exists and user owns it
     if (context?.userId) {
-      const calendar = await query('SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.calendarId, context.userId], this.db);
+      const calendar = await query(
+        'SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1',
+        [data.calendarId, context.userId],
+        this.db
+      );
       if (calendar.rowCount === 0) {
-        throw new Error('VALIDATION_ERROR: Calendar not found or access denied');
+        throw new Error(
+          'VALIDATION_ERROR: Calendar not found or access denied'
+        );
       }
     }
 
@@ -248,7 +303,11 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     }
 
     // Get current event data for validation
-    const currentRes = await query('SELECT start, "end", "allDay" FROM events WHERE id = $1', [id], this.db);
+    const currentRes = await query(
+      'SELECT start, "end", "allDay" FROM events WHERE id = $1',
+      [id],
+      this.db
+    );
     const currentEvent = currentRes.rows[0];
 
     if (!currentEvent) {
@@ -256,8 +315,12 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     }
 
     // Validate start/end relationship
-    const start = (typeof data.start === 'string' ? new Date(data.start) : data.start) ?? currentEvent.start;
-    const end = (typeof data.end === 'string' ? new Date(data.end) : data.end) ?? currentEvent.end;
+    const start =
+      (typeof data.start === 'string' ? new Date(data.start) : data.start) ??
+      currentEvent.start;
+    const end =
+      (typeof data.end === 'string' ? new Date(data.end) : data.end) ??
+      currentEvent.end;
     const allDay = data.allDay ?? currentEvent.allDay;
 
     if (!allDay && start >= end) {
@@ -266,9 +329,15 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
 
     // Validate calendar if being updated
     if (data.calendarId && context?.userId) {
-      const calendar = await query('SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1', [data.calendarId, context.userId], this.db);
+      const calendar = await query(
+        'SELECT id FROM calendars WHERE id = $1 AND "userId" = $2 LIMIT 1',
+        [data.calendarId, context.userId],
+        this.db
+      );
       if (calendar.rowCount === 0) {
-        throw new Error('VALIDATION_ERROR: Calendar not found or access denied');
+        throw new Error(
+          'VALIDATION_ERROR: Calendar not found or access denied'
+        );
       }
     }
 
@@ -281,11 +350,15 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Update event by ID
    */
-  async update(id: string, data: UpdateEventDTO, context?: ServiceContext): Promise<EventEntity | null> {
+  async update(
+    id: string,
+    data: UpdateEventDTO,
+    context?: ServiceContext
+  ): Promise<EventEntity | null> {
     await this.validateUpdate(id, data, context);
 
     const sets: string[] = [];
-    const params: any[] = [];
+    const params: Array<string | boolean | null | Date> = [];
 
     if (data.title !== undefined) {
       params.push(data.title.trim());
@@ -296,7 +369,8 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       sets.push(`description = $${params.length}`);
     }
     if (data.start !== undefined) {
-      const d = typeof data.start === 'string' ? new Date(data.start) : data.start;
+      const d =
+        typeof data.start === 'string' ? new Date(data.start) : data.start;
       params.push(d);
       sets.push(`start = $${params.length}`);
     }
@@ -341,7 +415,11 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Find events by date range
    */
-  async findByDateRange(start: Date, end: Date, context?: ServiceContext): Promise<EventEntity[]> {
+  async findByDateRange(
+    start: Date,
+    end: Date,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     const filters: EventFilters = { start, end };
     return await this.findAll(filters, context);
   }
@@ -349,7 +427,10 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Find events by calendar
    */
-  async findByCalendar(calendarId: string, context?: ServiceContext): Promise<EventEntity[]> {
+  async findByCalendar(
+    calendarId: string,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     const filters: EventFilters = { calendarId };
     return await this.findAll(filters, context);
   }
@@ -357,7 +438,10 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Find upcoming events
    */
-  async findUpcoming(limit: number = 10, context?: ServiceContext): Promise<EventEntity[]> {
+  async findUpcoming(
+    limit: number = 10,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -366,7 +450,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
       this.log('findUpcoming', { limit }, context);
 
       const now = new Date();
-      const res = await query(
+      const res = await query<EventEntity>(
         `SELECT e.*
          FROM events e
          JOIN calendars c ON c.id = e."calendarId"
@@ -376,7 +460,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
         [context.userId!, now, limit],
         this.db
       );
-      const base = res.rows.map((r: any) => this.transformEntity(r));
+      const base = res.rows.map((row) => this.transformEntity(row));
       const enriched = await this.enrichEntities(base, context);
       this.log('findUpcoming:success', { count: enriched.length }, context);
       return enriched;
@@ -389,7 +473,10 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Search events by query
    */
-  async search(query: string, context?: ServiceContext): Promise<EventEntity[]> {
+  async search(
+    query: string,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     const filters: EventFilters = { search: query };
     return await this.findAll(filters, context);
   }
@@ -397,7 +484,11 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Get event conflicts for a new or updated event
    */
-  async getConflicts(eventData: CreateEventDTO | UpdateEventDTO, excludeId?: string, context?: ServiceContext): Promise<EventConflict[]> {
+  async getConflicts(
+    eventData: CreateEventDTO | UpdateEventDTO,
+    excludeId?: string,
+    context?: ServiceContext
+  ): Promise<EventConflict[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -409,31 +500,57 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     try {
       this.log('getConflicts', { eventData, excludeId }, context);
 
-      const params: any[] = [context.userId!, eventData.end!, eventData.start!];
+      const params: Array<string | Date> = [
+        context.userId!,
+        eventData.end!,
+        eventData.start!,
+      ];
       const and: string[] = ['e."userId" = $1', 'e.start < $2', 'e."end" > $3'];
-      if (excludeId) { params.push(excludeId); and.push('e.id <> $' + params.length); }
-      if (eventData.calendarId) { params.push(eventData.calendarId); and.push('e."calendarId" = $' + params.length); }
+      if (excludeId) {
+        params.push(excludeId);
+        and.push('e.id <> $' + params.length);
+      }
+      if (eventData.calendarId) {
+        params.push(eventData.calendarId);
+        and.push('e."calendarId" = $' + params.length);
+      }
       const sql = `SELECT e.* FROM events e WHERE ${and.join(' AND ')}`;
-      const res = await query(sql, params, this.db);
-      const conflictingEvents = res.rows as any[];
+      const res = await query<EventEntity>(sql, params, this.db);
+      const conflictingEvents = res.rows;
 
-      const conflicts: EventConflict[] = conflictingEvents.map((conflictEvent) => {
-        const overlapStart = new Date(Math.max(eventData.start!.getTime(), conflictEvent.start.getTime()));
-        const overlapEnd = new Date(Math.min(eventData.end!.getTime(), conflictEvent.end.getTime()));
-        const overlapDuration = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60));
+      const conflicts: EventConflict[] = conflictingEvents.map(
+        (conflictEvent) => {
+          const overlapStart = new Date(
+            Math.max(eventData.start!.getTime(), conflictEvent.start.getTime())
+          );
+          const overlapEnd = new Date(
+            Math.min(eventData.end!.getTime(), conflictEvent.end.getTime())
+          );
+          const overlapDuration = Math.round(
+            (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
+          );
 
-        return {
-          conflictingEvent: this.transformEntity(conflictEvent),
-          overlapStart,
-          overlapEnd,
-          overlapDuration,
-        };
-      });
+          return {
+            conflictingEvent: this.transformEntity(conflictEvent),
+            overlapStart,
+            overlapEnd,
+            overlapDuration,
+          };
+        }
+      );
 
-      this.log('getConflicts:success', { conflictCount: conflicts.length }, context);
+      this.log(
+        'getConflicts:success',
+        { conflictCount: conflicts.length },
+        context
+      );
       return conflicts;
     } catch (error) {
-      this.log('getConflicts:error', { error: error.message, eventData }, context);
+      this.log(
+        'getConflicts:error',
+        { error: error.message, eventData },
+        context
+      );
       throw error;
     }
   }
@@ -441,7 +558,11 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Get events for a specific month (optimized for calendar view)
    */
-  async findByMonth(year: number, month: number, context?: ServiceContext): Promise<EventEntity[]> {
+  async findByMonth(
+    year: number,
+    month: number,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
 
@@ -453,8 +574,20 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
    */
   async findToday(context?: ServiceContext): Promise<EventEntity[]> {
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const endOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
 
     return await this.findByDateRange(startOfDay, endOfDay, context);
   }
@@ -467,7 +600,7 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
@@ -478,7 +611,10 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
   /**
    * Create recurring events (basic implementation)
    */
-  async createRecurring(data: CreateEventDTO, context?: ServiceContext): Promise<EventEntity[]> {
+  async createRecurring(
+    data: CreateEventDTO,
+    context?: ServiceContext
+  ): Promise<EventEntity[]> {
     if (!data.recurrence) {
       // If no recurrence, create single event
       const event = await this.create(data, context);
@@ -488,20 +624,24 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     // For now, create just the master event
     // In a full implementation, you'd parse the RRULE and create instances
     const masterEvent = await this.create(data, context);
-    
+
     // TODO: Implement full recurring event logic with RRULE parsing
     // This would involve:
     // 1. Parsing the RRULE string
     // 2. Generating occurrence dates
     // 3. Creating individual event instances or using a virtual approach
-    
+
     return [masterEvent];
   }
 
   /**
    * Move event to different calendar
    */
-  async moveToCalendar(eventId: string, newCalendarId: string, context?: ServiceContext): Promise<EventEntity> {
+  async moveToCalendar(
+    eventId: string,
+    newCalendarId: string,
+    context?: ServiceContext
+  ): Promise<EventEntity> {
     return await this.update(eventId, { calendarId: newCalendarId }, context);
   }
 
@@ -540,9 +680,17 @@ export class EventService extends BaseService<EventEntity, CreateEventDTO, Updat
     }
 
     // Check for basic RRULE components
-    const validKeywords = ['FREQ', 'INTERVAL', 'COUNT', 'UNTIL', 'BYDAY', 'BYMONTH', 'BYMONTHDAY'];
+    const validKeywords = [
+      'FREQ',
+      'INTERVAL',
+      'COUNT',
+      'UNTIL',
+      'BYDAY',
+      'BYMONTH',
+      'BYMONTHDAY',
+    ];
     const ruleBody = rrule.substring(6); // Remove 'RRULE:'
-    
+
     // Split by semicolon and validate each part
     const parts = ruleBody.split(';');
     for (const part of parts) {

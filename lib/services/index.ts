@@ -18,7 +18,6 @@ export * from './ServiceFactory.js';
 
 // Service initialization and utilities
 import { initializeServiceFactory } from './ServiceFactory.js';
-import pool from '../config/database.js';
 
 /**
  * Initialize all services with default configuration

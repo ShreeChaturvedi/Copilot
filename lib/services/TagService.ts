@@ -1,10 +1,21 @@
 /**
  * Tag Service - Concrete implementation of BaseService for Tag operations
  */
-import { BaseService, type ServiceContext, type BaseEntity } from './BaseService.js';
+import {
+  BaseService,
+  type ServiceContext,
+  type BaseEntity,
+} from './BaseService.js';
 import { query, withTransaction } from '../config/database.js';
 
-export type TagType = 'DATE' | 'TIME' | 'PRIORITY' | 'LOCATION' | 'PERSON' | 'LABEL' | 'PROJECT';
+export type TagType =
+  | 'DATE'
+  | 'TIME'
+  | 'PRIORITY'
+  | 'LOCATION'
+  | 'PERSON'
+  | 'LABEL'
+  | 'PROJECT';
 
 /**
  * Tag entity interface extending base
@@ -16,7 +27,7 @@ export interface TagEntity extends BaseEntity {
   createdAt: Date;
   updatedAt: Date;
   usageCount?: number;
-  
+
   // Relations (optional for different query contexts)
   tasks?: Array<{
     taskId: string;
@@ -80,16 +91,26 @@ export interface TaskTagDTO {
 /**
  * TagService - Handles all tag-related operations
  */
-export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDTO, TagFilters> {
-  protected getTableName(): string { return 'tags'; }
+export class TagService extends BaseService<
+  TagEntity,
+  CreateTagDTO,
+  UpdateTagDTO,
+  TagFilters
+> {
+  protected getTableName(): string {
+    return 'tags';
+  }
 
   protected getEntityName(): string {
     return 'Tag';
   }
 
-  protected buildWhereClause(filters: TagFilters, _context?: ServiceContext): { sql: string; params: any[] } {
+  protected buildWhereClause(
+    filters: TagFilters,
+    _context?: ServiceContext
+  ): { sql: string; params: unknown[] } {
     const clauses: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (filters.type) {
       params.push(filters.type);
       clauses.push('type = $' + params.length);
@@ -126,7 +147,10 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Find tags with optional filtering
    */
-  async findAll(filters: TagFilters = {}, context?: ServiceContext): Promise<TagEntity[]> {
+  async findAll(
+    filters: TagFilters = {},
+    context?: ServiceContext
+  ): Promise<TagEntity[]> {
     try {
       this.log('findAll', { filters }, context);
       const scopedFilters: TagFilters = {
@@ -201,17 +225,23 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
 
         if (scopedFilters.unused !== undefined) {
           whereClauses.push(
-            scopedFilters.unused ? 'COALESCE(tag_usage.count, 0) = 0' : 'COALESCE(tag_usage.count, 0) > 0'
+            scopedFilters.unused
+              ? 'COALESCE(tag_usage.count, 0) = 0'
+              : 'COALESCE(tag_usage.count, 0) > 0'
           );
         }
         if (scopedFilters.minUsageCount !== undefined) {
           params.push(scopedFilters.minUsageCount);
-          whereClauses.push(`COALESCE(tag_usage.count, 0) >= $${params.length}`);
+          whereClauses.push(
+            `COALESCE(tag_usage.count, 0) >= $${params.length}`
+          );
         }
       }
 
-      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-      const res = await query(
+      const whereSql = whereClauses.length
+        ? `WHERE ${whereClauses.join(' AND ')}`
+        : '';
+      const res = await query<TagEntity>(
         `SELECT t.id, t.name, t.type, t.color, t."createdAt", t."updatedAt"${usageSelect}
          FROM tags t
          ${usageJoin}
@@ -220,9 +250,10 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         params,
         this.db
       );
-      return res.rows.map((row: any) => this.transformEntity(row));
-    } catch (error) {
-      this.log('findAll:error', { error: (error as Error).message, filters }, context);
+      return res.rows.map((row) => this.transformEntity(row));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('findAll:error', { error: message, filters }, context);
       throw error;
     }
   }
@@ -230,14 +261,21 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Validate tag creation
    */
-  protected async validateCreate(data: CreateTagDTO, _context?: ServiceContext): Promise<void> {
+  protected async validateCreate(
+    data: CreateTagDTO,
+    _context?: ServiceContext
+  ): Promise<void> {
     void _context;
     if (!data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Tag name is required');
     }
 
     // Check for duplicate tag name (tags are global, not user-specific)
-    const existingTag = await query('SELECT id FROM tags WHERE name = $1 LIMIT 1', [data.name.trim().toLowerCase()], this.db);
+    const existingTag = await query(
+      'SELECT id FROM tags WHERE name = $1 LIMIT 1',
+      [data.name.trim().toLowerCase()],
+      this.db
+    );
 
     if (existingTag.rowCount > 0) {
       throw new Error('VALIDATION_ERROR: Tag name already exists');
@@ -245,11 +283,21 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
 
     // Validate color format if provided
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
 
     // Validate tag type
-    const validTypes: TagType[] = ['DATE', 'TIME', 'PRIORITY', 'LOCATION', 'PERSON', 'LABEL', 'PROJECT'];
+    const validTypes: TagType[] = [
+      'DATE',
+      'TIME',
+      'PRIORITY',
+      'LOCATION',
+      'PERSON',
+      'LABEL',
+      'PROJECT',
+    ];
     if (!validTypes.includes(data.type)) {
       throw new Error('VALIDATION_ERROR: Invalid tag type');
     }
@@ -270,7 +318,11 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
 
     // Check for duplicate name if name is being updated
     if (data.name) {
-      const existingTag = await query('SELECT id FROM tags WHERE name = $1 AND id <> $2 LIMIT 1', [data.name.trim().toLowerCase(), id], this.db);
+      const existingTag = await query(
+        'SELECT id FROM tags WHERE name = $1 AND id <> $2 LIMIT 1',
+        [data.name.trim().toLowerCase(), id],
+        this.db
+      );
       if (existingTag.rowCount > 0) {
         throw new Error('VALIDATION_ERROR: Tag name already exists');
       }
@@ -278,12 +330,22 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
 
     // Validate color format if provided
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
 
     // Validate tag type if provided
     if (data.type) {
-      const validTypes: TagType[] = ['DATE', 'TIME', 'PRIORITY', 'LOCATION', 'PERSON', 'LABEL', 'PROJECT'];
+      const validTypes: TagType[] = [
+        'DATE',
+        'TIME',
+        'PRIORITY',
+        'LOCATION',
+        'PERSON',
+        'LABEL',
+        'PROJECT',
+      ];
       if (!validTypes.includes(data.type)) {
         throw new Error('VALIDATION_ERROR: Invalid tag type');
       }
@@ -293,7 +355,10 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Create tag with proper normalization
    */
-  async create(data: CreateTagDTO, context?: ServiceContext): Promise<TagEntity> {
+  async create(
+    data: CreateTagDTO,
+    context?: ServiceContext
+  ): Promise<TagEntity> {
     try {
       this.log('create', { data }, context);
 
@@ -318,13 +383,17 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Update tag fields with validation and normalization
    */
-  async update(id: string, data: UpdateTagDTO, context?: ServiceContext): Promise<TagEntity | null> {
+  async update(
+    id: string,
+    data: UpdateTagDTO,
+    context?: ServiceContext
+  ): Promise<TagEntity | null> {
     try {
       this.log('update', { id, data }, context);
       await this.validateUpdate(id, data, context);
 
       const sets: string[] = [];
-      const params: any[] = [];
+      const params: Array<string | null> = [];
 
       if (data.name !== undefined) {
         params.push(data.name.trim().toLowerCase());
@@ -352,7 +421,11 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
       const row = res.rows[0];
       return row ? this.transformEntity(row) : null;
     } catch (error) {
-      this.log('update:error', { error: (error as Error).message, id, data }, context);
+      this.log(
+        'update:error',
+        { error: (error as Error).message, id, data },
+        context
+      );
       throw error;
     }
   }
@@ -360,18 +433,28 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Find or create tag (upsert operation)
    */
-  async findOrCreate(data: CreateTagDTO, context?: ServiceContext): Promise<TagEntity> {
+  async findOrCreate(
+    data: CreateTagDTO,
+    context?: ServiceContext
+  ): Promise<TagEntity> {
     try {
       this.log('findOrCreate', { data }, context);
 
       const normalizedName = data.name.trim().toLowerCase();
-      const existingTag = await query('SELECT * FROM tags WHERE name = $1 LIMIT 1', [normalizedName], this.db);
+      const existingTag = await query(
+        'SELECT * FROM tags WHERE name = $1 LIMIT 1',
+        [normalizedName],
+        this.db
+      );
       if (existingTag.rowCount > 0) {
         const row = existingTag.rows[0];
         this.log('findOrCreate:found', { id: row.id }, context);
         return this.transformEntity(row);
       }
-      const created = await this.create({ ...data, name: normalizedName }, context);
+      const created = await this.create(
+        { ...data, name: normalizedName },
+        context
+      );
       this.log('findOrCreate:created', { id: created.id }, context);
       return created;
     } catch (error) {
@@ -383,7 +466,10 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Get tags by type
    */
-  async findByType(type: TagType, context?: ServiceContext): Promise<TagEntity[]> {
+  async findByType(
+    type: TagType,
+    context?: ServiceContext
+  ): Promise<TagEntity[]> {
     const filters: TagFilters = { type };
     return await this.findAll(filters, context);
   }
@@ -391,10 +477,13 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Get tags for a specific user's tasks
    */
-  async findByUser(userId: string, context?: ServiceContext): Promise<TagEntity[]> {
+  async findByUser(
+    userId: string,
+    context?: ServiceContext
+  ): Promise<TagEntity[]> {
     try {
       this.log('findByUser', { userId }, context);
-      const tags = await query(
+      const tags = await query<TagEntity>(
         `SELECT t.*
          FROM tags t
          WHERE EXISTS (
@@ -407,7 +496,7 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         this.db
       );
       this.log('findByUser:success', { count: tags.rowCount }, context);
-      return tags.rows.map((row: any) => this.transformEntity(row));
+      return tags.rows.map((row) => this.transformEntity(row));
     } catch (error) {
       this.log('findByUser:error', { error: error.message, userId }, context);
       throw error;
@@ -417,13 +506,20 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Create task-tag relationship
    */
-  async attachToTask(taskTagData: TaskTagDTO, context?: ServiceContext): Promise<void> {
+  async attachToTask(
+    taskTagData: TaskTagDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     try {
       this.log('attachToTask', { taskTagData }, context);
 
       // Validate task exists and user has access
       if (context?.userId) {
-        const task = await query('SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1', [taskTagData.taskId, context.userId], this.db);
+        const task = await query(
+          'SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1',
+          [taskTagData.taskId, context.userId],
+          this.db
+        );
         if (task.rowCount === 0) {
           throw new Error('VALIDATION_ERROR: Task not found or access denied');
         }
@@ -434,13 +530,27 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         `INSERT INTO task_tags ("taskId", "tagId", value, "displayText", "iconName")
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT ("taskId", "tagId") DO UPDATE SET value = EXCLUDED.value, "displayText" = EXCLUDED."displayText", "iconName" = EXCLUDED."iconName"`,
-        [taskTagData.taskId, taskTagData.tagId, taskTagData.value, taskTagData.displayText, taskTagData.iconName],
+        [
+          taskTagData.taskId,
+          taskTagData.tagId,
+          taskTagData.value,
+          taskTagData.displayText,
+          taskTagData.iconName,
+        ],
         this.db
       );
 
-      this.log('attachToTask:success', { taskId: taskTagData.taskId, tagId: taskTagData.tagId }, context);
+      this.log(
+        'attachToTask:success',
+        { taskId: taskTagData.taskId, tagId: taskTagData.tagId },
+        context
+      );
     } catch (error) {
-      this.log('attachToTask:error', { error: error.message, taskTagData }, context);
+      this.log(
+        'attachToTask:error',
+        { error: error.message, taskTagData },
+        context
+      );
       throw error;
     }
   }
@@ -448,24 +558,40 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Remove task-tag relationship
    */
-  async detachFromTask(taskId: string, tagId: string, context?: ServiceContext): Promise<void> {
+  async detachFromTask(
+    taskId: string,
+    tagId: string,
+    context?: ServiceContext
+  ): Promise<void> {
     try {
       this.log('detachFromTask', { taskId, tagId }, context);
 
       // Validate task exists and user has access
       if (context?.userId) {
-        const task = await query('SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1', [taskId, context.userId], this.db);
+        const task = await query(
+          'SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1',
+          [taskId, context.userId],
+          this.db
+        );
         if (task.rowCount === 0) {
           throw new Error('VALIDATION_ERROR: Task not found or access denied');
         }
       }
 
       // Remove the relationship
-      await query('DELETE FROM task_tags WHERE "taskId" = $1 AND "tagId" = $2', [taskId, tagId], this.db);
+      await query(
+        'DELETE FROM task_tags WHERE "taskId" = $1 AND "tagId" = $2',
+        [taskId, tagId],
+        this.db
+      );
 
       this.log('detachFromTask:success', { taskId, tagId }, context);
     } catch (error) {
-      this.log('detachFromTask:error', { error: error.message, taskId, tagId }, context);
+      this.log(
+        'detachFromTask:error',
+        { error: error.message, taskId, tagId },
+        context
+      );
       throw error;
     }
   }
@@ -473,24 +599,44 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Get task-tag relationships for a task
    */
-  async getTaskTags(taskId: string, context?: ServiceContext): Promise<Array<{
-    tag: TagEntity;
-    value: string;
-    displayText: string;
-    iconName: string;
-  }>> {
+  async getTaskTags(
+    taskId: string,
+    context?: ServiceContext
+  ): Promise<
+    Array<{
+      tag: TagEntity;
+      value: string;
+      displayText: string;
+      iconName: string;
+    }>
+  > {
     try {
       this.log('getTaskTags', { taskId }, context);
 
       // Validate task exists and user has access
       if (context?.userId) {
-        const validate = await query('SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1', [taskId, context.userId], this.db);
+        const validate = await query(
+          'SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1',
+          [taskId, context.userId],
+          this.db
+        );
         if (validate.rowCount === 0) {
           throw new Error('VALIDATION_ERROR: Task not found or access denied');
         }
       }
 
-      const res = await query(
+      type TaskTagRow = {
+        id: string;
+        name: string;
+        type: TagType;
+        color: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        value: string;
+        displayText: string;
+        iconName: string;
+      };
+      const res = await query<TaskTagRow>(
         `SELECT tt.value, tt."displayText", tt."iconName", t.*
          FROM task_tags tt
          JOIN tags t ON t.id = tt."tagId"
@@ -499,11 +645,18 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         this.db
       );
 
-      const results = res.rows.map((r: any) => ({
-        tag: this.transformEntity({ id: r.id, name: r.name, type: r.type, color: r.color, createdAt: r.createdAt, updatedAt: r.updatedAt }),
-        value: r.value,
-        displayText: r.displayText,
-        iconName: r.iconName,
+      const results = res.rows.map((row) => ({
+        tag: this.transformEntity({
+          id: row.id,
+          name: row.name,
+          type: row.type,
+          color: row.color,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        }),
+        value: row.value,
+        displayText: row.displayText,
+        iconName: row.iconName,
       }));
 
       this.log('getTaskTags:success', { count: results.length }, context);
@@ -528,22 +681,43 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
 
       // Validate task exists and user has access
       if (context?.userId) {
-        const task = await query('SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1', [taskId, context.userId], this.db);
+        const task = await query(
+          'SELECT id FROM tasks WHERE id = $1 AND "userId" = $2 LIMIT 1',
+          [taskId, context.userId],
+          this.db
+        );
         if (task.rowCount === 0) {
           throw new Error('VALIDATION_ERROR: Task not found or access denied');
         }
       }
       const sets: string[] = [];
-      const params: any[] = [];
-      if (updates.value !== undefined) { params.push(updates.value); sets.push(`value = $${params.length}`); }
-      if (updates.displayText !== undefined) { params.push(updates.displayText); sets.push(`"displayText" = $${params.length}`); }
-      if (updates.iconName !== undefined) { params.push(updates.iconName); sets.push(`"iconName" = $${params.length}`); }
+      const params: string[] = [];
+      if (updates.value !== undefined) {
+        params.push(updates.value);
+        sets.push(`value = $${params.length}`);
+      }
+      if (updates.displayText !== undefined) {
+        params.push(updates.displayText);
+        sets.push(`"displayText" = $${params.length}`);
+      }
+      if (updates.iconName !== undefined) {
+        params.push(updates.iconName);
+        sets.push(`"iconName" = $${params.length}`);
+      }
       params.push(taskId, tagId);
-      await query(`UPDATE task_tags SET ${sets.join(', ')} WHERE "taskId" = $${params.length - 1} AND "tagId" = $${params.length}`, params, this.db);
+      await query(
+        `UPDATE task_tags SET ${sets.join(', ')} WHERE "taskId" = $${params.length - 1} AND "tagId" = $${params.length}`,
+        params,
+        this.db
+      );
 
       this.log('updateTaskTag:success', { taskId, tagId }, context);
     } catch (error) {
-      this.log('updateTaskTag:error', { error: error.message, taskId, tagId }, context);
+      this.log(
+        'updateTaskTag:error',
+        { error: error.message, taskId, tagId },
+        context
+      );
       throw error;
     }
   }
@@ -551,7 +725,9 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Clean up unused tags (tags with no task relationships)
    */
-  async cleanupUnusedTags(context?: ServiceContext): Promise<{ deletedCount: number; deletedTagIds: string[] }> {
+  async cleanupUnusedTags(
+    context?: ServiceContext
+  ): Promise<{ deletedCount: number; deletedTagIds: string[] }> {
     try {
       this.log('cleanupUnusedTags', {}, context);
       const idsRes = await query<{ id: string }>(
@@ -563,9 +739,17 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
       );
       const ids = idsRes.rows.map((r) => r.id);
       if (ids.length > 0) {
-        await query('DELETE FROM tags WHERE id = ANY($1::text[])', [ids], this.db);
+        await query(
+          'DELETE FROM tags WHERE id = ANY($1::text[])',
+          [ids],
+          this.db
+        );
       }
-      this.log('cleanupUnusedTags:success', { deletedCount: ids.length }, context);
+      this.log(
+        'cleanupUnusedTags:success',
+        { deletedCount: ids.length },
+        context
+      );
       return { deletedCount: ids.length, deletedTagIds: ids };
     } catch (error) {
       this.log('cleanupUnusedTags:error', { error: error.message }, context);
@@ -576,9 +760,15 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   /**
    * Merge tags (combine two tags into one)
    */
-  async mergeTags(sourceTagId: string | string[], targetTagId: string, context?: ServiceContext): Promise<TagEntity> {
+  async mergeTags(
+    sourceTagId: string | string[],
+    targetTagId: string,
+    context?: ServiceContext
+  ): Promise<TagEntity> {
     try {
-      const sourceTagIds = Array.isArray(sourceTagId) ? sourceTagId : [sourceTagId];
+      const sourceTagIds = Array.isArray(sourceTagId)
+        ? sourceTagId
+        : [sourceTagId];
       this.log('mergeTags', { sourceTagIds, targetTagId }, context);
 
       if (sourceTagIds.includes(targetTagId)) {
@@ -592,23 +782,39 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
             [targetTagId, sourceTagIds[0]],
             client
           );
-          await query('DELETE FROM tags WHERE id = $1', [sourceTagIds[0]], client);
+          await query(
+            'DELETE FROM tags WHERE id = $1',
+            [sourceTagIds[0]],
+            client
+          );
         } else {
           await query(
             'UPDATE task_tags SET "tagId" = $1 WHERE "tagId" = ANY($2::text[])',
             [targetTagId, sourceTagIds],
             client
           );
-          await query('DELETE FROM tags WHERE id = ANY($1::text[])', [sourceTagIds], client);
+          await query(
+            'DELETE FROM tags WHERE id = ANY($1::text[])',
+            [sourceTagIds],
+            client
+          );
         }
-        const res = await query('SELECT * FROM tags WHERE id = $1', [targetTagId], client);
+        const res = await query(
+          'SELECT * FROM tags WHERE id = $1',
+          [targetTagId],
+          client
+        );
         return res.rows[0];
       });
 
       this.log('mergeTags:success', { targetTagId }, context);
       return this.transformEntity(result);
     } catch (error) {
-      this.log('mergeTags:error', { error: error.message, sourceTagId, targetTagId }, context);
+      this.log(
+        'mergeTags:error',
+        { error: error.message, sourceTagId, targetTagId },
+        context
+      );
       throw error;
     }
   }
@@ -630,9 +836,17 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
   }> {
     try {
       this.log('getStatistics', {}, context);
-      const totalRes = await query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM tags', [], this.db);
-      const byTypeRes = await query<{ type: TagType; count: string }>('SELECT type, COUNT(*)::bigint AS count FROM tags GROUP BY type', [], this.db);
-      const mostUsedRes = await query(
+      const totalRes = await query<{ count: string }>(
+        'SELECT COUNT(*)::bigint AS count FROM tags',
+        [],
+        this.db
+      );
+      const byTypeRes = await query<{ type: TagType; count: string }>(
+        'SELECT type, COUNT(*)::bigint AS count FROM tags GROUP BY type',
+        [],
+        this.db
+      );
+      const mostUsedRes = await query<TagEntity & { usage: string | number }>(
         `SELECT t.*, COALESCE(cnt.c, 0)::bigint AS usage
          FROM tags t
          LEFT JOIN (
@@ -644,9 +858,22 @@ export class TagService extends BaseService<TagEntity, CreateTagDTO, UpdateTagDT
         this.db
       );
 
-      const typeStats = byTypeRes.rows.reduce((acc, r) => { acc[r.type] = Number(r.count); return acc; }, {} as Record<TagType, number>);
-      const topTags = mostUsedRes.rows.map((row: any) => ({ tag: this.transformEntity(row), usageCount: Number(row.usage) }));
-      const stats = { totalTags: Number(totalRes.rows[0].count), tagsByType: typeStats, mostUsedTags: topTags };
+      const typeStats = byTypeRes.rows.reduce(
+        (acc, r) => {
+          acc[r.type] = Number(r.count);
+          return acc;
+        },
+        {} as Record<TagType, number>
+      );
+      const topTags = mostUsedRes.rows.map((row) => ({
+        tag: this.transformEntity(row),
+        usageCount: Number(row.usage),
+      }));
+      const stats = {
+        totalTags: Number(totalRes.rows[0].count),
+        tagsByType: typeStats,
+        mostUsedTags: topTags,
+      };
       this.log('getStatistics:success', stats, context);
       return stats;
     } catch (error) {
