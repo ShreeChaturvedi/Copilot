@@ -36,10 +36,7 @@ describe('CompactFilePreview', () => {
 
   it('renders nothing when no files are provided', () => {
     const { container } = render(
-      <CompactFilePreview
-        files={[]}
-        onFileRemove={mockOnFileRemove}
-      />
+      <CompactFilePreview files={[]} onFileRemove={mockOnFileRemove} />
     );
 
     expect(container.firstChild).toBeNull();
@@ -47,10 +44,7 @@ describe('CompactFilePreview', () => {
 
   it('renders files when provided', () => {
     render(
-      <CompactFilePreview
-        files={mockFiles}
-        onFileRemove={mockOnFileRemove}
-      />
+      <CompactFilePreview files={mockFiles} onFileRemove={mockOnFileRemove} />
     );
 
     expect(screen.getByText('test.txt')).toBeInTheDocument();
@@ -59,10 +53,7 @@ describe('CompactFilePreview', () => {
 
   it('displays file sizes correctly', () => {
     render(
-      <CompactFilePreview
-        files={mockFiles}
-        onFileRemove={mockOnFileRemove}
-      />
+      <CompactFilePreview files={mockFiles} onFileRemove={mockOnFileRemove} />
     );
 
     expect(screen.getByText('1 KB')).toBeInTheDocument();
@@ -71,10 +62,7 @@ describe('CompactFilePreview', () => {
 
   it('calls onFileRemove when remove button is clicked', () => {
     render(
-      <CompactFilePreview
-        files={mockFiles}
-        onFileRemove={mockOnFileRemove}
-      />
+      <CompactFilePreview files={mockFiles} onFileRemove={mockOnFileRemove} />
     );
 
     const removeButtons = screen.getAllByLabelText(/Remove/);
@@ -108,17 +96,14 @@ describe('CompactFilePreview', () => {
     expect(container.firstChild).toHaveClass('custom-class');
   });
 
-  it('shows image preview for image files', () => {
+  it('shows image preview for image files', async () => {
     render(
-      <CompactFilePreview
-        files={mockFiles}
-        onFileRemove={mockOnFileRemove}
-      />
+      <CompactFilePreview files={mockFiles} onFileRemove={mockOnFileRemove} />
     );
 
-    const imagePreview = screen.getByAltText('image.png');
+    const imagePreview = await screen.findByAltText('Preview of image.png');
     expect(imagePreview).toBeInTheDocument();
-    expect(imagePreview).toHaveAttribute('src', 'data:image/png;base64,test');
+    expect(imagePreview).toHaveAttribute('src', 'blob:mock');
   });
 
   it('renders single file correctly', () => {

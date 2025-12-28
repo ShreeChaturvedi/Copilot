@@ -1,39 +1,81 @@
 /**
  * File Upload Accessibility Tests
- * 
+ *
  * Tests accessibility features of the enhanced file upload components
  * to ensure compliance with WCAG guidelines and screen reader compatibility.
  */
 
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { FileUploadButton } from '../FileUploadButton';
 import type { UploadedFile } from '../FileUploadZone';
 
 // Mock dialog components to avoid portal issues in tests
-vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
-    <div data-testid="dialog" data-open={open}>
-      {children}
-    </div>
-  ),
-  DialogContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="dialog-content" className={className}>
-      {children}
-    </div>
-  ),
-  DialogDescription: ({ children }: { children: React.ReactNode }) => (
-    <p data-testid="dialog-description">{children}</p>
-  ),
-  DialogHeader: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dialog-header">{children}</div>
-  ),
-  DialogTitle: ({ children }: { children: React.ReactNode }) => (
-    <h2 data-testid="dialog-title">{children}</h2>
-  ),
-  DialogTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock('@/components/ui/dialog', () => {
+  const DialogContext = React.createContext<((open: boolean) => void) | null>(
+    null
+  );
+
+  return {
+    Dialog: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children: React.ReactNode;
+      open?: boolean;
+      onOpenChange?: (open: boolean) => void;
+    }) => (
+      <DialogContext.Provider value={onOpenChange || null}>
+        <div data-testid="dialog" data-open={open}>
+          {children}
+        </div>
+      </DialogContext.Provider>
+    ),
+    DialogContent: ({
+      children,
+      className,
+    }: {
+      children: React.ReactNode;
+      className?: string;
+    }) => (
+      <div data-testid="dialog-content" className={className}>
+        {children}
+      </div>
+    ),
+    DialogDescription: ({ children }: { children: React.ReactNode }) => (
+      <p data-testid="dialog-description">{children}</p>
+    ),
+    DialogHeader: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="dialog-header">{children}</div>
+    ),
+    DialogTitle: ({ children }: { children: React.ReactNode }) => (
+      <h2 data-testid="dialog-title">{children}</h2>
+    ),
+    DialogTrigger: ({ children }: { children: React.ReactNode }) => {
+      const onOpenChange = React.useContext(DialogContext);
+
+      if (!React.isValidElement(children)) {
+        return <>{children}</>;
+      }
+
+      return React.cloneElement(children, {
+        onClick: (event: React.MouseEvent) => {
+          children.props.onClick?.(event);
+          onOpenChange?.(true);
+        },
+        onKeyDown: (event: React.KeyboardEvent) => {
+          children.props.onKeyDown?.(event);
+          if (event.key === 'Enter' || event.key === ' ') {
+            onOpenChange?.(true);
+          }
+        },
+      });
+    },
+  };
+});
 
 // Mock tooltip components
 vi.mock('@/components/ui/tooltip', () => ({
@@ -41,16 +83,32 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="tooltip-content">{children}</div>
   ),
-  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="tooltip-trigger">{children}</div>
+  ),
 }));
 
 // Mock FileUploadZone
 vi.mock('../FileUploadZone', () => ({
-  FileUploadZone: ({ files, onFilesAdded, onFileRemove, disabled }: { files: UploadedFile[]; onFilesAdded: (files: File[]) => void; onFileRemove: (id: string) => void; disabled?: boolean }) => (
+  FileUploadZone: ({
+    files,
+    onFilesAdded,
+    onFileRemove,
+    disabled,
+  }: {
+    files: UploadedFile[];
+    onFilesAdded: (files: File[]) => void;
+    onFileRemove: (id: string) => void;
+    disabled?: boolean;
+  }) => (
     <div data-testid="file-upload-zone">
       <div>Files: {files.length}</div>
       <button
-        onClick={() => onFilesAdded([new File(['test'], 'test.pdf', { type: 'application/pdf' })])}
+        onClick={() =>
+          onFilesAdded([
+            new File(['test'], 'test.pdf', { type: 'application/pdf' }),
+          ])
+        }
         disabled={disabled}
       >
         Add File
@@ -58,7 +116,10 @@ vi.mock('../FileUploadZone', () => ({
       {files.map((file) => (
         <div key={file.id} data-testid={`file-${file.id}`}>
           {file.name}
-          <button onClick={() => onFileRemove(file.id)} aria-label={`Remove ${file.name}`}>
+          <button
+            onClick={() => onFileRemove(file.id)}
+            aria-label={`Remove ${file.name}`}
+          >
             Remove
           </button>
         </div>
@@ -69,7 +130,7 @@ vi.mock('../FileUploadZone', () => ({
 
 describe('File Upload Accessibility', () => {
   const createMockFile = (name: string, type: string): UploadedFile => ({
-    id: `mock-${Date.now()}`,
+    id: `mock-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     file: new File(['test'], name, { type }),
     name,
     size: 1024,
@@ -92,7 +153,9 @@ describe('File Upload Accessibility', () => {
       );
 
       // Button should be accessible
-      const button = screen.getByRole('button');
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
       expect(button).toBeInTheDocument();
       expect(button).not.toHaveAttribute('aria-label', ''); // Should have meaningful label
     });
@@ -149,8 +212,10 @@ describe('File Upload Accessibility', () => {
         />
       );
 
-      const button = screen.getByRole('button');
-      
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
+
       // Should be focusable
       await user.tab();
       expect(button).toHaveFocus();
@@ -174,9 +239,11 @@ describe('File Upload Accessibility', () => {
         />
       );
 
-      const button = screen.getByRole('button');
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
       expect(button).toBeDisabled();
-      
+
       // Should pass disabled state to FileUploadZone
       const uploadZone = screen.getByTestId('file-upload-zone');
       expect(uploadZone.querySelector('button')).toBeDisabled();
@@ -203,7 +270,9 @@ describe('File Upload Accessibility', () => {
 
       // Dialog should have description
       const dialogDescription = screen.getByTestId('dialog-description');
-      expect(dialogDescription).toHaveTextContent(/Upload files to attach to your task/);
+      expect(dialogDescription).toHaveTextContent(
+        /Upload files to attach to your task/
+      );
     });
 
     it('should describe supported file types clearly', () => {
@@ -220,14 +289,18 @@ describe('File Upload Accessibility', () => {
       );
 
       const description = screen.getByTestId('dialog-description');
-      expect(description).toHaveTextContent(/documents \(PDF, Word, Excel, PowerPoint\)/);
+      expect(description).toHaveTextContent(
+        /documents \(PDF, Word, Excel, PowerPoint\)/
+      );
     });
   });
 
   describe('File Item Accessibility', () => {
     it('should provide proper remove button labels', async () => {
       const user = userEvent.setup();
-      const files = [createMockFile('important-document.pdf', 'application/pdf')];
+      const files = [
+        createMockFile('important-document.pdf', 'application/pdf'),
+      ];
       const onFilesAdded = vi.fn();
       const onFileRemove = vi.fn();
 
@@ -240,7 +313,9 @@ describe('File Upload Accessibility', () => {
       );
 
       // Remove button should have descriptive aria-label
-      const removeButton = screen.getByLabelText('Remove important-document.pdf');
+      const removeButton = screen.getByLabelText(
+        'Remove important-document.pdf'
+      );
       expect(removeButton).toBeInTheDocument();
 
       // Should be keyboard accessible
@@ -250,9 +325,19 @@ describe('File Upload Accessibility', () => {
 
     it('should handle file status announcements', () => {
       const files = [
-        { ...createMockFile('uploading.pdf', 'application/pdf'), status: 'uploading' as const },
-        { ...createMockFile('completed.pdf', 'application/pdf'), status: 'completed' as const },
-        { ...createMockFile('error.pdf', 'application/pdf'), status: 'error' as const, error: 'Upload failed' },
+        {
+          ...createMockFile('uploading.pdf', 'application/pdf'),
+          status: 'uploading' as const,
+        },
+        {
+          ...createMockFile('completed.pdf', 'application/pdf'),
+          status: 'completed' as const,
+        },
+        {
+          ...createMockFile('error.pdf', 'application/pdf'),
+          status: 'error' as const,
+          error: 'Upload failed',
+        },
       ];
       const onFilesAdded = vi.fn();
       const onFileRemove = vi.fn();
@@ -308,7 +393,10 @@ describe('File Upload Accessibility', () => {
 
       // Should be able to tab to trigger button
       await user.tab();
-      expect(screen.getByRole('button')).toHaveFocus();
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
+      expect(button).toHaveFocus();
     });
 
     it('should handle escape key to close dialog', async () => {
@@ -326,7 +414,9 @@ describe('File Upload Accessibility', () => {
       );
 
       // Open dialog
-      const button = screen.getByRole('button');
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
       await user.click(button);
 
       // Dialog should be open
@@ -352,9 +442,11 @@ describe('File Upload Accessibility', () => {
       );
 
       // File count indicator should be accessible
-      const button = screen.getByRole('button');
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
       expect(button).toBeInTheDocument();
-      
+
       // Tooltip should provide context
       const tooltip = screen.getByTestId('tooltip-content');
       expect(tooltip).toHaveTextContent('1 file attached');
@@ -374,7 +466,9 @@ describe('File Upload Accessibility', () => {
       );
 
       // Should use proper button element
-      const button = screen.getByRole('button');
+      const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+        'button'
+      );
       expect(button.tagName.toLowerCase()).toBe('button');
 
       // Dialog should have proper heading structure

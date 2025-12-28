@@ -8,9 +8,15 @@ import { EnhancedTaskInput } from '../EnhancedTaskInput';
 
 // Mock the tooltip components to avoid provider issues
 vi.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Tooltip: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  TooltipContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 describe('EnhancedTaskInput Integration', () => {
@@ -24,28 +30,28 @@ describe('EnhancedTaskInput Integration', () => {
         placeholder="What would you like to work on?"
       />
     );
-    
+
     // Should render textarea (multi-line input)
     const textarea = screen.getByRole('textbox');
     expect(textarea.tagName.toLowerCase()).toBe('textarea');
-    expect(textarea).toHaveAttribute('placeholder', 'What would you like to work on?');
+    expect(textarea).toHaveAttribute(
+      'placeholder',
+      'What would you like to work on?'
+    );
   });
 
   it('has controls positioned below the input', () => {
     render(
-      <EnhancedTaskInput
-        onAddTask={mockOnAddTask}
-        enableSmartParsing={true}
-      />
+      <EnhancedTaskInput onAddTask={mockOnAddTask} enableSmartParsing={true} />
     );
-    
+
     // Should have submit button
     const submitButton = screen.getByRole('button', { name: /add task/i });
     expect(submitButton).toBeInTheDocument();
-    
+
     // Should have task group selector
-    const taskGroupButton = screen.getByRole('button', { name: /current task group/i });
-    expect(taskGroupButton).toBeInTheDocument();
+    const taskGroupCombobox = screen.getByRole('combobox');
+    expect(taskGroupCombobox).toBeInTheDocument();
   });
 
   it('shows task group selector with default group', () => {
@@ -58,41 +64,33 @@ describe('EnhancedTaskInput Integration', () => {
             name: 'Tasks',
             iconId: 'CheckSquare',
             color: '#3b82f6',
-            description: 'Default task group'
-          }
+            description: 'Default task group',
+          },
         ]}
         activeTaskGroupId="default"
       />
     );
-    
+
     // Should show the task group name
     expect(screen.getByText('Tasks')).toBeInTheDocument();
   });
 
   it('renders additional control buttons', () => {
     render(
-      <EnhancedTaskInput
-        onAddTask={mockOnAddTask}
-        enableSmartParsing={true}
-      />
+      <EnhancedTaskInput onAddTask={mockOnAddTask} enableSmartParsing={true} />
     );
-    
+
     // Should have file attachment, voice input, and more options buttons
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(2); // At least task group, submit, and additional controls
   });
 
   it('handles disabled state correctly', () => {
-    render(
-      <EnhancedTaskInput
-        onAddTask={mockOnAddTask}
-        disabled={true}
-      />
-    );
-    
+    render(<EnhancedTaskInput onAddTask={mockOnAddTask} disabled={true} />);
+
     const textarea = screen.getByRole('textbox');
     expect(textarea).toBeDisabled();
-    
+
     const submitButton = screen.getByRole('button', { name: /add task/i });
     expect(submitButton).toBeDisabled();
   });

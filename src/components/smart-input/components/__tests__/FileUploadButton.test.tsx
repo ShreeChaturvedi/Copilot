@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FileUploadButton } from '../FileUploadButton';
 import type { UploadedFile } from '../FileUploadZone';
@@ -40,6 +40,9 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogTitle: ({ children }: MockDialogChildProps) => (
     <h2 data-testid="dialog-title">{children}</h2>
   ),
+  DialogDescription: ({ children }: MockDialogChildProps) => (
+    <p data-testid="dialog-description">{children}</p>
+  ),
   DialogTrigger: ({ children }: MockDialogChildProps) => (
     <div data-testid="dialog-trigger">{children}</div>
   ),
@@ -68,14 +71,16 @@ vi.mock('../FileUploadZone', () => ({
       <div>Files: {files.length}</div>
       <button
         onClick={() =>
-          onFilesAdded([{
-            id: '1',
-            file: new File(['test'], 'test.txt', { type: 'text/plain' }),
-            name: 'test.txt',
-            size: 100,
-            type: 'text/plain',
-            status: 'completed' as const
-          }])
+          onFilesAdded([
+            {
+              id: '1',
+              file: new File(['test'], 'test.txt', { type: 'text/plain' }),
+              name: 'test.txt',
+              size: 100,
+              type: 'text/plain',
+              status: 'completed' as const,
+            },
+          ])
         }
         disabled={disabled}
       >
@@ -146,7 +151,9 @@ describe('FileUploadButton', () => {
       />
     );
 
-    const button = screen.getByRole('button');
+    const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+      'button'
+    );
     expect(button).toBeDisabled();
   });
 
@@ -160,7 +167,9 @@ describe('FileUploadButton', () => {
       />
     );
 
-    const button = screen.getByRole('button');
+    const button = within(screen.getByTestId('tooltip-trigger')).getByRole(
+      'button'
+    );
     expect(button).toHaveClass('custom-class');
   });
 

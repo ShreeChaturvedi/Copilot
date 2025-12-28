@@ -1,5 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from "@shared/types";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
+import { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
 
 export interface HighlightedTextareaFieldProps {
@@ -39,7 +45,9 @@ export interface HighlightedTextareaFieldProps {
   name?: string;
 }
 
-export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> = ({
+export const HighlightedTextareaField: React.FC<
+  HighlightedTextareaFieldProps
+> = ({
   value,
   isRecording = false,
   onChange,
@@ -93,13 +101,21 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
     if (textarea) {
       const scrollEvents = ['scroll', 'input', 'focus', 'keydown', 'keyup'];
       const resizeEvents = ['input', 'focus', 'blur'];
-      scrollEvents.forEach(event => textarea.addEventListener(event, syncScroll));
-      resizeEvents.forEach(event => textarea.addEventListener(event, autoResize));
+      scrollEvents.forEach((event) =>
+        textarea.addEventListener(event, syncScroll)
+      );
+      resizeEvents.forEach((event) =>
+        textarea.addEventListener(event, autoResize)
+      );
       syncScroll();
       autoResize();
       return () => {
-        scrollEvents.forEach(event => textarea.removeEventListener(event, syncScroll));
-        resizeEvents.forEach(event => textarea.removeEventListener(event, autoResize));
+        scrollEvents.forEach((event) =>
+          textarea.removeEventListener(event, syncScroll)
+        );
+        resizeEvents.forEach((event) =>
+          textarea.removeEventListener(event, autoResize)
+        );
       };
     }
   }, [syncScroll, autoResize]);
@@ -119,11 +135,14 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
 
     for (const tag of sortedTags) {
       if (tag.startIndex > lastIndex) {
-        html += escapeHtml(value.substring(lastIndex, tag.startIndex)).replace(/\n/g, '<br>');
+        html += escapeHtml(value.substring(lastIndex, tag.startIndex)).replace(
+          /\n/g,
+          '<br>'
+        );
       }
       const tagText = value.substring(tag.startIndex, tag.endIndex);
       const color = tag.color || '#3b82f6';
-      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; color: inherit;">${escapeHtml(tagText)}</mark>`;
+      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</mark>`;
       lastIndex = tag.endIndex;
     }
 
@@ -135,33 +154,42 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
   }, [value, tags]);
 
   // Handle textarea changes
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value);
-    // Trigger scroll sync and resize after state update
-    requestAnimationFrame(() => {
-      syncScroll();
-      autoResize();
-    });
-  }, [onChange, syncScroll, autoResize]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChange(e.target.value);
+      // Trigger scroll sync and resize after state update
+      requestAnimationFrame(() => {
+        syncScroll();
+        autoResize();
+      });
+    },
+    [onChange, syncScroll, autoResize]
+  );
 
   // Handle key press events
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    onKeyPress?.(e);
-    // Sync after key events
-    requestAnimationFrame(() => {
-      syncScroll();
-      autoResize();
-    });
-  }, [onKeyPress, syncScroll, autoResize]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      onKeyPress?.(e);
+      // Sync after key events
+      requestAnimationFrame(() => {
+        syncScroll();
+        autoResize();
+      });
+    },
+    [onKeyPress, syncScroll, autoResize]
+  );
 
   // Handle key down events (for reliable Enter/Shift+Enter detection)
-  const handleKeyDownInternal = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    onKeyDown?.(e);
-    requestAnimationFrame(() => {
-      syncScroll();
-      autoResize();
-    });
-  }, [onKeyDown, syncScroll, autoResize]);
+  const handleKeyDownInternal = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      onKeyDown?.(e);
+      requestAnimationFrame(() => {
+        syncScroll();
+        autoResize();
+      });
+    },
+    [onKeyDown, syncScroll, autoResize]
+  );
 
   // Handle focus events
   const handleFocus = useCallback(() => {
@@ -225,7 +253,11 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
         )}
         style={{
           // Blue cursor when recording, otherwise normal
-          caretColor: isRecording ? '#3b82f6' : (isFocused ? 'var(--foreground)' : 'transparent'),
+          caretColor: isRecording
+            ? '#3b82f6'
+            : isFocused
+              ? 'var(--foreground)'
+              : 'transparent',
           // Perfect font matching for overlay alignment
           fontFamily: 'inherit',
           fontSize: 'inherit',
@@ -258,7 +290,7 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
           // Typography - match textarea
           'text-base md:text-sm',
           // Remove padding - container handles spacing
-          'p-0',
+          'p-0'
         )}
         style={{
           // Critical: Match textarea font properties exactly
@@ -283,11 +315,14 @@ export const HighlightedTextareaField: React.FC<HighlightedTextareaFieldProps> =
       {/* Confidence indicator */}
       {showConfidence && confidence < 1 && tags.length > 0 && (
         <div className="absolute -bottom-1 right-1 flex items-center gap-1 z-20">
-          <div 
+          <div
             className={cn(
               'w-2 h-2 rounded-full',
-              confidence >= 0.8 ? 'bg-green-400' : 
-              confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
+              confidence >= 0.8
+                ? 'bg-green-400'
+                : confidence >= 0.6
+                  ? 'bg-yellow-400'
+                  : 'bg-red-400'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />

@@ -1,6 +1,6 @@
 /**
  * File Types Configuration Tests
- * 
+ *
  * Tests the shared file type configuration system to ensure
  * proper file type detection, validation, and utility functions.
  */
@@ -54,7 +54,7 @@ describe('File Types Configuration', () => {
     it('should generate ALL_ACCEPTED_FILES correctly', () => {
       expect(typeof ALL_ACCEPTED_FILES).toBe('object');
       expect(Object.keys(ALL_ACCEPTED_FILES).length).toBeGreaterThan(0);
-      
+
       // Should contain key MIME types
       expect(ALL_ACCEPTED_FILES).toHaveProperty('image/jpeg');
       expect(ALL_ACCEPTED_FILES).toHaveProperty('application/pdf');
@@ -67,7 +67,9 @@ describe('File Types Configuration', () => {
       expect(ALL_SUPPORTED_MIME_TYPES.length).toBeGreaterThan(0);
       expect(ALL_SUPPORTED_MIME_TYPES).toContain('image/jpeg');
       expect(ALL_SUPPORTED_MIME_TYPES).toContain('application/pdf');
-      expect(ALL_SUPPORTED_MIME_TYPES).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(ALL_SUPPORTED_MIME_TYPES).toContain(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      );
     });
 
     it('should generate supported extensions array', () => {
@@ -93,9 +95,21 @@ describe('File Types Configuration', () => {
       it('should detect document types correctly', () => {
         expect(getFileTypeCategory('application/pdf')).toBe('documents');
         expect(getFileTypeCategory('application/msword')).toBe('documents');
-        expect(getFileTypeCategory('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('documents');
-        expect(getFileTypeCategory('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe('documents');
-        expect(getFileTypeCategory('application/vnd.openxmlformats-officedocument.presentationml.presentation')).toBe('documents');
+        expect(
+          getFileTypeCategory(
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          )
+        ).toBe('documents');
+        expect(
+          getFileTypeCategory(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          )
+        ).toBe('documents');
+        expect(
+          getFileTypeCategory(
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          )
+        ).toBe('documents');
         expect(getFileTypeCategory('text/plain')).toBe('documents');
         expect(getFileTypeCategory('text/csv')).toBe('documents');
       });
@@ -114,8 +128,12 @@ describe('File Types Configuration', () => {
 
       it('should detect archive types correctly', () => {
         expect(getFileTypeCategory('application/zip')).toBe('archives');
-        expect(getFileTypeCategory('application/x-rar-compressed')).toBe('archives');
-        expect(getFileTypeCategory('application/x-7z-compressed')).toBe('archives');
+        expect(getFileTypeCategory('application/x-rar-compressed')).toBe(
+          'archives'
+        );
+        expect(getFileTypeCategory('application/x-7z-compressed')).toBe(
+          'archives'
+        );
       });
 
       it('should return null for unsupported types', () => {
@@ -127,9 +145,15 @@ describe('File Types Configuration', () => {
     describe('getFileTypeCategoryByExtension', () => {
       it('should detect categories by extension', () => {
         expect(getFileTypeCategoryByExtension('photo.jpg')).toBe('images');
-        expect(getFileTypeCategoryByExtension('document.pdf')).toBe('documents');
-        expect(getFileTypeCategoryByExtension('spreadsheet.xlsx')).toBe('documents');
-        expect(getFileTypeCategoryByExtension('presentation.pptx')).toBe('documents');
+        expect(getFileTypeCategoryByExtension('document.pdf')).toBe(
+          'documents'
+        );
+        expect(getFileTypeCategoryByExtension('spreadsheet.xlsx')).toBe(
+          'documents'
+        );
+        expect(getFileTypeCategoryByExtension('presentation.pptx')).toBe(
+          'documents'
+        );
         expect(getFileTypeCategoryByExtension('song.mp3')).toBe('audio');
         expect(getFileTypeCategoryByExtension('video.mp4')).toBe('video');
         expect(getFileTypeCategoryByExtension('archive.zip')).toBe('archives');
@@ -137,8 +161,12 @@ describe('File Types Configuration', () => {
 
       it('should be case insensitive', () => {
         expect(getFileTypeCategoryByExtension('photo.JPG')).toBe('images');
-        expect(getFileTypeCategoryByExtension('document.PDF')).toBe('documents');
-        expect(getFileTypeCategoryByExtension('spreadsheet.XLSX')).toBe('documents');
+        expect(getFileTypeCategoryByExtension('document.PDF')).toBe(
+          'documents'
+        );
+        expect(getFileTypeCategoryByExtension('spreadsheet.XLSX')).toBe(
+          'documents'
+        );
       });
 
       it('should handle files without extensions', () => {
@@ -153,7 +181,11 @@ describe('File Types Configuration', () => {
       it('should return true for supported MIME types', () => {
         expect(isSupportedFileType('image/jpeg')).toBe(true);
         expect(isSupportedFileType('application/pdf')).toBe(true);
-        expect(isSupportedFileType('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe(true);
+        expect(
+          isSupportedFileType(
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          )
+        ).toBe(true);
         expect(isSupportedFileType('audio/mpeg')).toBe(true);
         expect(isSupportedFileType('video/mp4')).toBe(true);
       });
@@ -233,14 +265,17 @@ describe('File Types Configuration', () => {
       });
 
       it('should return icon for other document types', () => {
-        const file = createMockFile('document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        expect(getPreviewType(file)).toBe('pdf'); // Documents category uses 'pdf' preview type
+        const file = createMockFile(
+          'document.docx',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        );
+        expect(getPreviewType(file)).toBe('icon');
       });
 
       it('should return icon for audio/video files', () => {
         const audioFile = createMockFile('song.mp3', 'audio/mpeg');
         const videoFile = createMockFile('movie.mp4', 'video/mp4');
-        
+
         expect(getPreviewType(audioFile)).toBe('icon');
         expect(getPreviewType(videoFile)).toBe('icon');
       });
@@ -249,7 +284,11 @@ describe('File Types Configuration', () => {
 
   describe('File Validation', () => {
     describe('validateFile', () => {
-      const createMockFile = (name: string, type: string, size: number): File => {
+      const createMockFile = (
+        name: string,
+        type: string,
+        size: number
+      ): File => {
         const file = new File(['test'], name, { type });
         Object.defineProperty(file, 'size', { value: size });
         return file;
@@ -258,7 +297,7 @@ describe('File Types Configuration', () => {
       it('should validate supported files correctly', () => {
         const file = createMockFile('photo.jpg', 'image/jpeg', 1024);
         const result = validateFile(file);
-        
+
         expect(result.isValid).toBe(true);
         expect(result.category).toBe('images');
         expect(result.error).toBeUndefined();
@@ -267,7 +306,7 @@ describe('File Types Configuration', () => {
       it('should reject unsupported file types', () => {
         const file = createMockFile('unknown.xyz', 'application/unknown', 1024);
         const result = validateFile(file);
-        
+
         expect(result.isValid).toBe(false);
         expect(result.error).toContain('not supported');
       });
@@ -275,23 +314,31 @@ describe('File Types Configuration', () => {
       it('should reject files that exceed size limits', () => {
         const file = createMockFile('huge.jpg', 'image/jpeg', 10 * 1024 * 1024); // 10MB (exceeds 5MB limit)
         const result = validateFile(file);
-        
+
         expect(result.isValid).toBe(false);
         expect(result.error).toContain('exceeds maximum limit');
       });
 
       it('should validate Excel files correctly', () => {
-        const file = createMockFile('spreadsheet.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 1024);
+        const file = createMockFile(
+          'spreadsheet.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          1024
+        );
         const result = validateFile(file);
-        
+
         expect(result.isValid).toBe(true);
         expect(result.category).toBe('documents');
       });
 
       it('should validate PowerPoint files correctly', () => {
-        const file = createMockFile('presentation.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 1024);
+        const file = createMockFile(
+          'presentation.pptx',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          1024
+        );
         const result = validateFile(file);
-        
+
         expect(result.isValid).toBe(true);
         expect(result.category).toBe('documents');
       });
@@ -300,7 +347,11 @@ describe('File Types Configuration', () => {
 
   describe('File Display Info', () => {
     describe('getFileDisplayInfo', () => {
-      const createMockFile = (name: string, type: string, size: number): File => {
+      const createMockFile = (
+        name: string,
+        type: string,
+        size: number
+      ): File => {
         const file = new File(['test'], name, { type });
         Object.defineProperty(file, 'size', { value: size });
         return file;
@@ -309,7 +360,7 @@ describe('File Types Configuration', () => {
       it('should provide comprehensive display info', () => {
         const file = createMockFile('photo.jpg', 'image/jpeg', 2048);
         const info = getFileDisplayInfo(file);
-        
+
         expect(info).toHaveProperty('category', 'images');
         expect(info).toHaveProperty('config');
         expect(info).toHaveProperty('icon', 'jpg');
@@ -322,7 +373,7 @@ describe('File Types Configuration', () => {
       it('should handle unknown file types gracefully', () => {
         const file = createMockFile('unknown.xyz', 'application/unknown', 1024);
         const info = getFileDisplayInfo(file);
-        
+
         expect(info.category).toBeNull();
         expect(info.config).toBeNull();
         expect(info.icon).toBe('default');

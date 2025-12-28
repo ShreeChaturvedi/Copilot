@@ -10,7 +10,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HighlightedTextareaField } from '../HighlightedTextareaField';
-import { ParsedTag } from "@shared/types";
+import { ParsedTag } from '@shared/types';
 
 // Mock requestAnimationFrame for testing
 const mockRequestAnimationFrame = vi.fn((callback) => {
@@ -19,6 +19,31 @@ const mockRequestAnimationFrame = vi.fn((callback) => {
 });
 
 describe('HighlightedTextareaField - Comprehensive Tests', () => {
+  const originalRequestAnimationFrame = global.requestAnimationFrame;
+  const originalScrollHeight = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'scrollHeight'
+  );
+  const originalScrollTop = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'scrollTop'
+  );
+  const originalScrollLeft = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'scrollLeft'
+  );
+  const deletePrototypeProperty = (
+    key: 'scrollHeight' | 'scrollTop' | 'scrollLeft'
+  ) => {
+    const prototype = HTMLTextAreaElement.prototype as {
+      scrollHeight?: number;
+      scrollTop?: number;
+      scrollLeft?: number;
+    };
+
+    delete prototype[key];
+  };
+
   beforeEach(() => {
     // Mock requestAnimationFrame
     global.requestAnimationFrame = mockRequestAnimationFrame;
@@ -54,6 +79,36 @@ describe('HighlightedTextareaField - Comprehensive Tests', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    if (originalRequestAnimationFrame) {
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+    }
+    if (originalScrollHeight) {
+      Object.defineProperty(
+        HTMLTextAreaElement.prototype,
+        'scrollHeight',
+        originalScrollHeight
+      );
+    } else {
+      deletePrototypeProperty('scrollHeight');
+    }
+    if (originalScrollTop) {
+      Object.defineProperty(
+        HTMLTextAreaElement.prototype,
+        'scrollTop',
+        originalScrollTop
+      );
+    } else {
+      deletePrototypeProperty('scrollTop');
+    }
+    if (originalScrollLeft) {
+      Object.defineProperty(
+        HTMLTextAreaElement.prototype,
+        'scrollLeft',
+        originalScrollLeft
+      );
+    } else {
+      deletePrototypeProperty('scrollLeft');
+    }
   });
 
   const createMockTags = (text: string): ParsedTag[] => [

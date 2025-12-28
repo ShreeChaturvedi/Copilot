@@ -1,6 +1,6 @@
 /**
  * FileUploadButton - Button trigger for file upload functionality
- * 
+ *
  * This component provides a button interface for the FileUploadZone component,
  * allowing users to trigger file uploads from the enhanced task input controls.
  * It integrates with the existing FileUploadZone for consistent file handling.
@@ -9,8 +9,19 @@
 import React, { useState, useCallback } from 'react';
 import { Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { FileUploadZone, UploadedFile } from './FileUploadZone';
 import { cn } from '@/lib/utils';
 
@@ -41,22 +52,31 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   maxFiles = 5,
   disabled = false,
   size = 'sm',
-  className
+  className,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Handle files added from the upload zone
-  const handleFilesAdded = useCallback((newFiles: File[]) => {
-    onFilesAdded(newFiles);
-  }, [onFilesAdded]);
+  const handleFilesAdded = useCallback(
+    (newFiles: File[]) => {
+      onFilesAdded(newFiles);
+    },
+    [onFilesAdded]
+  );
 
   // Handle file removal
-  const handleFileRemove = useCallback((fileId: string) => {
-    onFileRemove(fileId);
-  }, [onFileRemove]);
+  const handleFileRemove = useCallback(
+    (fileId: string) => {
+      onFileRemove(fileId);
+    },
+    [onFileRemove]
+  );
 
   // Check if we have files
   const hasFiles = files.length > 0;
+  const tooltipLabel = hasFiles
+    ? `${files.length} file${files.length === 1 ? '' : 's'} attached`
+    : 'Attach files';
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -67,6 +87,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
               type="button"
               variant="ghost"
               size={size}
+              aria-label={tooltipLabel}
               className={cn(
                 'relative text-muted-foreground hover:text-foreground',
                 size === 'sm' && 'h-8 w-8 p-0',
@@ -75,10 +96,10 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
               )}
               disabled={disabled}
             >
-              <Paperclip className={cn(
-                size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
-              )} />
-              
+              <Paperclip
+                className={cn(size === 'sm' ? 'w-4 h-4' : 'w-5 h-5')}
+              />
+
               {/* File count indicator */}
               {hasFiles && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
@@ -89,22 +110,16 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
           </DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          <p>
-            {hasFiles 
-              ? `${files.length} file${files.length === 1 ? '' : 's'} attached`
-              : 'Attach files'
-            }
-          </p>
+          <p>{tooltipLabel}</p>
         </TooltipContent>
       </Tooltip>
 
       <DialogContent className="max-w-lg lg:max-w-xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            Attach Files
-          </DialogTitle>
+          <DialogTitle>Attach Files</DialogTitle>
           <DialogDescription>
-            Upload files to attach to your task. Supports images, documents (PDF, Word, Excel, PowerPoint), audio, and video files.
+            Upload files to attach to your task. Supports images, documents
+            (PDF, Word, Excel, PowerPoint), audio, and video files.
           </DialogDescription>
         </DialogHeader>
 

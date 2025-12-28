@@ -62,6 +62,7 @@ export function useTextParser(
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   // Memoize parser instance
   const parserRef = useRef<SmartParserType | null>(null);
@@ -77,6 +78,14 @@ export function useTextParser(
 
   // Debounced parsing function - using useRef to maintain timeout across renders
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const debouncedParse = useCallback(
     (textToParse: string) => {
@@ -85,6 +94,7 @@ export function useTextParser(
       }
 
       timeoutRef.current = setTimeout(async () => {
+        if (!isMountedRef.current) return;
         if (!enabled || textToParse.length < minLength) {
           setParseResult(null);
           setIsLoading(false);
@@ -98,13 +108,19 @@ export function useTextParser(
         try {
           const parser = parserRef.current || (await getParser());
           const result = await parser.parse(textToParse);
-          setParseResult(result);
+          if (isMountedRef.current) {
+            setParseResult(result);
+          }
         } catch (err) {
           console.error('Text parsing error:', err);
-          setError(err instanceof Error ? err.message : 'Parsing failed');
-          setParseResult(null);
+          if (isMountedRef.current) {
+            setError(err instanceof Error ? err.message : 'Parsing failed');
+            setParseResult(null);
+          }
         } finally {
-          setIsLoading(false);
+          if (isMountedRef.current) {
+            setIsLoading(false);
+          }
         }
       }, debounceMs);
     },
@@ -122,13 +138,21 @@ export function useTextParser(
       setIsLoading(true);
       (parserRef.current ? Promise.resolve(parserRef.current) : getParser())
         .then((p) => p.parse(text))
-        .then(setParseResult)
+        .then((result) => {
+          if (isMountedRef.current) {
+            setParseResult(result);
+          }
+        })
         .catch((err) => {
-          setError(err instanceof Error ? err.message : 'Parsing failed');
-          setParseResult(null);
+          if (isMountedRef.current) {
+            setError(err instanceof Error ? err.message : 'Parsing failed');
+            setParseResult(null);
+          }
         })
         .finally(() => {
-          setIsLoading(false);
+          if (isMountedRef.current) {
+            setIsLoading(false);
+          }
         });
     }
   }, [text, enabled, minLength]);
@@ -163,8 +187,12 @@ export function useTextParser(
  * Hook for testing parsing without side effects
  */
 export function useTextParserDebug(text: string) {
-  const [debugResult, setDebugResult] = useState<{ parserResults: Array<{ parser: string; tags: ParsedTag[] }> } | null>(null);
-  const [parserInstance, setParserInstance] = useState<SmartParserType | null>(null);
+  const [debugResult, setDebugResult] = useState<{
+    parserResults: Array<{ parser: string; tags: ParsedTag[] }>;
+  } | null>(null);
+  const [parserInstance, setParserInstance] = useState<SmartParserType | null>(
+    null
+  );
   useEffect(() => {
     let mounted = true;
     getParser().then((p) => {

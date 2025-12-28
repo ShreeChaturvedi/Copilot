@@ -1,6 +1,6 @@
 /**
  * Voice Input Demo Test
- * 
+ *
  * This test creates a demo component to manually test voice input functionality
  */
 
@@ -30,8 +30,18 @@ const mockSpeechRecognition = {
 const mockGetUserMedia = vi.fn();
 
 // Set up mocks
-(global.window as unknown as Window & { SpeechRecognition: new () => unknown }).SpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
-(global.window as unknown as Window & { webkitSpeechRecognition: new () => unknown }).webkitSpeechRecognition = vi.fn(() => mockSpeechRecognition) as unknown as new () => SpeechRecognition;
+(
+  global.window as unknown as Window & { SpeechRecognition: new () => unknown }
+).SpeechRecognition = vi.fn(
+  () => mockSpeechRecognition
+) as unknown as new () => SpeechRecognition;
+(
+  global.window as unknown as Window & {
+    webkitSpeechRecognition: new () => unknown;
+  }
+).webkitSpeechRecognition = vi.fn(
+  () => mockSpeechRecognition
+) as unknown as new () => SpeechRecognition;
 
 Object.defineProperty(global.navigator, 'mediaDevices', {
   value: {
@@ -47,11 +57,14 @@ mockGetUserMedia.mockResolvedValue({
 describe('Voice Input Demo', () => {
   it('renders SmartTaskInput with voice input in enhanced layout', () => {
     const mockOnAddTask = vi.fn();
-    
+
     render(
       <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
         <h2>Voice Input Demo</h2>
-        <p>This demo shows the SmartTaskInput with voice input functionality enabled.</p>
+        <p>
+          This demo shows the SmartTaskInput with voice input functionality
+          enabled.
+        </p>
         <SmartTaskInput
           onAddTask={mockOnAddTask}
           useEnhancedLayout={true}
@@ -61,7 +74,10 @@ describe('Voice Input Demo', () => {
         <div style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>
           <h3>Features:</h3>
           <ul>
-            <li>✅ Voice input button (microphone icon) positioned next to submit button</li>
+            <li>
+              ✅ Voice input button (microphone icon) positioned next to submit
+              button
+            </li>
             <li>✅ Browser compatibility detection</li>
             <li>✅ Continuous recognition with interim results</li>
             <li>✅ Integration with existing text parsing and tag detection</li>
@@ -75,13 +91,15 @@ describe('Voice Input Demo', () => {
 
     // Verify the demo renders
     expect(screen.getByText('Voice Input Demo')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Enter a new task/)).toBeInTheDocument();
-    
+    expect(screen.getByPlaceholderText(/Add Task/i)).toBeInTheDocument();
+
     // Verify voice input button is present
     const buttons = screen.getAllByRole('button');
-    const voiceButton = buttons.find(button => button.querySelector('svg[class*="lucide-mic"]'));
+    const voiceButton = buttons.find((button) =>
+      button.querySelector('svg[class*="lucide-mic"]')
+    );
     expect(voiceButton).toBeTruthy();
-    
+
     // Verify enhanced layout features
     expect(screen.getByText('Features:')).toBeInTheDocument();
   });
