@@ -32,6 +32,7 @@
     "test:backend:coverage": "vitest run --config vitest.backend.config.ts --coverage",
     "test:frontend": "vitest --config vitest.config.ts",
     "test:frontend:run": "vitest run --config vitest.config.ts",
+    "test:all": "npm run test:run --workspaces --if-present && npm run test:frontend:run",
     "preview": "vite preview",
     "prepare": "husky",
     "docker:up": "docker-compose up -d",
@@ -115,6 +116,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@tailwindcss/postcss": "^4.1.11",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
