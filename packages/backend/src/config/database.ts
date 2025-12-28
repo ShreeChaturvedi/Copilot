@@ -2,21 +2,23 @@ import { Pool, type PoolClient, type QueryResult } from 'pg';
 
 // Pure SQL (pg) client for the backend workspace
 export const databaseConfig = {
-  url: process.env.DATABASE_URL || 'postgresql://localhost:5432/react_calendar_dev',
+  url:
+    process.env.DATABASE_URL ||
+    'postgresql://localhost:5432/react_calendar_dev',
   max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10'),
   idleTimeoutMillis: parseInt(process.env.DATABASE_TIMEOUT || '10000'),
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __backendPgPool: Pool | undefined;
 }
 
-const createPool = () => new Pool({
-  connectionString: databaseConfig.url,
-  max: databaseConfig.max,
-  idleTimeoutMillis: databaseConfig.idleTimeoutMillis,
-});
+const createPool = () =>
+  new Pool({
+    connectionString: databaseConfig.url,
+    max: databaseConfig.max,
+    idleTimeoutMillis: databaseConfig.idleTimeoutMillis,
+  });
 
 export const pool: Pool = globalThis.__backendPgPool || createPool();
 if (process.env.NODE_ENV !== 'production') {
@@ -47,7 +49,9 @@ export async function checkDatabaseHealth(): Promise<boolean> {
   }
 }
 
-export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>
+): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -55,14 +59,24 @@ export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>)
     await client.query('COMMIT');
     return res;
   } catch (e) {
-    try { await client.query('ROLLBACK'); } catch { }
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // Ignore rollback failures
+    }
     throw e;
   } finally {
     client.release();
   }
 }
 
-export async function query<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, params: unknown[] = [], client?: SqlClient): Promise<QueryResult<T>> {
+export async function query<
+  T extends Record<string, unknown> = Record<string, unknown>,
+>(
+  sql: string,
+  params: unknown[] = [],
+  client?: SqlClient
+): Promise<QueryResult<T>> {
   if (client && 'query' in client) {
     return (client as PoolClient).query<T>(sql, params);
   }
