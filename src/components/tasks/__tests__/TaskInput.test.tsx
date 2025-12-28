@@ -2,327 +2,108 @@
  * Tests for TaskInput component
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TaskInput } from '../TaskInput';
-import { taskStorage } from '../../../utils/storage';
+import { TaskInput, type TaskGroup } from '../TaskInput';
 
-// Mock the storage utility
-vi.mock('../../../utils/storage', () => ({
-  taskStorage: {
-    getTasks: vi.fn(),
-    addTask: vi.fn(),
-    updateTask: vi.fn(),
-    deleteTask: vi.fn(),
+const taskGroups: TaskGroup[] = [
+  {
+    id: 'work',
+    name: 'Work',
+    emoji: '💼',
+    color: '#3b82f6',
   },
-}));
+  {
+    id: 'personal',
+    name: 'Personal',
+    emoji: '🏠',
+    color: '#10b981',
+  },
+];
 
-// Mock uuid
-vi.mock('uuid', () => ({
-  v4: () => 'test-uuid-123',
-}));
-
-const mockTaskStorage = taskStorage as typeof taskStorage & {
-  addTask: ReturnType<typeof vi.fn>;
-  getTasks: ReturnType<typeof vi.fn>;
-  saveTasks: ReturnType<typeof vi.fn>;
-  updateTask: ReturnType<typeof vi.fn>;
-  deleteTask: ReturnType<typeof vi.fn>;
-};
-
-// Test wrapper with QueryClient
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-};
-
-const renderTaskInput = (props = {}) => {
-  const Wrapper = createWrapper();
+const renderTaskInput = (
+  props?: Partial<React.ComponentProps<typeof TaskInput>>
+) => {
   const defaultProps = {
     onAddTask: vi.fn(),
-    ...props
+    ...props,
   };
-  return render(
-    <Wrapper>
-      <TaskInput {...defaultProps} />
-    </Wrapper>
-  );
+
+  return render(<TaskInput {...defaultProps} />);
 };
 
 describe('TaskInput Component', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockTaskStorage.addTask.mockResolvedValue(true);
-  });
-
-  it('should render with default placeholder', () => {
+  it('renders input with placeholder and label', () => {
     renderTaskInput();
 
-    const input = screen.getByPlaceholderText('Enter a new task...');
-    expect(input).toBeInTheDocument();
+    const input = screen.getByRole('textbox', { name: 'New task input' });
+    expect(input).toHaveAttribute('placeholder', 'Add Task');
   });
 
-  it('should render with custom placeholder', () => {
-    renderTaskInput({ placeholder: 'Custom placeholder' });
-
-    const input = screen.getByPlaceholderText('Custom placeholder');
-    expect(input).toBeInTheDocument();
-  });
-
-  it('should focus input when autoFocus is true', () => {
-    renderTaskInput({ autoFocus: true });
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-    expect(input).toHaveFocus();
-  });
-
-  it('should create a task when form is submitted', async () => {
+  it('submits task with active group', async () => {
     const user = userEvent.setup();
-    const onTaskCreated = vi.fn();
+    const onAddTask = vi.fn();
 
-    renderTaskInput({ onTaskCreated });
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type a task title
-    await user.type(input, 'New test task');
-
-    // Submit the form
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(mockTaskStorage.addTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'test-uuid-123',
-          title: 'New test task',
-          completed: false,
-        })
-      );
+    renderTaskInput({
+      onAddTask,
+      taskGroups,
+      activeTaskGroupId: 'work',
     });
 
-    // Input should be cleared after successful creation
+    const input = screen.getByRole('textbox', { name: 'New task input' });
+    await user.type(input, 'test task{enter}');
+
+    expect(onAddTask).toHaveBeenCalledWith('Test task', 'work');
     expect(input).toHaveValue('');
-
-    // Callback should be called
-    await waitFor(() => {
-      expect(onTaskCreated).toHaveBeenCalledWith('test-uuid-123');
-    });
   });
 
-  it('should show validation error for empty task', async () => {
+  it('uses default group when no groups are provided', async () => {
     const user = userEvent.setup();
+    const onAddTask = vi.fn();
 
-    renderTaskInput();
+    renderTaskInput({ onAddTask });
 
-    const input = screen.getByPlaceholderText('Enter a new task...');
+    const input = screen.getByRole('textbox', { name: 'New task input' });
+    await user.type(input, 'hello{enter}');
 
-    // Try to submit empty form
-    await user.click(input);
-    await user.keyboard('{Enter}');
-
-    // Should show validation error
-    await waitFor(() => {
-      expect(screen.getByText(/required/i)).toBeInTheDocument();
-    });
-
-    // Should not call storage
-    expect(mockTaskStorage.addTask).not.toHaveBeenCalled();
+    expect(onAddTask).toHaveBeenCalledWith('Hello', 'default');
   });
 
-  it('should show validation error for whitespace-only task', async () => {
-    const user = userEvent.setup();
+  it('disables input and submit when disabled', () => {
+    renderTaskInput({ disabled: true });
 
-    renderTaskInput();
+    const input = screen.getByRole('textbox', { name: 'New task input' });
+    const submitButton = screen.getByRole('button', { name: 'Add task' });
 
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type only whitespace
-    await user.type(input, '   ');
-    await user.keyboard('{Enter}');
-
-    // Should show validation error
-    await waitFor(() => {
-      expect(screen.getByText(/required/i)).toBeInTheDocument();
-    });
-
-    expect(mockTaskStorage.addTask).not.toHaveBeenCalled();
-  });
-
-  it('should clear input and error when Escape is pressed', async () => {
-    const user = userEvent.setup();
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type some text
-    await user.type(input, 'Some text');
-
-    // Trigger validation error
-    await user.clear(input);
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(screen.getByText(/required/i)).toBeInTheDocument();
-    });
-
-    // Type again and press Escape
-    await user.type(input, 'New text');
-    await user.keyboard('{Escape}');
-
-    // Input should be cleared and error should be gone
-    expect(input).toHaveValue('');
-    expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
-  });
-
-  it('should clear error when user starts typing', async () => {
-    const user = userEvent.setup();
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Trigger validation error
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(screen.getByText(/required/i)).toBeInTheDocument();
-    });
-
-    // Start typing
-    await user.type(input, 'N');
-
-    // Error should be cleared
-    expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
-  });
-
-  it('should show loading state during task creation', async () => {
-    const user = userEvent.setup();
-
-    // Make addTask return a pending promise
-    let resolveAddTask: (value: boolean) => void;
-    const addTaskPromise = new Promise<boolean>((resolve) => {
-      resolveAddTask = resolve;
-    });
-    mockTaskStorage.addTask.mockReturnValue(addTaskPromise);
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type and submit
-    await user.type(input, 'Test task');
-    await user.keyboard('{Enter}');
-
-    // Should show loading indicator
-    await waitFor(() => {
-      const spinner = screen.getByRole('generic', { hidden: true });
-      expect(spinner).toHaveClass('animate-spin');
-    });
-
-    // Input should be disabled
     expect(input).toBeDisabled();
-
-    // Resolve the promise
-    resolveAddTask!(true);
-
-    // Loading should disappear
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('generic', { hidden: true })
-      ).not.toBeInTheDocument();
-    });
+    expect(submitButton).toBeDisabled();
   });
 
-  it('should handle task creation failure', async () => {
+  it('invokes task group selection callbacks', async () => {
     const user = userEvent.setup();
+    const onSelectTaskGroup = vi.fn();
+    const onCreateTaskGroup = vi.fn();
 
-    // Make addTask fail
-    mockTaskStorage.addTask.mockRejectedValue(new Error('Storage failed'));
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type and submit
-    await user.type(input, 'Test task');
-    await user.keyboard('{Enter}');
-
-    // Should show error message
-    await waitFor(() => {
-      expect(screen.getByText(/Storage failed/i)).toBeInTheDocument();
+    renderTaskInput({
+      taskGroups,
+      activeTaskGroupId: 'work',
+      onSelectTaskGroup,
+      onCreateTaskGroup,
     });
 
-    // Input should not be cleared on failure
-    expect(input).toHaveValue('Test task');
-  });
+    const trigger = screen.getByRole('button', { name: /current task group/i });
+    await user.click(trigger);
 
-  it('should validate on blur', async () => {
-    const user = userEvent.setup();
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Type invalid content and blur
-    await user.type(input, '   ');
-    await user.tab(); // This will blur the input
-
-    // Should show validation error
+    await user.click(await screen.findByText('Personal'));
     await waitFor(() => {
-      expect(screen.getByText(/required/i)).toBeInTheDocument();
+      expect(onSelectTaskGroup).toHaveBeenCalledWith('personal');
     });
-  });
 
-  it('should not validate empty input on blur', async () => {
-    const user = userEvent.setup();
-
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    // Focus and blur without typing
-    await user.click(input);
-    await user.tab();
-
-    // Should not show validation error for empty input on blur
-    expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
-  });
-
-  it('should have proper accessibility attributes', () => {
-    renderTaskInput();
-
-    const input = screen.getByPlaceholderText('Enter a new task...');
-
-    expect(input).toHaveAttribute('aria-label', 'New task title');
-    expect(input).toHaveAttribute('type', 'text');
-
-    // Submit button should be present but hidden
-    const submitButton = screen.getByLabelText('Create task');
-    expect(submitButton).toHaveClass('sr-only');
-  });
-
-  it('should show keyboard shortcuts hint', () => {
-    renderTaskInput();
-
-    expect(screen.getByText(/Press/)).toBeInTheDocument();
-    expect(screen.getByText('Enter')).toBeInTheDocument();
-    expect(screen.getByText('Esc')).toBeInTheDocument();
-  });
-
-  it('should apply custom className', () => {
-    const { container } = renderTaskInput({ className: 'custom-class' });
-
-    expect(container.firstChild).toHaveClass('custom-class');
+    await user.click(trigger);
+    await user.click(await screen.findByText('New List'));
+    await waitFor(() => {
+      expect(onCreateTaskGroup).toHaveBeenCalled();
+    });
   });
 });
