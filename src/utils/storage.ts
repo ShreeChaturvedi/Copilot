@@ -55,6 +55,9 @@ export const DEFAULT_CALENDARS: Calendar[] = [
   },
 ];
 
+const cloneDefaultCalendars = (): Calendar[] =>
+  DEFAULT_CALENDARS.map((calendar) => ({ ...calendar }));
+
 /**
  * Check if localStorage is available
  */
@@ -241,12 +244,13 @@ export const calendarStorage = {
    */
   getCalendars: (): Calendar[] => {
     const stored = localStorage.getItem(STORAGE_KEYS.CALENDARS);
-    const calendars = safeJsonParse(stored, DEFAULT_CALENDARS);
+    const calendars = safeJsonParse(stored, cloneDefaultCalendars());
 
     // Ensure we always have at least the default calendars
     if (calendars.length === 0) {
-      calendarStorage.saveCalendars(DEFAULT_CALENDARS);
-      return DEFAULT_CALENDARS;
+      const defaults = cloneDefaultCalendars();
+      calendarStorage.saveCalendars(defaults);
+      return defaults;
     }
 
     return calendars;
@@ -412,13 +416,18 @@ export const exportData = (): StorageSchema => {
  */
 export const importData = (data: Partial<StorageSchema>): boolean => {
   try {
-    if (data.tasks) taskStorage.saveTasks(data.tasks);
-    if (data.events) eventStorage.saveEvents(data.events);
-    if (data.calendars) calendarStorage.saveCalendars(data.calendars);
-    if (data.settings) settingsStorage.saveSettings(data.settings);
-    if (data.googleAuth) googleAuthStorage.saveAuthState(data.googleAuth);
+    let success = true;
 
-    return true;
+    if (data.tasks) success = taskStorage.saveTasks(data.tasks) && success;
+    if (data.events) success = eventStorage.saveEvents(data.events) && success;
+    if (data.calendars)
+      success = calendarStorage.saveCalendars(data.calendars) && success;
+    if (data.settings)
+      success = settingsStorage.saveSettings(data.settings) && success;
+    if (data.googleAuth)
+      success = googleAuthStorage.saveAuthState(data.googleAuth) && success;
+
+    return success;
   } catch (error) {
     console.error('Failed to import data:', error);
     return false;
