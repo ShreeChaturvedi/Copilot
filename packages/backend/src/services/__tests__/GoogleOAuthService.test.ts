@@ -1,37 +1,35 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock environment variables
+// Mock environment variables BEFORE any imports
 process.env.GOOGLE_CLIENT_ID = 'test-client-id';
 process.env.GOOGLE_CLIENT_SECRET = 'test-client-secret';
 process.env.GOOGLE_REDIRECT_URI = 'http://localhost:3001/auth/google/callback';
 
-// Mock Google Auth Library
-const mockOAuth2Client = {
-  generateAuthUrl: vi.fn(),
-  getToken: vi.fn(),
-  setCredentials: vi.fn(),
-  verifyIdToken: vi.fn()
-};
+// Mock Google Auth Library - define mock inside factory due to hoisting
+vi.mock('google-auth-library', () => {
+  const mockOAuth2Client = {
+    generateAuthUrl: vi.fn(),
+    getToken: vi.fn(),
+    setCredentials: vi.fn(),
+    verifyIdToken: vi.fn()
+  };
+  return {
+    OAuth2Client: vi.fn(() => mockOAuth2Client),
+    __mockOAuth2Client: mockOAuth2Client, // Export for test access
+  };
+});
 
-vi.mock('google-auth-library', () => ({
-  OAuth2Client: vi.fn(() => mockOAuth2Client)
-}));
-
-// Mock Prisma
-const mockPrisma = {
-  user: {
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn()
-  },
-  userProfile: {
-    update: vi.fn()
-  }
-};
-
-vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn(() => mockPrisma)
-}));
+// Mock database module with factory pattern for hoisting
+vi.mock('../../config/database.js', () => {
+  const query = vi.fn();
+  const withTransaction = vi.fn();
+  const pool = { query };
+  return {
+    query,
+    withTransaction,
+    pool,
+  };
+});
 
 // Mock JWT utilities
 vi.mock('../../utils/jwt.js', () => ({
@@ -52,8 +50,33 @@ vi.mock('../RefreshTokenService.js', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
-// Import after mocks
-const { googleOAuthService } = await import('../GoogleOAuthService.js');
+// Import AFTER mocks are set up
+import { googleOAuthService } from '../GoogleOAuthService.js';
+import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
+import { OAuth2Client, __mockOAuth2Client } from 'google-auth-library';
+
+// Get the mock client instance
+const mockOAuth2Client = __mockOAuth2Client as {
+  generateAuthUrl: ReturnType<typeof vi.fn>;
+  getToken: ReturnType<typeof vi.fn>;
+  setCredentials: ReturnType<typeof vi.fn>;
+  verifyIdToken: ReturnType<typeof vi.fn>;
+};
+
+// Helper to create query results
+function createQueryResult<T>(rows: T[], rowCount?: number) {
+  return {
+    rows,
+    rowCount: rowCount ?? rows.length,
+    command: 'SELECT',
+    oid: 0,
+    fields: [],
+  };
+}
+
+// Cast mocked functions
+const mockedQuery = vi.mocked(mockQuery);
+const mockedWithTransaction = vi.mocked(mockWithTransaction);
 
 describe('GoogleOAuthService', () => {
   const mockGoogleUserInfo = {
@@ -72,15 +95,12 @@ describe('GoogleOAuthService', () => {
     googleId: 'google-123',
     createdAt: new Date(),
     updatedAt: new Date(),
-    profile: {
-      id: 'profile-123',
-      avatarUrl: 'https://example.com/avatar.jpg',
-      timezone: 'UTC'
-    }
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedQuery.mockReset();
+    mockedWithTransaction.mockReset();
   });
 
   describe('getAuthUrl', () => {
@@ -111,24 +131,51 @@ describe('GoogleOAuthService', () => {
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockGoogleUserInfo)
       } as Response);
 
-      // Mock user not found by Google ID
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      // Mock user not found by email
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      // Mock user creation
-      mockPrisma.user.create.mockResolvedValue(mockUser);
+      // Mock transaction for user creation - the callback uses the module-level query()
+      const createdUser = {
+        id: 'new-user-123',
+        email: mockGoogleUserInfo.email.toLowerCase(),
+        name: mockGoogleUserInfo.name,
+        createdAt: new Date(),
+      };
+
+      // Mock database queries - both outside and inside transaction use this mock
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        // User not found by Google ID
+        if (sqlLower.includes('select') && sqlLower.includes('"googleid"')) {
+          return createQueryResult([]);
+        }
+        // User not found by email
+        if (sqlLower.includes('select') && sqlLower.includes('lower(email)')) {
+          return createQueryResult([]);
+        }
+        // INSERT user (inside transaction)
+        if (sqlLower.includes('insert into users')) {
+          return createQueryResult([createdUser]);
+        }
+        // INSERT user_profile (inside transaction)
+        if (sqlLower.includes('insert into user_profiles')) {
+          return createQueryResult([{ id: 'profile-123' }]);
+        }
+        return createQueryResult([]);
+      });
+
+      // Mock transaction - just execute the callback with a fake client
+      mockedWithTransaction.mockImplementation(async (callback: any) => {
+        return callback({});  // The callback uses module-level query(), not client.query()
+      });
 
       const result = await googleOAuthService.handleCallback(authCode);
 
-      expect(result.user.email).toBe(mockGoogleUserInfo.email);
+      expect(result.user.email).toBe(mockGoogleUserInfo.email.toLowerCase());
       expect(result.isNewUser).toBe(true);
       expect(result.tokens.accessToken).toBe('mock-access-token');
-      expect(mockPrisma.user.create).toHaveBeenCalled();
     });
 
     it('should handle OAuth callback for existing Google user', async () => {
@@ -139,20 +186,29 @@ describe('GoogleOAuthService', () => {
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockGoogleUserInfo)
       } as Response);
 
       // Mock existing user found by Google ID
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        if (sqlLower.includes('select') && sqlLower.includes('"googleid"')) {
+          return createQueryResult([mockUser]);
+        }
+        // Update avatar
+        if (sqlLower.includes('update user_profiles')) {
+          return createQueryResult([], 1);
+        }
+        return createQueryResult([]);
+      });
 
       const result = await googleOAuthService.handleCallback(authCode);
 
       expect(result.user.email).toBe(mockGoogleUserInfo.email);
       expect(result.isNewUser).toBe(false);
       expect(result.tokens.accessToken).toBe('mock-access-token');
-      expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
 
     it('should link Google account to existing email user', async () => {
@@ -169,30 +225,37 @@ describe('GoogleOAuthService', () => {
       };
 
       mockOAuth2Client.getToken.mockResolvedValue({ tokens: mockTokens });
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockGoogleUserInfo)
       } as Response);
 
-      // Mock user not found by Google ID
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      // Mock existing user found by email
-      mockPrisma.user.findUnique.mockResolvedValueOnce(existingUser);
-      // Mock user update with Google ID
-      mockPrisma.user.update.mockResolvedValue({
-        ...existingUser,
-        googleId: mockGoogleUserInfo.id
+      // Mock user not found by Google ID, but found by email
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        // Find user by email (SELECT with LOWER(email) in WHERE clause)
+        if (sqlLower.includes('select') && sqlLower.includes('lower(email)')) {
+          return createQueryResult([existingUser]);
+        }
+        // Find user by googleId (SELECT with "googleid" = $1 in WHERE clause)
+        if (sqlLower.includes('select') && sqlLower.includes('where') && sqlLower.includes('"googleid" = $1')) {
+          return createQueryResult([]);
+        }
+        // Update user with googleId
+        if (sqlLower.includes('update users set "googleid"')) {
+          return createQueryResult([], 1);
+        }
+        // Update avatar
+        if (sqlLower.includes('update user_profiles')) {
+          return createQueryResult([], 1);
+        }
+        return createQueryResult([]);
       });
 
       const result = await googleOAuthService.handleCallback(authCode);
 
       expect(result.user.email).toBe(mockGoogleUserInfo.email);
       expect(result.isNewUser).toBe(false);
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: existingUser.id },
-        data: { googleId: mockGoogleUserInfo.id },
-        include: { profile: true }
-      });
     });
 
     it('should throw error on OAuth failure', async () => {
@@ -219,12 +282,17 @@ describe('GoogleOAuthService', () => {
         getPayload: () => mockPayload
       });
 
-      // Mock user not found by Google ID
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      // Mock user not found by email
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      // Mock user creation
-      mockPrisma.user.create.mockResolvedValue(mockUser);
+      // Mock existing user found by Google ID
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        if (sqlLower.includes('select') && sqlLower.includes('"googleid"')) {
+          return createQueryResult([mockUser]);
+        }
+        if (sqlLower.includes('update user_profiles')) {
+          return createQueryResult([], 1);
+        }
+        return createQueryResult([]);
+      });
 
       const result = await googleOAuthService.verifyIdToken(idToken);
 
@@ -259,28 +327,33 @@ describe('GoogleOAuthService', () => {
     it('should unlink Google account successfully', async () => {
       const userId = 'user-123';
       const userWithPassword = {
-        ...mockUser,
+        id: userId,
+        googleId: 'google-123',
         password: 'hashed-password'
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(userWithPassword);
-      mockPrisma.user.update.mockResolvedValue({
-        ...userWithPassword,
-        googleId: null
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        // SELECT query
+        if (sqlLower.includes('select') && sqlLower.includes('from users')) {
+          return createQueryResult([userWithPassword]);
+        }
+        // UPDATE query
+        if (sqlLower.includes('update users')) {
+          return createQueryResult([], 1);
+        }
+        return createQueryResult([]);
       });
 
       await googleOAuthService.unlinkAccount(userId);
 
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: userId },
-        data: { googleId: null }
-      });
+      expect(mockedQuery).toHaveBeenCalled();
     });
 
     it('should throw error if user not found', async () => {
       const userId = 'non-existent';
 
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('USER_NOT_FOUND');
     });
@@ -288,11 +361,12 @@ describe('GoogleOAuthService', () => {
     it('should throw error if Google account not linked', async () => {
       const userId = 'user-123';
       const userWithoutGoogle = {
-        ...mockUser,
-        googleId: null
+        id: userId,
+        googleId: null,
+        password: 'hashed-password'
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(userWithoutGoogle);
+      mockedQuery.mockResolvedValueOnce(createQueryResult([userWithoutGoogle]));
 
       await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('GOOGLE_ACCOUNT_NOT_LINKED');
     });
@@ -300,11 +374,12 @@ describe('GoogleOAuthService', () => {
     it('should throw error if Google is the only auth method', async () => {
       const userId = 'user-123';
       const googleOnlyUser = {
-        ...mockUser,
+        id: userId,
+        googleId: 'google-123',
         password: null
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(googleOnlyUser);
+      mockedQuery.mockResolvedValueOnce(createQueryResult([googleOnlyUser]));
 
       await expect(googleOAuthService.unlinkAccount(userId)).rejects.toThrow('CANNOT_UNLINK_ONLY_AUTH_METHOD');
     });

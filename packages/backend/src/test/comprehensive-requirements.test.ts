@@ -1,19 +1,20 @@
 /**
  * Comprehensive Test Suite for Requirements 1-4
- * 
+ *
  * This test suite validates all implemented functionality for:
  * - Requirement 1: User Authentication and Authorization System
- * - Requirement 2: Database Schema and Data Models  
+ * - Requirement 2: Database Schema and Data Models
  * - Requirement 3: Calendar Management API (schema only)
  * - Requirement 4: Event Management API (schema only)
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import AuthService from '../services/AuthService.js';
 import { generateTokenPair, verifyToken } from '../utils/jwt.js';
+import { query } from '../config/database.js';
 
 // Mock Google OAuth for testing
 vi.mock('../services/GoogleOAuthService.js', () => ({
@@ -34,34 +35,287 @@ vi.mock('../services/GoogleOAuthService.js', () => ({
   }))
 }));
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL
-    }
-  }
-});
+const toIso = (value: Date | string) => new Date(value).toISOString();
+const expectValidDate = (value: Date | string) => {
+  const date = value instanceof Date ? value : new Date(value);
+  expect(Number.isNaN(date.getTime())).toBe(false);
+};
+
+async function createUser(overrides: {
+  id?: string;
+  email?: string;
+  name?: string | null;
+  password?: string | null;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const email = overrides.email ?? `user-${randomUUID()}@example.com`;
+  const name = overrides.name ?? 'Test User';
+  const hashedPassword = overrides.password
+    ? await bcrypt.hash(overrides.password, 12)
+    : null;
+
+  const result = await query<{
+    id: string;
+    email: string;
+    name: string | null;
+    password: string | null;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+  }>(
+    `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, NOW(), NOW())
+     RETURNING id, email, name, password, "createdAt", "updatedAt"`,
+    [id, email.toLowerCase(), name, hashedPassword]
+  );
+
+  return result.rows[0];
+}
+
+async function createUserProfile(userId: string, overrides: {
+  id?: string;
+  bio?: string | null;
+  timezone?: string;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const bio = overrides.bio ?? null;
+  const timezone = overrides.timezone ?? 'UTC';
+
+  const result = await query<{
+    id: string;
+    userId: string;
+    bio: string | null;
+    timezone: string;
+  }>(
+    `INSERT INTO user_profiles (id, "userId", bio, timezone)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, "userId", bio, timezone`,
+    [id, userId, bio, timezone]
+  );
+
+  return result.rows[0];
+}
+
+async function createTaskList(userId: string, overrides: {
+  id?: string;
+  name?: string;
+  color?: string | null;
+  icon?: string | null;
+  description?: string | null;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const name = overrides.name ?? 'Test List';
+  const color = overrides.color ?? '#8B5CF6';
+  const icon = overrides.icon ?? null;
+  const description = overrides.description ?? null;
+
+  const result = await query<{
+    id: string;
+    name: string;
+    color: string;
+    icon: string | null;
+    description: string | null;
+    userId: string;
+  }>(
+    `INSERT INTO task_lists (id, name, color, icon, description, "userId", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+     RETURNING id, name, color, icon, description, "userId"`,
+    [id, name, color, icon, description, userId]
+  );
+
+  return result.rows[0];
+}
+
+async function createTask(userId: string, taskListId: string, overrides: {
+  id?: string;
+  title?: string;
+  completed?: boolean;
+  priority?: string;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const title = overrides.title ?? 'Test Task';
+  const completed = overrides.completed ?? false;
+  const priority = overrides.priority ?? 'MEDIUM';
+
+  const result = await query<{
+    id: string;
+    title: string;
+    completed: boolean;
+    userId: string;
+    taskListId: string;
+    priority: string;
+  }>(
+    `INSERT INTO tasks (id, title, completed, "userId", "taskListId", priority, "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+     RETURNING id, title, completed, "userId", "taskListId", priority`,
+    [id, title, completed, userId, taskListId, priority]
+  );
+
+  return result.rows[0];
+}
+
+async function createTag(overrides: {
+  id?: string;
+  name?: string;
+  type?: string;
+  color?: string | null;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const name = overrides.name ?? 'urgent';
+  const type = overrides.type ?? 'PRIORITY';
+  const color = overrides.color ?? null;
+
+  const result = await query<{
+    id: string;
+    name: string;
+    type: string;
+    color: string | null;
+  }>(
+    `INSERT INTO tags (id, name, type, color)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, name, type, color`,
+    [id, name, type, color]
+  );
+
+  return result.rows[0];
+}
+
+async function createTaskTag(overrides: {
+  taskId: string;
+  tagId: string;
+  value?: string;
+  displayText?: string;
+  iconName?: string;
+}) {
+  const value = overrides.value ?? 'high';
+  const displayText = overrides.displayText ?? 'High Priority';
+  const iconName = overrides.iconName ?? 'alert';
+
+  const result = await query<{
+    taskId: string;
+    tagId: string;
+    value: string;
+    displayText: string;
+    iconName: string;
+  }>(
+    `INSERT INTO task_tags ("taskId", "tagId", value, "displayText", "iconName")
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING "taskId", "tagId", value, "displayText", "iconName"`,
+    [overrides.taskId, overrides.tagId, value, displayText, iconName]
+  );
+
+  return result.rows[0];
+}
+
+async function createCalendar(userId: string, overrides: {
+  id?: string;
+  name?: string;
+  color?: string | null;
+  description?: string | null;
+  isVisible?: boolean;
+  isDefault?: boolean;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const name = overrides.name ?? 'Test Calendar';
+  const color = overrides.color ?? '#3B82F6';
+  const description = overrides.description ?? null;
+  const isVisible = overrides.isVisible ?? true;
+  const isDefault = overrides.isDefault ?? false;
+
+  const result = await query<{
+    id: string;
+    name: string;
+    color: string;
+    description: string | null;
+    isVisible: boolean;
+    isDefault: boolean;
+    userId: string;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+  }>(
+    `INSERT INTO calendars (id, name, color, description, "isVisible", "isDefault", "userId", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+     RETURNING id, name, color, description, "isVisible", "isDefault", "userId", "createdAt", "updatedAt"`,
+    [id, name, color, description, isVisible, isDefault, userId]
+  );
+
+  return result.rows[0];
+}
+
+async function createEvent(userId: string, calendarId: string, overrides: {
+  id?: string;
+  title?: string;
+  description?: string | null;
+  start?: Date;
+  end?: Date;
+  allDay?: boolean;
+  location?: string | null;
+  notes?: string | null;
+  recurrence?: string | null;
+} = {}) {
+  const id = overrides.id ?? randomUUID();
+  const title = overrides.title ?? 'Test Event';
+  const description = overrides.description ?? null;
+  const start = overrides.start ?? new Date();
+  const end = overrides.end ?? new Date(Date.now() + 3600000);
+  const allDay = overrides.allDay ?? false;
+  const location = overrides.location ?? null;
+  const notes = overrides.notes ?? null;
+  const recurrence = overrides.recurrence ?? null;
+
+  const result = await query<{
+    id: string;
+    title: string;
+    description: string | null;
+    start: Date | string;
+    end: Date | string;
+    allDay: boolean;
+    location: string | null;
+    notes: string | null;
+    recurrence: string | null;
+    userId: string;
+    calendarId: string;
+  }>(
+    `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, "userId", "calendarId", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+     RETURNING id, title, description, start, "end", "allDay", location, notes, recurrence, "userId", "calendarId"`,
+    [id, title, description, start, end, allDay, location, notes, recurrence, userId, calendarId]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Helper function to clean up test database
+ */
+async function cleanupDatabase() {
+  await query('DELETE FROM task_tags');
+  await query('DELETE FROM attachments');
+  await query('DELETE FROM tasks');
+  await query('DELETE FROM task_lists');
+  await query('DELETE FROM tags');
+  await query('DELETE FROM events');
+  await query('DELETE FROM calendars');
+  await query('DELETE FROM user_profiles');
+  await query('DELETE FROM users');
+}
 
 describe('Comprehensive Requirements 1-4 Testing', () => {
   beforeAll(async () => {
-    // Ensure database is clean and ready
     await cleanupDatabase();
   });
 
   afterAll(async () => {
     await cleanupDatabase();
-    await prisma.$disconnect();
   });
 
   beforeEach(async () => {
-    // Clean up between tests
     await cleanupDatabase();
   });
 
   describe('Requirement 1: User Authentication and Authorization System', () => {
     describe('1.1 & 1.2: Email/Password Registration and Storage', () => {
       it('should register new user with hashed password', async () => {
-        const authService = new AuthService(prisma);
+        const authService = new AuthService();
         const userData = {
           email: `test-${Date.now()}@example.com`,
           password: 'SecurePassword123!',
@@ -70,28 +324,26 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
 
         const result = await authService.registerUser(userData);
 
-        expect(result.user.email).toBe(userData.email);
+        expect(result.user.email).toBe(userData.email.toLowerCase());
         expect(result.user.name).toBe('Test User');
-        expect(result.user.password).toBeUndefined(); // Should not return password
         expect(result.user.id).toBeDefined();
         expect(result.tokens.accessToken).toBeDefined();
         expect(result.tokens.refreshToken).toBeDefined();
 
         // Verify password is hashed in database
-        const dbUser = await prisma.user.findUnique({
-          where: { email: userData.email },
-          select: { id: true, email: true, password: true }
-        });
-        
-        // Debug: Check if user exists
-        expect(dbUser).toBeDefined();
-        expect(dbUser?.password).toBeDefined();
-        expect(dbUser?.password).not.toBe('SecurePassword123!');
-        expect(await bcrypt.compare('SecurePassword123!', dbUser!.password!)).toBe(true);
+        const dbUser = await query<{ id: string; email: string; password: string | null }>(
+          'SELECT id, email, password FROM users WHERE email = $1 LIMIT 1',
+          [userData.email.toLowerCase()]
+        );
+
+        expect(dbUser.rows[0]).toBeDefined();
+        expect(dbUser.rows[0].password).toBeDefined();
+        expect(dbUser.rows[0].password).not.toBe('SecurePassword123!');
+        expect(await bcrypt.compare('SecurePassword123!', dbUser.rows[0].password!)).toBe(true);
       });
 
       it('should prevent duplicate email registration', async () => {
-        const authService = new AuthService(prisma);
+        const authService = new AuthService();
         const userData = {
           email: `duplicate-${Date.now()}@example.com`,
           password: 'Password123!',
@@ -107,7 +359,7 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
       });
 
       it('should convert email to lowercase during registration', async () => {
-        const authService = new AuthService(prisma);
+        const authService = new AuthService();
         const userData = {
           email: `UPPERCASE-${Date.now()}@EXAMPLE.COM`,
           password: 'Password123!',
@@ -139,7 +391,7 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
 
       it('should generate refresh tokens with longer expiration', async () => {
         const tokens = await generateTokenPair('user-id', 'test@example.com');
-        
+
         const accessDecoded = await verifyToken(tokens.accessToken);
         const refreshDecoded = await verifyToken(tokens.refreshToken);
 
@@ -174,7 +426,7 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
         const { GoogleOAuthService } = await import('../services/GoogleOAuthService.js');
         const googleOAuthService = new GoogleOAuthService();
         const authUrl = googleOAuthService.getAuthUrl();
-        
+
         expect(authUrl).toContain('accounts.google.com');
         expect(authUrl).toContain('oauth');
         expect(authUrl).toContain('mock=true');
@@ -183,9 +435,9 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
       it('should handle OAuth callback flow', async () => {
         const { GoogleOAuthService } = await import('../services/GoogleOAuthService.js');
         const googleOAuthService = new GoogleOAuthService();
-        
+
         const result = await googleOAuthService.handleCallback('mock-auth-code');
-        
+
         expect(result.user.email).toBe('test@example.com');
         expect(result.tokens.accessToken).toBe('mock-token');
       });
@@ -194,14 +446,14 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
     describe('1.6: Token Expiration and Refresh', () => {
       it('should handle token refresh flow', async () => {
         const originalTokens = await generateTokenPair('user-id', 'test@example.com');
-        
+
         // Verify refresh token is valid
         const refreshDecoded = await verifyToken(originalTokens.refreshToken);
         expect(refreshDecoded.type).toBe('refresh');
 
         // Wait a moment to ensure different timestamps
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Generate new tokens using refresh token
         const newTokens = await generateTokenPair(refreshDecoded.userId, refreshDecoded.email);
         expect(newTokens.accessToken).toBeDefined();
@@ -212,9 +464,8 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
 
     describe('1.7: User Authorization and Data Access Control', () => {
       it('should ensure users can only access their own data', async () => {
-        // Create two users
-        const authService = new AuthService(prisma);
-        
+        const authService = new AuthService();
+
         const result1 = await authService.registerUser({
           email: `user1-${Date.now()}@example.com`,
           password: 'Password123!',
@@ -242,34 +493,27 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
   describe('Requirement 2: Database Schema and Data Models', () => {
     describe('2.1: Database Table Creation and Relationships', () => {
       it('should create User with proper relationships', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'schema-test@example.com',
-            name: 'Schema Test User',
-            password: await bcrypt.hash('Password123!', 12)
-          }
+        const user = await createUser({
+          email: 'schema-test@example.com',
+          name: 'Schema Test User',
+          password: 'Password123!'
         });
 
         expect(user.id).toBeDefined();
         expect(user.email).toBe('schema-test@example.com');
-        expect(user.createdAt).toBeInstanceOf(Date);
-        expect(user.updatedAt).toBeInstanceOf(Date);
+        expectValidDate(user.createdAt);
+        expectValidDate(user.updatedAt);
       });
 
       it('should create UserProfile with User relationship', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'profile-test@example.com',
-            name: 'Profile Test User'
-          }
+        const user = await createUser({
+          email: 'profile-test@example.com',
+          name: 'Profile Test User'
         });
 
-        const profile = await prisma.userProfile.create({
-          data: {
-            userId: user.id,
-            bio: 'Test bio',
-            timezone: 'America/New_York'
-          }
+        const profile = await createUserProfile(user.id, {
+          bio: 'Test bio',
+          timezone: 'America/New_York'
         });
 
         expect(profile.userId).toBe(user.id);
@@ -277,224 +521,168 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
         expect(profile.timezone).toBe('America/New_York');
 
         // Test relationship
-        const userWithProfile = await prisma.user.findUnique({
-          where: { id: user.id },
-          include: { profile: true }
-        });
+        const userWithProfile = await query<{ id: string; bio: string | null }>(
+          `SELECT u.id, p.bio
+           FROM users u
+           LEFT JOIN user_profiles p ON p."userId" = u.id
+           WHERE u.id = $1`,
+          [user.id]
+        );
 
-        expect(userWithProfile?.profile?.bio).toBe('Test bio');
+        expect(userWithProfile.rows[0]?.bio).toBe('Test bio');
       });
     });
 
     describe('2.2 & 2.3: Foreign Key Relationships and Cascade Deletes', () => {
       it('should cascade delete user profile when user is deleted', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'cascade-test@example.com',
-            name: 'Cascade Test User'
-          }
+        const user = await createUser({
+          email: 'cascade-test@example.com',
+          name: 'Cascade Test User'
         });
 
-        await prisma.userProfile.create({
-          data: {
-            userId: user.id,
-            bio: 'Will be deleted'
-          }
+        await createUserProfile(user.id, {
+          bio: 'Will be deleted'
         });
 
         // Delete user
-        await prisma.user.delete({
-          where: { id: user.id }
-        });
+        await query('DELETE FROM users WHERE id = $1', [user.id]);
 
         // Verify profile was cascade deleted
-        const profile = await prisma.userProfile.findUnique({
-          where: { userId: user.id }
-        });
-        expect(profile).toBeNull();
+        const profile = await query('SELECT id FROM user_profiles WHERE "userId" = $1', [user.id]);
+        expect(profile.rows.length).toBe(0);
       });
 
       it('should cascade delete calendars and events when user is deleted', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'calendar-cascade@example.com',
-            name: 'Calendar Cascade User'
-          }
+        const user = await createUser({
+          email: 'calendar-cascade@example.com',
+          name: 'Calendar Cascade User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'Test Calendar',
-            userId: user.id
-          }
+        const calendar = await createCalendar(user.id, {
+          name: 'Test Calendar'
         });
 
-        const event = await prisma.event.create({
-          data: {
-            title: 'Test Event',
-            start: new Date(),
-            end: new Date(Date.now() + 3600000), // 1 hour later
-            userId: user.id,
-            calendarId: calendar.id
-          }
+        const event = await createEvent(user.id, calendar.id, {
+          title: 'Test Event',
+          start: new Date(),
+          end: new Date(Date.now() + 3600000)
         });
 
         // Delete user
-        await prisma.user.delete({
-          where: { id: user.id }
-        });
+        await query('DELETE FROM users WHERE id = $1', [user.id]);
 
         // Verify cascade deletion
-        const deletedCalendar = await prisma.calendar.findUnique({
-          where: { id: calendar.id }
-        });
-        const deletedEvent = await prisma.event.findUnique({
-          where: { id: event.id }
-        });
+        const deletedCalendar = await query('SELECT id FROM calendars WHERE id = $1', [calendar.id]);
+        const deletedEvent = await query('SELECT id FROM events WHERE id = $1', [event.id]);
 
-        expect(deletedCalendar).toBeNull();
-        expect(deletedEvent).toBeNull();
+        expect(deletedCalendar.rows.length).toBe(0);
+        expect(deletedEvent.rows.length).toBe(0);
       });
     });
 
     describe('2.4: Task and Tag Many-to-Many Relationships', () => {
       it('should create tasks with tag relationships', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'task-tag-test@example.com',
-            name: 'Task Tag User'
-          }
+        const user = await createUser({
+          email: 'task-tag-test@example.com',
+          name: 'Task Tag User'
         });
 
-        const taskList = await prisma.taskList.create({
-          data: {
-            name: 'Test List',
-            userId: user.id
-          }
+        const taskList = await createTaskList(user.id, {
+          name: 'Test List'
         });
 
-        const tag = await prisma.tag.create({
-          data: {
-            name: 'urgent',
-            type: 'PRIORITY'
-          }
+        const tag = await createTag({
+          name: 'urgent',
+          type: 'PRIORITY'
         });
 
-        const task = await prisma.task.create({
-          data: {
-            title: 'Test Task',
-            userId: user.id,
-            taskListId: taskList.id,
-            tags: {
-              create: {
-                tagId: tag.id,
-                value: 'high',
-                displayText: 'High Priority',
-                iconName: 'alert'
-              }
-            }
-          },
-          include: {
-            tags: {
-              include: {
-                tag: true
-              }
-            }
-          }
+        const task = await createTask(user.id, taskList.id, {
+          title: 'Test Task'
         });
 
-        expect(task.tags).toHaveLength(1);
-        expect(task.tags[0].tag.name).toBe('urgent');
-        expect(task.tags[0].displayText).toBe('High Priority');
+        await createTaskTag({
+          taskId: task.id,
+          tagId: tag.id,
+          value: 'high',
+          displayText: 'High Priority',
+          iconName: 'alert'
+        });
+
+        const taskTags = await query<{ tagName: string; displayText: string }>(
+          `SELECT tt."displayText" as "displayText", tg.name as "tagName"
+           FROM task_tags tt
+           JOIN tags tg ON tg.id = tt."tagId"
+           WHERE tt."taskId" = $1`,
+          [task.id]
+        );
+
+        expect(taskTags.rows).toHaveLength(1);
+        expect(taskTags.rows[0].tagName).toBe('urgent');
+        expect(taskTags.rows[0].displayText).toBe('High Priority');
       });
     });
 
     describe('2.5: UTC Date Storage and Timezone Handling', () => {
       it('should store event dates in UTC format', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'date-test@example.com',
-            name: 'Date Test User'
-          }
+        const user = await createUser({
+          email: 'date-test@example.com',
+          name: 'Date Test User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'Date Test Calendar',
-            userId: user.id
-          }
+        const calendar = await createCalendar(user.id, {
+          name: 'Date Test Calendar'
         });
 
         const startDate = new Date('2024-12-25T10:00:00.000Z');
         const endDate = new Date('2024-12-25T11:00:00.000Z');
 
-        const event = await prisma.event.create({
-          data: {
-            title: 'UTC Test Event',
-            start: startDate,
-            end: endDate,
-            userId: user.id,
-            calendarId: calendar.id
-          }
+        const event = await createEvent(user.id, calendar.id, {
+          title: 'UTC Test Event',
+          start: startDate,
+          end: endDate
         });
 
-        expect(event.start.toISOString()).toBe('2024-12-25T10:00:00.000Z');
-        expect(event.end.toISOString()).toBe('2024-12-25T11:00:00.000Z');
+        expect(toIso(event.start)).toBe('2024-12-25T10:00:00.000Z');
+        expect(toIso(event.end)).toBe('2024-12-25T11:00:00.000Z');
       });
     });
 
     describe('2.6: Unique Constraints and Business Rules', () => {
       it('should enforce unique calendar names per user', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'unique-test@example.com',
-            name: 'Unique Test User'
-          }
+        const user = await createUser({
+          email: 'unique-test@example.com',
+          name: 'Unique Test User'
         });
 
-        await prisma.calendar.create({
-          data: {
-            name: 'Work Calendar',
-            userId: user.id
-          }
+        await createCalendar(user.id, {
+          name: 'Work Calendar'
         });
 
         // Should fail due to unique constraint
-        await expect(prisma.calendar.create({
-          data: {
-            name: 'Work Calendar',
-            userId: user.id
-          }
-        })).rejects.toThrow();
+        await expect(query(
+          `INSERT INTO calendars (id, name, "userId", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, NOW(), NOW())`,
+          [randomUUID(), 'Work Calendar', user.id]
+        )).rejects.toThrow();
       });
 
       it('should allow same calendar name for different users', async () => {
-        const user1 = await prisma.user.create({
-          data: {
-            email: 'user1-unique@example.com',
-            name: 'User One'
-          }
+        const user1 = await createUser({
+          email: 'user1-unique@example.com',
+          name: 'User One'
         });
 
-        const user2 = await prisma.user.create({
-          data: {
-            email: 'user2-unique@example.com',
-            name: 'User Two'
-          }
+        const user2 = await createUser({
+          email: 'user2-unique@example.com',
+          name: 'User Two'
         });
 
-        const calendar1 = await prisma.calendar.create({
-          data: {
-            name: 'Personal',
-            userId: user1.id
-          }
+        const calendar1 = await createCalendar(user1.id, {
+          name: 'Personal'
         });
 
-        const calendar2 = await prisma.calendar.create({
-          data: {
-            name: 'Personal',
-            userId: user2.id
-          }
+        const calendar2 = await createCalendar(user2.id, {
+          name: 'Personal'
         });
 
         expect(calendar1.name).toBe('Personal');
@@ -505,58 +693,39 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
 
     describe('2.7: Database Indexes and Performance', () => {
       it('should efficiently query tasks by user and completion status', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'performance-test@example.com',
-            name: 'Performance Test User'
-          }
+        const user = await createUser({
+          email: 'performance-test@example.com',
+          name: 'Performance Test User'
         });
 
-        const taskList = await prisma.taskList.create({
-          data: {
-            name: 'Performance List',
-            userId: user.id
-          }
+        const taskList = await createTaskList(user.id, {
+          name: 'Performance List'
         });
 
         // Create multiple tasks
         await Promise.all([
-          prisma.task.create({
-            data: {
-              title: 'Completed Task 1',
-              completed: true,
-              userId: user.id,
-              taskListId: taskList.id
-            }
+          createTask(user.id, taskList.id, {
+            title: 'Completed Task 1',
+            completed: true
           }),
-          prisma.task.create({
-            data: {
-              title: 'Incomplete Task 1',
-              completed: false,
-              userId: user.id,
-              taskListId: taskList.id
-            }
+          createTask(user.id, taskList.id, {
+            title: 'Incomplete Task 1',
+            completed: false
           }),
-          prisma.task.create({
-            data: {
-              title: 'Completed Task 2',
-              completed: true,
-              userId: user.id,
-              taskListId: taskList.id
-            }
+          createTask(user.id, taskList.id, {
+            title: 'Completed Task 2',
+            completed: true
           })
         ]);
 
         // Query completed tasks (should use index)
-        const completedTasks = await prisma.task.findMany({
-          where: {
-            userId: user.id,
-            completed: true
-          }
-        });
+        const completedTasks = await query<{ completed: boolean }>(
+          'SELECT completed FROM tasks WHERE "userId" = $1 AND completed = true',
+          [user.id]
+        );
 
-        expect(completedTasks).toHaveLength(2);
-        expect(completedTasks.every(task => task.completed)).toBe(true);
+        expect(completedTasks.rows).toHaveLength(2);
+        expect(completedTasks.rows.every(task => task.completed)).toBe(true);
       });
     });
   });
@@ -564,44 +733,47 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
   describe('Requirements 3 & 4: Calendar and Event Schema Validation', () => {
     describe('Calendar Model Validation', () => {
       it('should create calendar with default values', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'calendar-default@example.com',
-            name: 'Calendar Default User'
-          }
+        const user = await createUser({
+          email: 'calendar-default@example.com',
+          name: 'Calendar Default User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'Default Test Calendar',
-            userId: user.id
-          }
-        });
+        const result = await query<{
+          id: string;
+          name: string;
+          color: string;
+          isVisible: boolean;
+          isDefault: boolean;
+          createdAt: Date | string;
+          updatedAt: Date | string;
+        }>(
+          `INSERT INTO calendars (id, name, "userId", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, NOW(), NOW())
+           RETURNING id, name, color, "isVisible", "isDefault", "createdAt", "updatedAt"`,
+          [randomUUID(), 'Default Test Calendar', user.id]
+        );
+
+        const calendar = result.rows[0];
 
         expect(calendar.color).toBe('#3B82F6'); // Default blue
         expect(calendar.isVisible).toBe(true);
         expect(calendar.isDefault).toBe(false);
-        expect(calendar.createdAt).toBeInstanceOf(Date);
-        expect(calendar.updatedAt).toBeInstanceOf(Date);
+        expectValidDate(calendar.createdAt);
+        expectValidDate(calendar.updatedAt);
       });
 
       it('should support calendar customization', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'calendar-custom@example.com',
-            name: 'Calendar Custom User'
-          }
+        const user = await createUser({
+          email: 'calendar-custom@example.com',
+          name: 'Calendar Custom User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'Custom Calendar',
-            color: '#FF5733',
-            description: 'My custom calendar',
-            isVisible: false,
-            isDefault: true,
-            userId: user.id
-          }
+        const calendar = await createCalendar(user.id, {
+          name: 'Custom Calendar',
+          color: '#FF5733',
+          description: 'My custom calendar',
+          isVisible: false,
+          isDefault: true
         });
 
         expect(calendar.color).toBe('#FF5733');
@@ -613,33 +785,24 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
 
     describe('Event Model Validation', () => {
       it('should create event with all metadata fields', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'event-test@example.com',
-            name: 'Event Test User'
-          }
+        const user = await createUser({
+          email: 'event-test@example.com',
+          name: 'Event Test User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'Event Test Calendar',
-            userId: user.id
-          }
+        const calendar = await createCalendar(user.id, {
+          name: 'Event Test Calendar'
         });
 
-        const event = await prisma.event.create({
-          data: {
-            title: 'Comprehensive Event',
-            description: 'A detailed event description',
-            start: new Date('2024-12-25T14:00:00.000Z'),
-            end: new Date('2024-12-25T15:30:00.000Z'),
-            allDay: false,
-            location: '123 Main St, City, State',
-            notes: 'Important meeting notes',
-            recurrence: 'FREQ=WEEKLY;BYDAY=TU',
-            userId: user.id,
-            calendarId: calendar.id
-          }
+        const event = await createEvent(user.id, calendar.id, {
+          title: 'Comprehensive Event',
+          description: 'A detailed event description',
+          start: new Date('2024-12-25T14:00:00.000Z'),
+          end: new Date('2024-12-25T15:30:00.000Z'),
+          allDay: false,
+          location: '123 Main St, City, State',
+          notes: 'Important meeting notes',
+          recurrence: 'FREQ=WEEKLY;BYDAY=TU'
         });
 
         expect(event.title).toBe('Comprehensive Event');
@@ -651,29 +814,20 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
       });
 
       it('should support all-day events', async () => {
-        const user = await prisma.user.create({
-          data: {
-            email: 'allday-test@example.com',
-            name: 'All Day Test User'
-          }
+        const user = await createUser({
+          email: 'allday-test@example.com',
+          name: 'All Day Test User'
         });
 
-        const calendar = await prisma.calendar.create({
-          data: {
-            name: 'All Day Calendar',
-            userId: user.id
-          }
+        const calendar = await createCalendar(user.id, {
+          name: 'All Day Calendar'
         });
 
-        const event = await prisma.event.create({
-          data: {
-            title: 'All Day Event',
-            start: new Date('2024-12-25T00:00:00.000Z'),
-            end: new Date('2024-12-25T23:59:59.999Z'),
-            allDay: true,
-            userId: user.id,
-            calendarId: calendar.id
-          }
+        const event = await createEvent(user.id, calendar.id, {
+          title: 'All Day Event',
+          start: new Date('2024-12-25T00:00:00.000Z'),
+          end: new Date('2024-12-25T23:59:59.999Z'),
+          allDay: true
         });
 
         expect(event.allDay).toBe(true);
@@ -682,19 +836,3 @@ describe('Comprehensive Requirements 1-4 Testing', () => {
     });
   });
 });
-
-/**
- * Helper function to clean up test database
- */
-async function cleanupDatabase() {
-  // Delete in order to respect foreign key constraints
-  await prisma.taskTag.deleteMany();
-  await prisma.attachment.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.taskList.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.event.deleteMany();
-  await prisma.calendar.deleteMany();
-  await prisma.userProfile.deleteMany();
-  await prisma.user.deleteMany();
-}

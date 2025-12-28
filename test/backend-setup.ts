@@ -21,9 +21,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
   error: vi.fn(),
 } as ConsoleLike;
 
-// Mock Date.now for consistent testing
-const mockNow = new Date('2024-01-15T12:00:00Z');
-vi.setSystemTime(mockNow);
+// Keep real timers by default; individual tests can opt into fake timers.
 
 // Global test utilities
 // Provide explicit global declaration casts for Vitest
@@ -89,10 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Clean up after each test
-afterEach(() => {
-  vi.resetAllMocks();
-});
+// Avoid resetAllMocks here so module mocks keep their implementations.
 
 // Global error handler for unhandled promise rejections in tests
 process.on('unhandledRejection', (reason, promise) => {
