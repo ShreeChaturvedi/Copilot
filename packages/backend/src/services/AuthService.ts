@@ -263,7 +263,6 @@ class AuthService {
   /**
    * Confirm password reset with token
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async confirmPasswordReset(
     _token: string,
     _newPassword: string

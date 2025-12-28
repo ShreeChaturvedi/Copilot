@@ -45,6 +45,9 @@ const devContext = {
   requestId: 'dev-request',
 };
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? getErrorMessage(error) : String(error);
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -59,9 +62,11 @@ app.get('/api/tasks', async (_req, res) => {
     const { task: taskService } = getAllServices();
     const tasks = await taskService.findAll({}, devContext);
     res.json({ success: true, data: tasks });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/tasks error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -70,8 +75,10 @@ app.post('/api/tasks', async (req, res) => {
     const { task: taskService } = getAllServices();
     const task = await taskService.create(req.body, devContext);
     res.status(201).json({ success: true, data: task });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -80,8 +87,10 @@ app.patch('/api/tasks/:id', async (req, res) => {
     const { task: taskService } = getAllServices();
     const task = await taskService.update(req.params.id, req.body, devContext);
     res.json({ success: true, data: task });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -91,8 +100,10 @@ app.put('/api/tasks/:id', async (req, res) => {
     const { task: taskService } = getAllServices();
     const task = await taskService.update(req.params.id, req.body, devContext);
     res.json({ success: true, data: task });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -101,8 +112,10 @@ app.delete('/api/tasks/:id', async (req, res) => {
     const { task: taskService } = getAllServices();
     await taskService.delete(req.params.id, devContext);
     res.json({ success: true, data: { deleted: true } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -112,8 +125,10 @@ app.get('/api/task-lists', async (_req, res) => {
     const { taskList: taskListService } = getAllServices();
     const lists = await taskListService.findAll({}, devContext);
     res.json({ success: true, data: lists });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -126,8 +141,10 @@ app.get('/api/task-lists/default', async (_req, res) => {
       lists[0] ||
       (await taskListService.create({ name: 'Default' }, devContext));
     res.json({ success: true, data: defaultList });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -136,8 +153,10 @@ app.post('/api/task-lists', async (req, res) => {
     const { taskList: taskListService } = getAllServices();
     const list = await taskListService.create(req.body, devContext);
     res.status(201).json({ success: true, data: list });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -155,9 +174,11 @@ app.patch('/api/task-lists/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Task list not found' } });
     }
     res.json({ success: true, data: list });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PATCH /api/task-lists/:id error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -175,9 +196,11 @@ app.put('/api/task-lists/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Task list not found' } });
     }
     res.json({ success: true, data: list });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PUT /api/task-lists/:id error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -186,8 +209,10 @@ app.delete('/api/task-lists/:id', async (req, res) => {
     const { taskList: taskListService } = getAllServices();
     await taskListService.delete(req.params.id, devContext);
     res.json({ success: true, data: { deleted: true } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -201,8 +226,10 @@ app.get('/api/calendars', async (req, res) => {
       devContext
     );
     res.json({ success: true, data: calendars });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -211,8 +238,10 @@ app.post('/api/calendars', async (req, res) => {
     const { calendar: calendarService } = getAllServices();
     const calendar = await calendarService.create(req.body, devContext);
     res.status(201).json({ success: true, data: calendar });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -226,9 +255,11 @@ app.get('/api/calendars/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Calendar not found' } });
     }
     res.json({ success: true, data: calendar });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/calendars/:id error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -246,22 +277,24 @@ app.put('/api/calendars/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Calendar not found' } });
     }
     res.json({ success: true, data: calendar });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PUT /api/calendars/:id error:', error);
-    if (error.message?.startsWith('VALIDATION_ERROR:')) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: { message: error.message.replace('VALIDATION_ERROR: ', '') },
-        });
+    if (getErrorMessage(error)?.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: getErrorMessage(error).replace('VALIDATION_ERROR: ', ''),
+        },
+      });
     }
-    if (error.message?.includes('AUTHORIZATION_ERROR')) {
+    if (getErrorMessage(error)?.includes('AUTHORIZATION_ERROR')) {
       return res
         .status(403)
         .json({ success: false, error: { message: 'Access denied' } });
     }
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -295,17 +328,19 @@ app.patch('/api/calendars/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Calendar not found' } });
     }
     res.json({ success: true, data: result });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PATCH /api/calendars/:id error:', error);
-    if (error.message?.startsWith('VALIDATION_ERROR:')) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: { message: error.message.replace('VALIDATION_ERROR: ', '') },
-        });
+    if (getErrorMessage(error)?.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: getErrorMessage(error).replace('VALIDATION_ERROR: ', ''),
+        },
+      });
     }
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -319,9 +354,11 @@ app.delete('/api/calendars/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Calendar not found' } });
     }
     res.json({ success: true, data: { deleted: true } });
-  } catch (error: any) {
+  } catch (error) {
     console.error('DELETE /api/calendars/:id error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -331,8 +368,10 @@ app.get('/api/events', async (_req, res) => {
     const { event: eventService } = getAllServices();
     const events = await eventService.findAll({}, devContext);
     res.json({ success: true, data: events });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -346,8 +385,10 @@ app.get('/api/events/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Event not found' } });
     }
     res.json({ success: true, data: event });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -356,8 +397,10 @@ app.post('/api/events', async (req, res) => {
     const { event: eventService } = getAllServices();
     const event = await eventService.create(req.body, devContext);
     res.status(201).json({ success: true, data: event });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -370,8 +413,10 @@ app.patch('/api/events/:id', async (req, res) => {
       devContext
     );
     res.json({ success: true, data: event });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -390,9 +435,11 @@ app.put('/api/events/:id', async (req, res) => {
         .json({ success: false, error: { message: 'Event not found' } });
     }
     res.json({ success: true, data: event });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PUT /api/events/:id error:', error);
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -401,8 +448,10 @@ app.delete('/api/events/:id', async (req, res) => {
     const { event: eventService } = getAllServices();
     await eventService.delete(req.params.id, devContext);
     res.json({ success: true, data: { deleted: true } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -412,8 +461,10 @@ app.get('/api/tags', async (_req, res) => {
     const { tag: tagService } = getAllServices();
     const tags = await tagService.findAll({}, devContext);
     res.json({ success: true, data: tags });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -424,19 +475,19 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const authResult = await authService.registerUser(req.body);
     res.status(201).json({ success: true, data: authResult });
-  } catch (error: any) {
-    if (error.message === 'USER_ALREADY_EXISTS') {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          error: {
-            code: 'USER_ALREADY_EXISTS',
-            message: 'User already exists',
-          },
-        });
+  } catch (error) {
+    if (getErrorMessage(error) === 'USER_ALREADY_EXISTS') {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'USER_ALREADY_EXISTS',
+          message: 'User already exists',
+        },
+      });
     }
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -445,30 +496,28 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const authResult = await authService.loginUser(req.body);
     res.json({ success: true, data: authResult });
-  } catch (error: any) {
-    if (error.message === 'INVALID_CREDENTIALS') {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: {
-            code: 'INVALID_CREDENTIALS',
-            message: 'Invalid credentials',
-          },
-        });
+  } catch (error) {
+    if (getErrorMessage(error) === 'INVALID_CREDENTIALS') {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid credentials',
+        },
+      });
     }
-    if (error.message === 'OAUTH_USER_NO_PASSWORD') {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: {
-            code: 'OAUTH_USER_NO_PASSWORD',
-            message: 'Use Google OAuth to login',
-          },
-        });
+    if (getErrorMessage(error) === 'OAUTH_USER_NO_PASSWORD') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'OAUTH_USER_NO_PASSWORD',
+          message: 'Use Google OAuth to login',
+        },
+      });
     }
-    res.status(500).json({ success: false, error: { message: error.message } });
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -479,21 +528,21 @@ app.post('/api/auth/refresh', async (req, res) => {
     const isTokenReuse =
       await refreshTokenService.detectTokenReuse(refreshToken);
     if (isTokenReuse) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: {
-            code: 'TOKEN_REUSE_DETECTED',
-            message: 'Token reuse detected',
-          },
-        });
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'TOKEN_REUSE_DETECTED',
+          message: 'Token reuse detected',
+        },
+      });
     }
     const newTokenPair =
       await refreshTokenService.rotateRefreshToken(refreshToken);
     res.json({ success: true, data: newTokenPair });
-  } catch (error: any) {
-    res.status(401).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(401)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
@@ -507,7 +556,7 @@ app.post('/api/auth/logout', async (req, res) => {
       refreshTokenService.invalidateRefreshToken(refreshToken);
     }
     res.json({ success: true, data: { message: 'Logged out successfully' } });
-  } catch (error: any) {
+  } catch {
     res.json({ success: true, data: { message: 'Logged out successfully' } });
   }
 });
@@ -522,8 +571,10 @@ app.get('/api/auth/me', async (_req, res) => {
         .json({ success: false, error: { message: 'User not found' } });
     }
     res.json({ success: true, data: user });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: { message: error.message } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
   }
 });
 
