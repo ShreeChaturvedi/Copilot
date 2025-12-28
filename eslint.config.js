@@ -13,6 +13,7 @@ export default tseslint.config([
     '**/*.d.ts',
     'packages/*/dist',
     // Explicitly ignore legacy/untyped sources that cause parse errors
+    '.archive/**',
     'shared/**',
     '.shree/**',
     'screenshots/**',
@@ -33,7 +34,14 @@ export default tseslint.config([
       globals: globals.browser,
     },
     rules: {
-      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
 
@@ -46,7 +54,12 @@ export default tseslint.config([
       ecmaVersion: 2022,
       globals: globals.node,
     },
-    rules: {},
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
   },
 
   // Root test utilities (ensure TS parser for declare global, etc.)
@@ -57,6 +70,12 @@ export default tseslint.config([
       ecmaVersion: 2022,
       globals: globals.node,
     },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
   },
 
   // Shared package configuration (types-only, strict TS)
@@ -66,6 +85,34 @@ export default tseslint.config([
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  // Local scripts (tsx)
+  {
+    files: ['scripts/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  // Relax strict any usage in tests/mocks
+  {
+    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ]);
