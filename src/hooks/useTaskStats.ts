@@ -33,21 +33,26 @@ export interface TaskStatsScope {
 
 /**
  * Hook to compute task statistics from a task array
- * 
+ *
  * @param tasks - Array of tasks to analyze
  * @param scope - Optional scope configuration for filtering
  * @returns Computed statistics with memoization
  */
-export function useTaskStats(tasks: Task[], scope?: TaskStatsScope): TaskStatusCounts {
+export function useTaskStats(
+  tasks: Task[],
+  scope?: TaskStatsScope
+): TaskStatusCounts {
   return useMemo(() => {
     // Filter tasks by scope if provided
     let filteredTasks = tasks;
     if (scope?.taskListId !== undefined && scope?.taskListId !== null) {
       if (scope.taskListId === 'default') {
         // Special handling: 'default' represents tasks not assigned to a specific list
-        filteredTasks = tasks.filter(task => !task.taskListId);
+        filteredTasks = tasks.filter((task) => !task.taskListId);
       } else {
-        filteredTasks = tasks.filter(task => task.taskListId === scope.taskListId);
+        filteredTasks = tasks.filter(
+          (task) => task.taskListId === scope.taskListId
+        );
       }
     }
 
@@ -57,10 +62,10 @@ export function useTaskStats(tasks: Task[], scope?: TaskStatsScope): TaskStatusC
     let done = 0;
 
     // Count tasks by status
-    filteredTasks.forEach(task => {
+    filteredTasks.forEach((task) => {
       // Check for backend status field (may be added in future)
-      const backendStatus = (task as any).status;
-      
+      const backendStatus = task.status;
+
       if (backendStatus && typeof backendStatus === 'string') {
         // Map backend status values to our counts
         switch (backendStatus.toUpperCase()) {

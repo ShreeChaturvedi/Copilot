@@ -20,17 +20,36 @@ import {
 } from '@/components/ui/Select';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { Monitor, Moon, Sun, Trash2, Download, CheckSquare, Tag } from 'lucide-react';
-import { useSettingsStore } from '@/stores/settingsStore';
+import {
+  Monitor,
+  Moon,
+  Sun,
+  Trash2,
+  Download,
+  CheckSquare,
+  Tag,
+} from 'lucide-react';
+import {
+  useSettingsStore,
+  type TaskCompletionControl,
+} from '@/stores/settingsStore';
 
 export function GeneralSettings() {
   const { user, authMethod } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
   const [exportingData, setExportingData] = useState(false);
-  const taskCompletionControl = useSettingsStore((s) => s.taskCompletionControl);
-  const setTaskCompletionControl = useSettingsStore((s) => s.setTaskCompletionControl);
-  const showSidebarTaskAnalytics = useSettingsStore((s) => s.showSidebarTaskAnalytics);
-  const setShowSidebarTaskAnalytics = useSettingsStore((s) => s.setShowSidebarTaskAnalytics);
+  const taskCompletionControl = useSettingsStore(
+    (s) => s.taskCompletionControl
+  );
+  const setTaskCompletionControl = useSettingsStore(
+    (s) => s.setTaskCompletionControl
+  );
+  const showSidebarTaskAnalytics = useSettingsStore(
+    (s) => s.showSidebarTaskAnalytics
+  );
+  const setShowSidebarTaskAnalytics = useSettingsStore(
+    (s) => s.setShowSidebarTaskAnalytics
+  );
 
   // const userInfo = authMethod === 'google' ? googleUser : user;
 
@@ -147,19 +166,35 @@ export function GeneralSettings() {
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <Label htmlFor="completion-control" className="whitespace-nowrap">Task Completion Control</Label>
+              <Label htmlFor="completion-control" className="whitespace-nowrap">
+                Task Completion Control
+              </Label>
               <p className="text-sm text-muted-foreground">
-                Choose whether to use a checkbox or a status tag icon in list view
+                Choose whether to use a checkbox or a status tag icon in list
+                view
               </p>
             </div>
             <div className="min-w-40">
-              <Select value={taskCompletionControl} onValueChange={(v) => setTaskCompletionControl(v as any)}>
+              <Select
+                value={taskCompletionControl}
+                onValueChange={(v) =>
+                  setTaskCompletionControl(v as TaskCompletionControl)
+                }
+              >
                 <SelectTrigger id="completion-control" className="w-full">
                   <SelectValue placeholder="Select control" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="checkbox"><div className="flex items-center gap-2"><CheckSquare className="w-4 h-4" /> Checkbox</div></SelectItem>
-                  <SelectItem value="status-tag"><div className="flex items-center gap-2"><Tag className="w-4 h-4" /> Status Tag (icon)</div></SelectItem>
+                  <SelectItem value="checkbox">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4" /> Checkbox
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="status-tag">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4" /> Status Tag (icon)
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -169,13 +204,15 @@ export function GeneralSettings() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="sidebar-analytics">Sidebar Task Analytics Summary</Label>
+              <Label htmlFor="sidebar-analytics">
+                Sidebar Task Analytics Summary
+              </Label>
               <p className="text-sm text-muted-foreground">
                 Show a compact analytics card above Task Lists in the sidebar
               </p>
             </div>
-            <Switch 
-              id="sidebar-analytics" 
+            <Switch
+              id="sidebar-analytics"
               checked={showSidebarTaskAnalytics}
               onCheckedChange={setShowSidebarTaskAnalytics}
             />

@@ -2,7 +2,7 @@ import React from 'react';
 import { EnhancedLayoutWrapper } from './EnhancedLayoutWrapper';
 import { HighlightedTextareaField } from './HighlightedTextareaField';
 import { ParsedTags } from './ParsedTags';
-import { ParsedTag } from "@shared/types";
+import { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
 
 export interface EnhancedTaskInputLayoutProps {
@@ -19,7 +19,7 @@ export interface EnhancedTaskInputLayoutProps {
   /** Additional CSS classes */
   className?: string;
   /** Key press handler */
-  onKeyPress?: (e: React.KeyboardEvent) => void;
+  onKeyPress?: React.KeyboardEventHandler<HTMLTextAreaElement>;
   /** Blur handler */
   onBlur?: () => void;
   /** Focus handler */
@@ -64,7 +64,9 @@ export interface EnhancedTaskInputLayoutProps {
   customTagRow?: React.ReactNode;
 }
 
-export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = ({
+export const EnhancedTaskInputLayout: React.FC<
+  EnhancedTaskInputLayoutProps
+> = ({
   value,
   onChange,
   tags,
@@ -97,10 +99,20 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
 }) => {
   const controls = (
     <>
-      <div className={cn('flex items-center gap-2', disabled && 'pointer-events-none opacity-50')}>
+      <div
+        className={cn(
+          'flex items-center gap-2',
+          disabled && 'pointer-events-none opacity-50'
+        )}
+      >
         {leftControls}
       </div>
-      <div className={cn('flex items-center gap-2', disabled && 'pointer-events-none opacity-50')}>
+      <div
+        className={cn(
+          'flex items-center gap-2',
+          disabled && 'pointer-events-none opacity-50'
+        )}
+      >
         {rightControls}
       </div>
     </>
@@ -116,9 +128,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
     >
       <div className="space-y-2">
         {filePreview && (
-          <div className="border-b border-border/50 pb-2">
-            {filePreview}
-          </div>
+          <div className="border-b border-border/50 pb-2">{filePreview}</div>
         )}
         <div className="relative">
           {enableSmartParsing ? (
@@ -131,7 +141,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
               placeholder={placeholder}
               disabled={disabled}
               onKeyPress={onKeyPress}
-              onKeyDown={onKeyPress as any}
+              onKeyDown={onKeyPress}
               onBlur={onBlur}
               onFocus={onFocus}
               confidence={confidence}
@@ -158,7 +168,7 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
                 'focus:outline-none',
                 disabled && 'cursor-not-allowed',
                 'p-0',
-                'font-[inherit]',
+                'font-[inherit]'
               )}
               style={{
                 minHeight,
@@ -195,7 +205,8 @@ export const EnhancedTaskInputLayout: React.FC<EnhancedTaskInputLayoutProps> = (
                 // Placeholder + disabled treatments
                 'placeholder:text-muted-foreground',
                 // Reserve space from the beginning; hide and disable pointer events until enabled
-                !secondaryEnabled && 'opacity-0 pointer-events-none select-none',
+                !secondaryEnabled &&
+                  'opacity-0 pointer-events-none select-none',
                 disabled && 'cursor-not-allowed'
               )}
               aria-hidden={!secondaryEnabled}

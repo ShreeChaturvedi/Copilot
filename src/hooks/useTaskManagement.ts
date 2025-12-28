@@ -156,18 +156,25 @@ export function useTaskManagement(
         method: 'GET',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
       });
-      const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+      const isJson = (r: Response) =>
+        (r.headers.get('content-type') || '').includes('application/json');
       if (!isJson(res)) return [] as TaskGroup[];
       const body = await res.json();
       if (!res.ok || !body.success) return [] as TaskGroup[];
-      const items = Array.isArray(body.data?.data) ? body.data.data : (body.data || []);
-      const mapped: TaskGroup[] = items.map((it: any) => ({
-        id: String(it.id),
-        name: String(it.name ?? 'Tasks'),
-        emoji: String(it.icon ?? '📁'),
-        color: String(it.color ?? '#3b82f6'),
-        description: String(it.description ?? ''),
-      }));
+      const items = Array.isArray(body.data?.data)
+        ? body.data.data
+        : Array.isArray(body.data)
+          ? body.data
+          : [];
+      const mapped: TaskGroup[] = items.map(
+        (item: Record<string, unknown>) => ({
+          id: String(item.id),
+          name: String(item.name ?? 'Tasks'),
+          emoji: String(item.icon ?? '📁'),
+          color: String(item.color ?? '#3b82f6'),
+          description: String(item.description ?? ''),
+        })
+      );
       return mapped;
     },
     staleTime: 5 * 60 * 1000,
@@ -179,97 +186,104 @@ export function useTaskManagement(
   useEffect(() => {
     if (taskListsQuery.data && taskListsQuery.data.length > 0) {
       setTaskGroups(taskListsQuery.data);
-      setActiveTaskGroupId((prev) => (prev === 'default' ? taskListsQuery.data![0].id : prev));
+      setActiveTaskGroupId((prev) =>
+        prev === 'default' ? taskListsQuery.data![0].id : prev
+      );
     }
   }, [taskListsQuery.data]);
 
   // Task CRUD handlers (only when includeTaskOperations is true)
   const handleAddTask = includeTaskOperations
     ? (title: string, _groupId?: string, smartData?: SmartTaskData) => {
-      // Extract scheduled date from smart data (already provided by parser)
-      const scheduledDate = smartData?.scheduledDate;
+        // Extract scheduled date from smart data (already provided by parser)
+        const scheduledDate = smartData?.scheduledDate;
 
-      // Convert auto-created natural language date/time tags into the canonical due date
-      // representation by removing them from the tags array. We will surface the due date via
-      // the task's scheduledDate property and a unified editable badge in the UI.
-      const nonDateTimeTags = smartData?.tags
-        ?.filter((tag) => {
-          const type = String((tag as unknown as { type?: string }).type || '').toLowerCase();
-          return type !== 'date' && type !== 'time';
-        })
-        .map((tag) => ({
-          id: tag.id,
-          type: tag.type,
-          value: tag.value,
-          displayText: tag.displayText,
-          iconName: tag.iconName,
-          color: tag.color,
-        }));
+        // Convert auto-created natural language date/time tags into the canonical due date
+        // representation by removing them from the tags array. We will surface the due date via
+        // the task's scheduledDate property and a unified editable badge in the UI.
+        const nonDateTimeTags = smartData?.tags
+          ?.filter((tag) => {
+            const type = String(
+              (tag as unknown as { type?: string }).type || ''
+            ).toLowerCase();
+            return type !== 'date' && type !== 'time';
+          })
+          .map((tag) => ({
+            id: tag.id,
+            type: tag.type,
+            value: tag.value,
+            displayText: tag.displayText,
+            iconName: tag.iconName,
+            color: tag.color,
+          }));
 
-      // Normalize special group ids
-      const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
+        // Normalize special group ids
+        const taskListId =
+          _groupId && _groupId !== 'default' && _groupId !== 'all'
+            ? _groupId
+            : undefined;
 
-      addTask.mutate({
-        title,
-        taskListId,
-        priority: smartData?.priority,
-        scheduledDate,
-        tags: nonDateTimeTags,
-        parsedMetadata: smartData
-          ? {
-            originalInput: smartData.originalInput,
-            cleanTitle: smartData.title,
-          }
-          : undefined,
-      });
-    }
+        addTask.mutate({
+          title,
+          taskListId,
+          priority: smartData?.priority,
+          scheduledDate,
+          tags: nonDateTimeTags,
+          parsedMetadata: smartData
+            ? {
+                originalInput: smartData.originalInput,
+                cleanTitle: smartData.title,
+              }
+            : undefined,
+        });
+      }
     : undefined;
 
   const handleToggleTask = includeTaskOperations
     ? (id: string) => {
-      const task = tasks.find((t) => t.id === id);
-      if (task) {
-        updateTask.mutate({
-          id,
-          updates: { completed: !task.completed },
-        });
+        const task = tasks.find((t) => t.id === id);
+        if (task) {
+          updateTask.mutate({
+            id,
+            updates: { completed: !task.completed },
+          });
+        }
       }
-    }
     : undefined;
 
   const handleEditTask = includeTaskOperations
     ? (id: string, title: string) => {
-      updateTask.mutate({
-        id,
-        updates: { title },
-      });
-    }
+        updateTask.mutate({
+          id,
+          updates: { title },
+        });
+      }
     : undefined;
 
   const handleDeleteTask = includeTaskOperations
     ? (id: string) => {
-      deleteTask.mutate(id);
-    }
+        deleteTask.mutate(id);
+      }
     : undefined;
 
   const handleScheduleTask = includeTaskOperations
     ? (id: string, scheduledDate: Date) => {
-      scheduleTask.mutate({ id, scheduledDate });
-    }
+        scheduleTask.mutate({ id, scheduledDate });
+      }
     : undefined;
 
   const handleRemoveTag = includeTaskOperations
     ? (taskId: string, tagId: string) => {
-      updateTask.mutate({
-        id: taskId,
-        updates: {
-          tags:
-            tasks
-              .find((t) => t.id === taskId)
-              ?.tags?.filter((tag) => tag.id !== tagId) || [],
-        },
-      });
-    }
+        updateTask.mutate({
+          id: taskId,
+          updates: {
+            tags:
+              tasks
+                .find((t) => t.id === taskId)
+                ?.tags?.filter((tag) => tag.id !== tagId) || [],
+          },
+        });
+      }
     : undefined;
 
   // Task group handlers (shared across all components)
@@ -287,19 +301,41 @@ export function useTaskManagement(
             description: data.description,
           }),
         });
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
         if (!isJson(res)) {
           // Optimistic local-only path already applied by UI add below
         }
         const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create list');
-        const created = body.data as { id: string; name: string; color: string; description?: string };
-        setTaskGroups((prev) => prev.map(g => g.id.startsWith('group-temp-') && g.name === data.name ? { ...g, id: String(created.id), color: created.color, description: created.description } : g));
+        if (!res.ok || !body.success)
+          throw new Error(body.error?.message || 'Failed to create list');
+        const created = body.data as {
+          id: string;
+          name: string;
+          color: string;
+          description?: string;
+        };
+        setTaskGroups((prev) =>
+          prev.map((g) =>
+            g.id.startsWith('group-temp-') && g.name === data.name
+              ? {
+                  ...g,
+                  id: String(created.id),
+                  color: created.color,
+                  description: created.description,
+                }
+              : g
+          )
+        );
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
         toast.error((err as Error).message || 'Failed to create task list');
         // Rollback optimistic add
-        setTaskGroups((prev) => prev.filter((g) => !g.id.startsWith('group-temp-') || g.name !== data.name));
+        setTaskGroups((prev) =>
+          prev.filter(
+            (g) => !g.id.startsWith('group-temp-') || g.name !== data.name
+          )
+        );
       }
     })();
     // Optimistic add
@@ -329,16 +365,23 @@ export function useTaskManagement(
           ...(updates.description ? { description: updates.description } : {}),
         };
 
-        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify(payload),
-        });
+        const res = await fetch(
+          `/api/task-lists/${encodeURIComponent(groupId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify(payload),
+          }
+        );
         // Ignore non-json responses silently in dev
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
         if (isJson(res)) {
           const body = await res.json();
-          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list');
+          if (!res.ok || !body.success)
+            throw new Error(
+              body.error?.message || 'Failed to update task list'
+            );
         }
       } catch (err) {
         toast.error((err as Error).message || 'Failed to update task list');
@@ -365,11 +408,15 @@ export function useTaskManagement(
     }
     (async () => {
       try {
-        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
-          method: 'DELETE',
-          headers: { ...authHeaders() },
-        });
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        const res = await fetch(
+          `/api/task-lists/${encodeURIComponent(groupId)}`,
+          {
+            method: 'DELETE',
+            headers: { ...authHeaders() },
+          }
+        );
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
         if (isJson(res) && !res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error?.message || 'Failed to delete task list');
@@ -408,23 +455,34 @@ export function useTaskManagement(
   const handleUpdateTaskGroupIcon = (groupId: string, emoji: string) => {
     // Optimistic update with rollback
     const previous = taskGroups;
-    setTaskGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, emoji } : g)));
+    setTaskGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, emoji } : g))
+    );
     (async () => {
       try {
-        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ icon: emoji }),
-        });
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        const res = await fetch(
+          `/api/task-lists/${encodeURIComponent(groupId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ icon: emoji }),
+          }
+        );
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
         if (isJson(res)) {
           const body = await res.json();
-          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list icon');
+          if (!res.ok || !body.success)
+            throw new Error(
+              body.error?.message || 'Failed to update task list icon'
+            );
         }
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
         setTaskGroups(previous);
-        toast.error((err as Error).message || 'Failed to update task list icon');
+        toast.error(
+          (err as Error).message || 'Failed to update task list icon'
+        );
       }
     })();
   };
@@ -432,23 +490,34 @@ export function useTaskManagement(
   const handleUpdateTaskGroupColor = (groupId: string, color: string) => {
     // Optimistic update with rollback
     const previous = taskGroups;
-    setTaskGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, color } : g)));
+    setTaskGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, color } : g))
+    );
     (async () => {
       try {
-        const res = await fetch(`/api/task-lists/${encodeURIComponent(groupId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ color }),
-        });
-        const isJson = (r: Response) => (r.headers.get('content-type') || '').includes('application/json');
+        const res = await fetch(
+          `/api/task-lists/${encodeURIComponent(groupId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ color }),
+          }
+        );
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
         if (isJson(res)) {
           const body = await res.json();
-          if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update task list color');
+          if (!res.ok || !body.success)
+            throw new Error(
+              body.error?.message || 'Failed to update task list color'
+            );
         }
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
         setTaskGroups(previous);
-        toast.error((err as Error).message || 'Failed to update task list color');
+        toast.error(
+          (err as Error).message || 'Failed to update task list color'
+        );
       }
     })();
   };

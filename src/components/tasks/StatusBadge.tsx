@@ -1,5 +1,10 @@
 import React from 'react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Flag, PlayCircle, Circle } from 'lucide-react';
 import type { Task } from '@shared/types';
@@ -14,11 +19,28 @@ export interface StatusBadgeProps {
   iconOnly?: boolean;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ task, onChange, className, iconOnly }) => {
-  const status = ((task as any).status as SimpleStatus | undefined) || (task.completed ? 'done' : 'not_started');
-  const label = status === 'in_progress' ? 'In Progress' : status === 'done' ? 'Done' : 'Not Started';
-  const Icon = status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
-  const colorClass = status === 'in_progress' ? 'text-amber-500' : status === 'done' ? 'text-emerald-600' : 'text-muted-foreground';
+export const StatusBadge: React.FC<StatusBadgeProps> = ({
+  task,
+  onChange,
+  className,
+  iconOnly,
+}) => {
+  const status: SimpleStatus =
+    task.status ?? (task.completed ? 'done' : 'not_started');
+  const label =
+    status === 'in_progress'
+      ? 'In Progress'
+      : status === 'done'
+        ? 'Done'
+        : 'Not Started';
+  const Icon =
+    status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
+  const colorClass =
+    status === 'in_progress'
+      ? 'text-amber-500'
+      : status === 'done'
+        ? 'text-emerald-600'
+        : 'text-muted-foreground';
 
   // Consistent sizing:
   // - iconOnly: 20x20 container, 2px inner padding to give breathing room around a 14px icon
@@ -37,25 +59,45 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ task, onChange, classN
           onClick={(e) => e.stopPropagation()}
         >
           <Icon className={cn(iconOnly ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5')} />
-          {!iconOnly && <span className="hidden sm:inline leading-[1.1rem]">{label}</span>}
+          {!iconOnly && (
+            <span className="hidden sm:inline leading-[1.1rem]">{label}</span>
+          )}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="w-44">
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onChange('not_started'); }}
-          className={cn('cursor-pointer', status === 'not_started' && 'bg-accent text-accent-foreground')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange('not_started');
+          }}
+          className={cn(
+            'cursor-pointer',
+            status === 'not_started' && 'bg-accent text-accent-foreground'
+          )}
         >
           <Circle className="w-3 h-3" /> Not Started
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onChange('in_progress'); }}
-          className={cn('cursor-pointer', status === 'in_progress' && 'bg-accent text-accent-foreground')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange('in_progress');
+          }}
+          className={cn(
+            'cursor-pointer',
+            status === 'in_progress' && 'bg-accent text-accent-foreground'
+          )}
         >
           <PlayCircle className="w-3 h-3" /> In Progress
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onChange('done'); }}
-          className={cn('cursor-pointer', status === 'done' && 'bg-accent text-accent-foreground')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange('done');
+          }}
+          className={cn(
+            'cursor-pointer',
+            status === 'done' && 'bg-accent text-accent-foreground'
+          )}
         >
           <Flag className="w-3 h-3" /> Done
         </DropdownMenuItem>
@@ -65,4 +107,3 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ task, onChange, classN
 };
 
 export default StatusBadge;
-

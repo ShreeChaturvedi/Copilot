@@ -1,10 +1,10 @@
 /**
  * EnhancedTaskInput - Chat-interface-style task input with advanced features
- * 
+ *
  * Professional, spacious input interface inspired by modern chat applications.
  * Features multi-line input, file attachments, voice input, and smart parsing,
  * all contained within a beautiful card-based container.
- * 
+ *
  * Key improvements over SmartTaskInput:
  * - Much larger, more spacious design (120px+ min height)
  * - Card-based container with proper shadows and borders
@@ -38,10 +38,18 @@ type TaskGroup = {
 import { cn } from '@/lib/utils';
 import { DueDateBadge } from '@/components/tasks/DueDateBadge';
 
-
 export interface EnhancedTaskInputProps {
-  onAddTask: (title: string, groupId?: string, smartData?: SmartTaskData) => void;
-  onAddTaskWithFiles?: (title: string, groupId?: string, smartData?: SmartTaskData, files?: UploadedFile[]) => void;
+  onAddTask: (
+    title: string,
+    groupId?: string,
+    smartData?: SmartTaskData
+  ) => void;
+  onAddTaskWithFiles?: (
+    title: string,
+    groupId?: string,
+    smartData?: SmartTaskData,
+    files?: UploadedFile[]
+  ) => void;
   taskGroups?: TaskGroup[];
   activeTaskGroupId?: string;
   onCreateTaskGroup?: () => void;
@@ -75,24 +83,28 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   enableSmartParsing = true,
   showConfidence = false,
   // maxDisplayTags = 5,
-  placeholder = "What would you like to work on?",
+  placeholder = 'What would you like to work on?',
   onFilesAdded,
   maxFiles = 5,
-  enableFileUpload = true
+  enableFileUpload = true,
 }) => {
   const [inputText, setInputText] = useState('');
   const [descriptionText, setDescriptionText] = useState('');
-  const [smartParsingEnabled, setSmartParsingEnabled] = useState(enableSmartParsing);
+  const [smartParsingEnabled, setSmartParsingEnabled] =
+    useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [, setIsFocused] = useState(false); // State maintained for potential future focus styling
   const baseTextRef = useRef('');
   const descriptionInputRef = useRef<HTMLInputElement>(null);
   // Track tags the user dismissed (we hide these without modifying the input text)
-  const [dismissedTagSignatures, setDismissedTagSignatures] = useState<Set<string>>(new Set());
+  const [dismissedTagSignatures, setDismissedTagSignatures] = useState<
+    Set<string>
+  >(new Set());
   // Manual due date state for this input session
-  const [manualDueDate, setManualDueDate] = useState<Date | undefined>(undefined);
-
+  const [manualDueDate, setManualDueDate] = useState<Date | undefined>(
+    undefined
+  );
 
   // Initialize text parser
   const {
@@ -114,201 +126,268 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     name: 'Tasks',
     emoji: '📋',
     color: '#3b82f6',
-    description: 'Default task group'
+    description: 'Default task group',
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) ||
+  const activeTaskGroup =
+    taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Handle voice transcript (final results)
   const handleVoiceTranscript = useCallback((transcript: string) => {
-    const newText = baseTextRef.current ? `${baseTextRef.current} ${transcript}` : transcript;
+    const newText = baseTextRef.current
+      ? `${baseTextRef.current} ${transcript}`
+      : transcript;
     setInputText(newText);
   }, []);
 
   // Handle interim voice transcript (real-time feedback)
   const handleInterimTranscript = useCallback((interim: string) => {
-    const newText = baseTextRef.current ? `${baseTextRef.current} ${interim}` : interim;
+    const newText = baseTextRef.current
+      ? `${baseTextRef.current} ${interim}`
+      : interim;
     setInputText(newText);
   }, []);
 
   // Handle recording state changes
-  const handleRecordingStateChange = useCallback((recording: boolean) => {
-    setIsRecording(recording);
-    if (recording) {
-      baseTextRef.current = inputText.trim();
-    }
-  }, [inputText]);
+  const handleRecordingStateChange = useCallback(
+    (recording: boolean) => {
+      setIsRecording(recording);
+      if (recording) {
+        baseTextRef.current = inputText.trim();
+      }
+    },
+    [inputText]
+  );
 
   // Handle file uploads
-  const handleFilesAdded = useCallback(async (files: File[]) => {
-    const readAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-
-    async function compressImageIfNeeded(file: File): Promise<File> {
-      if (!file.type.startsWith('image/')) return file;
-      // Only compress if larger than ~1MB
-      if (file.size < 1_000_000) return file;
-      try {
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const image = new Image();
-          const url = URL.createObjectURL(file);
-          image.onload = () => resolve(image);
-          image.onerror = (e) => reject(e);
-          image.src = url;
+  const handleFilesAdded = useCallback(
+    async (files: File[]) => {
+      const readAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
         });
-        const canvas = document.createElement('canvas');
-        const maxDim = 1920; // cap dimensions
-        let { width, height } = img;
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
+
+      async function compressImageIfNeeded(file: File): Promise<File> {
+        if (!file.type.startsWith('image/')) return file;
+        // Only compress if larger than ~1MB
+        if (file.size < 1_000_000) return file;
+        try {
+          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const image = new Image();
+            const url = URL.createObjectURL(file);
+            image.onload = () => resolve(image);
+            image.onerror = (e) => reject(e);
+            image.src = url;
+          });
+          const canvas = document.createElement('canvas');
+          const maxDim = 1920; // cap dimensions
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return file;
+          ctx.drawImage(img, 0, 0, width, height);
+          const quality = 0.8; // balance quality/size
+          const blob: Blob | null = await new Promise((resolve) =>
+            canvas.toBlob(
+              resolve,
+              file.type === 'image/png' ? 'image/png' : 'image/jpeg',
+              quality
+            )
+          );
+          if (!blob) return file;
+          return new File([blob], file.name, {
+            type: blob.type,
+            lastModified: Date.now(),
+          });
+        } catch {
+          return file;
         }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return file;
-        ctx.drawImage(img, 0, 0, width, height);
-        const quality = 0.8; // balance quality/size
-        const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality));
-        if (!blob) return file;
-        return new File([blob], file.name, { type: blob.type, lastModified: Date.now() });
-      } catch {
-        return file;
       }
-    }
 
-    const processed = await Promise.all(files.map(async (f) => await compressImageIfNeeded(f)));
+      const processed = await Promise.all(
+        files.map(async (f) => await compressImageIfNeeded(f))
+      );
 
-    const newUploadedFiles: UploadedFile[] = await Promise.all(
-      processed.map(async (file) => ({
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        file,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        status: 'completed' as const,
-        preview: await readAsDataUrl(file),
-      }))
-    );
+      const newUploadedFiles: UploadedFile[] = await Promise.all(
+        processed.map(async (file) => ({
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          file,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: 'completed' as const,
+          preview: await readAsDataUrl(file),
+        }))
+      );
 
-    setUploadedFiles((prev) => {
-      const updated = [...prev, ...newUploadedFiles];
-      if (onFilesAdded) onFilesAdded(updated);
-      return updated;
-    });
-  }, [onFilesAdded]);
+      setUploadedFiles((prev) => {
+        const updated = [...prev, ...newUploadedFiles];
+        if (onFilesAdded) onFilesAdded(updated);
+        return updated;
+      });
+    },
+    [onFilesAdded]
+  );
 
   // Handle file removal
-  const handleFileRemove = useCallback((fileId: string) => {
-    setUploadedFiles(prev => {
-      const updated = prev.filter(file => file.id !== fileId);
+  const handleFileRemove = useCallback(
+    (fileId: string) => {
+      setUploadedFiles((prev) => {
+        const updated = prev.filter((file) => file.id !== fileId);
 
-      // Clean up object URLs for removed image previews
-      const removedFile = prev.find(file => file.id === fileId);
-      if (removedFile?.preview && removedFile.preview.startsWith('blob:')) {
-        URL.revokeObjectURL(removedFile.preview);
-      }
+        // Clean up object URLs for removed image previews
+        const removedFile = prev.find((file) => file.id === fileId);
+        if (removedFile?.preview && removedFile.preview.startsWith('blob:')) {
+          URL.revokeObjectURL(removedFile.preview);
+        }
 
-      // Notify parent component if callback provided
-      if (onFilesAdded) {
-        onFilesAdded(updated);
-      }
+        // Notify parent component if callback provided
+        if (onFilesAdded) {
+          onFilesAdded(updated);
+        }
 
-      return updated;
-    });
-  }, [onFilesAdded]);
+        return updated;
+      });
+    },
+    [onFilesAdded]
+  );
 
   // Create a stable signature for a tag to support dismissal without changing input text
-  const makeTagSignature = useCallback((t: { type: string; originalText: string; startIndex: number }) => {
-    return `${t.type}|${t.originalText}|${t.startIndex}`;
-  }, []);
+  const makeTagSignature = useCallback(
+    (t: { type: string; originalText: string; startIndex: number }) => {
+      return `${t.type}|${t.originalText}|${t.startIndex}`;
+    },
+    []
+  );
 
   // Derived: tags after applying user dismissals (used for highlighting, UI, and submission)
   const filteredTags = useMemo(() => {
     // Always hide date/time tags from the inline tag list; the Due Date badge replaces them
-    let base = (parsedTags || []).filter((t) => t.type !== 'date' && t.type !== 'time');
+    const base = (parsedTags || []).filter(
+      (t) => t.type !== 'date' && t.type !== 'time'
+    );
     if (dismissedTagSignatures.size === 0) return base;
     return base.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
   }, [parsedTags, dismissedTagSignatures, makeTagSignature]);
 
   // Handle form submission
-  const handleSubmit = useCallback((e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleSubmit = useCallback(
+    (e?: React.FormEvent) => {
+      e?.preventDefault();
 
-    const titleToUse = inputText.trim();
+      const titleToUse = inputText.trim();
 
-    if (titleToUse) {
-      // Capitalize first letter
-      const capitalizedTitle = titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
+      if (titleToUse) {
+        // Capitalize first letter
+        const capitalizedTitle =
+          titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
 
-      // Extract smart data if parsing is enabled
-      let smartData: SmartTaskData | undefined;
-      if (smartParsingEnabled && filteredTags.length > 0) {
-        const priorityTag = filteredTags.find(tag => tag.type === 'priority');
-        const priority = priorityTag?.value as 'low' | 'medium' | 'high' | undefined;
+        // Extract smart data if parsing is enabled
+        let smartData: SmartTaskData | undefined;
+        if (smartParsingEnabled && filteredTags.length > 0) {
+          const priorityTag = filteredTags.find(
+            (tag) => tag.type === 'priority'
+          );
+          const priority = priorityTag?.value as
+            | 'low'
+            | 'medium'
+            | 'high'
+            | undefined;
 
-        const parsedDateTag = parsedTags?.find(tag => tag.type === 'date' || tag.type === 'time');
-        const scheduledDate = manualDueDate || (parsedDateTag?.value as Date | undefined);
+          const parsedDateTag = parsedTags?.find(
+            (tag) => tag.type === 'date' || tag.type === 'time'
+          );
+          const scheduledDate =
+            manualDueDate || (parsedDateTag?.value as Date | undefined);
 
-        smartData = {
-          title: capitalizedTitle,
-          originalInput: inputText,
-          priority,
-          scheduledDate,
-          tags: filteredTags,
-          confidence,
-        };
+          smartData = {
+            title: capitalizedTitle,
+            originalInput: inputText,
+            priority,
+            scheduledDate,
+            tags: filteredTags,
+            confidence,
+          };
+        }
+
+        // Prefer file-aware callback if provided
+        if (onAddTaskWithFiles) {
+          onAddTaskWithFiles(
+            capitalizedTitle,
+            activeTaskGroup.id,
+            smartData,
+            uploadedFiles
+          );
+        } else {
+          onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
+        }
+
+        // Clear input and parsing state
+        setInputText('');
+        setDescriptionText('');
+        setUploadedFiles([]);
+        clear();
+        setDismissedTagSignatures(new Set());
+        setManualDueDate(undefined);
       }
-
-      // Prefer file-aware callback if provided
-      if (onAddTaskWithFiles) {
-        onAddTaskWithFiles(capitalizedTitle, activeTaskGroup.id, smartData, uploadedFiles);
-      } else {
-        onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
-      }
-
-      // Clear input and parsing state
-      setInputText('');
-      setDescriptionText('');
-      setUploadedFiles([]);
-      clear();
-      setDismissedTagSignatures(new Set());
-      setManualDueDate(undefined);
-    }
-  }, [inputText, smartParsingEnabled, filteredTags, confidence, onAddTask, onAddTaskWithFiles, uploadedFiles, activeTaskGroup.id, clear, parsedTags, manualDueDate]);
+    },
+    [
+      inputText,
+      smartParsingEnabled,
+      filteredTags,
+      confidence,
+      onAddTask,
+      onAddTaskWithFiles,
+      uploadedFiles,
+      activeTaskGroup.id,
+      clear,
+      parsedTags,
+      manualDueDate,
+    ]
+  );
 
   // Handle key press in title field: Enter sends; Shift+Enter focuses description
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.shiftKey) {
-      e.preventDefault();
-      // Only focus description when enabled (after user typed in title)
-      if (inputText.trim().length > 0) {
-        descriptionInputRef.current?.focus();
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        // Only focus description when enabled (after user typed in title)
+        if (inputText.trim().length > 0) {
+          descriptionInputRef.current?.focus();
+        }
+        return;
       }
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    }
-  }, [handleSubmit, inputText]);
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit, inputText]
+  );
 
   // Handle key press in description field: Enter sends
-  const handleDescriptionKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    }
-  }, [handleSubmit]);
+  const handleDescriptionKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit]
+  );
 
   // Check if we have content to submit (only finalized text, not interim)
   const hasContent = inputText.trim().length > 0;
@@ -336,20 +415,22 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   }, [manualDueDate, autoDueTag]);
 
   // File preview component
-  const filePreview = useMemo(() => (
-    uploadedFiles.length > 0 ? (
-      <CompactFilePreview
-        files={uploadedFiles}
-        onFileRemove={handleFileRemove}
-        disabled={disabled}
-      />
-    ) : null
-  ), [uploadedFiles, handleFileRemove, disabled]);
+  const filePreview = useMemo(
+    () =>
+      uploadedFiles.length > 0 ? (
+        <CompactFilePreview
+          files={uploadedFiles}
+          onFileRemove={handleFileRemove}
+          disabled={disabled}
+        />
+      ) : null,
+    [uploadedFiles, handleFileRemove, disabled]
+  );
 
   // Task Group Selector using Combobox
   const taskGroupSelector = (
     <TaskGroupCombobox
-      taskGroups={taskGroups as any}
+      taskGroups={taskGroups}
       activeTaskGroupId={activeTaskGroup.id}
       onSelectTaskGroup={onSelectTaskGroup}
       onCreateTaskGroup={onCreateTaskGroup}
@@ -388,8 +469,12 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     <>
       {hasContent && (
         <div className="text-sm text-muted-foreground">
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">⇧</kbd>
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded ml-0.5">⏎</kbd>
+          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">
+            ⇧
+          </kbd>
+          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded ml-0.5">
+            ⏎
+          </kbd>
           <span className="ml-1">for description</span>
         </div>
       )}
@@ -418,19 +503,27 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   );
 
   // Remove a tag visually (do not alter input text). Hide tag and its highlight.
-  const handleRemoveInlineTag = useCallback((tagId: string) => {
-    const tagToRemove = filteredTags.find((t) => t.id === tagId);
-    if (!tagToRemove) return;
-    setDismissedTagSignatures((prev) => {
-      const next = new Set(prev);
-      next.add(makeTagSignature(tagToRemove));
-      return next;
-    });
-  }, [filteredTags, makeTagSignature]);
+  const handleRemoveInlineTag = useCallback(
+    (tagId: string) => {
+      const tagToRemove = filteredTags.find((t) => t.id === tagId);
+      if (!tagToRemove) return;
+      setDismissedTagSignatures((prev) => {
+        const next = new Set(prev);
+        next.add(makeTagSignature(tagToRemove));
+        return next;
+      });
+    },
+    [filteredTags, makeTagSignature]
+  );
 
   return (
     <div className={cn('max-w-2xl mx-auto', className)}>
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+      >
         <EnhancedTaskInputLayout
           value={inputText}
           onChange={setInputText}
@@ -478,9 +571,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       {/* Error Display */}
       {error && smartParsingEnabled && (
         <div className="mt-2 px-1">
-          <div className="text-sm text-destructive">
-            Parsing error: {error}
-          </div>
+          <div className="text-sm text-destructive">Parsing error: {error}</div>
         </div>
       )}
 

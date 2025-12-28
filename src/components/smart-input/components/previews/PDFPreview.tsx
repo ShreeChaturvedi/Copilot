@@ -1,6 +1,6 @@
 /**
  * PDFPreview - Component for generating and displaying PDF first page thumbnails
- * 
+ *
  * Uses PDF.js to render the first page of a PDF file as a canvas thumbnail.
  * Implements dynamic loading, error handling, and memory management.
  */
@@ -20,7 +20,11 @@ interface PDFDocumentProxy {
 
 interface PDFPageProxy {
   getViewport: (options: { scale: number }) => PDFPageViewport;
-  render: (options: { canvasContext: CanvasRenderingContext2D; viewport: PDFPageViewport; canvas?: HTMLCanvasElement }) => PDFRenderTask;
+  render: (options: {
+    canvasContext: CanvasRenderingContext2D;
+    viewport: PDFPageViewport;
+    canvas?: HTMLCanvasElement;
+  }) => PDFRenderTask;
   cleanup: () => void;
 }
 
@@ -80,7 +84,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
   /**
    * Generate PDF thumbnail using PDF.js
    */
-  const generateThumbnail = async (): Promise<void> => {
+  const generateThumbnail = useCallback(async (): Promise<void> => {
     if (!file || file.type !== 'application/pdf') {
       throw new Error('Invalid PDF file');
     }
@@ -88,7 +92,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
     try {
       // Dynamic import to avoid bundle bloat
       const pdfjs = await import('pdfjs-dist');
-      
+
       // Configure PDF.js worker from CDN to avoid bundling ~1MB worker in our dist
       // Pinned to the installed version for cacheability and consistency
       pdfjs.GlobalWorkerOptions.workerSrc =
@@ -96,10 +100,10 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
 
       // Convert file to array buffer
       const arrayBuffer = await file.arrayBuffer();
-      
+
       // Load PDF document
       const loadingTask = pdfjs.getDocument(arrayBuffer);
-      const pdfDoc = await loadingTask.promise as unknown as PDFDocumentProxy;
+      const pdfDoc = (await loadingTask.promise) as unknown as PDFDocumentProxy;
       pdfDocRef.current = pdfDoc as PDFDocumentProxy;
 
       if (pdfDoc.numPages === 0) {
@@ -107,11 +111,13 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       }
 
       // Get first page
-      const page = await (pdfDoc as unknown as { getPage: (n: number) => Promise<PDFPageProxy> }).getPage(1);
-      
+      const page = await (
+        pdfDoc as unknown as { getPage: (n: number) => Promise<PDFPageProxy> }
+      ).getPage(1);
+
       // Calculate viewport
       const viewport = (page as PDFPageProxy).getViewport({ scale });
-      
+
       // Create canvas programmatically to avoid ref issues
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
@@ -126,7 +132,11 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       // Render PDF page to canvas
-      const renderContext: { canvasContext: CanvasRenderingContext2D; viewport: PDFPageViewport; canvas?: HTMLCanvasElement } = {
+      const renderContext: {
+        canvasContext: CanvasRenderingContext2D;
+        viewport: PDFPageViewport;
+        canvas?: HTMLCanvasElement;
+      } = {
         canvasContext: context,
         viewport: viewport,
         canvas,
@@ -134,37 +144,45 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
 
       const renderTask = (page as PDFPageProxy).render(renderContext);
       renderTaskRef.current = renderTask;
-      
+
       await renderTask.promise;
 
       // Convert canvas to blob URL
       const blob = await new Promise<Blob>((resolve) => {
         // Prefer WebP for smaller previews with good quality; fall back to PNG if not supported
         const tryWebp = () =>
-          canvas.toBlob((b) => {
-            if (b) resolve(b);
-            else tryPng();
-          }, 'image/webp', 0.8);
+          canvas.toBlob(
+            (b) => {
+              if (b) resolve(b);
+              else tryPng();
+            },
+            'image/webp',
+            0.8
+          );
         const tryPng = () =>
-          canvas.toBlob((b) => {
-            resolve((b as Blob) || new Blob());
-          }, 'image/png', 0.8);
+          canvas.toBlob(
+            (b) => {
+              resolve((b as Blob) || new Blob());
+            },
+            'image/png',
+            0.8
+          );
         tryWebp();
       });
 
       const url = URL.createObjectURL(blob);
       setThumbnailUrl(url);
-      
+
       // Clean up page resources
       page.cleanup();
-      
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown PDF processing error');
+      const error =
+        err instanceof Error ? err : new Error('Unknown PDF processing error');
       setError(error.message);
       onError?.(error);
       throw error;
     }
-  };
+  }, [file, onError, scale]);
 
   /**
    * Clean up resources
@@ -284,10 +302,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        'relative rounded-md overflow-hidden bg-white',
-        className
-      )}
+      className={cn('relative rounded-md overflow-hidden bg-white', className)}
       style={{ width, height }}
     >
       {/* Thumbnail image */}
@@ -297,7 +312,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
         className="w-full h-full object-cover"
         loading="lazy"
       />
-      
+
       {/* PDF indicator overlay */}
       <div className="absolute bottom-0 right-0 bg-red-500 text-white text-xs px-1 rounded-tl">
         PDF

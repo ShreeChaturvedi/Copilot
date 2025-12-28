@@ -31,7 +31,7 @@ type TaskGroup = {
   color: string;
   description?: string;
 };
-import { ParsedTag } from "@shared/types";
+import { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
 import './components/smart-tags.css';
 
@@ -51,7 +51,11 @@ export interface SmartTaskData {
 }
 
 export interface SmartTaskInputProps {
-  onAddTask: (title: string, groupId?: string, smartData?: SmartTaskData) => void;
+  onAddTask: (
+    title: string,
+    groupId?: string,
+    smartData?: SmartTaskData
+  ) => void;
   taskGroups?: TaskGroup[];
   activeTaskGroupId?: string;
   onCreateTaskGroup?: () => void;
@@ -106,18 +110,12 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   const [, setVoiceTranscript] = useState(''); // Voice transcript state maintained for potential future use
 
   // Initialize text parser
-  const {
-    isLoading,
-    error,
-    tags,
-    confidence,
-    hasConflicts,
-    clear,
-  } = useTextParser(inputText, {
-    enabled: enableSmartParsing,
-    debounceMs: parsingOptions.debounceMs || 100,
-    minLength: parsingOptions.minLength || 2,
-  });
+  const { isLoading, error, tags, confidence, hasConflicts, clear } =
+    useTextParser(inputText, {
+      enabled: enableSmartParsing,
+      debounceMs: parsingOptions.debounceMs || 100,
+      minLength: parsingOptions.minLength || 2,
+    });
 
   // Default task group if none exist
   const defaultTaskGroup: TaskGroup = {
@@ -125,11 +123,12 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
     name: 'Tasks',
     emoji: '📋',
     color: '#3b82f6',
-    description: 'Default task group'
+    description: 'Default task group',
   };
 
   // Get current active task group
-  const activeTaskGroup = taskGroups.find(group => group.id === activeTaskGroupId) ||
+  const activeTaskGroup =
+    taskGroups.find((group) => group.id === activeTaskGroupId) ||
     (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
   // Handle input change
@@ -139,13 +138,10 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
 
   // Handle voice transcript (final results)
   const handleVoiceTranscript = useCallback((transcript: string) => {
-
     // Use functional update to avoid dependency on inputText
-    setInputText(prevText => {
+    setInputText((prevText) => {
       const currentText = prevText.trim();
-      const newText = currentText
-        ? `${currentText} ${transcript}`
-        : transcript;
+      const newText = currentText ? `${currentText} ${transcript}` : transcript;
       return newText;
     });
 
@@ -158,75 +154,99 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   }, []);
 
   // Handle form submission
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
 
-    // Always use the original input text as the title (user's requirement)
-    const titleToUse = inputText.trim();
+      // Always use the original input text as the title (user's requirement)
+      const titleToUse = inputText.trim();
 
-    if (titleToUse) {
-      // Capitalize first letter
-      const capitalizedTitle = titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
+      if (titleToUse) {
+        // Capitalize first letter
+        const capitalizedTitle =
+          titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
 
-      // Extract smart data if parsing is enabled
-      let smartData: SmartTaskData | undefined;
-      if (enableSmartParsing && tags.length > 0) {
-        // Extract priority from tags
-        const priorityTag = tags.find(tag => tag.type === 'priority');
-        const priority = priorityTag?.value as 'low' | 'medium' | 'high' | undefined;
+        // Extract smart data if parsing is enabled
+        let smartData: SmartTaskData | undefined;
+        if (enableSmartParsing && tags.length > 0) {
+          // Extract priority from tags
+          const priorityTag = tags.find((tag) => tag.type === 'priority');
+          const priority = priorityTag?.value as
+            | 'low'
+            | 'medium'
+            | 'high'
+            | undefined;
 
-        // Extract scheduled date from date/time tags
-        const dateTag = tags.find(tag => tag.type === 'date' || tag.type === 'time');
-        const scheduledDate = dateTag?.value as Date | undefined;
+          // Extract scheduled date from date/time tags
+          const dateTag = tags.find(
+            (tag) => tag.type === 'date' || tag.type === 'time'
+          );
+          const scheduledDate = dateTag?.value as Date | undefined;
 
-        smartData = {
-          title: capitalizedTitle, // This is the full original title, not cleaned
-          originalInput: inputText, // Keep original for metadata
-          priority,
-          scheduledDate,
-          tags,
-          confidence,
-        };
+          smartData = {
+            title: capitalizedTitle, // This is the full original title, not cleaned
+            originalInput: inputText, // Keep original for metadata
+            priority,
+            scheduledDate,
+            tags,
+            confidence,
+          };
+        }
+
+        // Call onAddTask with smart data
+        onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
+
+        // Clear input and parsing state
+        setInputText('');
+        setVoiceTranscript('');
+        clear();
       }
-
-      // Call onAddTask with smart data
-      onAddTask(capitalizedTitle, activeTaskGroup.id, smartData);
-
-      // Clear input and parsing state
-      setInputText('');
-      setVoiceTranscript('');
-      clear();
-    }
-  }, [inputText, enableSmartParsing, tags, confidence, onAddTask, activeTaskGroup.id, clear]);
+    },
+    [
+      inputText,
+      enableSmartParsing,
+      tags,
+      confidence,
+      onAddTask,
+      activeTaskGroup.id,
+      clear,
+    ]
+  );
 
   // Handle key press
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e);
-    }
-  }, [handleSubmit]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        handleSubmit(e);
+      }
+    },
+    [handleSubmit]
+  );
 
   // Handle tag removal
-  const handleRemoveTag = useCallback((tagId: string) => {
-    // Find the tag to remove
-    const tagToRemove = tags.find(tag => tag.id === tagId);
-    if (tagToRemove) {
-      // Remove the tag text from the input
-      const startIndex = tagToRemove.startIndex;
-      const endIndex = tagToRemove.endIndex;
+  const handleRemoveTag = useCallback(
+    (tagId: string) => {
+      // Find the tag to remove
+      const tagToRemove = tags.find((tag) => tag.id === tagId);
+      if (tagToRemove) {
+        // Remove the tag text from the input
+        const startIndex = tagToRemove.startIndex;
+        const endIndex = tagToRemove.endIndex;
 
-      // Create new text without the removed tag
-      const beforeTag = inputText.substring(0, startIndex);
-      const afterTag = inputText.substring(endIndex);
-      const newText = (beforeTag + afterTag).replace(/\s+/g, ' ').trim();
+        // Create new text without the removed tag
+        const beforeTag = inputText.substring(0, startIndex);
+        const afterTag = inputText.substring(endIndex);
+        const newText = (beforeTag + afterTag).replace(/\s+/g, ' ').trim();
 
-      // Update input text - this will trigger re-parsing
-      setInputText(newText);
-    }
-  }, [tags, inputText]);
+        // Update input text - this will trigger re-parsing
+        setInputText(newText);
+      }
+    },
+    [tags, inputText]
+  );
 
   // Handle tag click
-  const handleTagClick = useCallback((tag: ParsedTag) => {
+  const handleTagClick = useCallback((_tag: ParsedTag) => {
     // TODO: Open tag editor or show tag details
   }, []);
 
@@ -316,7 +336,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
       />
       {submitButton}
     </>
-  ) : submitButton;
+  ) : (
+    submitButton
+  );
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -340,172 +362,178 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           />
         </form>
       ) : /* Main input form using new FlexInputGroup architecture */
-        useFlexInputGroup ? (
-          <form onSubmit={handleSubmit}>
-            <FlexInputGroup
-              prefix={taskGroupSelector}
-              suffix={submitButton}
-              disabled={disabled}
-              hideFocusOutline={hideFocusOutline}
-            >
-              {enableSmartParsing ? (
-                <HighlightedInputField
-                  id="smart-task-input-highlighted"
-                  name="smart-task-input-highlighted"
-                  value={inputText}
-                  onChange={handleInputChange}
-                  tags={tags}
-                  placeholder="Add Task"
-                  disabled={disabled}
-                  onKeyPress={handleKeyPress}
-                  confidence={confidence}
-                  showConfidence={showConfidence}
-                />
-              ) : (
-                <input
-                  type="text"
-                  id="smart-task-input-fallback"
-                  name="smart-task-input-fallback"
-                  placeholder="Add Task"
-                  value={inputText}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  disabled={disabled}
-                  className={cn(
-                    'h-full w-full border-none outline-none bg-transparent',
-                    'text-base md:text-sm',
-                    'placeholder:text-muted-foreground',
-                    'focus:outline-none',
-                    'disabled:cursor-not-allowed disabled:opacity-50'
-                  )}
-                  aria-label="New task input"
-                />
-              )}
-            </FlexInputGroup>
-          </form>
-        ) : (
-          // Legacy form structure (for fallback)
-          <form onSubmit={handleSubmit} className="relative">
-            {/* Task Group Selector */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
-                  aria-label={`Current task group: ${activeTaskGroup.name}`}
-                >
-                  <span className="text-base" style={{ color: activeTaskGroup.color }}>
-                    {activeTaskGroup.emoji}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                {taskGroups.map((group) => (
-                  <DropdownMenuItem
-                    key={group.id}
-                    onClick={() => onSelectTaskGroup?.(group.id)}
-                    className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
-                  >
-                    <span className="mr-2 text-base" style={{ color: group.color }}>
-                      {group.emoji}
-                    </span>
-                    <span>{group.name}</span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                {/* New List Option */}
-                <DropdownMenuItem
-                  onClick={() => onCreateTaskGroup?.()}
-                  className="text-success hover:text-success hover:bg-success/10 focus:text-success focus:bg-success/10"
-                >
-                  <Plus className="mr-2 h-4 w-4 text-success" />
-                  <span>New List</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Smart Input */}
+      useFlexInputGroup ? (
+        <form onSubmit={handleSubmit}>
+          <FlexInputGroup
+            prefix={taskGroupSelector}
+            suffix={submitButton}
+            disabled={disabled}
+            hideFocusOutline={hideFocusOutline}
+          >
             {enableSmartParsing ? (
-              useOverlayHighlighting ? (
-                <OverlayHighlightedInput
-                  value={inputText}
-                  onChange={handleInputChange}
-                  tags={tags}
-                  placeholder="Add Task"
-                  disabled={disabled}
-                  onKeyPress={handleKeyPress}
-                  confidence={confidence}
-                  showConfidence={showConfidence}
-                  className="pl-10 pr-12 border-input"
-                />
-              ) : useInlineHighlighting ? (
-                <InlineHighlightedInput
-                  value={inputText}
-                  onChange={handleInputChange}
-                  tags={tags}
-                  placeholder="Add Task"
-                  disabled={disabled}
-                  onKeyPress={handleKeyPress}
-                  confidence={confidence}
-                  showConfidence={showConfidence}
-                  className="pl-10 pr-12 border-input"
-                />
-              ) : (
-                <HighlightedInput
-                  value={inputText}
-                  onChange={handleInputChange}
-                  tags={tags}
-                  placeholder="Add Task"
-                  disabled={disabled}
-                  onKeyPress={handleKeyPress}
-                  confidence={confidence}
-                  showConfidence={showConfidence}
-                  className="pl-10 pr-12 border-input"
-                />
-              )
+              <HighlightedInputField
+                id="smart-task-input-highlighted"
+                name="smart-task-input-highlighted"
+                value={inputText}
+                onChange={handleInputChange}
+                tags={tags}
+                placeholder="Add Task"
+                disabled={disabled}
+                onKeyPress={handleKeyPress}
+                confidence={confidence}
+                showConfidence={showConfidence}
+              />
             ) : (
               <input
                 type="text"
-                id="legacy-task-input"
-                name="legacy-task-input"
+                id="smart-task-input-fallback"
+                name="smart-task-input-fallback"
                 placeholder="Add Task"
                 value={inputText}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={disabled}
                 className={cn(
-                  'w-full pl-10 pr-12 border-input rounded-md',
-                  'px-3 py-2 text-sm',
+                  'h-full w-full border-none outline-none bg-transparent',
+                  'text-base md:text-sm',
                   'placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                  'focus:outline-none',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
                 aria-label="New task input"
               />
             )}
+          </FlexInputGroup>
+        </form>
+      ) : (
+        // Legacy form structure (for fallback)
+        <form onSubmit={handleSubmit} className="relative">
+          {/* Task Group Selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
+                aria-label={`Current task group: ${activeTaskGroup.name}`}
+              >
+                <span
+                  className="text-base"
+                  style={{ color: activeTaskGroup.color }}
+                >
+                  {activeTaskGroup.emoji}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {taskGroups.map((group) => (
+                <DropdownMenuItem
+                  key={group.id}
+                  onClick={() => onSelectTaskGroup?.(group.id)}
+                  className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
+                >
+                  <span
+                    className="mr-2 text-base"
+                    style={{ color: group.color }}
+                  >
+                    {group.emoji}
+                  </span>
+                  <span>{group.name}</span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              {/* New List Option */}
+              <DropdownMenuItem
+                onClick={() => onCreateTaskGroup?.()}
+                className="text-success hover:text-success hover:bg-success/10 focus:text-success focus:bg-success/10"
+              >
+                <Plus className="mr-2 h-4 w-4 text-success" />
+                <span>New List</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={disabled || !inputText.trim()}
-              size="sm"
-              variant="ghost"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-              aria-label="Add task"
-            >
-              <ArrowUp className="w-4 h-4" />
-            </Button>
+          {/* Smart Input */}
+          {enableSmartParsing ? (
+            useOverlayHighlighting ? (
+              <OverlayHighlightedInput
+                value={inputText}
+                onChange={handleInputChange}
+                tags={tags}
+                placeholder="Add Task"
+                disabled={disabled}
+                onKeyPress={handleKeyPress}
+                confidence={confidence}
+                showConfidence={showConfidence}
+                className="pl-10 pr-12 border-input"
+              />
+            ) : useInlineHighlighting ? (
+              <InlineHighlightedInput
+                value={inputText}
+                onChange={handleInputChange}
+                tags={tags}
+                placeholder="Add Task"
+                disabled={disabled}
+                onKeyPress={handleKeyPress}
+                confidence={confidence}
+                showConfidence={showConfidence}
+                className="pl-10 pr-12 border-input"
+              />
+            ) : (
+              <HighlightedInput
+                value={inputText}
+                onChange={handleInputChange}
+                tags={tags}
+                placeholder="Add Task"
+                disabled={disabled}
+                onKeyPress={handleKeyPress}
+                confidence={confidence}
+                showConfidence={showConfidence}
+                className="pl-10 pr-12 border-input"
+              />
+            )
+          ) : (
+            <input
+              type="text"
+              id="legacy-task-input"
+              name="legacy-task-input"
+              placeholder="Add Task"
+              value={inputText}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={disabled}
+              className={cn(
+                'w-full pl-10 pr-12 border-input rounded-md',
+                'px-3 py-2 text-sm',
+                'placeholder:text-muted-foreground',
+                'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                'disabled:cursor-not-allowed disabled:opacity-50'
+              )}
+              aria-label="New task input"
+            />
+          )}
 
-            {/* Loading indicator */}
-            {isLoading && enableSmartParsing && (
-              <div className="absolute right-10 top-1/2 -translate-y-1/2 z-10">
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </form>
-        )}
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            disabled={disabled || !inputText.trim()}
+            size="sm"
+            variant="ghost"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+            aria-label="Add task"
+          >
+            <ArrowUp className="w-4 h-4" />
+          </Button>
+
+          {/* Loading indicator */}
+          {isLoading && enableSmartParsing && (
+            <div className="absolute right-10 top-1/2 -translate-y-1/2 z-10">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </form>
+      )}
 
       {/* Parsed Tags Display */}
       {showTags && (
@@ -522,9 +550,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
 
       {/* Error Display */}
       {error && enableSmartParsing && (
-        <div className="text-sm text-red-500 px-1">
-          Parsing error: {error}
-        </div>
+        <div className="text-sm text-red-500 px-1">Parsing error: {error}</div>
       )}
 
       {/* Conflicts Warning */}
@@ -535,7 +561,6 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           Some tags may overlap. Using highest confidence matches.
         </div>
       )}
-
     </div>
   );
 };

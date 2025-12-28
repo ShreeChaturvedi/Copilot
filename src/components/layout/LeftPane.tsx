@@ -2,16 +2,32 @@
  * LeftPane - Complete rewrite using shadcn Sidebar component
  */
 
-import React, { useCallback, useMemo, memo, useEffect, useState, lazy, Suspense } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  memo,
+  useEffect,
+  useState,
+  lazy,
+  Suspense,
+} from 'react';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 // Lazy load SmartTaskInput to code-split the 405KB bundle
-const SmartTaskInput = lazy(async () => ({ default: (await import('@/components/smart-input/SmartTaskInput')).SmartTaskInput }));
+const SmartTaskInput = lazy(async () => ({
+  default: (await import('@/components/smart-input/SmartTaskInput'))
+    .SmartTaskInput,
+}));
 // Lazy load TaskList to code-split 160KB bundle
-const TaskList = lazy(async () => ({ default: (await import('@/components/tasks/TaskList')).TaskList }));
+const TaskList = lazy(async () => ({
+  default: (await import('@/components/tasks/TaskList')).TaskList,
+}));
 import { CalendarList } from '@/components/calendar/CalendarList';
 import { TaskGroupList } from '@/components/tasks/TaskGroupList';
 // Lazy load TaskAnalyticsSummary to code-split recharts dependency
-const TaskAnalyticsSummary = lazy(async () => ({ default: (await import('@/components/tasks/TaskAnalyticsSummary')).TaskAnalyticsSummary }));
+const TaskAnalyticsSummary = lazy(async () => ({
+  default: (await import('@/components/tasks/TaskAnalyticsSummary'))
+    .TaskAnalyticsSummary,
+}));
 import { EventOverview } from '@/components/calendar/EventOverview';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useCalendarManagement } from '@/hooks/useCalendarManagement';
@@ -19,7 +35,12 @@ import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseSidebarPane } from './BaseSidebarPane';
 import { Button } from '@/components/ui/Button';
-import { CalendarArrowDown, CalendarArrowUp, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
+import {
+  CalendarArrowDown,
+  CalendarArrowUp,
+  ArrowUpToLine,
+  ArrowDownToLine,
+} from 'lucide-react';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Calendar as MiniCalendar } from '@/components/ui/calendar';
 import { Separator } from '@/components/ui/separator';
@@ -42,11 +63,14 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
       const nextMidnight = new Date(now);
       nextMidnight.setHours(24, 0, 0, 0);
       const msUntilMidnight = nextMidnight.getTime() - now.getTime();
-      timeoutId = window.setTimeout(() => {
-        if (cancelled) return;
-        setToday(new Date());
-        scheduleNext();
-      }, Math.max(1000, msUntilMidnight));
+      timeoutId = window.setTimeout(
+        () => {
+          if (cancelled) return;
+          setToday(new Date());
+          scheduleNext();
+        },
+        Math.max(1000, msUntilMidnight)
+      );
     };
 
     scheduleNext();
@@ -73,7 +97,6 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     setShowCreateTaskDialog,
     handleAddTaskGroup,
     handleEditTaskGroup,
-    handleCreateTaskGroup,
     handleSelectTaskGroup,
     handleUpdateTaskGroupIcon,
     handleUpdateTaskGroupColor,
@@ -118,13 +141,22 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   useEffect(() => {
     if (!taskGroups || taskGroups.length === 0) return;
     if (!leftSmartInputTaskListId) return;
-    const exists = taskGroups.some(g => g.id === leftSmartInputTaskListId) || leftSmartInputTaskListId === 'all' || leftSmartInputTaskListId === 'default';
+    const exists =
+      taskGroups.some((g) => g.id === leftSmartInputTaskListId) ||
+      leftSmartInputTaskListId === 'all' ||
+      leftSmartInputTaskListId === 'default';
     if (!exists) return;
     if (leftSmartInputTaskListId !== activeTaskGroupId) {
       handleSelectTaskGroup(leftSmartInputTaskListId);
     }
-  }, [taskGroups, leftSmartInputTaskListId, activeTaskGroupId, handleSelectTaskGroup]);
-  const [hasUserToggledSmartInput, setHasUserToggledSmartInput] = useState<boolean>(false);
+  }, [
+    taskGroups,
+    leftSmartInputTaskListId,
+    activeTaskGroupId,
+    handleSelectTaskGroup,
+  ]);
+  const [hasUserToggledSmartInput, setHasUserToggledSmartInput] =
+    useState<boolean>(false);
 
   // Disable animation on initial mount and when switching tabs; enable only after explicit user toggle
   useEffect(() => {
@@ -149,15 +181,27 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
               : '')
           }
         >
-          <div className={hasUserToggledSmartInput ? 'calendar-item' : undefined}>
+          <div
+            className={hasUserToggledSmartInput ? 'calendar-item' : undefined}
+          >
             <div className="mt-4 text-sm">
-              <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
+              <Suspense
+                fallback={
+                  <div className="h-10 animate-pulse bg-muted rounded-md" />
+                }
+              >
                 <SmartTaskInput
-                  onAddTask={(title: string, groupId?: string, smartData?: SmartTaskData) => {
+                  onAddTask={(
+                    title: string,
+                    groupId?: string,
+                    smartData?: SmartTaskData
+                  ) => {
                     memoizedHandleAddTask(title, groupId, smartData);
                   }}
                   taskGroups={taskGroups}
-                  activeTaskGroupId={leftSmartInputTaskListId || activeTaskGroupId}
+                  activeTaskGroupId={
+                    leftSmartInputTaskListId || activeTaskGroupId
+                  }
                   onCreateTaskGroup={memoizedHandleOpenCreateTaskDialog}
                   onSelectTaskGroup={(groupId) => {
                     setLeftSmartInputTaskListId(groupId);
@@ -187,6 +231,8 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     activeTaskGroupId,
     memoizedHandleOpenCreateTaskDialog,
     memoizedHandleSelectTaskGroup,
+    leftSmartInputTaskListId,
+    setLeftSmartInputTaskListId,
     isLoading,
     addTask.isPending,
   ]);
@@ -204,9 +250,6 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   ]);
   const memoizedHandleRemoveTag = useCallback(handleRemoveTag, [
     handleRemoveTag,
-  ]);
-  const memoizedHandleCreateTaskGroup = useCallback(handleCreateTaskGroup, [
-    handleCreateTaskGroup,
   ]);
   const memoizedHandleEditTaskGroup = useCallback(handleEditTaskGroup, [
     handleEditTaskGroup,
@@ -263,7 +306,11 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         <Button
           variant="ghost"
           size="icon"
-          aria-label={taskViewMiniCalendarExpanded ? 'Hide mini calendar' : 'Show mini calendar'}
+          aria-label={
+            taskViewMiniCalendarExpanded
+              ? 'Hide mini calendar'
+              : 'Show mini calendar'
+          }
           className="h-8 w-8"
           onClick={handleToggleMiniCalendar}
         >
@@ -293,12 +340,20 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
       );
     }
     return null;
-  }, [currentView, taskViewMiniCalendarExpanded, handleToggleMiniCalendar, calendarViewInputExpanded, handleToggleSmartInput]);
+  }, [
+    currentView,
+    taskViewMiniCalendarExpanded,
+    handleToggleMiniCalendar,
+    calendarViewInputExpanded,
+    handleToggleSmartInput,
+  ]);
 
   // Main content - TaskList in calendar view, EventOverview in task view
   const mainContent = useMemo(() => {
     return currentView === 'calendar' ? (
-      <Suspense fallback={<div className="h-40 animate-pulse bg-muted rounded-md" />}>
+      <Suspense
+        fallback={<div className="h-40 animate-pulse bg-muted rounded-md" />}
+      >
         <TaskList
           tasks={tasks}
           taskGroups={taskGroups}
@@ -331,7 +386,11 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
                 : '')
             }
           >
-            <div className={hasUserToggledMiniCalendar ? 'calendar-item' : undefined}>
+            <div
+              className={
+                hasUserToggledMiniCalendar ? 'calendar-item' : undefined
+              }
+            >
               <div className="pt-1">
                 <MiniCalendar
                   className="w-full rounded-md bg-card [--cell-size:--spacing(7)]"
@@ -349,7 +408,11 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
                 <div className="h-2" />
               </div>
             </div>
-            <div className={hasUserToggledMiniCalendar ? 'calendar-item' : undefined}>
+            <div
+              className={
+                hasUserToggledMiniCalendar ? 'calendar-item' : undefined
+              }
+            >
               <Separator />
             </div>
           </CollapsibleContent>
@@ -367,15 +430,17 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     memoizedHandleDeleteTask,
     memoizedHandleScheduleTask,
     memoizedHandleRemoveTag,
-    memoizedHandleCreateTaskGroup,
     memoizedHandleSelectTaskGroup,
     memoizedHandleUpdateTaskGroupIcon,
     memoizedHandleUpdateTaskGroupColor,
     memoizedHandleDeleteTaskGroup,
+    memoizedHandleAddTaskGroupForTaskList,
+    memoizedHandleEditTaskGroup,
     showCreateTaskDialog,
     memoizedSetShowCreateTaskDialog,
     today,
     taskViewMiniCalendarExpanded,
+    hasUserToggledMiniCalendar,
   ]);
 
   // Memoized handlers for CalendarList
@@ -417,7 +482,13 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         color: string;
         description?: string;
       }
-    ) => handleEditTaskGroup(id, { name: updates.name, color: updates.color, emoji: updates.emoji, description: updates.description }),
+    ) =>
+      handleEditTaskGroup(id, {
+        name: updates.name,
+        color: updates.color,
+        emoji: updates.emoji,
+        description: updates.description,
+      }),
     [handleEditTaskGroup]
   );
 
@@ -442,7 +513,11 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
           onSelectTaskGroup={memoizedHandleSelectTaskGroup}
         />
         {showSidebarTaskAnalytics && (
-          <Suspense fallback={<div className="h-20 animate-pulse bg-muted rounded-md" />}>
+          <Suspense
+            fallback={
+              <div className="h-20 animate-pulse bg-muted rounded-md" />
+            }
+          >
             <TaskAnalyticsSummary />
           </Suspense>
         )}
@@ -475,8 +550,6 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
         mainContent={mainContent}
         footerListContent={footerListContent}
       />
-
-
     </>
   );
 };

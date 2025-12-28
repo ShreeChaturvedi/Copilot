@@ -40,7 +40,8 @@ export const attachmentsApi = {
       size: Number(a.fileSize),
       url: String(a.fileUrl),
       uploadedAt: a.createdAt ? new Date(String(a.createdAt)) : new Date(),
-      thumbnailUrl: (a as any).thumbnailUrl ? String((a as any).thumbnailUrl) : undefined,
+      thumbnailUrl:
+        typeof a.thumbnailUrl === 'string' ? a.thumbnailUrl : undefined,
       taskId: String(a.taskId),
     })) as FileAttachment[];
   },
@@ -59,4 +60,3 @@ export const attachmentsApi = {
       throw new Error(body.error?.message || 'Failed to delete attachment');
   },
 };
-

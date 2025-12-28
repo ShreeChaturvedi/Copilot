@@ -1,16 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Bell, BellRing } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore, type DateDisplayMode } from '@/stores/settingsStore';
 import { formatRelative } from '@/utils/date';
 
 interface DueDateBadgeProps {
@@ -49,8 +59,14 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
 
   useEffect(() => {
     setSelectedDate(date);
-    setIncludeTime(date ? !(date.getHours() === 0 && date.getMinutes() === 0) : false);
-    setTimeValue(date ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : '12:00');
+    setIncludeTime(
+      date ? !(date.getHours() === 0 && date.getMinutes() === 0) : false
+    );
+    setTimeValue(
+      date
+        ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+        : '12:00'
+    );
   }, [date]);
 
   const formatDisplay = useMemo(() => {
@@ -103,30 +119,47 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
         <Badge
           variant="outline"
           className={cn(
-            "text-xs px-2 py-1 gap-1 transition-colors cursor-pointer",
+            'text-xs px-2 py-1 gap-1 transition-colors cursor-pointer',
             (() => {
               const hasReminder = remind !== 'none';
-              const overdue = hasReminder && selectedDate ? selectedDate.getTime() < Date.now() : false;
-              if (hasReminder && overdue) return "text-[#ef4444] border-[#ef4444] hover:border-[#ef4444]";
-              if (hasReminder) return "text-[#3b82f6] border-[#3b82f6] hover:border-[#3b82f6]";
-              return "text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50";
+              const overdue =
+                hasReminder && selectedDate
+                  ? selectedDate.getTime() < Date.now()
+                  : false;
+              if (hasReminder && overdue)
+                return 'text-[#ef4444] border-[#ef4444] hover:border-[#ef4444]';
+              if (hasReminder)
+                return 'text-[#3b82f6] border-[#3b82f6] hover:border-[#3b82f6]';
+              return 'text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50';
             })()
           )}
           style={(() => {
             const hasReminder = remind !== 'none';
             if (!hasReminder) {
-              return { backgroundColor: 'color-mix(in srgb, currentColor 10%, transparent)' } as React.CSSProperties;
+              return {
+                backgroundColor:
+                  'color-mix(in srgb, currentColor 10%, transparent)',
+              } as React.CSSProperties;
             }
-            const overdue = selectedDate ? selectedDate.getTime() < Date.now() : false;
+            const overdue = selectedDate
+              ? selectedDate.getTime() < Date.now()
+              : false;
             const hex = overdue ? '#ef4444' : '#3b82f6';
-            return { backgroundColor: `${hex}1A`, borderColor: hex, color: hex } as React.CSSProperties;
+            return {
+              backgroundColor: `${hex}1A`,
+              borderColor: hex,
+              color: hex,
+            } as React.CSSProperties;
           })()}
           aria-label="Edit due date"
           data-testid="due-date-badge"
         >
           {(() => {
             const hasReminder = remind !== 'none';
-            const overdue = hasReminder && selectedDate ? selectedDate.getTime() < Date.now() : false;
+            const overdue =
+              hasReminder && selectedDate
+                ? selectedDate.getTime() < Date.now()
+                : false;
             if (hasReminder && overdue) return <BellRing className="w-3 h-3" />;
             if (hasReminder) return <Bell className="w-3 h-3" />;
             return <Calendar className="w-3 h-3" />;
@@ -139,7 +172,9 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
           {/* Top display with optional time field */}
           <div className="flex items-center gap-2">
             <div className="flex-1 text-sm font-medium">
-              {selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Select a date'}
+              {selectedDate
+                ? format(selectedDate, 'MMM d, yyyy')
+                : 'Select a date'}
             </div>
             {includeTime && (
               <div className="flex items-center gap-2">
@@ -162,7 +197,9 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
 
           {/* Include time switch */}
           <div className="flex items-center justify-between">
-            <Label htmlFor={`include-time-${taskId}`} className="text-sm">Include time</Label>
+            <Label htmlFor={`include-time-${taskId}`} className="text-sm">
+              Include time
+            </Label>
             <Switch
               id={`include-time-${taskId}`}
               checked={includeTime}
@@ -182,7 +219,14 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
           {/* Display mode selector */}
           <div className="flex items-center justify-between">
             <Label className="text-sm">Display</Label>
-            <Select value={dateDisplayMode} onValueChange={(v) => useSettingsStore.getState().setDateDisplayMode(v as any)}>
+            <Select
+              value={dateDisplayMode}
+              onValueChange={(v) =>
+                useSettingsStore
+                  .getState()
+                  .setDateDisplayMode(v as DateDisplayMode)
+              }
+            >
               <SelectTrigger size="sm" className="min-w-[150px]">
                 <SelectValue placeholder="Relative" />
               </SelectTrigger>
@@ -223,7 +267,9 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
             >
               Clear
             </Button>
-            <Button size="sm" onClick={() => apply(selectedDate)}>Save</Button>
+            <Button size="sm" onClick={() => apply(selectedDate)}>
+              Save
+            </Button>
           </div>
         </div>
       </PopoverContent>

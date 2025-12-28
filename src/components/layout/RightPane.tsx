@@ -2,10 +2,17 @@ import { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { CalendarView, CalendarViewType } from '../calendar';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { lazy, Suspense } from 'react';
-const LazyConsolidatedCalendarHeader = lazy(async () => ({ default: (await import('../calendar/ConsolidatedCalendarHeader')).ConsolidatedCalendarHeader }));
-const LazyEventCreationDialog = lazy(async () => ({ default: (await import('../dialogs/EventCreationDialog')).EventCreationDialog }));
-const LazyEventDisplayDialog = lazy(async () => ({ default: (await import('../dialogs/EventDisplayDialog')).EventDisplayDialog }));
-import type { CalendarEvent } from "@shared/types";
+const LazyConsolidatedCalendarHeader = lazy(async () => ({
+  default: (await import('../calendar/ConsolidatedCalendarHeader'))
+    .ConsolidatedCalendarHeader,
+}));
+const LazyEventCreationDialog = lazy(async () => ({
+  default: (await import('../dialogs/EventCreationDialog')).EventCreationDialog,
+}));
+const LazyEventDisplayDialog = lazy(async () => ({
+  default: (await import('../dialogs/EventDisplayDialog')).EventDisplayDialog,
+}));
+import type { CalendarEvent } from '@shared/types';
 import type FullCalendar from '@fullcalendar/react';
 
 interface RightPaneProps {
@@ -13,12 +20,16 @@ interface RightPaneProps {
   calendarRef?: React.RefObject<FullCalendar | null>;
 }
 
-export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightPaneProps) => {
+export const RightPane = ({
+  children,
+  calendarRef: externalCalendarRef,
+}: RightPaneProps) => {
   const internalCalendarRef = useRef<FullCalendar>(null);
   const calendarRef = externalCalendarRef || internalCalendarRef;
-  const [currentView, setCurrentView] = useState<CalendarViewType>('timeGridWeek');
+  const [currentView, setCurrentView] =
+    useState<CalendarViewType>('timeGridWeek');
   const { calendarSubView, setCalendarSubView } = useSettingsStore();
-  
+
   // Initialize calendar sub-view from settings on mount and when settings change
   useEffect(() => {
     if (calendarSubView && calendarSubView !== currentView) {
@@ -26,13 +37,17 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarSubView]);
-  
+
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [displayDialogOpen, setDisplayDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [initialEventData, setInitialEventData] = useState<Partial<CalendarEvent> | undefined>();
-  
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null
+  );
+  const [initialEventData, setInitialEventData] = useState<
+    Partial<CalendarEvent> | undefined
+  >();
+
   /**
    * Handle event click from calendar
    */
@@ -60,21 +75,29 @@ export const RightPane = ({ children, calendarRef: externalCalendarRef }: RightP
   /**
    * Handle editing an event from the display dialog
    */
-  const handleEditEvent = useCallback((event: CalendarEvent) => {
-    setInitialEventData(event);
-    setDisplayDialogOpen(false);
-    setCreateDialogOpen(true);
-  }, []);
+  const handleEditEvent = useCallback(
+    (event: CalendarEvent) => {
+      setInitialEventData(event);
+      setDisplayDialogOpen(false);
+      setCreateDialogOpen(true);
+    },
+    [setCreateDialogOpen, setDisplayDialogOpen, setInitialEventData]
+  );
 
   /**
    * Handle calendar view change
    */
-  const handleViewChange = useCallback((view: CalendarViewType) => {
-    setCurrentView(view);
-    try {
-      setCalendarSubView(view);
-    } catch {}
-  }, []);
+  const handleViewChange = useCallback(
+    (view: CalendarViewType) => {
+      setCurrentView(view);
+      try {
+        setCalendarSubView(view);
+      } catch {
+        // Ignore settings persistence failures
+      }
+    },
+    [setCalendarSubView, setCurrentView]
+  );
 
   /**
    * Navigate to today
