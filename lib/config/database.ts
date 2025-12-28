@@ -15,7 +15,9 @@ types.setTypeParser(1114, (stringValue: string) => {
 
 // Database configuration object
 export const databaseConfig = {
-  url: process.env.DATABASE_URL || 'postgresql://localhost:5432/react_calendar_dev',
+  url:
+    process.env.DATABASE_URL ||
+    'postgresql://localhost:5432/react_calendar_dev',
   maxConnections: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10'),
   connectionTimeout: parseInt(process.env.DATABASE_TIMEOUT || '10000'),
   queryTimeout: parseInt(process.env.DATABASE_QUERY_TIMEOUT || '60000'),
@@ -23,7 +25,6 @@ export const databaseConfig = {
 
 // Global pool (cached in dev to avoid multiple instances during HMR)
 declare global {
-  // eslint-disable-next-line no-var
   var __pgPool: Pool | undefined;
 }
 
@@ -74,7 +75,11 @@ export async function cleanupDatabase(): Promise<void> {
 }
 
 // Simple query helper
-export async function query<T = any>(sql: string, params: any[] = [], client?: SqlClient): Promise<QueryResult<T>> {
+export async function query<T = unknown>(
+  sql: string,
+  params: unknown[] = [],
+  client?: SqlClient
+): Promise<QueryResult<T>> {
   if (client) {
     return (client as PoolClient).query<T>(sql, params);
   }
@@ -82,7 +87,9 @@ export async function query<T = any>(sql: string, params: any[] = [], client?: S
 }
 
 // Transaction helper for API routes
-export async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  callback: (client: PoolClient) => Promise<T>
+): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

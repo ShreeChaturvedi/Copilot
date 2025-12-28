@@ -98,8 +98,7 @@ export class TaskListService extends BaseService<
     await this.validateUpdate(id, data, context);
 
     const sets: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const params: any[] = []; // Mixed types for SQL parameters
+    const params: Array<string | null | Date> = []; // Mixed types for SQL parameters
 
     if (data.name !== undefined) {
       params.push(data.name.trim());
@@ -135,14 +134,12 @@ export class TaskListService extends BaseService<
     return this.transformEntity(res.rows[0]);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected buildWhereClause(
     filters: TaskListFilters,
     context?: ServiceContext
-  ): { sql: string; params: any[] } {
+  ): { sql: string; params: unknown[] } {
     const clauses: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const params: any[] = []; // Mixed types for SQL parameters
+    const params: unknown[] = []; // Mixed types for SQL parameters
     if (context?.userId) {
       params.push(context.userId);
       clauses.push('"userId" = $' + params.length);
@@ -168,13 +165,12 @@ export class TaskListService extends BaseService<
     try {
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
-      const res = await query(
+      const res = await query<TaskListEntity>(
         `SELECT * FROM task_lists ${sql} ORDER BY name ASC`,
         params,
         this.db
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return res.rows.map((r: any) => this.transformEntity(r)); // Database row
+      return res.rows.map((row) => this.transformEntity(row)); // Database row
     } catch (error) {
       this.log('findAll:error', { error: error.message, filters }, context);
       throw error;
@@ -392,7 +388,11 @@ export class TaskListService extends BaseService<
     try {
       this.log('getWithTaskCount', {}, context);
 
-      const res = await query(
+      type TaskListCountRow = TaskListEntity & {
+        task_count: string | number;
+        completed_count: string | number;
+      };
+      const res = await query<TaskListCountRow>(
         `SELECT tl.id, tl.name, tl.color, tl.icon, tl.description, tl."userId", tl."createdAt", tl."updatedAt",
                 COUNT(t.*)::bigint AS task_count,
                 COUNT(CASE WHEN t.completed THEN 1 END)::bigint AS completed_count
@@ -405,20 +405,19 @@ export class TaskListService extends BaseService<
         this.db
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const results: TaskListWithCounts[] = res.rows.map((r: any) => ({
+      const results: TaskListWithCounts[] = res.rows.map((row) => ({
         // Database row
-        id: r.id,
-        name: r.name,
-        color: r.color,
-        icon: r.icon,
-        description: r.description,
-        userId: r.userId,
-        createdAt: new Date(r.createdAt),
-        updatedAt: new Date(r.updatedAt),
-        taskCount: Number(r.task_count),
-        completedTaskCount: Number(r.completed_count),
-        pendingTaskCount: Number(r.task_count) - Number(r.completed_count),
+        id: row.id,
+        name: row.name,
+        color: row.color,
+        icon: row.icon,
+        description: row.description,
+        userId: row.userId,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+        taskCount: Number(row.task_count),
+        completedTaskCount: Number(row.completed_count),
+        pendingTaskCount: Number(row.task_count) - Number(row.completed_count),
       }));
 
       this.log('getWithTaskCount:success', { count: results.length }, context);
@@ -440,23 +439,13 @@ export class TaskListService extends BaseService<
     try {
       this.log('getWithTasks', {}, context);
 
-      const listsRes = await query(
+      const listsRes = await query<TaskListEntity>(
         'SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY name ASC',
         [context.userId!],
         this.db
       );
-      const listIds = listsRes.rows.map((r) => r.id);
+      const listIds = listsRes.rows.map((row) => row.id);
       const placeholders = listIds.map((_, i) => `$${i + 1}`).join(',');
-      const tasksRes = listIds.length
-        ? await query(
-            `SELECT id, title, completed, "scheduledDate", priority, "taskListId"
-             FROM tasks WHERE "taskListId" IN (${placeholders})
-             ORDER BY completed ASC, "scheduledDate" ASC NULLS LAST, "createdAt" DESC`,
-            listIds,
-            this.db
-          )
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ({ rows: [] } as any); // Empty result set for no task lists
       interface TaskRow {
         id: string;
         title: string;
@@ -465,32 +454,39 @@ export class TaskListService extends BaseService<
         priority: string;
         taskListId: string;
       }
+      const tasksRes = listIds.length
+        ? await query<TaskRow>(
+            `SELECT id, title, completed, "scheduledDate", priority, "taskListId"
+             FROM tasks WHERE "taskListId" IN (${placeholders})
+             ORDER BY completed ASC, "scheduledDate" ASC NULLS LAST, "createdAt" DESC`,
+            listIds,
+            this.db
+          )
+        : { rows: [] as TaskRow[] }; // Empty result set for no task lists
       const tasksByList = new Map<string, TaskRow[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (tasksRes.rows as any[]).forEach((t) => {
+      tasksRes.rows.forEach((task) => {
         // Database rows
-        const arr = tasksByList.get(t.taskListId) || [];
-        if (arr.length < 10) arr.push(t);
-        tasksByList.set(t.taskListId, arr);
+        const arr = tasksByList.get(task.taskListId) || [];
+        if (arr.length < 10) arr.push(task);
+        tasksByList.set(task.taskListId, arr);
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const results = listsRes.rows.map((l: any) => ({
+      const results = listsRes.rows.map((list) => ({
         // Database row
-        id: l.id,
-        name: l.name,
-        color: l.color,
-        icon: l.icon,
-        description: l.description,
-        userId: l.userId,
-        createdAt: new Date(l.createdAt),
-        updatedAt: new Date(l.updatedAt),
-        _count: { tasks: (tasksByList.get(l.id) || []).length },
-        tasks: (tasksByList.get(l.id) || []).map((t) => ({
-          id: t.id,
-          title: t.title,
-          completed: t.completed,
-          scheduledDate: t.scheduledDate,
-          priority: t.priority,
+        id: list.id,
+        name: list.name,
+        color: list.color,
+        icon: list.icon,
+        description: list.description,
+        userId: list.userId,
+        createdAt: new Date(list.createdAt),
+        updatedAt: new Date(list.updatedAt),
+        _count: { tasks: (tasksByList.get(list.id) || []).length },
+        tasks: (tasksByList.get(list.id) || []).map((task) => ({
+          id: task.id,
+          title: task.title,
+          completed: task.completed,
+          scheduledDate: task.scheduledDate,
+          priority: task.priority,
         })),
       }));
 

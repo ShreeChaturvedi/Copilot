@@ -53,6 +53,17 @@ export interface TaskEntity extends UserOwnedEntity {
   }>;
 }
 
+type TaskRow = Omit<
+  TaskEntity,
+  'createdAt' | 'updatedAt' | 'completedAt' | 'scheduledDate' | 'status'
+> & {
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  completedAt?: Date | string | null;
+  scheduledDate?: Date | string | null;
+  status?: TaskEntity['status'] | null;
+};
+
 /**
  * Task creation DTO
  */
@@ -186,14 +197,12 @@ export class TaskService extends BaseService<
     return 'Task';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected buildWhereClause(
     filters: TaskFilters,
     context?: ServiceContext
-  ): { sql: string; params: any[] } {
+  ): { sql: string; params: unknown[] } {
     const clauses: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const params: any[] = []; // Mixed types for SQL parameters
+    const params: unknown[] = []; // Mixed types for SQL parameters
     // Always filter by user
     if (context?.userId) {
       params.push(context.userId);
@@ -264,8 +273,7 @@ export class TaskService extends BaseService<
     return `ORDER BY "${column}" ${sortOrder}`;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected transformEntity(row: any): TaskEntity {
+  protected transformEntity(row: TaskRow): TaskEntity {
     // Database row type from pg query
     return {
       id: row.id,
@@ -321,8 +329,15 @@ export class TaskService extends BaseService<
         );
     } else {
       // Cache miss - fetch all user's task lists and cache them
-      const allListsRes = await query(
-        `SELECT id, name, color FROM "task_lists" WHERE "userId" = $1`,
+      type TaskListRow = {
+        id: string;
+        name: string;
+        color: string;
+        icon?: string | null;
+        description?: string | null;
+      };
+      const allListsRes = await query<TaskListRow>(
+        `SELECT id, name, color, icon, description FROM "task_lists" WHERE "userId" = $1`,
         [userId]
       );
 
@@ -331,17 +346,15 @@ export class TaskService extends BaseService<
 
       // Build map for current tasks
       allListsRes.rows
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((r: any) => listIds.includes(r.id))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .forEach((r: any) =>
-          listMap.set(r.id, { id: r.id, name: r.name, color: r.color })
+        .filter((row) => listIds.includes(row.id))
+        .forEach((row) =>
+          listMap.set(row.id, { id: row.id, name: row.name, color: row.color })
         );
     }
 
     // Attachments
     const taskPlaceholders = taskIds.map((_, i) => `$${i + 1}`).join(',');
-    const attachmentsRes = await query(
+    const attachmentsRes = await query<AttachmentRow>(
       `SELECT id, "fileName", "fileUrl", "fileType", "fileSize", "taskId", "createdAt", "thumbnailUrl"
        FROM attachments WHERE "taskId" IN (${taskPlaceholders})`,
       taskIds
@@ -357,23 +370,22 @@ export class TaskService extends BaseService<
       thumbnailUrl?: string;
     }
     const attachmentsByTask = new Map<string, AttachmentRow[]>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attachmentsRes.rows.forEach((r: any) => {
-      const arr = attachmentsByTask.get(r.taskId) || [];
+    attachmentsRes.rows.forEach((row) => {
+      const arr = attachmentsByTask.get(row.taskId) || [];
       arr.push({
-        id: r.id,
-        fileName: r.fileName,
-        fileUrl: r.fileUrl,
-        fileType: r.fileType,
-        fileSize: r.fileSize,
-        createdAt: r.createdAt,
-        thumbnailUrl: r.thumbnailUrl,
+        id: row.id,
+        fileName: row.fileName,
+        fileUrl: row.fileUrl,
+        fileType: row.fileType,
+        fileSize: row.fileSize,
+        createdAt: row.createdAt,
+        thumbnailUrl: row.thumbnailUrl,
       });
-      attachmentsByTask.set(r.taskId, arr);
+      attachmentsByTask.set(row.taskId, arr);
     });
 
     // Tags with tag details
-    const tagsRes = await query(
+    const tagsRes = await query<TagRow>(
       `SELECT tt."taskId", tt.value, tt."displayText", tt."iconName", t.id as tag_id, t.name, t.type, t.color
        FROM "task_tags" tt
        JOIN tags t ON t.id = tt."tagId"
@@ -390,18 +402,29 @@ export class TaskService extends BaseService<
       type: string;
       color: string | null;
     }
-    const tagsByTask = new Map<string, TagRow[]>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tagsRes.rows.forEach((r: any) => {
-      const arr = tagsByTask.get(r.taskId) || [];
+    type TaskTagRelation = {
+      id: string;
+      value: string;
+      displayText: string;
+      iconName: string;
+      tag: { id: string; name: string; type: string; color: string | null };
+    };
+    const tagsByTask = new Map<string, TaskTagRelation[]>();
+    tagsRes.rows.forEach((row) => {
+      const arr = tagsByTask.get(row.taskId) || [];
       arr.push({
-        id: r.tag_id,
-        value: r.value,
-        displayText: r.displayText,
-        iconName: r.iconName,
-        tag: { id: r.tag_id, name: r.name, type: r.type, color: r.color },
+        id: row.tag_id,
+        value: row.value,
+        displayText: row.displayText,
+        iconName: row.iconName,
+        tag: {
+          id: row.tag_id,
+          name: row.name,
+          type: row.type,
+          color: row.color,
+        },
       });
-      tagsByTask.set(r.taskId, arr);
+      tagsByTask.set(row.taskId, arr);
     });
 
     // Attach relations onto entities
@@ -421,13 +444,12 @@ export class TaskService extends BaseService<
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
       const order = this.buildOrderByClause(filters);
-      const res = await query(
+      const res = await query<TaskRow>(
         `SELECT * FROM tasks ${sql} ${order}`,
         params,
         this.db
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const base = res.rows.map((r: any) => this.transformEntity(r)); // Database row
+      const base = res.rows.map((row) => this.transformEntity(row)); // Database row
       return await this.enrichEntities(base, context);
     } catch (error) {
       this.log(
@@ -461,7 +483,7 @@ export class TaskService extends BaseService<
       const { sql, params } = this.buildWhereClause(filters, context);
       const order = this.buildOrderByClause(filters);
       const offset = (page - 1) * limit;
-      const dataRes = await query(
+      const dataRes = await query<TaskRow>(
         `SELECT * FROM tasks ${sql} ${order} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, limit, offset],
         this.db
@@ -471,8 +493,7 @@ export class TaskService extends BaseService<
         params,
         this.db
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = dataRes.rows.map((r: any) => this.transformEntity(r)); // Database row
+      const rows = dataRes.rows.map((row) => this.transformEntity(row)); // Database row
       const enriched = await this.enrichEntities(rows, context);
       const total = Number(countRes.rows[0]?.count || 0);
       return {
@@ -580,7 +601,7 @@ export class TaskService extends BaseService<
 
       const created = await withTransaction(async (client) => {
         // Insert task
-        const insertRes = await query(
+        const insertRes = await query<TaskRow>(
           `INSERT INTO tasks (id, title, completed, status, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
            VALUES (gen_random_uuid()::text, $1, false, 'NOT_STARTED', $2, $3, $4, $5, $6, $7, NOW(), NOW())
            RETURNING *`,
@@ -656,8 +677,7 @@ export class TaskService extends BaseService<
     await this.ensureStatusColumnExists();
     await this.validateUpdate(id, data, context);
     const sets: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const params: any[] = []; // Mixed types for SQL parameters
+    const params: Array<string | boolean | Date | null> = []; // Mixed types for SQL parameters
     if (data.title !== undefined) {
       params.push(data.title.trim());
       sets.push(`title = $${params.length}`);
@@ -709,7 +729,7 @@ export class TaskService extends BaseService<
     sets.push(`"updatedAt" = $${params.length}`);
     params.push(id);
     const updateSql = `UPDATE tasks SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
-    const res = await query(updateSql, params, this.db);
+    const res = await query<TaskRow>(updateSql, params, this.db);
     if (res.rowCount === 0) return null;
     const base = this.transformEntity(res.rows[0]);
     const [enriched] = await this.enrichEntities([base], context);
@@ -732,7 +752,7 @@ export class TaskService extends BaseService<
     id: string,
     context?: ServiceContext
   ): Promise<TaskEntity | null> {
-    const res = await query(
+    const res = await query<TaskRow>(
       'SELECT * FROM tasks WHERE id = $1 LIMIT 1',
       [id],
       this.db
@@ -770,7 +790,7 @@ export class TaskService extends BaseService<
         throw new Error('NOT_FOUND: Task not found');
       const current = currentRes.rows[0].completed;
       const nowCompleted = !current;
-      const updatedRes = await query(
+      const updatedRes = await query<TaskRow>(
         `UPDATE tasks
          SET completed = $1,
              status = $2,
@@ -883,8 +903,7 @@ export class TaskService extends BaseService<
 
       // Perform bulk update
       const setClauses: string[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const params: any[] = []; // Mixed types for SQL parameters
+      const params: Array<string | boolean | Date | null> = []; // Mixed types for SQL parameters
       if (updates.title !== undefined) {
         params.push(updates.title);
         setClauses.push(`title = $${params.length}`);
@@ -926,13 +945,12 @@ export class TaskService extends BaseService<
       );
 
       // Return updated tasks
-      const selectRes = await query(
+      const selectRes = await query<TaskRow>(
         `SELECT * FROM tasks WHERE id IN (${ids.map((_, i) => `$${i + 1}`).join(',')})`,
         ids,
         this.db
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const base = selectRes.rows.map((r: any) => this.transformEntity(r)); // Database row
+      const base = selectRes.rows.map((row) => this.transformEntity(row)); // Database row
       const updatedTasks = await this.enrichEntities(base, context);
 
       this.log('bulkUpdate:success', { count: updatedTasks.length }, context);
@@ -1060,15 +1078,17 @@ export class TaskService extends BaseService<
   /**
    * Get or create default task list for user
    */
-  private async getOrCreateDefaultTaskList(userId: string) {
+  private async getOrCreateDefaultTaskList(
+    userId: string
+  ): Promise<{ id: string; name: string; color: string }> {
     await this.ensureUserExists(userId);
-    const existing = await query(
+    const existing = await query<{ id: string; name: string; color: string }>(
       `SELECT id, name, color FROM "task_lists" WHERE "userId" = $1 AND name = 'General' LIMIT 1`,
       [userId],
       this.db
     );
     if (existing.rowCount > 0) return existing.rows[0];
-    const created = await query(
+    const created = await query<{ id: string; name: string; color: string }>(
       `INSERT INTO "task_lists" (id, name, color, "userId", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, 'General', '#8B5CF6', $1, NOW(), NOW()) RETURNING id, name, color`,
       [userId],

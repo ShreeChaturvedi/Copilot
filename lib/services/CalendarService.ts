@@ -1,7 +1,11 @@
 /**
  * Calendar Service - Concrete implementation of BaseService for Calendar operations (SQL)
  */
-import { BaseService, type ServiceContext, type UserOwnedEntity } from './BaseService.js';
+import {
+  BaseService,
+  type ServiceContext,
+  type UserOwnedEntity,
+} from './BaseService.js';
 import { query, withTransaction } from '../config/database.js';
 
 /**
@@ -62,7 +66,12 @@ export interface CalendarFilters {
 /**
  * CalendarService - Handles all calendar-related operations
  */
-export class CalendarService extends BaseService<CalendarEntity, CreateCalendarDTO, UpdateCalendarDTO, CalendarFilters> {
+export class CalendarService extends BaseService<
+  CalendarEntity,
+  CreateCalendarDTO,
+  UpdateCalendarDTO,
+  CalendarFilters
+> {
   protected getTableName(): string {
     return 'calendars';
   }
@@ -71,9 +80,12 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     return 'Calendar';
   }
 
-  protected buildWhereClause(filters: CalendarFilters, context?: ServiceContext): { sql: string; params: any[] } {
+  protected buildWhereClause(
+    filters: CalendarFilters,
+    context?: ServiceContext
+  ): { sql: string; params: unknown[] } {
     const clauses: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (context?.userId) {
       params.push(context.userId);
       clauses.push(`"userId" = $${params.length}`);
@@ -95,20 +107,31 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     return { sql, params };
   }
 
-  async findAll(filters: CalendarFilters = {}, context?: ServiceContext): Promise<CalendarEntity[]> {
+  async findAll(
+    filters: CalendarFilters = {},
+    context?: ServiceContext
+  ): Promise<CalendarEntity[]> {
     try {
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
-      const res = await query(`SELECT * FROM calendars ${sql} ORDER BY "isDefault" DESC, name ASC`, params, this.db);
-      const rows = res.rows.map((r: any) => this.transformEntity(r));
+      const res = await query<CalendarEntity>(
+        `SELECT * FROM calendars ${sql} ORDER BY "isDefault" DESC, name ASC`,
+        params,
+        this.db
+      );
+      const rows = res.rows.map((row) => this.transformEntity(row));
       return rows;
-    } catch (error: any) {
-      this.log('findAll:error', { error: error.message, filters }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('findAll:error', { error: message, filters }, context);
       throw error;
     }
   }
 
-  protected async enrichEntities(entities: CalendarEntity[], context?: ServiceContext): Promise<CalendarEntity[]> {
+  protected async enrichEntities(
+    entities: CalendarEntity[],
+    _context?: ServiceContext
+  ): Promise<CalendarEntity[]> {
     if (!entities.length) return entities;
     const ids = entities.map((c) => c.id);
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -123,13 +146,22 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     );
     const countMap = new Map<string, number>();
     counts.rows.forEach((r) => countMap.set(r.id, Number(r.count)));
-    return entities.map((c) => ({ ...c, _count: { events: countMap.get(c.id) || 0 } } as unknown as CalendarEntity));
+    return entities.map(
+      (c) =>
+        ({
+          ...c,
+          _count: { events: countMap.get(c.id) || 0 },
+        }) as unknown as CalendarEntity
+    );
   }
 
   /**
    * Validate calendar creation
    */
-  protected async validateCreate(data: CreateCalendarDTO, context?: ServiceContext): Promise<void> {
+  protected async validateCreate(
+    data: CreateCalendarDTO,
+    context?: ServiceContext
+  ): Promise<void> {
     if (!data.name?.trim()) {
       throw new Error('VALIDATION_ERROR: Calendar name is required');
     }
@@ -149,7 +181,9 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
     // Validate color format (basic hex color validation)
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
   }
 
@@ -186,14 +220,19 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
     // Validate color format if provided
     if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
-      throw new Error('VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)');
+      throw new Error(
+        'VALIDATION_ERROR: Invalid color format. Use hex format (#RRGGBB)'
+      );
     }
   }
 
   /**
    * Create calendar with default handling
    */
-  async create(data: CreateCalendarDTO, context?: ServiceContext): Promise<CalendarEntity> {
+  async create(
+    data: CreateCalendarDTO,
+    context?: ServiceContext
+  ): Promise<CalendarEntity> {
     try {
       this.log('create', { data }, context);
 
@@ -214,13 +253,23 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       const result = await withTransaction(async (client) => {
         if (isDefault && context?.userId) {
-          await query('UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true', [context.userId], client);
+          await query(
+            'UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true',
+            [context.userId],
+            client
+          );
         }
         const created = await query(
           `INSERT INTO calendars (id, name, color, description, "isDefault", "isVisible", "userId", "createdAt", "updatedAt")
            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, true, $5, NOW(), NOW())
            RETURNING *`,
-          [data.name.trim(), data.color, data.description?.trim() || null, isDefault, context!.userId!],
+          [
+            data.name.trim(),
+            data.color,
+            data.description?.trim() || null,
+            isDefault,
+            context!.userId!,
+          ],
           client
         );
         return created.rows[0];
@@ -228,8 +277,9 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       this.log('create:success', { id: result.id }, context);
       return this.transformEntity(result);
-    } catch (error) {
-      this.log('create:error', { error: error.message, data }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('create:error', { error: message, data }, context);
       throw error;
     }
   }
@@ -237,7 +287,11 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
   /**
    * Update calendar by ID
    */
-  async update(id: string, data: UpdateCalendarDTO, context?: ServiceContext): Promise<CalendarEntity | null> {
+  async update(
+    id: string,
+    data: UpdateCalendarDTO,
+    context?: ServiceContext
+  ): Promise<CalendarEntity | null> {
     try {
       this.log('update', { id, data }, context);
 
@@ -245,7 +299,7 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       // Build dynamic update query
       const updates: string[] = [];
-      const params: any[] = [];
+      const params: Array<string | boolean | null> = [];
       let paramIndex = 1;
 
       if (data.name !== undefined) {
@@ -299,8 +353,9 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       this.log('update:success', { id }, context);
       return this.transformEntity(row);
-    } catch (error) {
-      this.log('update:error', { error: error.message, id, data }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('update:error', { error: message, id, data }, context);
       throw error;
     }
   }
@@ -316,17 +371,29 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
     try {
       this.log('getDefault', {}, context);
 
-      const defaultRes = await query('SELECT * FROM calendars WHERE "userId" = $1 AND "isDefault" = true LIMIT 1', [context.userId], this.db);
-      let defaultCalendar: any | null = defaultRes.rows[0] || null;
+      const defaultRes = await query<CalendarEntity>(
+        'SELECT * FROM calendars WHERE "userId" = $1 AND "isDefault" = true LIMIT 1',
+        [context.userId],
+        this.db
+      );
+      let defaultCalendar: CalendarEntity | null = defaultRes.rows[0] || null;
 
       // If no default calendar exists, get the first one or create one
       if (!defaultCalendar) {
-        const firstRes = await query('SELECT * FROM calendars WHERE "userId" = $1 LIMIT 1', [context.userId], this.db);
-        const firstCalendar = (firstRes.rows[0] as any) || null;
+        const firstRes = await query<CalendarEntity>(
+          'SELECT * FROM calendars WHERE "userId" = $1 LIMIT 1',
+          [context.userId],
+          this.db
+        );
+        const firstCalendar = firstRes.rows[0] || null;
 
         if (firstCalendar) {
           // Set first calendar as default
-          const updated = await query('UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *', [firstCalendar.id], this.db);
+          const updated = await query(
+            'UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *',
+            [firstCalendar.id],
+            this.db
+          );
           defaultCalendar = updated.rows[0];
         } else {
           // Create a default calendar and return immediately to avoid mixed inferred types
@@ -346,8 +413,9 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       this.log('getDefault:success', { id: defaultCalendar.id }, context);
       return this.transformEntity(defaultCalendar);
-    } catch (error) {
-      this.log('getDefault:error', { error: error.message }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('getDefault:error', { error: message }, context);
       throw error;
     }
   }
@@ -355,7 +423,10 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
   /**
    * Set calendar as default
    */
-  async setDefault(id: string, context?: ServiceContext): Promise<CalendarEntity> {
+  async setDefault(
+    id: string,
+    context?: ServiceContext
+  ): Promise<CalendarEntity> {
     try {
       this.log('setDefault', { id }, context);
 
@@ -368,16 +439,25 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       const result = await withTransaction(async (client) => {
         if (context?.userId) {
-          await query('UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true', [context.userId], client);
+          await query(
+            'UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true',
+            [context.userId],
+            client
+          );
         }
-        const updated = await query('UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *', [id], client);
+        const updated = await query(
+          'UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *',
+          [id],
+          client
+        );
         return updated.rows[0];
       });
 
       this.log('setDefault:success', { id }, context);
       return this.transformEntity(result);
-    } catch (error) {
-      this.log('setDefault:error', { error: error.message, id }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('setDefault:error', { error: message, id }, context);
       throw error;
     }
   }
@@ -385,7 +465,10 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
   /**
    * Toggle calendar visibility
    */
-  async toggleVisibility(id: string, context?: ServiceContext): Promise<CalendarEntity> {
+  async toggleVisibility(
+    id: string,
+    context?: ServiceContext
+  ): Promise<CalendarEntity> {
     try {
       this.log('toggleVisibility', { id }, context);
 
@@ -396,20 +479,33 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
       }
 
-      const currentRes = await query<{ isVisible: boolean }>('SELECT "isVisible" FROM calendars WHERE id = $1', [id], this.db);
+      const currentRes = await query<{ isVisible: boolean }>(
+        'SELECT "isVisible" FROM calendars WHERE id = $1',
+        [id],
+        this.db
+      );
       const currentCalendar = currentRes.rows[0];
 
       if (!currentCalendar) {
         throw new Error('NOT_FOUND: Calendar not found');
       }
 
-      const updatedRes = await query('UPDATE calendars SET "isVisible" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING *', [!currentCalendar.isVisible, id], this.db);
+      const updatedRes = await query(
+        'UPDATE calendars SET "isVisible" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING *',
+        [!currentCalendar.isVisible, id],
+        this.db
+      );
       const updatedCalendar = updatedRes.rows[0];
 
-      this.log('toggleVisibility:success', { id, isVisible: updatedCalendar.isVisible }, context);
+      this.log(
+        'toggleVisibility:success',
+        { id, isVisible: updatedCalendar.isVisible },
+        context
+      );
       return this.transformEntity(updatedCalendar);
-    } catch (error) {
-      this.log('toggleVisibility:error', { error: error.message, id }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('toggleVisibility:error', { error: message, id }, context);
       throw error;
     }
   }
@@ -425,15 +521,21 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
   /**
    * Get calendars with event counts
    */
-  async getWithEventCounts(context?: ServiceContext): Promise<CalendarEntity[]> {
+  async getWithEventCounts(
+    context?: ServiceContext
+  ): Promise<CalendarEntity[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
+    const userId = context.userId;
 
     try {
       this.log('getWithEventCounts', {}, context);
 
-      const res = await query(
+      type CalendarWithCountRow = CalendarEntity & {
+        events_count: string | number;
+      };
+      const res = await query<CalendarWithCountRow>(
         `SELECT c.*, COALESCE(e_cnt.count, 0)::bigint AS events_count
          FROM calendars c
          LEFT JOIN (
@@ -443,14 +545,20 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
          ) e_cnt ON e_cnt."calendarId" = c.id
          WHERE c."userId" = $1
          ORDER BY c."isDefault" DESC, c.name ASC`,
-        [context.userId!],
+        [userId],
         this.db
       );
 
       this.log('getWithEventCounts:success', { count: res.rowCount }, context);
-      return res.rows.map((row: any) => this.transformEntity({ ...row, _count: { events: Number(row.events_count) } }));
-    } catch (error) {
-      this.log('getWithEventCounts:error', { error: error.message }, context);
+      return res.rows.map((row) =>
+        this.transformEntity({
+          ...row,
+          _count: { events: Number(row.events_count) },
+        })
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('getWithEventCounts:error', { error: message }, context);
       throw error;
     }
   }
@@ -469,23 +577,39 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
         }
 
         // Check if this is the only calendar
-        const userCalendarCountRes = await query<{ count: string }>('SELECT COUNT(*)::bigint AS count FROM calendars WHERE "userId" = $1', [context.userId!], this.db);
+        const userCalendarCountRes = await query<{ count: string }>(
+          'SELECT COUNT(*)::bigint AS count FROM calendars WHERE "userId" = $1',
+          [context.userId!],
+          this.db
+        );
         const userCalendarCount = Number(userCalendarCountRes.rows[0].count);
         if (userCalendarCount <= 1) {
           throw new Error('VALIDATION_ERROR: Cannot delete the only calendar');
         }
 
         // Check if this is the default calendar
-        const calendarRes = await query<{ isDefault: boolean }>('SELECT "isDefault" FROM calendars WHERE id = $1', [id], this.db);
+        const calendarRes = await query<{ isDefault: boolean }>(
+          'SELECT "isDefault" FROM calendars WHERE id = $1',
+          [id],
+          this.db
+        );
         const calendar = calendarRes.rows[0];
 
         if (calendar?.isDefault) {
           // Set another calendar as default before deleting
-          const otherRes = await query('SELECT id FROM calendars WHERE "userId" = $1 AND id <> $2 LIMIT 1', [context.userId!, id], this.db);
+          const otherRes = await query(
+            'SELECT id FROM calendars WHERE "userId" = $1 AND id <> $2 LIMIT 1',
+            [context.userId!, id],
+            this.db
+          );
           const otherCalendar = otherRes.rows[0];
 
           if (otherCalendar) {
-            await query('UPDATE calendars SET "isDefault" = true WHERE id = $1', [otherCalendar.id], this.db);
+            await query(
+              'UPDATE calendars SET "isDefault" = true WHERE id = $1',
+              [otherCalendar.id],
+              this.db
+            );
           }
         }
       }
@@ -494,8 +618,9 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
 
       this.log('delete:success', { id }, context);
       return true;
-    } catch (error) {
-      this.log('delete:error', { error: error.message, id }, context);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('delete:error', { error: message, id }, context);
       throw error;
     }
   }
@@ -503,7 +628,10 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
   /**
    * Reorder calendars (if ordering is needed in the future)
    */
-  async reorder(calendarIds: string[], context?: ServiceContext): Promise<CalendarEntity[]> {
+  async reorder(
+    calendarIds: string[],
+    context?: ServiceContext
+  ): Promise<CalendarEntity[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -520,14 +648,20 @@ export class CalendarService extends BaseService<CalendarEntity, CreateCalendarD
       );
 
       if (userCalendars.rowCount !== calendarIds.length) {
-        throw new Error('VALIDATION_ERROR: Some calendars not found or access denied');
+        throw new Error(
+          'VALIDATION_ERROR: Some calendars not found or access denied'
+        );
       }
 
       // For now, just return the calendars in the requested order
       // In a full implementation, you might add an `order` field to the database
       const orderedCalendars = await Promise.all(
         calendarIds.map(async (id) => {
-          const res = await query('SELECT * FROM calendars WHERE id = $1', [id], this.db);
+          const res = await query(
+            'SELECT * FROM calendars WHERE id = $1',
+            [id],
+            this.db
+          );
           return res.rows[0];
         })
       );
