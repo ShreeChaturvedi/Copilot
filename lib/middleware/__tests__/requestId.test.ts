@@ -18,6 +18,7 @@ describe('Request ID Middleware', () => {
 
   afterEach(() => {
     consoleLogSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   describe('requestIdMiddleware', () => {
@@ -155,6 +156,9 @@ describe('Request ID Middleware', () => {
       const req = createMockRequest({
         method: 'GET',
         url: '/api/tasks',
+        headers: {
+          'user-agent': 'Test Agent',
+        },
       }) as AuthenticatedRequest;
       req.requestId = 'test-request-123';
       const res = createMockResponse();
@@ -162,15 +166,13 @@ describe('Request ID Middleware', () => {
       const middleware = requestLogger();
       middleware(req, res, mockNext);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[test-request-123]'),
+      const [message, meta] = consoleLogSpy.mock.calls[0] ?? [];
+      expect(message).toContain('[test-request-123]');
+      expect(message).toContain('GET /api/tasks');
+      expect(meta).toEqual(
         expect.objectContaining({
           userAgent: expect.any(String),
         })
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('GET /api/tasks'),
-        expect.any(Object)
       );
     });
 
@@ -231,8 +233,7 @@ describe('Request ID Middleware', () => {
         expect.any(Object)
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Response 200'),
-        expect.any(Object)
+        expect.stringContaining('Response 200')
       );
     });
 
@@ -253,8 +254,7 @@ describe('Request ID Middleware', () => {
       res.emit('finish');
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('150ms'),
-        expect.any(Object)
+        expect.stringContaining('150ms')
       );
 
       vi.useRealTimers();
@@ -396,8 +396,7 @@ describe('Request ID Middleware', () => {
       res.emit('finish');
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Response 404'),
-        expect.any(Object)
+        expect.stringContaining('Response 404')
       );
     });
 

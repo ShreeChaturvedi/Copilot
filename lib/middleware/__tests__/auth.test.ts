@@ -13,12 +13,34 @@ import {
 import { UnauthorizedError } from '../../types/api';
 import { createMockRequest, createMockResponse } from '../../__tests__/helpers';
 import type { AuthenticatedRequest } from '../../types/api';
+import { extractTokenFromHeader, verifyToken } from '../../../packages/backend/src/utils/jwt.js';
+
+vi.mock('../../../packages/backend/src/utils/jwt.js', () => ({
+  verifyToken: vi.fn(),
+  extractTokenFromHeader: vi.fn(),
+}));
 
 describe('Authentication Middleware', () => {
   let mockNext: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockNext = vi.fn();
+    vi.mocked(extractTokenFromHeader).mockImplementation((authHeader?: string) => {
+      if (!authHeader) return null;
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
+      return parts[1];
+    });
+    vi.mocked(verifyToken).mockImplementation(async (token: string) => {
+      if (token.includes('malformed')) {
+        throw new Error('TOKEN_INVALID');
+      }
+      return {
+        userId: 'user-123',
+        email: 'user@example.com',
+        type: 'access',
+      };
+    });
   });
 
   describe('authenticateJWT', () => {
@@ -34,8 +56,8 @@ describe('Authentication Middleware', () => {
       await middleware(req, res, mockNext);
 
       expect(req.user).toBeDefined();
-      expect(req.user?.id).toBe('placeholder-user-id');
-      expect(req.user?.email).toBe('placeholder@example.com');
+      expect(req.user?.id).toBe('user-123');
+      expect(req.user?.email).toBe('user@example.com');
       expect(mockNext).toHaveBeenCalledOnce();
     });
 
@@ -112,7 +134,7 @@ describe('Authentication Middleware', () => {
       await middleware(req, res, mockNext);
 
       expect(req.user).toBeDefined();
-      expect(req.user?.id).toBe('placeholder-user-id');
+      expect(req.user?.id).toBe('user-123');
       expect(mockNext).toHaveBeenCalledOnce();
     });
 
@@ -445,7 +467,7 @@ describe('Authentication Middleware', () => {
       expect(req.user).toBeDefined();
 
       // Then, check ownership
-      const getResourceUserId = vi.fn().mockResolvedValue('placeholder-user-id');
+      const getResourceUserId = vi.fn().mockResolvedValue('user-123');
       const ownershipMiddleware = requireOwnership(getResourceUserId);
       await ownershipMiddleware(req, res, mockNext);
 

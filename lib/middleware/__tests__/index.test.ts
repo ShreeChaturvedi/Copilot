@@ -133,7 +133,7 @@ describe('Middleware Composition', () => {
         await next();
       };
 
-      const middleware2: Middleware = async (req, res, next) => {
+      const middleware2: Middleware = async (_req, _res, _next) => {
         throw new Error('Middleware error');
       };
 
@@ -252,15 +252,15 @@ describe('Middleware Composition', () => {
       const res = createMockResponse();
 
       const pipeline = new MiddlewarePipeline()
-        .use(async (req, res, next) => {
+        .use(async (_req, _res, next) => {
           execOrder.push(1);
           next();
         })
-        .use(async (req, res, next) => {
+        .use(async (_req, _res, _next) => {
           execOrder.push(2);
           // Stop here
         })
-        .use(async (req, res, next) => {
+        .use(async (_req, _res, next) => {
           execOrder.push(3);
           next();
         });
@@ -276,10 +276,10 @@ describe('Middleware Composition', () => {
       const res = createMockResponse();
 
       const pipeline = new MiddlewarePipeline()
-        .use(async (req, res, next) => {
+        .use(async (_req, _res, next) => {
           await next();
         })
-        .use(async (req, res, next) => {
+        .use(async (_req, _res, _next) => {
           throw new Error('Pipeline error');
         });
 
@@ -380,7 +380,7 @@ describe('Middleware Composition', () => {
         next();
       });
 
-      const condition = (req: AuthenticatedRequest) => {
+      const condition = (_req: AuthenticatedRequest) => {
         throw new Error('Condition error');
       };
 
@@ -659,7 +659,7 @@ describe('Middleware Composition', () => {
     });
 
     it('should handle middleware that sends response early', async () => {
-      const middleware: Middleware = async (req, res, next) => {
+      const middleware: Middleware = async (_req, res, _next) => {
         res.status(404).json({ error: 'Not found' });
         // Does not call next()
       };
@@ -679,8 +679,9 @@ describe('Middleware Composition', () => {
       const execOrder: number[] = [];
 
       for (let i = 0; i < 50; i++) {
-        middlewares.push(async (req, res, next) => {
-          execOrder.push(i);
+        const index = i; // Capture value
+        middlewares.push(async (_req, _res, next) => {
+          execOrder.push(index);
           next();
         });
       }

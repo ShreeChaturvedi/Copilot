@@ -3,7 +3,7 @@
  * Tests rate limit enforcement, memory store, headers, presets, and IP detection
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { rateLimit, rateLimitPresets } from '../rateLimit';
+import { rateLimit, rateLimitPresets, resetRateLimitStore } from '../rateLimit';
 import { createMockRequest, createMockResponse } from '../../__tests__/helpers';
 import type { AuthenticatedRequest } from '../../types/api';
 
@@ -13,6 +13,8 @@ describe('Rate Limit Middleware', () => {
   beforeEach(() => {
     mockNext = vi.fn();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+    resetRateLimitStore();
   });
 
   afterEach(() => {

@@ -3,11 +3,64 @@
  * Tests complete workflows from API endpoints through services to database
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  createMockAuthRequest,
+  createMockResponse,
+  mockUser,
+} from '../../lib/__tests__/helpers';
 
-// Mock the entire service layer and database
-vi.mock('../../lib/services/index');
-vi.mock('../../lib/middleware/errorHandler');
+vi.mock('../../lib/services/index.js', () => {
+  const mockTaskService = {
+    findAll: vi.fn(),
+    findPaginated: vi.fn(),
+    create: vi.fn(),
+    findById: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    toggleCompletion: vi.fn(),
+  };
+  const mockTaskListService = {
+    findAll: vi.fn(),
+    getWithTaskCount: vi.fn(),
+    create: vi.fn(),
+    findById: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    setDefault: vi.fn(),
+  };
+  return {
+    getAllServices: vi.fn(() => ({
+      task: mockTaskService,
+      taskList: mockTaskListService,
+    })),
+    __mockServices: {
+      task: mockTaskService,
+      taskList: mockTaskListService,
+    },
+  };
+});
+
+vi.mock('../../lib/middleware/errorHandler.js', () => {
+  const sendSuccess = vi.fn((res, data, statusCode = 200) => {
+    res.status(statusCode).json({ success: true, data });
+  });
+  const sendError = vi.fn((res, error) => {
+    const statusCode = error?.statusCode ?? 500;
+    res.status(statusCode).json({
+      success: false,
+      error: {
+        code: error?.code,
+        message: error?.message,
+      },
+    });
+  });
+  return {
+    asyncHandler: (handler: any) => handler,
+    errorHandler: vi.fn(),
+    sendSuccess,
+    sendError,
+  };
+});
 
 // Import handlers after mocking
 import tasksHandler from '../tasks/index';
@@ -17,28 +70,13 @@ import taskListHandler from '../task-lists/[id]';
 
 // Test scenarios that cover the requirements from Task 6
 describe('Task Management API End-to-End Tests', () => {
-  const mockUser = {
-    id: 'user-123',
-    email: 'test@example.com',
-    name: 'Test User',
-  };
-
-const createMockRequest = (overrides: Partial<VercelRequest> = {}): VercelRequest => ({
-    method: 'GET',
-    url: '/api/tasks',
-    headers: { 'x-request-id': 'test-request-123' },
-    query: {},
-    body: {},
-    user: mockUser,
-    ...overrides,
-} as unknown as VercelRequest);
-
-const createMockResponse = (): VercelResponse => ({
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
-    end: vi.fn().mockReturnThis(),
-    setHeader: vi.fn().mockReturnThis(),
-} as unknown as VercelResponse);
+  const createRequest = (overrides: Record<string, unknown> = {}) =>
+    createMockAuthRequest(mockUser, {
+      method: 'GET',
+      url: '/api/tasks',
+      ...overrides,
+    });
+  const createResponse = () => createMockResponse();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,12 +113,12 @@ const createMockResponse = (): VercelResponse => ({
       };
 
       // 1. Create task
-      const createReq = createMockRequest({
+      const createReq = createRequest({
         method: 'POST',
         url: '/api/tasks',
         body: taskData,
       });
-      const createRes = createMockResponse();
+      const createRes = createResponse();
 
       await tasksHandler(createReq, createRes);
       
@@ -88,12 +126,12 @@ const createMockResponse = (): VercelResponse => ({
       expect(createRes.json).toHaveBeenCalled();
 
       // 2. Read task
-      const readReq = createMockRequest({
+      const readReq = createRequest({
         method: 'GET',
         url: '/api/tasks/task-123',
         query: { id: 'task-123' },
       });
-      const readRes = createMockResponse();
+      const readRes = createResponse();
 
       await taskHandler(readReq, readRes);
       expect(readRes.json).toHaveBeenCalled();
@@ -105,24 +143,24 @@ const createMockResponse = (): VercelResponse => ({
         priority: 'MEDIUM',
       };
 
-      const updateReq = createMockRequest({
+      const updateReq = createRequest({
         method: 'PUT',
         url: '/api/tasks/task-123',
         query: { id: 'task-123' },
         body: updateData,
       });
-      const updateRes = createMockResponse();
+      const updateRes = createResponse();
 
       await taskHandler(updateReq, updateRes);
       expect(updateRes.json).toHaveBeenCalled();
 
       // 4. Delete task
-      const deleteReq = createMockRequest({
+      const deleteReq = createRequest({
         method: 'DELETE',
         url: '/api/tasks/task-123',
         query: { id: 'task-123' },
       });
-      const deleteRes = createMockResponse();
+      const deleteRes = createResponse();
 
       await taskHandler(deleteReq, deleteRes);
       expect(deleteRes.json).toHaveBeenCalled();
@@ -170,12 +208,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of filteringScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'GET',
           url: '/api/tasks',
           query: scenario.query,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await tasksHandler(req, res);
         
@@ -203,12 +241,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of paginationScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'GET',
           url: '/api/tasks',
           query: scenario.query,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await tasksHandler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -218,12 +256,12 @@ const createMockResponse = (): VercelResponse => ({
 
   describe('Requirement 5.4: Task Toggle and Bulk Operations', () => {
     it('should support task completion toggle', async () => {
-      const req = createMockRequest({
+      const req = createRequest({
         method: 'PATCH',
         url: '/api/tasks/task-123',
         query: { id: 'task-123', action: 'toggle' },
       });
-      const res = createMockResponse();
+      const res = createResponse();
 
       await taskHandler(req, res);
       expect(res.json).toHaveBeenCalled();
@@ -241,13 +279,13 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of bulkUpdateScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'PATCH',
           url: `/api/tasks/${scenario.taskId}`,
           query: { id: scenario.taskId },
           body: scenario.updates,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await taskHandler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -265,23 +303,23 @@ const createMockResponse = (): VercelResponse => ({
       };
 
       // 1. Create task list
-      const createReq = createMockRequest({
+      const createReq = createRequest({
         method: 'POST',
         url: '/api/task-lists',
         body: taskListData,
       });
-      const createRes = createMockResponse();
+      const createRes = createResponse();
 
       await taskListsHandler(createReq, createRes);
       expect(createRes.json).toHaveBeenCalled();
 
       // 2. Get task lists with counts
-      const getWithCountsReq = createMockRequest({
+      const getWithCountsReq = createRequest({
         method: 'GET',
         url: '/api/task-lists',
         query: { withTaskCount: 'true' },
       });
-      const getWithCountsRes = createMockResponse();
+      const getWithCountsRes = createResponse();
 
       await taskListsHandler(getWithCountsReq, getWithCountsRes);
       expect(getWithCountsRes.json).toHaveBeenCalled();
@@ -293,35 +331,35 @@ const createMockResponse = (): VercelResponse => ({
         description: 'Updated description',
       };
 
-      const updateReq = createMockRequest({
+      const updateReq = createRequest({
         method: 'PUT',
         url: '/api/task-lists/list-123',
         query: { id: 'list-123' },
         body: updateData,
       });
-      const updateRes = createMockResponse();
+      const updateRes = createResponse();
 
       await taskListHandler(updateReq, updateRes);
       expect(updateRes.json).toHaveBeenCalled();
 
       // 4. Set as default
-      const setDefaultReq = createMockRequest({
+      const setDefaultReq = createRequest({
         method: 'PATCH',
         url: '/api/task-lists/list-123',
         query: { id: 'list-123', action: 'set-default' },
       });
-      const setDefaultRes = createMockResponse();
+      const setDefaultRes = createResponse();
 
       await taskListHandler(setDefaultReq, setDefaultRes);
       expect(setDefaultRes.json).toHaveBeenCalled();
 
       // 5. Delete task list (with task reassignment)
-      const deleteReq = createMockRequest({
+      const deleteReq = createRequest({
         method: 'DELETE',
         url: '/api/task-lists/list-123',
         query: { id: 'list-123' },
       });
-      const deleteRes = createMockResponse();
+      const deleteRes = createResponse();
 
       await taskListHandler(deleteReq, deleteRes);
       expect(deleteRes.json).toHaveBeenCalled();
@@ -373,12 +411,12 @@ const createMockResponse = (): VercelResponse => ({
         ],
       };
 
-      const req = createMockRequest({
+      const req = createRequest({
         method: 'POST',
         url: '/api/tasks',
         body: taskWithComplexTags,
       });
-      const res = createMockResponse();
+      const res = createResponse();
 
       await tasksHandler(req, res);
       expect(res.json).toHaveBeenCalled();
@@ -404,12 +442,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of tagFilteringScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'GET',
           url: '/api/tasks',
           query: scenario.query,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await tasksHandler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -445,13 +483,13 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of unauthenticatedScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: scenario.method,
           url: scenario.url,
           body: scenario.body || {},
           user: undefined, // No authenticated user
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await scenario.handler(req, res);
         
@@ -490,12 +528,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of validationScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: scenario.method,
           body: scenario.body,
           query: scenario.query || {},
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await scenario.handler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -532,12 +570,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of notFoundScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: scenario.method,
           query: scenario.query,
           body: scenario.body || {},
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await scenario.handler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -572,12 +610,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const scenario of largeDatasetScenarios) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'GET',
           url: '/api/tasks',
           query: scenario.query,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await tasksHandler(req, res);
         expect(res.json).toHaveBeenCalled();
@@ -610,12 +648,12 @@ const createMockResponse = (): VercelResponse => ({
       ];
 
       for (const pattern of queryPatterns) {
-        const req = createMockRequest({
+        const req = createRequest({
           method: 'GET',
           url: '/api/tasks',
           query: pattern.query,
         });
-        const res = createMockResponse();
+        const res = createResponse();
 
         await tasksHandler(req, res);
         expect(res.json).toHaveBeenCalled();

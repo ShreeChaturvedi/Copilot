@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { corsMiddleware, cors } from '../cors';
 import { createMockRequest, createMockResponse } from '../../__tests__/helpers';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 describe('CORS Middleware', () => {
   let mockNext: ReturnType<typeof vi.fn>;

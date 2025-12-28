@@ -194,6 +194,10 @@ export default createCrudHandler({
       if (error.message?.includes('AUTHORIZATION_ERROR')) {
         return sendError(res, new ForbiddenError('Access denied'));
       }
+      if (error.message?.startsWith('VALIDATION_ERROR:')) {
+        const msg = error.message.replace('VALIDATION_ERROR: ', '');
+        return sendError(res, new ValidationError([{ message: msg, code: 'VALIDATION_ERROR' }], msg));
+      }
 
       sendError(res, new InternalServerError(error.message || 'Failed to delete task list'));
     }

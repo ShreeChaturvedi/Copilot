@@ -62,6 +62,10 @@ class MemoryStore {
       }
     }
   }
+
+  clear(): void {
+    this.store.clear();
+  }
 }
 
 // Global store instance
@@ -69,6 +73,11 @@ const store = new MemoryStore();
 
 // Cleanup expired entries every 5 minutes
 setInterval(() => store.cleanup(), 5 * 60 * 1000);
+
+// Test-only helper to reset the in-memory store between test cases.
+export function resetRateLimitStore(): void {
+  store.clear();
+}
 
 /**
  * Default rate limit configuration

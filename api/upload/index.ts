@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { asyncHandler } from '../../lib/middleware/errorHandler.js';
+import { asyncHandler, sendSuccess } from '../../lib/middleware/errorHandler.js';
 
 interface BlobPutResult {
   url: string;
@@ -68,16 +68,13 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
             .webp({ quality: 80 })
             .toBuffer();
 
-          res.status(201).json({
-            success: true,
-            data: {
-              url: toDataUri('image/jpeg', optimized),
-              thumbnailUrl: toDataUri('image/webp', thumb),
-              size: optimized.length,
-              contentType: 'image/jpeg',
-              dev: true,
-            },
-          });
+          sendSuccess(res, {
+            url: toDataUri('image/jpeg', optimized),
+            thumbnailUrl: toDataUri('image/webp', thumb),
+            size: optimized.length,
+            contentType: 'image/jpeg',
+            dev: true,
+          }, 201);
           return;
         } catch {
           // sharp failed: fall back to tiny placeholder thumb + original as data URI
@@ -85,30 +82,24 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
             'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAACENnwnAAAAK0lEQVR42mP8//8/AyWYgQESKAYMDKwGRgYhEASDEGQhQAcxIhAGQwMAAF0gBBf3n0vTAAAAAElFTkSuQmCC',
             'base64'
           ); // 10x10 gray PNG
-          res.status(201).json({
-            success: true,
-            data: {
-              url: toDataUri(contentType || 'application/octet-stream', body),
-              thumbnailUrl: toDataUri('image/png', tinyPng),
-              size: body.length,
-              contentType,
-              dev: true,
-            },
-          });
+          sendSuccess(res, {
+            url: toDataUri(contentType || 'application/octet-stream', body),
+            thumbnailUrl: toDataUri('image/png', tinyPng),
+            size: body.length,
+            contentType,
+            dev: true,
+          }, 201);
           return;
         }
       }
 
       // Non-images: return single data URI
-      res.status(201).json({
-        success: true,
-        data: {
-          url: toDataUri(contentType, body),
-          size: body.length,
-          contentType,
-          dev: true,
-        },
-      });
+      sendSuccess(res, {
+        url: toDataUri(contentType, body),
+        size: body.length,
+        contentType,
+        dev: true,
+      }, 201);
       return;
     }
 
@@ -148,15 +139,12 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
           contentType: 'image/webp',
         } as any);
 
-        res.status(201).json({
-          success: true,
-          data: {
-            url: fullStored.url,
-            thumbnailUrl: thumbStored.url,
-            size: optimized.length,
-            contentType: 'image/jpeg',
-          },
-        });
+        sendSuccess(res, {
+          url: fullStored.url,
+          thumbnailUrl: thumbStored.url,
+          size: optimized.length,
+          contentType: 'image/jpeg',
+        }, 201);
         return;
       } catch (e) {
         // Fallback: upload original buffer as-is
@@ -168,15 +156,12 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
       contentType,
     } as any);
 
-    res.status(201).json({
-      success: true,
-      data: {
-        url: stored.url,
-        pathname: stored.pathname,
-        size: body.length,
-        contentType,
-      },
-    });
+    sendSuccess(res, {
+      url: stored.url,
+      pathname: stored.pathname,
+      size: body.length,
+      contentType,
+    }, 201);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Upload failed';
     console.error('Upload error', error);
@@ -188,4 +173,3 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
 
 export default asyncHandler(handler);
 export { handler };
-
