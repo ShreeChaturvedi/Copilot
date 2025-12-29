@@ -28,14 +28,14 @@ export enum GroupBy {
 }
 
 /**
+ * String-only preset values for ViewSwitcher compatibility
+ */
+export type RangePresetValue = '7d' | '30d' | '90d' | 'ytd';
+
+/**
  * Predefined time range presets or custom range
  */
-export type RangePreset =
-  | '7d'
-  | '30d'
-  | '90d'
-  | 'ytd'
-  | { start: Date; end: Date };
+export type RangePreset = RangePresetValue | { start: Date; end: Date };
 
 /**
  * Bucket data for time series analytics

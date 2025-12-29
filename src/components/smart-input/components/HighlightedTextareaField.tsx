@@ -24,9 +24,9 @@ export interface HighlightedTextareaFieldProps {
   /** Additional CSS classes for the textarea */
   className?: string;
   /** Key press handler */
-  onKeyPress?: (e: React.KeyboardEvent) => void;
+  onKeyPress?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Key down handler */
-  onKeyDown?: (e: React.KeyboardEvent) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Blur handler */
   onBlur?: () => void;
   /** Focus handler */

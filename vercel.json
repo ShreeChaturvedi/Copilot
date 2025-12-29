@@ -2,7 +2,7 @@
   "version": 2,
   "framework": "vite",
   "devCommand": "vite --port 5173",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:shared && npm run build:frontend",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "functions": {

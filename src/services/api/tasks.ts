@@ -84,7 +84,7 @@ function reviveTaskDates(task: Record<string, unknown>): Task {
           : statusRaw === 'NOT_STARTED'
             ? 'not_started'
             : undefined;
-    if (mapped) (revived as Task).status = mapped;
+    if (mapped) revived.status = mapped;
   }
 
   // Attachments normalization (server join shape -> FileAttachment)

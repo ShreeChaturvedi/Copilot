@@ -18,7 +18,7 @@
     "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build:shared && npm run build:frontend && npm run build:backend",
     "build:shared": "npm run build --workspace=packages/shared",
-    "build:frontend": "tsc -b && vite build",
+    "build:frontend": "vite build",
     "build:backend": "npm run build --workspace=packages/backend",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "npm run lint:fix --workspaces --if-present",

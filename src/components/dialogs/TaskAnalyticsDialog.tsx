@@ -35,6 +35,7 @@ import { useTaskManagement } from '@/hooks/useTaskManagement';
 import {
   GroupBy,
   RangePreset,
+  RangePresetValue,
   computeStatusCounts,
   getOverdueCount,
   getWeeklyStatusBreakdown,
@@ -550,7 +551,7 @@ function TaskAnalyticsDialogContent({
   const { taskGroups } = useTaskManagement({ includeTaskOperations: false });
 
   const [activeTab, setActiveTab] = useState<'overview' | 'trends'>('overview');
-  const [rangePreset, setRangePreset] = useState<RangePreset>('30d');
+  const [rangePreset, setRangePreset] = useState<RangePresetValue>('30d');
   const [groupBy, setGroupBy] = useState<GroupBy>(GroupBy.Day);
   const [includeCompleted, setIncludeCompleted] = useState(true);
   const [listId] = useState<string | null>(defaultScope || null);
@@ -620,7 +621,7 @@ function TaskAnalyticsDialogContent({
         <div className="flex items-center gap-2 pb-4 border-b">
           <ViewSwitcher
             value={rangePreset}
-            onChange={(v) => setRangePreset(v as RangePreset)}
+            onChange={(v) => setRangePreset(v as RangePresetValue)}
             options={timeRangeOptions}
           />
 
