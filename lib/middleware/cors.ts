@@ -8,9 +8,14 @@ import type { CorsConfig } from '../types/api.js';
  * Default CORS configuration
  */
 const defaultCorsConfig: CorsConfig = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.VERCEL_URL || '', 'https://your-domain.com']
-    : true, // Allow all origins in development
+  origin:
+    process.env.NODE_ENV === 'production'
+      ? ([
+          `https://${process.env.VERCEL_URL}`,
+          `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`,
+          process.env.FRONTEND_URL,
+        ].filter(Boolean) as string[])
+      : true, // Allow all origins in development
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -18,7 +23,7 @@ const defaultCorsConfig: CorsConfig = {
     'X-Requested-With',
     'Accept',
     'Origin',
-    'X-Request-ID'
+    'X-Request-ID',
   ],
   credentials: true,
   maxAge: 86400, // 24 hours
@@ -66,8 +71,11 @@ function setCorsHeaders(
 
   // Set other headers
   res.setHeader('Access-Control-Allow-Methods', config.methods.join(', '));
-  res.setHeader('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
-  
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    config.allowedHeaders.join(', ')
+  );
+
   if (config.credentials) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }

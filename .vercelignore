@@ -1,0 +1,37 @@
+# Git
+.git
+
+# Dependencies (installed fresh during build)
+node_modules
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Screenshots
+screenshots/
+
+# Tests
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Local environment files
+.env*
+!.env.example
+
+# Development configs
+docker/
+.vscode/
+.idea/
+
+# Build artifacts (generated fresh)
+dist/
+*.tsbuildinfo
+
+# Claude/Cursor configs
+.claude/
+.cursor/
