@@ -4,7 +4,7 @@
   "devCommand": "vite --port 5173",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "functions": {
     "api/**/*.ts": {
       "runtime": "@vercel/node@5.3.11"
