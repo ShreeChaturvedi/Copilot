@@ -38,7 +38,8 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "db:migrate": "npm run db:migrate --workspace=packages/backend",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate:status": "tsx scripts/migrate.ts --status",
     "db:seed": "npm run db:seed --workspace=packages/backend",
     "db:studio": "npm run db:studio --workspace=packages/backend"
   },
@@ -143,6 +144,7 @@
     "sharp": "^0.33.5",
     "tailwindcss": "^4.1.11",
     "terser": "^5.44.1",
+    "tsx": "^4.22.4",
     "tw-animate-css": "^1.3.5",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.0",
