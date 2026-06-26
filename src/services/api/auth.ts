@@ -281,29 +281,42 @@ class AuthAPI {
     }
   }
 
-  async verifyToken(
-    token: string
-  ): Promise<{
+  async verifyToken(token: string): Promise<{
     valid: boolean;
     user?: { id: string; email: string; name?: string; picture?: string };
   }> {
     try {
-      const response = await fetch(`${this.baseURL}/verify`, {
+      // There is no dedicated /verify route; /me is the canonical "is this
+      // token still valid?" endpoint and already returns the authenticated
+      // user. A 200 means the access token is valid.
+      const response = await fetch(`${this.baseURL}/me`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
+      if (!response.ok) {
+        return { valid: false };
+      }
+
       const data = await response.json();
 
-      if (!response.ok) {
+      // /me returns the user fields flat under `data` ({ id, email, name, ... }),
+      // not nested under data.user.
+      const u = data?.data;
+      if (!data?.success || !u) {
         return { valid: false };
       }
 
       return {
         valid: true,
-        user: data.data?.user,
+        user: {
+          id: u.id,
+          email: u.email,
+          name: u.name ?? undefined,
+          picture: u.picture ?? u.profile?.avatarUrl,
+        },
       };
     } catch (error) {
       console.error('Token verification error:', error);

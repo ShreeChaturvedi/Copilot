@@ -31,6 +31,11 @@ import cors from 'cors';
 import { getAllServices, initServices } from '../lib/services/index';
 import { authService } from '../packages/backend/src/services/AuthService';
 import { refreshTokenService } from '../packages/backend/src/services/RefreshTokenService';
+import { googleOAuthService } from '../packages/backend/src/services/GoogleOAuthService';
+import {
+  extractTokenFromHeader,
+  verifyToken,
+} from '../packages/backend/src/utils/jwt';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -562,9 +567,37 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 // GET /api/auth/me
-app.get('/api/auth/me', async (_req, res) => {
+// Mirrors the serverless api/auth/me.ts: verify the bearer access token and
+// return the real authenticated user (NOT a hardcoded dev user), so the auth
+// guard's verification step behaves the same locally as in production.
+app.get('/api/auth/me', async (req, res) => {
   try {
-    const user = await authService.getUserById(devContext.userId);
+    const token = extractTokenFromHeader(req.headers.authorization);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = await verifyToken(token);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
+      });
+    }
+
+    if (decoded.type !== 'access') {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid token type' },
+      });
+    }
+
+    const user = await authService.getUserById(decoded.userId);
     if (!user) {
       return res
         .status(404)
@@ -578,7 +611,86 @@ app.get('/api/auth/me', async (_req, res) => {
   }
 });
 
-// Google OAuth routes removed - not configured
+// Google OAuth routes - mirror api/auth/google/index.ts. When Google OAuth is
+// not configured (no GOOGLE_CLIENT_ID/SECRET) these return 503, matching prod.
+app.get('/api/auth/google', async (_req, res) => {
+  try {
+    if (!googleOAuthService.isConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'GOOGLE_OAUTH_NOT_CONFIGURED',
+          message: 'Google OAuth is not configured on this server',
+        },
+      });
+    }
+    res.json({
+      success: true,
+      data: { authUrl: googleOAuthService.getAuthUrl() },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    if (!googleOAuthService.isConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'GOOGLE_OAUTH_NOT_CONFIGURED',
+          message: 'Google OAuth is not configured on this server',
+        },
+      });
+    }
+
+    const { code } = req.body ?? {};
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_AUTH_CODE',
+          message: 'Authorization code is required',
+        },
+      });
+    }
+
+    const result = await googleOAuthService.handleCallback(code);
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name ?? '',
+          picture: result.user.avatarUrl,
+        },
+        googleTokens: {
+          accessToken: result.tokens.accessToken,
+          refreshToken: result.tokens.refreshToken,
+          expiresAt: result.tokens.expiresAt,
+        },
+        isNewUser: result.isNewUser,
+      },
+    });
+  } catch (error) {
+    if (getErrorMessage(error) === 'GOOGLE_OAUTH_FAILED') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'GOOGLE_OAUTH_FAILED',
+          message: 'Failed to authenticate with Google',
+        },
+      });
+    }
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
 
 // Start
 console.log('Initializing services...');
