@@ -551,9 +551,9 @@ app.post('/api/auth/logout', async (req, res) => {
   try {
     const { refreshToken, logoutAll } = req.body;
     if (logoutAll) {
-      refreshTokenService.invalidateAllUserTokens(devContext.userId);
+      await refreshTokenService.invalidateAllUserTokens(devContext.userId);
     } else {
-      refreshTokenService.invalidateRefreshToken(refreshToken);
+      await refreshTokenService.invalidateRefreshToken(refreshToken);
     }
     res.json({ success: true, data: { message: 'Logged out successfully' } });
   } catch {

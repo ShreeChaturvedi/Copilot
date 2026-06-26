@@ -35,10 +35,10 @@ export default createMethodHandler({
 
       if (logoutAll && req.user) {
         // Invalidate all refresh tokens for this user
-        refreshTokenService.invalidateAllUserTokens(req.user.id);
+        await refreshTokenService.invalidateAllUserTokens(req.user.id);
       } else {
         // Invalidate only this refresh token
-        refreshTokenService.invalidateRefreshToken(refreshToken);
+        await refreshTokenService.invalidateRefreshToken(refreshToken);
       }
 
       return res.status(200).json({

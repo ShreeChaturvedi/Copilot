@@ -220,7 +220,7 @@ class GoogleOAuthService {
           );
           return u;
         });
-        user = created;
+        user = { ...created, googleId };
         isNewUser = true;
       }
     } else {
@@ -244,11 +244,15 @@ class GoogleOAuthService {
       }
     }
 
+    if (!user) {
+      throw new Error('GOOGLE_OAUTH_FAILED');
+    }
+
     // Generate JWT tokens
     const tokens = await generateTokenPair(user.id, user.email);
 
     // Store refresh token
-    refreshTokenService.storeRefreshToken(
+    await refreshTokenService.storeRefreshToken(
       tokens.refreshToken,
       user.id,
       user.email

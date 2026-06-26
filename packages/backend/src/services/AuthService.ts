@@ -83,7 +83,7 @@ class AuthService {
     const tokens = await generateTokenPair(user.id, user.email);
 
     // Store refresh token
-    refreshTokenService.storeRefreshToken(
+    await refreshTokenService.storeRefreshToken(
       tokens.refreshToken,
       user.id,
       user.email
@@ -138,7 +138,7 @@ class AuthService {
     const tokens = await generateTokenPair(user.id, user.email);
 
     // Store refresh token
-    refreshTokenService.storeRefreshToken(
+    await refreshTokenService.storeRefreshToken(
       tokens.refreshToken,
       user.id,
       user.email

@@ -15,7 +15,6 @@
     "dev:vite": "vite",
     "dev:api": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/react_calendar_dev npx tsx scripts/dev-server.ts",
     "dev:vercel": "vercel dev",
-    "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build:shared && npm run build:frontend && npm run build:backend",
     "build:shared": "npm run build --workspace=packages/shared",
     "build:frontend": "vite build",
