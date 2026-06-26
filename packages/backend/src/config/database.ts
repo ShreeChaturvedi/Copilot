@@ -13,11 +13,20 @@ declare global {
   var __backendPgPool: Pool | undefined;
 }
 
+// Neon and most managed Postgres require TLS. Enable SSL for any non-local
+// connection (or when sslmode=require is set), matching scripts/migrate.ts.
+// Without this, the deployed serverless functions cannot connect to Neon.
+const needsSsl =
+  /\bsslmode=require\b/.test(databaseConfig.url) ||
+  (!/localhost|127\.0\.0\.1/.test(databaseConfig.url) &&
+    process.env.PGSSLMODE !== 'disable');
+
 const createPool = () =>
   new Pool({
     connectionString: databaseConfig.url,
     max: databaseConfig.max,
     idleTimeoutMillis: databaseConfig.idleTimeoutMillis,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
   });
 
 export const pool: Pool = globalThis.__backendPgPool || createPool();
