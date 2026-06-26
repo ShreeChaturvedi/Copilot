@@ -46,7 +46,7 @@ const devContext = {
 };
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? getErrorMessage(error) : String(error);
+  error instanceof Error ? error.message : String(error);
 
 // Health check
 app.get('/api/health', (_req, res) => {

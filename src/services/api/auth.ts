@@ -88,6 +88,46 @@ export interface GoogleAuthResponse {
   message?: string;
 }
 
+/**
+ * The auth endpoints return { success, data: { user, tokens } } (nested), while
+ * the rest of the app consumes a flat { accessToken, refreshToken, expiresAt,
+ * user } shape. Normalize here so callers get a single, stable contract.
+ */
+interface BackendAuthResult {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    picture?: string;
+    createdAt: string;
+    updatedAt?: string;
+  };
+  tokens: { accessToken: string; refreshToken: string; expiresAt: number };
+}
+
+function normalizeAuthData(
+  raw: BackendAuthResult
+): NonNullable<LoginResponse['data']> {
+  return {
+    accessToken: raw.tokens.accessToken,
+    refreshToken: raw.tokens.refreshToken,
+    expiresAt: raw.tokens.expiresAt,
+    user: {
+      id: raw.user.id,
+      email: raw.user.email,
+      name: raw.user.name ?? '',
+      picture: raw.user.picture,
+      createdAt: raw.user.createdAt,
+      updatedAt: raw.user.updatedAt ?? raw.user.createdAt,
+    },
+  };
+}
+
+function extractErrorMessage(data: unknown, fallback: string): string {
+  const d = data as { error?: { message?: string }; message?: string };
+  return d?.error?.message || d?.message || fallback;
+}
+
 class AuthAPI {
   private baseURL = '/api/auth';
 
@@ -103,14 +143,14 @@ class AuthAPI {
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         return {
           success: false,
-          message: data.message || 'Login failed',
+          message: extractErrorMessage(data, 'Login failed'),
         };
       }
 
-      return data;
+      return { success: true, data: normalizeAuthData(data.data) };
     } catch (error) {
       console.error('Login error:', error);
       return {
@@ -122,7 +162,8 @@ class AuthAPI {
 
   async signup(userData: SignupRequest): Promise<SignupResponse> {
     try {
-      const response = await fetch(`${this.baseURL}/signup`, {
+      // The backend route is /register; there is no /signup endpoint.
+      const response = await fetch(`${this.baseURL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,14 +173,14 @@ class AuthAPI {
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         return {
           success: false,
-          message: data.message || 'Signup failed',
+          message: extractErrorMessage(data, 'Signup failed'),
         };
       }
 
-      return data;
+      return { success: true, data: normalizeAuthData(data.data) };
     } catch (error) {
       console.error('Signup error:', error);
       return {
@@ -178,16 +219,19 @@ class AuthAPI {
     }
   }
 
-  async logout(accessToken: string, refreshToken?: string): Promise<{ success: boolean; message?: string }> {
+  async logout(
+    accessToken: string,
+    refreshToken?: string
+  ): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await fetch(`${this.baseURL}/logout`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          refreshToken 
+        body: JSON.stringify({
+          refreshToken,
         }),
       });
 
@@ -237,12 +281,17 @@ class AuthAPI {
     }
   }
 
-  async verifyToken(token: string): Promise<{ valid: boolean; user?: { id: string; email: string; name?: string; picture?: string } }> {
+  async verifyToken(
+    token: string
+  ): Promise<{
+    valid: boolean;
+    user?: { id: string; email: string; name?: string; picture?: string };
+  }> {
     try {
       const response = await fetch(`${this.baseURL}/verify`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

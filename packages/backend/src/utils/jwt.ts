@@ -1,8 +1,20 @@
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 
-// JWT Configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+// JWT Configuration.
+// JWT_SECRET is mandatory in production. Outside production we fall back to a
+// clearly-labeled insecure value so tests and local dev work with zero config,
+// but production must fail loudly rather than sign tokens with a known key.
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === 'production'
+    ? ''
+    : 'insecure-development-jwt-secret-do-not-use-in-production');
+if (!JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET environment variable is required in production. Refusing to start with an insecure default.'
+  );
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
