@@ -20,6 +20,10 @@ export interface EventEntity extends UserOwnedEntity {
   location: string | null;
   notes: string | null;
   recurrence: string | null;
+  // Per-event color override (falls back to the calendar color in the UI).
+  color: string | null;
+  // ISO date strings marking deleted/edited occurrences of a recurring event.
+  exceptions: string[];
   calendarId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -46,6 +50,8 @@ export interface CreateEventDTO {
   calendarId: string;
   allDay?: boolean;
   recurrence?: string;
+  color?: string;
+  exceptions?: string[];
 }
 
 /**
@@ -61,6 +67,8 @@ export interface UpdateEventDTO {
   calendarId?: string;
   allDay?: boolean;
   recurrence?: string;
+  color?: string;
+  exceptions?: string[];
 }
 
 /**
@@ -116,8 +124,8 @@ export class EventService extends BaseService<
       await this.ensureUserExists(context?.userId, 'dev@example.com');
 
       const inserted = await query(
-        `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, "userId", "calendarId", "createdAt", "updatedAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, color, exceptions, "userId", "calendarId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
          RETURNING *`,
         [
           data.title.trim(),
@@ -128,6 +136,8 @@ export class EventService extends BaseService<
           data.location?.trim() || null,
           data.notes?.trim() || null,
           data.recurrence || null,
+          data.color || null,
+          data.exceptions ?? [],
           context!.userId!,
           data.calendarId,
         ],
@@ -358,7 +368,7 @@ export class EventService extends BaseService<
     await this.validateUpdate(id, data, context);
 
     const sets: string[] = [];
-    const params: Array<string | boolean | null | Date> = [];
+    const params: Array<string | boolean | null | Date | string[]> = [];
 
     if (data.title !== undefined) {
       params.push(data.title.trim());
@@ -394,6 +404,14 @@ export class EventService extends BaseService<
     if (data.recurrence !== undefined) {
       params.push(data.recurrence || null);
       sets.push(`recurrence = $${params.length}`);
+    }
+    if (data.color !== undefined) {
+      params.push(data.color || null);
+      sets.push(`color = $${params.length}`);
+    }
+    if (data.exceptions !== undefined) {
+      params.push(data.exceptions ?? []);
+      sets.push(`exceptions = $${params.length}`);
     }
     if (data.calendarId !== undefined) {
       params.push(data.calendarId);
@@ -665,6 +683,8 @@ export class EventService extends BaseService<
       calendarId: originalEvent.calendarId,
       allDay: originalEvent.allDay,
       recurrence: originalEvent.recurrence,
+      color: originalEvent.color ?? undefined,
+      exceptions: originalEvent.exceptions,
     };
 
     return await this.create(duplicateData, context);
