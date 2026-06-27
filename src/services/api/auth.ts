@@ -221,7 +221,8 @@ class AuthAPI {
 
   async logout(
     accessToken: string,
-    refreshToken?: string
+    refreshToken?: string,
+    logoutAll?: boolean
   ): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await fetch(`${this.baseURL}/logout`, {
@@ -232,6 +233,7 @@ class AuthAPI {
         },
         body: JSON.stringify({
           refreshToken,
+          logoutAll,
         }),
       });
 
@@ -321,6 +323,37 @@ class AuthAPI {
     } catch (error) {
       console.error('Token verification error:', error);
       return { valid: false };
+    }
+  }
+
+  async changePassword(
+    accessToken: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await fetch(`${this.baseURL}/change-password`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          message: extractErrorMessage(data, 'Failed to change password'),
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Change password error:', error);
+      return { success: false, message: 'Network error. Please try again.' };
     }
   }
 

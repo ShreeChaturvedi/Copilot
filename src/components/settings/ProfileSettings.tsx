@@ -32,6 +32,7 @@ import {
   TIMEZONE_OPTIONS,
 } from '@/hooks/useProfileData';
 import { useAuthStore } from '@/stores/authStore';
+import { userAPI } from '@/services/api/user';
 
 const profileFormSchema = z.object({
   name: z
@@ -54,7 +55,7 @@ export function ProfileSettings() {
 
   const profileData = useProfileData();
   const formData = useProfileFormData();
-  const { authMethod } = useAuthStore();
+  const { authMethod, updateUser } = useAuthStore();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -72,11 +73,27 @@ export function ProfileSettings() {
       setUpdateError(null);
       setUpdateSuccess(false);
 
-      // TODO: Implement profile update API call
-      console.log('Profile update data:', data);
+      const updated = await userAPI.updateProfile({
+        name: data.name,
+        bio: data.bio ?? null,
+        timezone: data.timezone || undefined,
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Reflect the persisted values across the app.
+      updateUser({
+        name: updated.name ?? data.name,
+        bio: updated.profile.bio ?? undefined,
+        timezone: updated.profile.timezone,
+        picture: updated.profile.avatarUrl ?? undefined,
+        googleId: updated.googleId,
+      });
+
+      // Reset dirty state to the newly persisted values.
+      form.reset({
+        name: updated.name ?? data.name,
+        bio: updated.profile.bio ?? '',
+        timezone: updated.profile.timezone ?? '',
+      });
 
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);

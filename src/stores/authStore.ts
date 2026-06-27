@@ -30,6 +30,10 @@ export interface User {
   picture?: string;
   createdAt: string;
   updatedAt: string;
+  // Optional profile fields surfaced by /api/auth/me and profile updates.
+  bio?: string;
+  timezone?: string;
+  googleId?: string | null;
 }
 
 export type AuthMethod = 'jwt' | 'google' | null;
@@ -59,6 +63,9 @@ interface AuthState {
   setJWTAuth: (tokens: JWTTokens, user: User) => void;
   updateJWTTokens: (tokens: Partial<JWTTokens>) => void;
   clearJWTAuth: () => void;
+
+  // Profile updates (reflect persisted profile changes across the app)
+  updateUser: (updates: Partial<User>) => void;
   
   // Google Authentication
   setGoogleAuth: (tokens: GoogleAuthTokens, user: GoogleUserInfo) => void;
@@ -67,6 +74,7 @@ interface AuthState {
   
   // General
   logout: () => void;
+  logoutEverywhere: () => Promise<void>;
   
   // Token management
   isTokenExpired: () => boolean;
@@ -141,6 +149,31 @@ export const useAuthStore = create<AuthState>()(
           false,
           'clearJWTAuth'
         ),
+
+        updateUser: (updates) => {
+          const { user, googleUser, authMethod } = get();
+          if (authMethod === 'google' && googleUser) {
+            set(
+              {
+                googleUser: {
+                  ...googleUser,
+                  name: updates.name ?? googleUser.name,
+                  picture: updates.picture ?? googleUser.picture,
+                },
+              },
+              false,
+              'updateUser'
+            );
+            return;
+          }
+          if (user) {
+            set(
+              { user: { ...user, ...updates } },
+              false,
+              'updateUser'
+            );
+          }
+        },
         
         // Google Authentication
         setGoogleAuth: (tokens, user) => set(
@@ -206,7 +239,25 @@ export const useAuthStore = create<AuthState>()(
             'logout'
           );
         },
-        
+
+        logoutEverywhere: async () => {
+          const { authMethod, jwtTokens, getValidAccessToken } = get();
+
+          try {
+            const accessToken = getValidAccessToken();
+            const refreshToken =
+              authMethod === 'jwt' ? jwtTokens?.refreshToken : undefined;
+            if (accessToken && refreshToken) {
+              // logoutAll revokes every refresh token for this user server-side.
+              await authAPI.logout(accessToken, refreshToken, true);
+            }
+          } catch (error) {
+            console.error('Logout everywhere error:', error);
+          }
+
+          set({ ...initialState }, false, 'logoutEverywhere');
+        },
+
         isTokenExpired: () => {
           const { authMethod, jwtTokens, googleTokens } = get();
           
