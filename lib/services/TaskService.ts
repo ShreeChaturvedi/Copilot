@@ -104,6 +104,20 @@ export interface UpdateTaskDTO {
   taskListId?: string;
   originalInput?: string;
   cleanTitle?: string;
+  /**
+   * When provided, REPLACES the task's full tag set with this list (the
+   * frontend sends the desired remaining tags, e.g. on tag removal). `type` is
+   * accepted case-insensitively; `name` defaults to the lowercased `value`,
+   * matching the create path. Pass `[]` to clear all tags.
+   */
+  tags?: Array<{
+    type: string;
+    name?: string;
+    value: string;
+    displayText: string;
+    iconName: string;
+    color?: string;
+  }>;
 }
 
 /**
@@ -729,9 +743,51 @@ export class TaskService extends BaseService<
     sets.push(`"updatedAt" = $${params.length}`);
     params.push(id);
     const updateSql = `UPDATE tasks SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
-    const res = await query<TaskRow>(updateSql, params, this.db);
-    if (res.rowCount === 0) return null;
-    const base = this.transformEntity(res.rows[0]);
+
+    // Run the scalar column update and any tag-set replacement atomically, so a
+    // failure mid-way can't leave tags half-rewritten.
+    const updatedRow = await withTransaction(async (client) => {
+      const res = await query<TaskRow>(updateSql, params, client);
+      if (res.rowCount === 0) return null;
+
+      // `tags`, when present, replaces the whole tag set (the frontend sends the
+      // desired remaining tags). Mirrors the find-or-create logic in create().
+      if (data.tags !== undefined) {
+        await query(
+          `DELETE FROM "task_tags" WHERE "taskId" = $1`,
+          [id],
+          client
+        );
+        for (const tagData of data.tags) {
+          const name = (tagData.name ?? tagData.value).trim().toLowerCase();
+          if (!name) continue;
+          const type = String(tagData.type).toUpperCase();
+          await query(
+            `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
+             ON CONFLICT (name) DO NOTHING`,
+            [name, type, tagData.color ?? null],
+            client
+          );
+          const tagRow = await query<{ id: string }>(
+            `SELECT id FROM tags WHERE name = $1`,
+            [name],
+            client
+          );
+          const tagId = tagRow.rows[0].id;
+          await query(
+            `INSERT INTO "task_tags" ("taskId", "tagId", value, "displayText", "iconName")
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT ("taskId", "tagId") DO NOTHING`,
+            [id, tagId, tagData.value, tagData.displayText, tagData.iconName],
+            client
+          );
+        }
+      }
+      return res.rows[0];
+    });
+
+    if (!updatedRow) return null;
+    const base = this.transformEntity(updatedRow);
     const [enriched] = await this.enrichEntities([base], context);
     return enriched;
   }
