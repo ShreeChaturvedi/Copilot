@@ -2,7 +2,13 @@ import * as React from 'react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { addHours, format } from 'date-fns';
 import { parseLocalDate } from '@/utils/date';
-import { MapPin, ArrowRight, Calendar, AtSign } from 'lucide-react';
+import {
+  MapPin,
+  ArrowRight,
+  Calendar,
+  AtSign,
+  AlertTriangle,
+} from 'lucide-react';
 
 import {
   Dialog,
@@ -44,6 +50,10 @@ import {
 import type { CalendarEvent } from '@shared/types';
 import { useCalendars } from '@/hooks/useCalendars';
 import { useCreateEvent, useUpdateEvent } from '@/hooks/useEvents';
+import { useTaskManagement } from '@/hooks/useTaskManagement';
+import { eventApi, type EventConflict } from '@/services/api';
+import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
+import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useUIStore } from '@/stores/uiStore';
 import { ConditionalDialogHeader } from './ConditionalDialogHeader';
 import type { RecurrenceEditorOptions } from '@/utils/recurrence';
@@ -160,6 +170,44 @@ export function CustomDateInput({
 
 // CustomTimeInput moved to shared UI component
 
+/**
+ * Task creation surface for the dialog's "Task" tab. Reuses the shared
+ * EnhancedTaskInput plus the task-management hook so a task created here is
+ * identical to one created from the left pane. Closes the dialog on submit.
+ */
+function TaskTabContent({ onClose }: { onClose: () => void }) {
+  const {
+    taskGroups,
+    activeTaskGroupId,
+    handleAddTask,
+    handleSelectTaskGroup,
+    addTask,
+  } = useTaskManagement({ includeTaskOperations: true });
+
+  const onAddTask = useCallback(
+    (title: string, groupId?: string, smartData?: SmartTaskData) => {
+      handleAddTask(title, groupId, smartData);
+      onClose();
+    },
+    [handleAddTask, onClose]
+  );
+
+  return (
+    <div className="py-2">
+      <EnhancedTaskInput
+        onAddTask={onAddTask}
+        taskGroups={taskGroups}
+        activeTaskGroupId={activeTaskGroupId}
+        onSelectTaskGroup={handleSelectTaskGroup}
+        disabled={addTask.isPending}
+        enableSmartParsing
+        showConfidence={false}
+        placeholder="Add a task..."
+      />
+    </div>
+  );
+}
+
 function EventCreationDialogContent({
   initialEventData,
   onClose,
@@ -211,6 +259,7 @@ function EventCreationDialogContent({
 
   const [activeTab, setActiveTab] = useState('event');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [conflicts, setConflicts] = useState<EventConflict[]>([]);
   const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<null | {
     start: Date;
@@ -423,6 +472,55 @@ function EventCreationDialogContent({
       return dateTime;
     }
   }, [formData.startDate, formData.endDate, formData.endTime, formData.allDay]);
+
+  // Resolve the selected calendar id so conflicts are scoped to that calendar
+  const selectedCalendarId = useMemo(
+    () => calendars.find((c) => c.name === formData.calendarName)?.id,
+    [calendars, formData.calendarName]
+  );
+
+  // Real-time conflict detection: when the event time range is valid, ask the
+  // backend for overlapping events and surface them as a non-blocking warning.
+  useEffect(() => {
+    if (activeTab !== 'event') {
+      setConflicts([]);
+      return;
+    }
+    const start = getStartDateTime();
+    const end = getEndDateTime();
+    if (!start || !end || start >= end) {
+      setConflicts([]);
+      return;
+    }
+
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      eventApi
+        .getConflicts({
+          start,
+          end,
+          calendarId: selectedCalendarId,
+          excludeEventId: initialEventData?.id,
+        })
+        .then((result) => {
+          if (!cancelled) setConflicts(result);
+        })
+        .catch(() => {
+          if (!cancelled) setConflicts([]);
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [
+    activeTab,
+    getStartDateTime,
+    getEndDateTime,
+    selectedCalendarId,
+    initialEventData?.id,
+  ]);
 
   // Get current frequency from recurrence string
   const currentFrequency = useMemo(():
@@ -865,31 +963,70 @@ function EventCreationDialogContent({
           value="task"
           className={`space-y-4 ${isEditing ? 'mt-0' : 'mt-6'}`}
         >
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Task creation form will be implemented here.</p>
-            <p className="text-sm mt-2">Coming soon...</p>
-          </div>
+          <TaskTabContent onClose={onClose} />
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end gap-2 mt-6">
-        <Button
-          variant="outline"
-          onClick={handleCancel}
-          disabled={isSubmitting}
+      {activeTab === 'event' && conflicts.length > 0 && (
+        <div
+          role="alert"
+          className="mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm dark:border-yellow-900/60 dark:bg-yellow-950/40"
         >
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit} disabled={!isFormValid || isSubmitting}>
-          {isSubmitting
-            ? isEditing
-              ? 'Saving...'
-              : 'Creating...'
-            : isEditing
-              ? 'Save'
-              : 'Create Event'}
-        </Button>
-      </div>
+          <div className="flex items-center gap-2 font-medium text-yellow-800 dark:text-yellow-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {conflicts.length === 1
+              ? 'This time overlaps 1 existing event'
+              : `This time overlaps ${conflicts.length} existing events`}
+          </div>
+          <ul className="mt-2 space-y-1 text-yellow-800 dark:text-yellow-200">
+            {conflicts.map((conflict) => {
+              const ev = conflict.conflictingEvent;
+              return (
+                <li key={ev.id} className="flex flex-col">
+                  <span className="font-medium">
+                    {ev.title || 'Untitled event'}
+                  </span>
+                  <span className="text-xs opacity-80">
+                    {ev.allDay
+                      ? 'All day'
+                      : `${format(new Date(ev.start), 'MMM d, h:mm a')} - ${format(
+                          new Date(ev.end),
+                          'h:mm a'
+                        )}`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-xs text-yellow-700 dark:text-yellow-300/80">
+            You can still save, or adjust the time to avoid the overlap.
+          </p>
+        </div>
+      )}
+
+      {activeTab === 'event' && (
+        <div className="flex justify-end gap-2 mt-6">
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isFormValid || isSubmitting}
+          >
+            {isSubmitting
+              ? isEditing
+                ? 'Saving...'
+                : 'Creating...'
+              : isEditing
+                ? 'Save'
+                : 'Create Event'}
+          </Button>
+        </div>
+      )}
 
       {/* Post-save scope dialog for editing recurring events */}
       <AlertDialog open={scopeDialogOpen} onOpenChange={setScopeDialogOpen}>
