@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export interface CreateTaskData {
   title: string;
+  description?: string;
   taskListId?: string;
   scheduledDate?: Date;
   priority?: 'low' | 'medium' | 'high';
@@ -35,6 +36,7 @@ export interface CreateTaskData {
  */
 export interface UpdateTaskData {
   title?: string;
+  description?: string;
   completed?: boolean;
   scheduledDate?: Date;
   priority?: 'low' | 'medium' | 'high';
@@ -199,6 +201,7 @@ export const taskApi = {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         title: data.title,
+        description: data.description,
         taskListId: data.taskListId,
         scheduledDate: data.scheduledDate?.toISOString(),
         priority: data.priority?.toUpperCase(), // Backend uses enum LOW|MEDIUM|HIGH

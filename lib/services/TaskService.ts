@@ -16,6 +16,7 @@ export type DbPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface TaskEntity extends UserOwnedEntity {
   title: string;
+  description: string | null;
   completed: boolean;
   completedAt: Date | null;
   scheduledDate: Date | null;
@@ -69,6 +70,7 @@ type TaskRow = Omit<
  */
 export interface CreateTaskDTO {
   title: string;
+  description?: string;
   taskListId?: string;
   scheduledDate?: Date;
   priority?: DbPriority;
@@ -96,6 +98,7 @@ export interface CreateTaskDTO {
  */
 export interface UpdateTaskDTO {
   title?: string;
+  description?: string;
   completed?: boolean;
   scheduledDate?: Date;
   priority?: DbPriority;
@@ -297,6 +300,7 @@ export class TaskService extends BaseService<
         row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
       userId: row.userId,
       title: row.title,
+      description: row.description ?? null,
       completed: row.completed,
       completedAt: row.completedAt ? new Date(row.completedAt) : null,
       scheduledDate: row.scheduledDate ? new Date(row.scheduledDate) : null,
@@ -616,11 +620,12 @@ export class TaskService extends BaseService<
       const created = await withTransaction(async (client) => {
         // Insert task
         const insertRes = await query<TaskRow>(
-          `INSERT INTO tasks (id, title, completed, status, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, false, 'NOT_STARTED', $2, $3, $4, $5, $6, $7, NOW(), NOW())
+          `INSERT INTO tasks (id, title, description, completed, status, "taskListId", "scheduledDate", priority, "originalInput", "cleanTitle", "userId", "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, false, 'NOT_STARTED', $3, $4, $5, $6, $7, $8, NOW(), NOW())
            RETURNING *`,
           [
             data.title.trim(),
+            data.description?.trim() || null,
             taskListId!,
             data.scheduledDate ?? null,
             data.priority || 'MEDIUM',
@@ -695,6 +700,10 @@ export class TaskService extends BaseService<
     if (data.title !== undefined) {
       params.push(data.title.trim());
       sets.push(`title = $${params.length}`);
+    }
+    if (data.description !== undefined) {
+      params.push(data.description?.trim() || null);
+      sets.push(`description = $${params.length}`);
     }
     if (data.completed !== undefined) {
       params.push(data.completed);

@@ -295,6 +295,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         const capitalizedTitle =
           titleToUse.charAt(0).toUpperCase() + titleToUse.slice(1);
 
+        // Free-text description entered in the secondary field.
+        const description = descriptionText.trim() || undefined;
+
         // Extract smart data if parsing is enabled
         let smartData: SmartTaskData | undefined;
         if (smartParsingEnabled && filteredTags.length > 0) {
@@ -315,11 +318,22 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
           smartData = {
             title: capitalizedTitle,
+            description,
             originalInput: inputText,
             priority,
             scheduledDate,
             tags: filteredTags,
             confidence,
+          };
+        } else if (description) {
+          // No parsed tags but the user typed a description -- still carry it
+          // through so it persists.
+          smartData = {
+            title: capitalizedTitle,
+            description,
+            originalInput: inputText,
+            tags: [],
+            confidence: 0,
           };
         }
 
@@ -346,6 +360,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     },
     [
       inputText,
+      descriptionText,
       smartParsingEnabled,
       filteredTags,
       confidence,

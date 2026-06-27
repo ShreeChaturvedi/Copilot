@@ -72,7 +72,6 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeAttachment, setActiveAttachment] =
     useState<FileAttachment | null>(null);
-  const taskWithDescription = task as Task & { description?: string };
 
   const handlePeekToggle = useCallback(() => {
     setPeekMode(peekMode === 'center' ? 'right' : 'center');
@@ -199,8 +198,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
             </div>
           </div>
           {/* Description */}
-          {taskWithDescription.description ||
-          task.parsedMetadata?.originalInput ? (
+          {task.description || task.parsedMetadata?.originalInput ? (
             <div className="flex items-start gap-3">
               <div className="text-muted-foreground flex-shrink-0 mt-1">
                 <FileText className="h-4 w-4" />
@@ -208,9 +206,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               <div className="flex-1">
                 <div className="text-sm whitespace-pre-wrap">
                   {String(
-                    taskWithDescription.description ||
-                      task.parsedMetadata?.originalInput ||
-                      ''
+                    task.description || task.parsedMetadata?.originalInput || ''
                   )}
                 </div>
               </div>

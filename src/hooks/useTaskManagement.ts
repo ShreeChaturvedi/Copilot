@@ -225,6 +225,7 @@ export function useTaskManagement(
 
         addTask.mutate({
           title,
+          description: smartData?.description,
           taskListId,
           priority: smartData?.priority,
           scheduledDate,

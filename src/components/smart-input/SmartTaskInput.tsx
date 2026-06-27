@@ -38,6 +38,8 @@ import './components/smart-tags.css';
 export interface SmartTaskData {
   /** Clean title without parsed elements */
   title: string;
+  /** Optional free-text description entered alongside the title */
+  description?: string;
   /** Original input text */
   originalInput: string;
   /** Parsed priority level */
