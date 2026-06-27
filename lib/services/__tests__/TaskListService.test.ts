@@ -740,17 +740,76 @@ describe('TaskListService', () => {
   });
 
   describe('archive', () => {
-    it('should throw not implemented error', async () => {
-      await expect(taskListService.archive()).rejects.toThrow(
-        'NOT_IMPLEMENTED: Archive functionality not yet implemented'
+    it('should mark the task list as archived', async () => {
+      // checkOwnership query, then the UPDATE ... RETURNING *
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ userId: 'user-123' }]))
+        .mockResolvedValueOnce(
+          createQueryResult([
+            { ...mockTaskList, isArchived: true, archivedAt: new Date() },
+          ])
+        );
+
+      const result = await taskListService.archive('list-123', mockContext);
+
+      expect(result?.isArchived).toBe(true);
+      const updateCall = mockedQuery.mock.calls[1];
+      expect(updateCall[0]).toContain('"isArchived" = true');
+      expect(updateCall[0]).toContain('"archivedAt" = NOW()');
+    });
+
+    it('should throw when the user does not own the task list', async () => {
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ userId: 'other-user' }])
+      );
+
+      await expect(
+        taskListService.archive('list-123', mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR: Access denied');
+    });
+
+    it('should throw when no user context provided', async () => {
+      await expect(taskListService.archive('list-123')).rejects.toThrow(
+        'AUTHORIZATION_ERROR: User ID required'
       );
     });
   });
 
+  describe('unarchive', () => {
+    it('should clear the archived flag', async () => {
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ userId: 'user-123' }]))
+        .mockResolvedValueOnce(
+          createQueryResult([
+            { ...mockTaskList, isArchived: false, archivedAt: null },
+          ])
+        );
+
+      const result = await taskListService.unarchive('list-123', mockContext);
+
+      expect(result?.isArchived).toBe(false);
+      const updateCall = mockedQuery.mock.calls[1];
+      expect(updateCall[0]).toContain('"isArchived" = false');
+      expect(updateCall[0]).toContain('"archivedAt" = NULL');
+    });
+  });
+
   describe('getArchived', () => {
-    it('should return empty array (placeholder)', async () => {
+    it('should return archived task lists for the user', async () => {
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ ...mockTaskList, isArchived: true }])
+      );
+
       const result = await taskListService.getArchived(mockContext);
-      expect(result).toEqual([]);
+
+      expect(result).toHaveLength(1);
+      expect(mockedQuery.mock.calls[0][0]).toContain('"isArchived" = true');
+    });
+
+    it('should throw when no user context provided', async () => {
+      await expect(taskListService.getArchived()).rejects.toThrow(
+        'AUTHORIZATION_ERROR: User ID required'
+      );
     });
   });
 

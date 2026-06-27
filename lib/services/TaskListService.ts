@@ -17,6 +17,8 @@ export interface TaskListEntity extends UserOwnedEntity {
   color: string;
   icon: string | null;
   description: string | null;
+  isArchived: boolean;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -59,6 +61,9 @@ export interface UpdateTaskListDTO {
 export interface TaskListFilters {
   search?: string;
   hasActiveTasks?: boolean;
+  // When true, include archived task lists in the result. Archived lists are
+  // excluded by default.
+  includeArchived?: boolean;
 }
 
 /**
@@ -153,6 +158,9 @@ export class TaskListService extends BaseService<
       clauses.push(
         'EXISTS (SELECT 1 FROM tasks t WHERE t."taskListId" = task_lists.id AND t.completed = false)'
       );
+    }
+    if (!filters.includeArchived) {
+      clauses.push('"isArchived" = false');
     }
     const sql = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
     return { sql, params };
@@ -337,7 +345,7 @@ export class TaskListService extends BaseService<
 
       // Try to find "General" task list first
       const generalRes = await query(
-        'SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 LIMIT 1',
+        'SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 AND "isArchived" = false LIMIT 1',
         [context.userId!, 'General'],
         this.db
       );
@@ -346,7 +354,7 @@ export class TaskListService extends BaseService<
       // If no "General" list, get the first task list
       if (!defaultTaskList) {
         const firstRes = await query(
-          'SELECT * FROM task_lists WHERE "userId" = $1 ORDER BY "createdAt" ASC LIMIT 1',
+          'SELECT * FROM task_lists WHERE "userId" = $1 AND "isArchived" = false ORDER BY "createdAt" ASC LIMIT 1',
           [context.userId!],
           this.db
         );
@@ -656,24 +664,100 @@ export class TaskListService extends BaseService<
   }
 
   /**
-   * Archive task list (soft delete by marking inactive)
-   * Note: This would require adding an `isActive` field to the database schema
+   * Archive a task list (soft hide). Archived lists are excluded from the
+   * default queries but their tasks are left untouched and can be restored
+   * with unarchive().
    */
-  async archive(): Promise<TaskListEntity> {
-    // This is a placeholder for future archiving functionality
-    // Would require schema changes to add `isActive` or `archivedAt` fields
-    throw new Error(
-      'NOT_IMPLEMENTED: Archive functionality not yet implemented'
-    );
+  async archive(
+    id: string,
+    context?: ServiceContext
+  ): Promise<TaskListEntity | null> {
+    if (!context?.userId) {
+      throw new Error('AUTHORIZATION_ERROR: User ID required');
+    }
+
+    try {
+      this.log('archive', { id }, context);
+
+      const hasAccess = await this.checkOwnership(id, context.userId);
+      if (!hasAccess) {
+        throw new Error('AUTHORIZATION_ERROR: Access denied');
+      }
+
+      const res = await query(
+        'UPDATE task_lists SET "isArchived" = true, "archivedAt" = NOW(), "updatedAt" = NOW() WHERE id = $1 RETURNING *',
+        [id],
+        this.db
+      );
+      if (res.rowCount === 0) return null;
+
+      const cacheKey = createCacheKey('task-lists', context.userId);
+      taskListCache.invalidate(cacheKey);
+
+      this.log('archive:success', { id }, context);
+      return this.transformEntity(res.rows[0]);
+    } catch (error) {
+      this.log('archive:error', { error: error.message, id }, context);
+      throw error;
+    }
   }
 
   /**
-   * Get archived task lists
+   * Restore a previously archived task list.
+   */
+  async unarchive(
+    id: string,
+    context?: ServiceContext
+  ): Promise<TaskListEntity | null> {
+    if (!context?.userId) {
+      throw new Error('AUTHORIZATION_ERROR: User ID required');
+    }
+
+    try {
+      this.log('unarchive', { id }, context);
+
+      const hasAccess = await this.checkOwnership(id, context.userId);
+      if (!hasAccess) {
+        throw new Error('AUTHORIZATION_ERROR: Access denied');
+      }
+
+      const res = await query(
+        'UPDATE task_lists SET "isArchived" = false, "archivedAt" = NULL, "updatedAt" = NOW() WHERE id = $1 RETURNING *',
+        [id],
+        this.db
+      );
+      if (res.rowCount === 0) return null;
+
+      const cacheKey = createCacheKey('task-lists', context.userId);
+      taskListCache.invalidate(cacheKey);
+
+      this.log('unarchive:success', { id }, context);
+      return this.transformEntity(res.rows[0]);
+    } catch (error) {
+      this.log('unarchive:error', { error: error.message, id }, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Get archived task lists for the current user.
    */
   async getArchived(context?: ServiceContext): Promise<TaskListEntity[]> {
-    void context;
-    // Placeholder for archived task lists
-    // Would require schema changes
-    return [];
+    if (!context?.userId) {
+      throw new Error('AUTHORIZATION_ERROR: User ID required');
+    }
+
+    try {
+      this.log('getArchived', {}, context);
+      const res = await query<TaskListEntity>(
+        'SELECT * FROM task_lists WHERE "userId" = $1 AND "isArchived" = true ORDER BY "archivedAt" DESC NULLS LAST, name ASC',
+        [context.userId!],
+        this.db
+      );
+      return res.rows.map((row) => this.transformEntity(row));
+    } catch (error) {
+      this.log('getArchived:error', { error: error.message }, context);
+      throw error;
+    }
   }
 }

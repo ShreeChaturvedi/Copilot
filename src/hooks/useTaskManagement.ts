@@ -65,6 +65,7 @@ interface TaskManagementWithOperations {
   handleAddTaskGroup: (data: Omit<TaskGroup, 'id'>) => void;
   handleEditTaskGroup: (groupId: string, updates: Partial<TaskGroup>) => void;
   handleDeleteTaskGroup: (groupId: string) => void;
+  handleArchiveTaskGroup: (groupId: string) => void;
   handleSelectTaskGroup: (groupId: string) => void;
   handleCreateTaskGroup: (data: {
     name: string;
@@ -89,6 +90,7 @@ interface TaskManagementWithoutOperations {
   handleAddTaskGroup: (data: Omit<TaskGroup, 'id'>) => void;
   handleEditTaskGroup: (groupId: string, updates: Partial<TaskGroup>) => void;
   handleDeleteTaskGroup: (groupId: string) => void;
+  handleArchiveTaskGroup: (groupId: string) => void;
   handleSelectTaskGroup: (groupId: string) => void;
   handleCreateTaskGroup: (data: {
     name: string;
@@ -431,6 +433,41 @@ export function useTaskManagement(
     })();
   };
 
+  const handleArchiveTaskGroup = (groupId: string) => {
+    if (groupId === 'default') return; // Don't archive the default group
+    const previous = taskGroups;
+    // Optimistically remove from the active list (archived lists are hidden)
+    setTaskGroups((prev) => prev.filter((group) => group.id !== groupId));
+    if (groupId === activeTaskGroupId) {
+      setActiveTaskGroupId('default');
+    }
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/task-lists/${encodeURIComponent(groupId)}?action=archive`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          }
+        );
+        const isJson = (r: Response) =>
+          (r.headers.get('content-type') || '').includes('application/json');
+        if (isJson(res)) {
+          const body = await res.json();
+          if (!res.ok || !body.success)
+            throw new Error(
+              body.error?.message || 'Failed to archive task list'
+            );
+        }
+        void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
+      } catch (err) {
+        toast.error((err as Error).message || 'Failed to archive task list');
+        // Rollback
+        setTaskGroups(previous);
+      }
+    })();
+  };
+
   const handleSelectTaskGroup = (groupId: string) => {
     setActiveTaskGroupId(groupId);
   };
@@ -539,6 +576,7 @@ export function useTaskManagement(
     handleAddTaskGroup,
     handleEditTaskGroup,
     handleDeleteTaskGroup,
+    handleArchiveTaskGroup,
     handleSelectTaskGroup,
     handleCreateTaskGroup,
     handleUpdateTaskGroupIcon,

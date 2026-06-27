@@ -32,6 +32,7 @@ export interface TaskGroupListProps {
     }
   ) => void;
   onDeleteTaskGroup?: (id: string) => void;
+  onArchiveTaskGroup?: (id: string) => void;
 }
 
 // Convert TaskGroup to SelectionModeItem
@@ -53,6 +54,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   onAddTaskGroup,
   onEditTaskGroup,
   onDeleteTaskGroup,
+  onArchiveTaskGroup,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<SelectionModeItem | null>(null);
@@ -88,6 +90,12 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
   const handleDelete = onDeleteTaskGroup
     ? (item: SelectionModeItem) => {
         onDeleteTaskGroup(item.id);
+      }
+    : undefined;
+
+  const handleArchive = onArchiveTaskGroup
+    ? (item: SelectionModeItem) => {
+        onArchiveTaskGroup(item.id);
       }
     : undefined;
 
@@ -135,6 +143,7 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
         setShowCreateDialog(true);
       }}
       onDelete={handleDelete}
+      onArchive={handleArchive}
       showCreateDialog={showCreateDialog}
       onShowCreateDialog={(open) => {
         setShowCreateDialog(open);
