@@ -7,6 +7,15 @@ import {
   type UserOwnedEntity,
 } from './BaseService.js';
 import { query } from '../config/database.js';
+// rrule ships an ESM type surface but a CJS (webpack) runtime build whose
+// named exports are not statically detectable by the Node/tsx ESM loader. A
+// default import resolves to module.exports (which carries rrulestr) and works
+// under both tsx (local dev server) and esbuild (Vercel). Types come from the
+// type-only import below.
+import rrulePkg from 'rrule';
+import type { RRule, RRuleSet } from 'rrule';
+
+const { rrulestr } = rrulePkg as unknown as typeof import('rrule');
 
 /**
  * Event entity interface extending base
@@ -27,6 +36,13 @@ export interface EventEntity extends UserOwnedEntity {
   calendarId: string;
   createdAt: Date;
   updatedAt: Date;
+
+  // Set on virtual occurrences expanded from a recurring master at read time.
+  // These instances are never persisted; the master keeps the RRULE in `recurrence`.
+  isRecurringInstance?: boolean;
+  masterId?: string;
+  occurrenceInstanceStart?: Date;
+  occurrenceInstanceEnd?: Date;
 
   // Relations (optional for different query contexts)
   calendar?: {
@@ -178,13 +194,23 @@ export class EventService extends BaseService<
       params.push(...filters.calendarIds);
       clauses.push('"calendarId" IN (' + placeholders + ')');
     }
+    // Date-range overlap. Recurring masters are always included regardless of
+    // their own start/end so the read path can expand them into occurrences
+    // that fall inside the requested window (the master's stored time may sit
+    // entirely outside the range).
+    const dateClauses: string[] = [];
     if (filters.start) {
       params.push(filters.start);
-      clauses.push('"end" >= $' + params.length);
+      dateClauses.push('"end" >= $' + params.length);
     }
     if (filters.end) {
       params.push(filters.end);
-      clauses.push('start <= $' + params.length);
+      dateClauses.push('start <= $' + params.length);
+    }
+    if (dateClauses.length) {
+      clauses.push(
+        '(recurrence IS NOT NULL OR (' + dateClauses.join(' AND ') + '))'
+      );
     }
     if (filters.search) {
       params.push('%' + filters.search + '%');
@@ -220,12 +246,100 @@ export class EventService extends BaseService<
         this.db
       );
       const base = res.rows.map((row) => this.transformEntity(row));
-      return await this.enrichEntities(base, context);
+      const enriched = await this.enrichEntities(base, context);
+      // When a date range is requested, expand recurring masters into concrete
+      // occurrences within that window. Non-recurring events pass through.
+      if (filters.start && filters.end) {
+        return this.expandRecurringInRange(
+          enriched,
+          filters.start,
+          filters.end
+        );
+      }
+      return enriched;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.log('findAll:error', { error: message, filters }, context);
       throw error;
     }
+  }
+
+  /**
+   * Expand every recurring master in `events` into the concrete occurrences
+   * that fall within [rangeStart, rangeEnd]. Non-recurring events are returned
+   * unchanged. Occurrences are virtual (never persisted) and tagged with
+   * `isRecurringInstance`, `masterId`, and a composite id of
+   * `${masterId}::${occurrenceISO}`.
+   */
+  private expandRecurringInRange(
+    events: EventEntity[],
+    rangeStart: Date,
+    rangeEnd: Date
+  ): EventEntity[] {
+    const out: EventEntity[] = [];
+    for (const event of events) {
+      if (!event.recurrence) {
+        out.push(event);
+        continue;
+      }
+      const occurrences = this.generateOccurrences(
+        event,
+        rangeStart,
+        rangeEnd
+      );
+      out.push(...occurrences);
+    }
+    return out;
+  }
+
+  /**
+   * Generate the virtual occurrences of a recurring master whose start falls
+   * within [windowStart, windowEnd] (inclusive), honoring the `exceptions`
+   * list of excluded occurrence start ISO strings. The master itself is never
+   * returned; only its occurrences are. On an unparseable RRULE we fall back to
+   * returning the master so data is never silently dropped.
+   */
+  private generateOccurrences(
+    master: EventEntity,
+    windowStart: Date,
+    windowEnd: Date
+  ): EventEntity[] {
+    const startDate = new Date(master.start);
+    const endDate = new Date(master.end);
+    const durationMs = Math.max(0, endDate.getTime() - startDate.getTime());
+
+    let rule: RRule | RRuleSet;
+    try {
+      rule = rrulestr(master.recurrence!, { dtstart: startDate });
+    } catch {
+      return [master];
+    }
+
+    let occStarts: Date[];
+    try {
+      occStarts = rule.between(new Date(windowStart), new Date(windowEnd), true);
+    } catch {
+      return [master];
+    }
+
+    const exceptionSet = new Set(master.exceptions ?? []);
+    const occurrences: EventEntity[] = [];
+    for (const occStart of occStarts) {
+      const iso = occStart.toISOString();
+      if (exceptionSet.has(iso)) continue;
+      const occEnd = new Date(occStart.getTime() + durationMs);
+      occurrences.push({
+        ...master,
+        id: `${master.id}::${iso}`,
+        masterId: master.id,
+        isRecurringInstance: true,
+        start: occStart,
+        end: occEnd,
+        occurrenceInstanceStart: occStart,
+        occurrenceInstanceEnd: occEnd,
+      });
+    }
+    return occurrences;
   }
 
   protected async enrichEntities(
@@ -518,12 +632,20 @@ export class EventService extends BaseService<
     try {
       this.log('getConflicts', { eventData, excludeId }, context);
 
+      const rangeStart = eventData.start!;
+      const rangeEnd = eventData.end!;
+
+      // Pull non-recurring events that overlap the window, plus every recurring
+      // master (expanded below) so occurrences inside the window are considered.
       const params: Array<string | Date> = [
         context.userId!,
-        eventData.end!,
-        eventData.start!,
+        rangeEnd,
+        rangeStart,
       ];
-      const and: string[] = ['e."userId" = $1', 'e.start < $2', 'e."end" > $3'];
+      const and: string[] = [
+        'e."userId" = $1',
+        '(e.recurrence IS NOT NULL OR (e.start < $2 AND e."end" > $3))',
+      ];
       if (excludeId) {
         params.push(excludeId);
         and.push('e.id <> $' + params.length);
@@ -534,28 +656,57 @@ export class EventService extends BaseService<
       }
       const sql = `SELECT e.* FROM events e WHERE ${and.join(' AND ')}`;
       const res = await query<EventEntity>(sql, params, this.db);
-      const conflictingEvents = res.rows;
 
-      const conflicts: EventConflict[] = conflictingEvents.map(
+      // Build the candidate set. Non-recurring rows were already filtered to
+      // overlap the window by SQL, so they pass through directly. Recurring
+      // masters are expanded into occurrences and then filtered to the ones
+      // that actually overlap the window. The expansion window is padded back
+      // by each occurrence's duration so an instance that starts before the
+      // range but ends inside it is still caught.
+      const candidates: EventEntity[] = [];
+      for (const row of res.rows) {
+        const transformed = this.transformEntity(row);
+        if (transformed.recurrence) {
+          const durationMs = Math.max(
+            0,
+            new Date(transformed.end).getTime() -
+              new Date(transformed.start).getTime()
+          );
+          const expansionStart = new Date(rangeStart.getTime() - durationMs);
+          const occurrences = this.generateOccurrences(
+            transformed,
+            expansionStart,
+            rangeEnd
+          ).filter(
+            (occ) =>
+              occ.start.getTime() < rangeEnd.getTime() &&
+              occ.end.getTime() > rangeStart.getTime()
+          );
+          candidates.push(...occurrences);
+        } else {
+          candidates.push(transformed);
+        }
+      }
+
+      const conflicts: EventConflict[] = candidates.map(
         (conflictEvent) => {
           const overlapStart = new Date(
-            Math.max(eventData.start!.getTime(), conflictEvent.start.getTime())
+            Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
           );
           const overlapEnd = new Date(
-            Math.min(eventData.end!.getTime(), conflictEvent.end.getTime())
+            Math.min(rangeEnd.getTime(), conflictEvent.end.getTime())
           );
           const overlapDuration = Math.round(
             (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
           );
 
           return {
-            conflictingEvent: this.transformEntity(conflictEvent),
+            conflictingEvent: conflictEvent,
             overlapStart,
             overlapEnd,
             overlapDuration,
           };
-        }
-      );
+        });
 
       this.log(
         'getConflicts:success',
@@ -627,28 +778,20 @@ export class EventService extends BaseService<
   }
 
   /**
-   * Create recurring events (basic implementation)
+   * Create a recurring event.
+   *
+   * We persist exactly one master row carrying the RRULE in `recurrence` and
+   * the excluded occurrence dates in `exceptions`. Individual occurrences are
+   * never written to the database; they are expanded virtually at read time by
+   * the date-range read path (findAll/findByDateRange) and by conflict checks.
+   * This keeps a daily/weekly series compact and lets a single edit to the
+   * master reshape every occurrence.
    */
   async createRecurring(
     data: CreateEventDTO,
     context?: ServiceContext
   ): Promise<EventEntity[]> {
-    if (!data.recurrence) {
-      // If no recurrence, create single event
-      const event = await this.create(data, context);
-      return [event];
-    }
-
-    // For now, create just the master event
-    // In a full implementation, you'd parse the RRULE and create instances
     const masterEvent = await this.create(data, context);
-
-    // TODO: Implement full recurring event logic with RRULE parsing
-    // This would involve:
-    // 1. Parsing the RRULE string
-    // 2. Generating occurrence dates
-    // 3. Creating individual event instances or using a virtual approach
-
     return [masterEvent];
   }
 
