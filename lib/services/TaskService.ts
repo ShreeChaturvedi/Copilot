@@ -8,6 +8,7 @@ import {
 } from './BaseService.js';
 import { withTransaction, query } from '../config/database.js';
 import { taskListCache, createCacheKey } from '../utils/cache.js';
+import { deleteBlobs } from '../utils/blobStorage.js';
 
 /**
  * Task entity interface extending base
@@ -806,8 +807,34 @@ export class TaskService extends BaseService<
    */
   async delete(id: string): Promise<boolean> {
     // Ownership already validated via routes/use of service; keep as is
+    // Capture attachment blob URLs before the ON DELETE CASCADE removes the
+    // rows, so the underlying files can be cleaned up afterwards.
+    const blobUrls = await this.collectAttachmentBlobUrls([id]);
     await query('DELETE FROM tasks WHERE id = $1', [id], this.db);
+    await deleteBlobs(blobUrls);
     return true;
+  }
+
+  /**
+   * Collect the fileUrl/thumbnailUrl of every attachment belonging to the
+   * given tasks. Failures are swallowed so blob bookkeeping never blocks the
+   * task delete itself.
+   */
+  private async collectAttachmentBlobUrls(
+    taskIds: string[]
+  ): Promise<Array<string | null>> {
+    if (taskIds.length === 0) return [];
+    try {
+      const placeholders = taskIds.map((_, i) => `$${i + 1}`).join(',');
+      const res = await query<{ fileUrl: string; thumbnailUrl: string | null }>(
+        `SELECT "fileUrl", "thumbnailUrl" FROM attachments WHERE "taskId" IN (${placeholders})`,
+        taskIds,
+        this.db
+      );
+      return res.rows.flatMap((r) => [r.fileUrl, r.thumbnailUrl]);
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -1052,12 +1079,18 @@ export class TaskService extends BaseService<
         }
       }
 
+      // Capture attachment blob URLs before the cascade removes the rows.
+      const blobUrls = await this.collectAttachmentBlobUrls(ids);
+
       // Perform bulk delete (cascade will handle tags and attachments)
       await query(
         `DELETE FROM tasks WHERE id IN (${ids.map((_, i) => `$${i + 1}`).join(',')})`,
         ids,
         this.db
       );
+
+      // Clean up the underlying attachment blobs for the deleted tasks.
+      await deleteBlobs(blobUrls);
 
       this.log('bulkDelete:success', { count: ids.length }, context);
     } catch (error) {
