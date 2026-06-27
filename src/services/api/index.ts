@@ -19,6 +19,7 @@ export type {
 export type {
   CreateEventData,
   UpdateEventData,
+  EventConflict,
 } from './events';
 
 export type {

@@ -45,6 +45,16 @@ export interface CreateEventData {
 }
 
 /**
+ * A single overlapping-event conflict returned by the conflicts endpoint.
+ */
+export interface EventConflict {
+  conflictingEvent: CalendarEvent;
+  overlapStart: Date;
+  overlapEnd: Date;
+  overlapDuration: number;
+}
+
+/**
  * Event update data
  */
 export interface UpdateEventData {
@@ -341,6 +351,56 @@ export const eventApi = {
           ? new Date(record.updatedAt as string)
           : undefined,
       } as CalendarEvent;
+    });
+  },
+
+  /**
+   * Check for events that overlap the given time range.
+   * Sourced from GET /api/events/conflicts. Returns an empty list on any
+   * non-JSON response (e.g. local fallback) so callers can treat conflicts as
+   * an advisory, non-blocking signal.
+   */
+  getConflicts: async (params: {
+    start: Date;
+    end: Date;
+    calendarId?: string;
+    excludeEventId?: string;
+  }): Promise<EventConflict[]> => {
+    const search = new URLSearchParams({
+      start: toUTC(params.start).toISOString(),
+      end: toUTC(params.end).toISOString(),
+    });
+    if (params.calendarId) search.set('calendarId', params.calendarId);
+    if (params.excludeEventId)
+      search.set('excludeEventId', params.excludeEventId);
+
+    const res = await fetch(`${apiBase}/events/conflicts?${search.toString()}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    });
+    if (!isJson(res)) return [];
+    const body = await res.json();
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to check event conflicts');
+    const conflicts = Array.isArray(body.data?.conflicts)
+      ? body.data.conflicts
+      : [];
+    return conflicts.map((c: Record<string, unknown>) => {
+      const ev = c.conflictingEvent as Record<string, unknown>;
+      const calendar = ev?.calendar as Record<string, unknown> | undefined;
+      return {
+        conflictingEvent: {
+          ...(ev as object),
+          calendarName:
+            (ev?.calendarName as string | undefined) ??
+            (calendar?.name as string | undefined),
+          start: new Date(ev?.start as string),
+          end: new Date(ev?.end as string),
+        } as CalendarEvent,
+        overlapStart: new Date(c.overlapStart as string),
+        overlapEnd: new Date(c.overlapEnd as string),
+        overlapDuration: Number(c.overlapDuration ?? 0),
+      } as EventConflict;
     });
   },
 };

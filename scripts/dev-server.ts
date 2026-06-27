@@ -682,6 +682,45 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
+// Conflict detection (must be registered before '/api/events/:id')
+app.get('/api/events/conflicts', async (req, res) => {
+  try {
+    const { event: eventService } = getAllServices();
+    const { start, end, startTime, endTime, excludeEventId, calendarId } =
+      req.query as Record<string, string>;
+    const startParam = start || startTime;
+    const endParam = end || endTime;
+    if (!startParam || !endParam) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Start time and end time are required' },
+      });
+    }
+    const conflicts = await eventService.getConflicts(
+      {
+        start: new Date(startParam),
+        end: new Date(endParam),
+        calendarId: calendarId || undefined,
+      },
+      excludeEventId || undefined,
+      devContext
+    );
+    res.json({
+      success: true,
+      data: {
+        conflicts,
+        hasConflicts: conflicts.length > 0,
+        count: conflicts.length,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/events/conflicts error:', error);
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
 app.get('/api/events/:id', async (req, res) => {
   try {
     const { event: eventService } = getAllServices();
