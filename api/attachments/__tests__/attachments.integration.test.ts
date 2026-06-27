@@ -60,6 +60,9 @@ vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
   return {
     ...actual,
     devAuth: () => (_req: any, _res: any, next: any) => next(),
+    // Pass through authenticateJWT too (requireAuth adds it to the pipeline);
+    // don't inject a user so the unauthenticated cases still 401 in the handler.
+    authenticateJWT: () => (_req: any, _res: any, next: any) => next(),
   };
 });
 vi.mock('@vercel/blob', () => ({

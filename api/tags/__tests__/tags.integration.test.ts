@@ -33,6 +33,9 @@ vi.mock('../../../lib/middleware/auth.js', async (importOriginal) => {
   return {
     ...actual,
     devAuth: () => (_req: any, _res: any, next: any) => next(),
+    // Pass through authenticateJWT too (requireAuth adds it to the pipeline);
+    // don't inject a user so the unauthenticated cases still 401 in the handler.
+    authenticateJWT: () => (_req: any, _res: any, next: any) => next(),
   };
 });
 
@@ -55,10 +58,14 @@ const mockServices = {
 const mockSendSuccess = vi.fn();
 const mockSendError = vi.fn();
 
-vi.mocked(getAllServices).mockReturnValue(mockServices as unknown as ReturnType<typeof getAllServices>);
+vi.mocked(getAllServices).mockReturnValue(
+  mockServices as unknown as ReturnType<typeof getAllServices>
+);
 
 // Import mocked functions
-const { sendSuccess, sendError } = await import('../../../lib/middleware/errorHandler.js');
+const { sendSuccess, sendError } = await import(
+  '../../../lib/middleware/errorHandler.js'
+);
 vi.mocked(sendSuccess).mockImplementation(mockSendSuccess);
 vi.mocked(sendError).mockImplementation((res, error) => {
   mockSendError(res, {
@@ -171,13 +178,10 @@ describe('Tags API Integration Tests', () => {
 
       await tagsHandler(req, res);
 
-      expect(mockTagService.create).toHaveBeenCalledWith(
-        tagData,
-        {
-          userId: 'user-123',
-          requestId: 'test-request-123',
-        }
-      );
+      expect(mockTagService.create).toHaveBeenCalledWith(tagData, {
+        userId: 'user-123',
+        requestId: 'test-request-123',
+      });
       expect(mockSendSuccess).toHaveBeenCalledWith(res, createdTag, 201);
     });
 
@@ -364,13 +368,10 @@ describe('Tags API Integration Tests', () => {
 
       await tagHandler(req, res);
 
-      expect(mockTagService.findById).toHaveBeenCalledWith(
-        'tag-123',
-        {
-          userId: 'user-123',
-          requestId: 'test-request-123',
-        }
-      );
+      expect(mockTagService.findById).toHaveBeenCalledWith('tag-123', {
+        userId: 'user-123',
+        requestId: 'test-request-123',
+      });
       expect(mockSendSuccess).toHaveBeenCalledWith(res, mockTag);
     });
 
@@ -414,13 +415,10 @@ describe('Tags API Integration Tests', () => {
 
       await tagHandler(req, res);
 
-      expect(mockTagService.delete).toHaveBeenCalledWith(
-        'tag-123',
-        {
-          userId: 'user-123',
-          requestId: 'test-request-123',
-        }
-      );
+      expect(mockTagService.delete).toHaveBeenCalledWith('tag-123', {
+        userId: 'user-123',
+        requestId: 'test-request-123',
+      });
       expect(mockSendSuccess).toHaveBeenCalledWith(res, { deleted: true });
     });
 
@@ -477,18 +475,19 @@ describe('Tags API Integration Tests', () => {
         });
         const res = createMockResponse();
 
-        const createdTag = { ...mockTag, ...tagData, id: `tag-${tagData.name}` };
+        const createdTag = {
+          ...mockTag,
+          ...tagData,
+          id: `tag-${tagData.name}`,
+        };
         mockTagService.create.mockResolvedValue(createdTag);
 
         await tagsHandler(req, res);
 
-        expect(mockTagService.create).toHaveBeenCalledWith(
-          tagData,
-          {
-            userId: 'user-123',
-            requestId: 'test-request-123',
-          }
-        );
+        expect(mockTagService.create).toHaveBeenCalledWith(tagData, {
+          userId: 'user-123',
+          requestId: 'test-request-123',
+        });
       }
     });
 
@@ -576,7 +575,9 @@ describe('Tags API Integration Tests', () => {
       const req = createMockAuthRequest(mockUser, { method: 'GET' });
       const res = createMockResponse();
 
-      mockTagService.findAll.mockRejectedValue(new Error('Database connection failed'));
+      mockTagService.findAll.mockRejectedValue(
+        new Error('Database connection failed')
+      );
 
       await tagsHandler(req, res);
 
