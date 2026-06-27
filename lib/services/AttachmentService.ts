@@ -9,6 +9,7 @@ import {
   type BaseEntity,
 } from './BaseService.js';
 import { query, type SqlClient } from '../config/database.js';
+import { deleteBlobs } from '../utils/blobStorage.js';
 
 /**
  * Attachment entity interface extending base
@@ -644,9 +645,9 @@ export class AttachmentService extends BaseService<
       // Delete from database
       await query('DELETE FROM attachments WHERE id = $1', [id], this.db);
 
-      // TODO: Delete file from storage (Vercel Blob, S3, etc.)
-      // This would require implementing file storage cleanup
-      // await this.deleteFileFromStorage(attachment.fileUrl);
+      // Clean up the underlying blob(s) so deleted attachments do not leak
+      // storage. Skips data: URIs and tolerates already-missing blobs.
+      await this.deleteFileFromStorage(attachment.fileUrl, attachment.thumbnailUrl);
 
       this.log(
         'delete:success',
@@ -676,10 +677,15 @@ export class AttachmentService extends BaseService<
     try {
       this.log('bulkDelete', { ids }, context);
 
-      // Get attachments to verify ownership
+      // Get attachments to verify ownership (and capture blob URLs for cleanup)
       const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-      const attachments = await query<{ id: string; userId: string }>(
-        `SELECT a.id, t."userId" FROM attachments a JOIN tasks t ON t.id = a."taskId" WHERE a.id IN (${placeholders}) AND t."userId" = $${ids.length + 1}`,
+      const attachments = await query<{
+        id: string;
+        userId: string;
+        fileUrl: string;
+        thumbnailUrl: string | null;
+      }>(
+        `SELECT a.id, t."userId", a."fileUrl", a."thumbnailUrl" FROM attachments a JOIN tasks t ON t.id = a."taskId" WHERE a.id IN (${placeholders}) AND t."userId" = $${ids.length + 1}`,
         [...ids, userId],
         this.db
       );
@@ -697,10 +703,11 @@ export class AttachmentService extends BaseService<
         this.db
       );
 
-      // TODO: Delete files from storage
-      // for (const attachment of attachments) {
-      //   await this.deleteFileFromStorage(attachment.fileUrl);
-      // }
+      // Clean up the underlying blobs for every deleted attachment. A storage
+      // error on one file is logged and skipped without aborting the rest.
+      await deleteBlobs(
+        attachments.rows.flatMap((a) => [a.fileUrl, a.thumbnailUrl])
+      );
 
       const deletedCount = result.rowCount ?? 0;
       this.log('bulkDelete:success', { deletedCount }, context);
@@ -802,8 +809,12 @@ export class AttachmentService extends BaseService<
     try {
       this.log('cleanupOrphanedAttachments', {}, context);
 
-      const orphanedRes = await query<{ id: string; fileUrl: string }>(
-        `SELECT a.id, a."fileUrl" FROM attachments a
+      const orphanedRes = await query<{
+        id: string;
+        fileUrl: string;
+        thumbnailUrl: string | null;
+      }>(
+        `SELECT a.id, a."fileUrl", a."thumbnailUrl" FROM attachments a
          LEFT JOIN tasks t ON t.id = a."taskId"
          WHERE t.id IS NULL`,
         [],
@@ -818,10 +829,10 @@ export class AttachmentService extends BaseService<
           this.db
         );
 
-        // TODO: Clean up files from storage
-        // for (const attachment of orphanedAttachments) {
-        //   await this.deleteFileFromStorage(attachment.fileUrl);
-        // }
+        // Clean up the orphaned blobs alongside their rows.
+        await deleteBlobs(
+          orphanedRes.rows.flatMap((a) => [a.fileUrl, a.thumbnailUrl])
+        );
       }
 
       this.log(
@@ -838,12 +849,16 @@ export class AttachmentService extends BaseService<
   }
 
   /**
-   * Private method to delete file from storage
-   * TODO: Implement based on storage provider (Vercel Blob, S3, etc.)
+   * Delete an attachment's underlying file(s) from Vercel Blob storage.
+   * Accepts the primary fileUrl plus any extra URLs (e.g. thumbnailUrl).
+   * Non-blob URLs (data: URIs) and missing blobs are handled gracefully and
+   * never throw, so a storage error cannot abort the surrounding delete.
    */
-  private async deleteFileFromStorage(fileUrl: string): Promise<void> {
-    // Placeholder for file storage cleanup
-    // Implementation depends on storage provider
+  private async deleteFileFromStorage(
+    fileUrl: string,
+    ...extraUrls: Array<string | null | undefined>
+  ): Promise<void> {
     this.log('deleteFileFromStorage', { fileUrl });
+    await deleteBlobs([fileUrl, ...extraUrls]);
   }
 }

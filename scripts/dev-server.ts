@@ -144,6 +144,257 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
+// File upload (mirrors api/upload/index.ts). Stores in Vercel Blob when
+// BLOB_READ_WRITE_TOKEN is set; otherwise returns an explicit JSON error
+// rather than a silent data: URL fallback, so local behavior is honest.
+app.put(
+  '/api/upload',
+  express.raw({ type: '*/*', limit: '60mb' }),
+  async (req, res) => {
+    try {
+      const filename =
+        (req.query.filename as string) || `upload-${Date.now()}`;
+      const contentType =
+        (req.headers['content-type'] as string) || 'application/octet-stream';
+
+      const body = Buffer.isBuffer(req.body)
+        ? req.body
+        : Buffer.from(
+            typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
+          );
+
+      if (!body || body.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Empty body' },
+        });
+      }
+
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'BLOB_NOT_CONFIGURED',
+            message:
+              'BLOB_READ_WRITE_TOKEN is not set; file uploads cannot be persisted locally. Set it in .env.local to test attachments.',
+          },
+        });
+      }
+
+      const { put } = await import('@vercel/blob');
+
+      if (contentType.startsWith('image/')) {
+        try {
+          const sharpMod = await import('sharp');
+          const sharp = (sharpMod.default ??
+            sharpMod) as typeof import('sharp');
+
+          const base =
+            filename.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '') ||
+            `upload-${Date.now()}`;
+
+          const optimized = await sharp(body)
+            .rotate()
+            .resize({
+              width: 1920,
+              height: 1920,
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .jpeg({ quality: 82, mozjpeg: true })
+            .toBuffer();
+
+          const thumb = await sharp(body)
+            .rotate()
+            .resize({
+              width: 512,
+              height: 512,
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+          const fullStored = await put(`${base}.jpg`, optimized, {
+            access: 'public',
+            contentType: 'image/jpeg',
+          });
+          const thumbStored = await put(`${base}.thumb.webp`, thumb, {
+            access: 'public',
+            contentType: 'image/webp',
+          });
+
+          return res.status(201).json({
+            success: true,
+            data: {
+              url: fullStored.url,
+              thumbnailUrl: thumbStored.url,
+              size: optimized.length,
+              contentType: 'image/jpeg',
+            },
+          });
+        } catch {
+          // Fall through to raw upload below
+        }
+      }
+
+      const stored = await put(filename, body, {
+        access: 'public',
+        contentType,
+      });
+      res.status(201).json({
+        success: true,
+        data: {
+          url: stored.url,
+          pathname: stored.pathname,
+          size: body.length,
+          contentType,
+        },
+      });
+    } catch (error) {
+      console.error('PUT /api/upload error:', error);
+      res
+        .status(500)
+        .json({ success: false, error: { message: getErrorMessage(error) } });
+    }
+  }
+);
+
+// Attachments (mirrors api/attachments/index.ts + [id].ts via AttachmentService)
+app.get('/api/attachments', async (req, res) => {
+  try {
+    const { attachment: attachmentService } = getAllServices();
+    const { taskId, category, search, fileType, limit, offset } = req.query;
+
+    if (category) {
+      const result = await attachmentService.findByCategory(
+        category as Parameters<typeof attachmentService.findByCategory>[0],
+        devContext
+      );
+      return res.json({ success: true, data: result });
+    }
+
+    const result = await attachmentService.findAll(
+      {
+        ...(taskId ? { taskId: taskId as string } : {}),
+        ...(fileType ? { fileType: fileType as string } : {}),
+        ...(search ? { search: search as string } : {}),
+        limit: Math.min(parseInt((limit as string) || '50') || 50, 100),
+        offset: parseInt((offset as string) || '0') || 0,
+      },
+      devContext
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('GET /api/attachments error:', error);
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+app.post('/api/attachments', async (req, res) => {
+  try {
+    const { attachment: attachmentService } = getAllServices();
+    const attachment = await attachmentService.create(req.body, devContext);
+    res.status(201).json({ success: true, data: attachment });
+  } catch (error) {
+    console.error('POST /api/attachments error:', error);
+    const message = getErrorMessage(error);
+    if (message.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: message.replace('VALIDATION_ERROR: ', ''),
+        },
+      });
+    }
+    if (message.includes('AUTHORIZATION_ERROR')) {
+      return res
+        .status(403)
+        .json({ success: false, error: { code: 'FORBIDDEN', message } });
+    }
+    res.status(500).json({ success: false, error: { message } });
+  }
+});
+
+app.get('/api/attachments/:id', async (req, res) => {
+  try {
+    const { attachment: attachmentService } = getAllServices();
+    const attachment = await attachmentService.findById(
+      req.params.id,
+      devContext
+    );
+    if (!attachment) {
+      return res
+        .status(404)
+        .json({ success: false, error: { message: 'Attachment not found' } });
+    }
+    res.json({ success: true, data: attachment });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+const updateAttachment = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { attachment: attachmentService } = getAllServices();
+    const attachment = await attachmentService.update(
+      req.params.id,
+      req.body,
+      devContext
+    );
+    if (!attachment) {
+      return res
+        .status(404)
+        .json({ success: false, error: { message: 'Attachment not found' } });
+    }
+    res.json({ success: true, data: attachment });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (message.startsWith('VALIDATION_ERROR:')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: message.replace('VALIDATION_ERROR: ', ''),
+        },
+      });
+    }
+    if (message.includes('AUTHORIZATION_ERROR')) {
+      return res
+        .status(403)
+        .json({ success: false, error: { code: 'FORBIDDEN', message } });
+    }
+    res.status(500).json({ success: false, error: { message } });
+  }
+};
+
+app.put('/api/attachments/:id', updateAttachment);
+app.patch('/api/attachments/:id', updateAttachment);
+
+app.delete('/api/attachments/:id', async (req, res) => {
+  try {
+    const { attachment: attachmentService } = getAllServices();
+    await attachmentService.delete(req.params.id, devContext);
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (message.includes('AUTHORIZATION_ERROR')) {
+      return res
+        .status(403)
+        .json({ success: false, error: { code: 'FORBIDDEN', message } });
+    }
+    res.status(500).json({ success: false, error: { message } });
+  }
+});
+
 // Task Lists
 app.get('/api/task-lists', async (_req, res) => {
   try {
