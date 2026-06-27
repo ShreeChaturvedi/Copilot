@@ -388,10 +388,35 @@ app.delete('/api/calendars/:id', async (req, res) => {
 });
 
 // Events
-app.get('/api/events', async (_req, res) => {
+app.get('/api/events', async (req, res) => {
   try {
     const { event: eventService } = getAllServices();
-    const events = await eventService.findAll({}, devContext);
+    const { calendarId, start, end, startDate, endDate, upcoming, search } =
+      req.query as Record<string, string>;
+
+    let events;
+    if (upcoming === 'true') {
+      events = await eventService.findUpcoming(undefined, devContext);
+    } else if ((start && end) || (startDate && endDate)) {
+      // Date range query: findAll expands recurring masters into occurrences.
+      events = await eventService.findAll(
+        {
+          ...(calendarId ? { calendarId } : {}),
+          ...(search ? { search } : {}),
+          start: new Date((start || startDate)!),
+          end: new Date((end || endDate)!),
+        },
+        devContext
+      );
+    } else {
+      events = await eventService.findAll(
+        {
+          ...(calendarId ? { calendarId } : {}),
+          ...(search ? { search } : {}),
+        },
+        devContext
+      );
+    }
     res.json({ success: true, data: events });
   } catch (error) {
     res

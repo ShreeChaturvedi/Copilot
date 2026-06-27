@@ -48,6 +48,11 @@ export interface CalendarEvent {
   updatedAt?: Date;
   occurrenceInstanceStart?: Date;
   occurrenceInstanceEnd?: Date;
+  // Set on virtual occurrences expanded from a recurring master server-side.
+  // The composite `id` is `${masterId}::${occurrenceISO}`; `masterId` is the
+  // persisted series id used for edits and deletes.
+  isRecurringInstance?: boolean;
+  masterId?: string;
 }
 
 // Tasks
