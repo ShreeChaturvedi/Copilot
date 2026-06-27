@@ -152,8 +152,7 @@ app.put(
   express.raw({ type: '*/*', limit: '60mb' }),
   async (req, res) => {
     try {
-      const filename =
-        (req.query.filename as string) || `upload-${Date.now()}`;
+      const filename = (req.query.filename as string) || `upload-${Date.now()}`;
       const contentType =
         (req.headers['content-type'] as string) || 'application/octet-stream';
 
@@ -819,6 +818,71 @@ app.post('/api/auth/login', async (req, res) => {
     res
       .status(500)
       .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// POST /api/auth/forgot-password
+// Always returns a generic success so it can't be used to probe for accounts.
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'A valid email address is required',
+      },
+    });
+  }
+  try {
+    await authService.requestPasswordReset(email);
+  } catch (error) {
+    console.error('Password reset request error:', getErrorMessage(error));
+  }
+  res.json({
+    success: true,
+    data: {
+      message:
+        'If an account exists for that email, a password reset link has been sent.',
+    },
+  });
+});
+
+// POST /api/auth/reset-password
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'A reset token and new password are required',
+      },
+    });
+  }
+  try {
+    await authService.confirmPasswordReset(token, newPassword);
+    res.json({
+      success: true,
+      data: { message: 'Your password has been reset. You can now sign in.' },
+    });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (
+      message === 'INVALID_RESET_TOKEN' ||
+      message === 'RESET_TOKEN_USED' ||
+      message === 'RESET_TOKEN_EXPIRED'
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: message,
+          message:
+            'This password reset link is invalid or has expired. Please request a new one.',
+        },
+      });
+    }
+    res.status(500).json({ success: false, error: { message } });
   }
 });
 

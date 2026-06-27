@@ -357,6 +357,73 @@ class AuthAPI {
     }
   }
 
+  // Request a password reset link. The backend always responds with a generic
+  // success (it never reveals whether the email is registered), so callers
+  // should show the same confirmation regardless of the result.
+  async requestPasswordReset(
+    email: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await fetch(`${this.baseURL}/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          message: extractErrorMessage(data, 'Could not send reset email'),
+        };
+      }
+
+      return { success: true, message: data.data?.message };
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please try again.',
+      };
+    }
+  }
+
+  // Confirm a password reset with the token from the emailed link.
+  async confirmPasswordReset(
+    token: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await fetch(`${this.baseURL}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          message: extractErrorMessage(data, 'Could not reset password'),
+        };
+      }
+
+      return { success: true, message: data.data?.message };
+    } catch (error) {
+      console.error('Password reset confirm error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please try again.',
+      };
+    }
+  }
+
   // Get Google OAuth URL
   getGoogleAuthUrl(redirectUri: string): string {
     const params = new URLSearchParams({

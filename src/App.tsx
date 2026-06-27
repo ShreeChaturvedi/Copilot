@@ -1,19 +1,38 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
 import { QueryProvider, ThemeProvider } from './components/providers';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
 import { useAuthStore } from './stores/authStore';
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 
-const MainLayout = lazy(async () => ({ default: (await import('./components/layout/MainLayout')).MainLayout }));
-const LoginPage = lazy(async () => ({ default: (await import('./pages/Login')).LoginPage }));
-const SignupPage = lazy(async () => ({ default: (await import('./pages/Signup')).SignupPage }));
-const GoogleCallbackPage = lazy(async () => ({ default: (await import('./pages/GoogleCallback')).GoogleCallbackPage }));
+const MainLayout = lazy(async () => ({
+  default: (await import('./components/layout/MainLayout')).MainLayout,
+}));
+const LoginPage = lazy(async () => ({
+  default: (await import('./pages/Login')).LoginPage,
+}));
+const SignupPage = lazy(async () => ({
+  default: (await import('./pages/Signup')).SignupPage,
+}));
+const GoogleCallbackPage = lazy(async () => ({
+  default: (await import('./pages/GoogleCallback')).GoogleCallbackPage,
+}));
+const ForgotPasswordPage = lazy(async () => ({
+  default: (await import('./pages/ForgotPassword')).ForgotPasswordPage,
+}));
+const ResetPasswordPage = lazy(async () => ({
+  default: (await import('./pages/ResetPassword')).ResetPasswordPage,
+}));
 
 // Development mode toggle component
 const DevAuthToggle = () => {
   const { setJWTAuth, logout, isAuthenticated, authMethod } = useAuthStore();
-  
+
   // Position and drag state
   const [position, setPosition] = useState(() => {
     const saved = localStorage.getItem('dev-toggle-position');
@@ -21,24 +40,24 @@ const DevAuthToggle = () => {
   });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  
+
   const handleMockLogin = () => {
     // Create mock user data for testing
     const mockTokens = {
       accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token', 
-      expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour from now
+      refreshToken: 'mock-refresh-token',
+      expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour from now
     };
-    
+
     const mockUser = {
       id: 'mock-user-123',
       email: 'developer@example.com',
       name: 'Dev User',
       picture: undefined,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
-    
+
     setJWTAuth(mockTokens, mockUser);
   };
 
@@ -47,10 +66,16 @@ const DevAuthToggle = () => {
     const boxWidth = 200; // Approximate width
     const boxHeight = 120; // Approximate height
     const margin = 10;
-    
-    const constrainedX = Math.max(margin, Math.min(window.innerWidth - boxWidth - margin, x));
-    const constrainedY = Math.max(margin, Math.min(window.innerHeight - boxHeight - margin, y));
-    
+
+    const constrainedX = Math.max(
+      margin,
+      Math.min(window.innerWidth - boxWidth - margin, x)
+    );
+    const constrainedY = Math.max(
+      margin,
+      Math.min(window.innerHeight - boxHeight - margin, y)
+    );
+
     return { x: constrainedX, y: constrainedY };
   };
 
@@ -58,11 +83,11 @@ const DevAuthToggle = () => {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
     e.preventDefault();
-    
+
     const rect = e.currentTarget.getBoundingClientRect();
     setDragOffset({
       x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      y: e.clientY - rect.top,
     });
     setIsDragging(true);
   };
@@ -70,12 +95,12 @@ const DevAuthToggle = () => {
   // Touch drag handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
-    
+
     const rect = e.currentTarget.getBoundingClientRect();
     const touch = e.touches[0];
     setDragOffset({
       x: touch.clientX - rect.left,
-      y: touch.clientY - rect.top
+      y: touch.clientY - rect.top,
     });
     setIsDragging(true);
   };
@@ -120,16 +145,18 @@ const DevAuthToggle = () => {
       document.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, dragOffset, position]);
-  
+
   return (
-    <div 
+    <div
       className={`fixed z-50 bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg border border-yellow-300 dark:border-yellow-700 shadow-lg select-none transition-opacity ${
-        isDragging ? 'opacity-75 cursor-grabbing' : 'cursor-grab hover:shadow-xl'
+        isDragging
+          ? 'opacity-75 cursor-grabbing'
+          : 'cursor-grab hover:shadow-xl'
       }`}
       style={{
         left: position.x,
         top: position.y,
-        touchAction: 'none'
+        touchAction: 'none',
       }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
@@ -139,7 +166,8 @@ const DevAuthToggle = () => {
       </div>
       <div className="flex flex-col gap-2 text-xs">
         <div className="text-yellow-700 dark:text-yellow-300 pointer-events-none">
-          Auth Status: {isAuthenticated ? `✅ ${authMethod}` : '❌ Not authenticated'}
+          Auth Status:{' '}
+          {isAuthenticated ? `✅ ${authMethod}` : '❌ Not authenticated'}
         </div>
         <div className="flex gap-2">
           <button
@@ -168,7 +196,7 @@ const DevAuthToggle = () => {
 
 function App() {
   const [showDevToggle, setShowDevToggle] = useState(false);
-  
+
   useEffect(() => {
     // Show dev toggle in development mode
     if (import.meta.env.DEV) {
@@ -189,7 +217,8 @@ function App() {
             richColors
             toastOptions={{
               classNames: {
-                toast: 'rounded-md shadow-lg border border-border text-foreground bg-background',
+                toast:
+                  'rounded-md shadow-lg border border-border text-foreground bg-background',
                 description: 'text-muted-foreground',
                 success: 'bg-emerald-600 text-white',
                 error: 'bg-red-600 text-white',
@@ -198,43 +227,66 @@ function App() {
             }}
           />
           <Suspense fallback={null}>
-          <Routes>
-            {/* Public routes */}
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <AuthLayout>
-                    <LoginPage />
-                  </AuthLayout>
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/signup" 
-              element={
-                <PublicRoute>
-                  <AuthLayout>
-                    <SignupPage />
-                  </AuthLayout>
-                </PublicRoute>
-              } 
-            />
-            <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
-            
-            {/* Protected routes */}
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Redirect to login for unknown routes */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            <Routes>
+              {/* Public routes */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <AuthLayout>
+                      <LoginPage />
+                    </AuthLayout>
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/signup"
+                element={
+                  <PublicRoute>
+                    <AuthLayout>
+                      <SignupPage />
+                    </AuthLayout>
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <PublicRoute>
+                    <AuthLayout>
+                      <ForgotPasswordPage />
+                    </AuthLayout>
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/reset-password"
+                element={
+                  <PublicRoute>
+                    <AuthLayout>
+                      <ResetPasswordPage />
+                    </AuthLayout>
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/auth/google/callback"
+                element={<GoogleCallbackPage />}
+              />
+
+              {/* Protected routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Redirect to login for unknown routes */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </Suspense>
         </Router>
       </ThemeProvider>
