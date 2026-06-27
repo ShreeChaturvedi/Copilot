@@ -31,6 +31,7 @@ import cors from 'cors';
 import { getAllServices, initServices } from '../lib/services/index';
 import { authService } from '../packages/backend/src/services/AuthService';
 import { refreshTokenService } from '../packages/backend/src/services/RefreshTokenService';
+import { userService } from '../packages/backend/src/services/UserService';
 import { googleOAuthService } from '../packages/backend/src/services/GoogleOAuthService';
 import {
   extractTokenFromHeader,
@@ -52,6 +53,25 @@ const devContext = {
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
+
+// Resolve the authenticated user id from a bearer token, mirroring the
+// serverless authenticateJWT middleware so /api/user/* routes act on the real
+// logged-in user (not the hardcoded dev user). Falls back to devContext when no
+// valid token is present, matching the rest of the dev server.
+async function resolveUserId(req: express.Request): Promise<string> {
+  try {
+    const token = extractTokenFromHeader(req.headers.authorization);
+    if (token) {
+      const decoded = await verifyToken(token);
+      if (decoded.type === 'access') {
+        return decoded.userId;
+      }
+    }
+  } catch {
+    // ignore and fall back to dev user
+  }
+  return devContext.userId;
+}
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -686,6 +706,148 @@ app.post('/api/auth/google', async (req, res) => {
         },
       });
     }
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// User profile, preferences, export and account deletion -------------------
+// Mirror api/user/*.ts and api/auth/change-password.ts.
+
+// PATCH /api/user/profile
+app.patch('/api/user/profile', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const user = await userService.updateProfile(userId, req.body ?? {});
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, error: { message: 'User not found' } });
+    }
+    res.json({
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
+        googleId: user.googleId,
+        profile: user.profile,
+      },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// GET /api/user/preferences
+app.get('/api/user/preferences', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const preferences = await userService.getPreferences(userId);
+    res.json({ success: true, data: preferences });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// PATCH /api/user/preferences
+app.patch('/api/user/preferences', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const preferences = await userService.updatePreferences(
+      userId,
+      req.body ?? {}
+    );
+    res.json({ success: true, data: preferences });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// GET /api/user/export
+app.get('/api/user/export', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const data = await userService.exportUserData(userId);
+    const filename = `taskflow-export-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json({ success: true, data });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// DELETE /api/user
+app.delete('/api/user', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    await refreshTokenService.invalidateAllUserTokens(userId);
+    const deleted = await userService.deleteUser(userId);
+    if (!deleted) {
+      return res
+        .status(404)
+        .json({ success: false, error: { message: 'User not found' } });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: { message: getErrorMessage(error) } });
+  }
+});
+
+// POST /api/auth/change-password
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Current and new password are required',
+        },
+      });
+    }
+    const isValid = await authService.verifyPassword(userId, currentPassword);
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_CURRENT_PASSWORD',
+          message: 'Current password is incorrect',
+        },
+      });
+    }
+    const strength = authService.validatePassword(newPassword);
+    if (!strength.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: strength.errors[0] ?? 'Password is too weak',
+          details: strength.errors,
+        },
+      });
+    }
+    await authService.updatePassword(userId, newPassword);
+    res.json({
+      success: true,
+      data: { message: 'Password updated successfully' },
+    });
+  } catch (error) {
     res
       .status(500)
       .json({ success: false, error: { message: getErrorMessage(error) } });

@@ -18,6 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import {
@@ -33,11 +44,16 @@ import {
   useSettingsStore,
   type TaskCompletionControl,
 } from '@/stores/settingsStore';
+import { userAPI } from '@/services/api/user';
 
 export function GeneralSettings() {
-  const { user, authMethod } = useAuthStore();
+  const { user, authMethod, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
   const [exportingData, setExportingData] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const taskCompletionControl = useSettingsStore(
     (s) => s.taskCompletionControl
   );
@@ -56,17 +72,32 @@ export function GeneralSettings() {
   const handleExportData = async () => {
     try {
       setExportingData(true);
-      // TODO: Implement data export
-      console.log('Exporting user data...');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setExportError(null);
+      await userAPI.exportData();
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : 'Failed to export data'
+      );
     } finally {
       setExportingData(false);
     }
   };
 
-  const handleDeleteAccount = () => {
-    // TODO: Implement account deletion confirmation dialog
-    console.log('Delete account requested');
+  const handleConfirmDelete = async () => {
+    try {
+      setDeletingAccount(true);
+      setDeleteError(null);
+      await userAPI.deleteAccount();
+      setDeleteDialogOpen(false);
+      // End the session after the account is removed server-side.
+      await logout();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : 'Failed to delete account'
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -285,6 +316,11 @@ export function GeneralSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {exportError && (
+            <Alert variant="destructive">
+              <AlertDescription>{exportError}</AlertDescription>
+            </Alert>
+          )}
           <div className="flex items-center justify-between p-4 border rounded-lg">
             <div>
               <h4 className="font-medium">Export Data</h4>
@@ -320,7 +356,10 @@ export function GeneralSettings() {
             </div>
             <Button
               variant="outline"
-              onClick={handleDeleteAccount}
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteDialogOpen(true);
+              }}
               className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -329,6 +368,40 @@ export function GeneralSettings() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes your account and all associated data:
+              tasks, events, calendars, lists, and attachments. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAccount}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // Keep the dialog open until the request resolves.
+                e.preventDefault();
+                void handleConfirmDelete();
+              }}
+              disabled={deletingAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAccount ? 'Deleting...' : 'Delete Account'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

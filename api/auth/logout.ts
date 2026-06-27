@@ -6,6 +6,10 @@ import { HttpMethod } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import { refreshTokenService } from '../../packages/backend/src/services/RefreshTokenService.js';
+import {
+  extractTokenFromHeader,
+  verifyToken,
+} from '../../packages/backend/src/utils/jwt.js';
 import { z } from 'zod';
 
 const logoutSchema = z.object({
@@ -33,9 +37,26 @@ export default createMethodHandler({
 
       const { refreshToken, logoutAll } = validationResult.data;
 
-      if (logoutAll && req.user) {
+      // Resolve the user id for "log out everywhere". This route has no auth
+      // middleware, so derive it from the access token when req.user is absent.
+      let userId = req.user?.id;
+      if (logoutAll && !userId) {
+        const token = extractTokenFromHeader(req.headers.authorization);
+        if (token) {
+          try {
+            const decoded = await verifyToken(token);
+            if (decoded.type === 'access') {
+              userId = decoded.userId;
+            }
+          } catch {
+            // ignore; fall through to single-token revocation
+          }
+        }
+      }
+
+      if (logoutAll && userId) {
         // Invalidate all refresh tokens for this user
-        await refreshTokenService.invalidateAllUserTokens(req.user.id);
+        await refreshTokenService.invalidateAllUserTokens(userId);
       } else {
         // Invalidate only this refresh token
         await refreshTokenService.invalidateRefreshToken(refreshToken);
