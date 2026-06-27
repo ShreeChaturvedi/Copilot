@@ -12,6 +12,7 @@ export interface AuthenticatedRequest extends VercelRequest {
     id: string;
     email: string;
     name?: string;
+    role?: string;
   };
   requestId?: string;
   validated?: {

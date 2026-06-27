@@ -49,6 +49,10 @@ export interface JWTPayload {
   userId: string;
   email: string;
   type: 'access' | 'refresh';
+  // Authorization role carried on access tokens so middleware can enforce
+  // roles without a database lookup on every request. Optional for backward
+  // compatibility with tokens minted before roles existed.
+  role?: string;
   jti?: string;
   iat?: number;
   exp?: number;
@@ -65,12 +69,14 @@ export interface TokenPair {
  */
 export async function generateAccessToken(
   userId: string,
-  email: string
+  email: string,
+  role?: string
 ): Promise<string> {
   const payload: Omit<JWTPayload, 'iat' | 'exp'> = {
     userId,
     email,
     type: 'access',
+    ...(role ? { role } : {}),
   };
 
   return await signAsync(payload, JWT_SECRET, {
@@ -108,10 +114,11 @@ export async function generateRefreshToken(
  */
 export async function generateTokenPair(
   userId: string,
-  email: string
+  email: string,
+  role?: string
 ): Promise<TokenPair> {
   const [accessToken, refreshToken] = await Promise.all([
-    generateAccessToken(userId, email),
+    generateAccessToken(userId, email, role),
     generateRefreshToken(userId, email),
   ]);
 

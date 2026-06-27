@@ -3,11 +3,29 @@
  */
 import type { VercelResponse } from '@vercel/node';
 import type { AuthenticatedRequest, Middleware } from '../types/api.js';
-import { UnauthorizedError } from '../types/api.js';
+import { ForbiddenError, UnauthorizedError } from '../types/api.js';
 import {
   verifyToken,
   extractTokenFromHeader,
 } from '../../packages/backend/src/utils/jwt.js';
+import { query } from '../config/database.js';
+
+// Baseline role assigned to every user by migration 008. The ADMIN role is a
+// superuser that satisfies any requireRole check.
+const DEFAULT_ROLE = 'USER';
+const ADMIN_ROLE = 'ADMIN';
+
+/**
+ * Resolve the role for a user id from the database, falling back to the
+ * baseline role when the user (or column) cannot be found.
+ */
+async function fetchUserRole(userId: string): Promise<string> {
+  const result = await query<{ role: string | null }>(
+    'SELECT "role" FROM users WHERE id = $1',
+    [userId]
+  );
+  return result.rows[0]?.role ?? DEFAULT_ROLE;
+}
 
 /**
  * JWT authentication middleware
@@ -45,6 +63,7 @@ export function authenticateJWT(): Middleware {
         id: decoded.userId,
         email: decoded.email,
         name: decoded.email.split('@')[0], // Extract name from email as fallback
+        role: decoded.role,
       };
 
       next();
@@ -89,6 +108,7 @@ export function optionalAuth(): Middleware {
                 id: decoded.userId,
                 email: decoded.email,
                 name: decoded.email.split('@')[0],
+                role: decoded.role,
               };
             }
           } catch {
@@ -119,6 +139,7 @@ export function devAuth(): Middleware {
         id: 'dev-user-id',
         email: 'dev@example.com',
         name: 'Dev User',
+        role: ADMIN_ROLE,
       };
     }
     next();
@@ -126,24 +147,32 @@ export function devAuth(): Middleware {
 }
 
 /**
- * Role-based authorization middleware (placeholder)
- * Will be implemented if needed in future tasks
+ * Role-based authorization middleware
+ * Requires the authenticated user to hold the given role. The ADMIN role is a
+ * superuser and satisfies any role requirement. The role is read from the
+ * request context (populated from the access token) and falls back to a
+ * database lookup when the token predates roles.
  */
-export function requireRole(_role: string): Middleware {
+export function requireRole(role: string): Middleware {
   return async (
-    _req: AuthenticatedRequest,
+    req: AuthenticatedRequest,
     _res: VercelResponse,
     next: () => void
   ) => {
-    if (!_req.user) {
+    if (!req.user) {
       throw new UnauthorizedError('Authentication required');
     }
 
-    // Reference parameter to satisfy linter until roles are implemented
-    void _role;
+    let userRole = req.user.role;
+    if (!userRole) {
+      userRole = await fetchUserRole(req.user.id);
+      req.user.role = userRole;
+    }
 
-    // TODO: Implement role checking when user roles are added
-    // For now, just pass through
+    if (userRole !== role && userRole !== ADMIN_ROLE) {
+      throw new ForbiddenError(`Requires '${role}' role`);
+    }
+
     next();
   };
 }

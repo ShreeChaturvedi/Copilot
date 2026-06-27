@@ -10,7 +10,7 @@ import {
   requireRole,
   requireOwnership,
 } from '../auth';
-import { UnauthorizedError } from '../../types/api';
+import { ForbiddenError, UnauthorizedError } from '../../types/api';
 import { createMockRequest, createMockResponse } from '../../__tests__/helpers';
 import type { AuthenticatedRequest } from '../../types/api';
 import {
@@ -298,39 +298,54 @@ describe('Authentication Middleware', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should pass through when user is authenticated (placeholder implementation)', async () => {
+    it('should pass through when the user holds the required role', async () => {
       const req = createMockRequest() as AuthenticatedRequest;
       req.user = {
         id: 'user-123',
         email: 'user@example.com',
         name: 'Test User',
+        role: 'ADMIN',
       };
       const res = createMockResponse();
 
-      const middleware = requireRole('admin');
+      const middleware = requireRole('ADMIN');
       await middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalledOnce();
     });
 
-    it('should work with different role values (placeholder)', async () => {
+    it('should reject with ForbiddenError when the role does not match', async () => {
       const req = createMockRequest() as AuthenticatedRequest;
       req.user = {
         id: 'user-123',
         email: 'user@example.com',
         name: 'Test User',
+        role: 'USER',
       };
       const res = createMockResponse();
 
-      const adminMiddleware = requireRole('admin');
-      const userMiddleware = requireRole('user');
-      const moderatorMiddleware = requireRole('moderator');
+      const middleware = requireRole('ADMIN');
 
-      await adminMiddleware(req, res, mockNext);
-      await userMiddleware(req, res, mockNext);
-      await moderatorMiddleware(req, res, mockNext);
+      await expect(middleware(req, res, mockNext)).rejects.toThrow(
+        ForbiddenError
+      );
+      expect(mockNext).not.toHaveBeenCalled();
+    });
 
-      expect(mockNext).toHaveBeenCalledTimes(3);
+    it('should let an ADMIN satisfy any required role', async () => {
+      const req = createMockRequest() as AuthenticatedRequest;
+      req.user = {
+        id: 'user-123',
+        email: 'user@example.com',
+        name: 'Test User',
+        role: 'ADMIN',
+      };
+      const res = createMockResponse();
+
+      const middleware = requireRole('USER');
+      await middleware(req, res, mockNext);
+
+      expect(mockNext).toHaveBeenCalledOnce();
     });
   });
 
