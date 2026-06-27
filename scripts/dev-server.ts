@@ -125,10 +125,13 @@ app.delete('/api/tasks/:id', async (req, res) => {
 });
 
 // Task Lists
-app.get('/api/task-lists', async (_req, res) => {
+app.get('/api/task-lists', async (req, res) => {
   try {
     const { taskList: taskListService } = getAllServices();
-    const lists = await taskListService.findAll({}, devContext);
+    const lists =
+      req.query.archived === 'true'
+        ? await taskListService.getArchived(devContext)
+        : await taskListService.findAll({}, devContext);
     res.json({ success: true, data: lists });
   } catch (error) {
     res
@@ -168,11 +171,15 @@ app.post('/api/task-lists', async (req, res) => {
 app.patch('/api/task-lists/:id', async (req, res) => {
   try {
     const { taskList: taskListService } = getAllServices();
-    const list = await taskListService.update(
-      req.params.id,
-      req.body,
-      devContext
-    );
+    const { action } = req.query;
+    let list;
+    if (action === 'archive') {
+      list = await taskListService.archive(req.params.id, devContext);
+    } else if (action === 'unarchive') {
+      list = await taskListService.unarchive(req.params.id, devContext);
+    } else {
+      list = await taskListService.update(req.params.id, req.body, devContext);
+    }
     if (!list) {
       return res
         .status(404)

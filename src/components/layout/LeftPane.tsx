@@ -101,6 +101,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     handleUpdateTaskGroupIcon,
     handleUpdateTaskGroupColor,
     handleDeleteTaskGroup,
+    handleArchiveTaskGroup,
     handleOpenCreateTaskDialog,
   } = useTaskManagement({ includeTaskOperations: true });
 
@@ -281,6 +282,9 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
   );
   const memoizedHandleDeleteTaskGroup = useCallback(handleDeleteTaskGroup, [
     handleDeleteTaskGroup,
+  ]);
+  const memoizedHandleArchiveTaskGroup = useCallback(handleArchiveTaskGroup, [
+    handleArchiveTaskGroup,
   ]);
   const memoizedSetShowCreateTaskDialog = useCallback(setShowCreateTaskDialog, [
     setShowCreateTaskDialog,
@@ -510,6 +514,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
           onAddTaskGroup={memoizedHandleAddTaskGroupForList}
           onEditTaskGroup={memoizedHandleEditTaskGroupForList}
           onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
+          onArchiveTaskGroup={memoizedHandleArchiveTaskGroup}
           onSelectTaskGroup={memoizedHandleSelectTaskGroup}
         />
         {showSidebarTaskAnalytics && (
@@ -535,6 +540,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     memoizedHandleAddTaskGroupForList,
     memoizedHandleEditTaskGroupForList,
     memoizedHandleDeleteTaskGroup,
+    memoizedHandleArchiveTaskGroup,
     memoizedHandleSelectTaskGroup,
     showSidebarTaskAnalytics,
   ]);

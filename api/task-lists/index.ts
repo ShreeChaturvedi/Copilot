@@ -19,11 +19,17 @@ export default createCrudHandler({
         return sendError(res, new UnauthorizedError('User authentication required'));
       }
 
-      const { search, withTaskCount } = req.query;
+      const { search, withTaskCount, archived } = req.query;
 
       let result;
-      
-      if (withTaskCount === 'true') {
+
+      if (archived === 'true') {
+        // Return only archived task lists
+        result = await taskListService.getArchived({
+          userId,
+          requestId: req.headers['x-request-id'] as string,
+        });
+      } else if (withTaskCount === 'true') {
         // Get task lists with task counts
         result = await taskListService.getWithTaskCount({
           userId,

@@ -6,6 +6,7 @@ import {
   Settings,
   Edit,
   Trash2,
+  Archive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -79,6 +80,7 @@ export interface BaseListProps<T extends BaseListItem> {
   onAdd: (name: string, color: string) => void;
   onEdit: (item: T, name: string, color: string) => void;
   onDelete?: (item: T) => void;
+  onArchive?: (item: T) => void; // Optional: soft-hide the item (shown as "Archive")
   onStartEdit?: (item: T) => void; // Optional: trigger parent-controlled dialog edit flow
 
   // Dialog support
@@ -144,6 +146,7 @@ export function BaseList<T extends BaseListItem>({
   onEdit,
   onStartEdit,
   onDelete,
+  onArchive,
   showCreateDialog = false,
   onShowCreateDialog,
   onCreateDialogSubmit,
@@ -259,6 +262,7 @@ export function BaseList<T extends BaseListItem>({
                 onEdit={onEdit}
                 onStartEdit={onStartEdit}
                 onDelete={onDelete}
+                onArchive={onArchive}
                 recentColors={recentColors}
                 onRecentColorAdd={handleRecentColorAdd}
                 deleteDialogTitle={deleteDialogTitle}
@@ -379,6 +383,7 @@ interface BaseListItemProps<T extends BaseListItem> {
   onEdit: (item: T, name: string, color: string) => void;
   onStartEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  onArchive?: (item: T) => void;
   recentColors: string[];
   onRecentColorAdd: (color: string) => void;
   deleteDialogTitle: string;
@@ -394,6 +399,7 @@ function BaseListItem<T extends BaseListItem>({
   onEdit,
   onStartEdit,
   onDelete,
+  onArchive,
   recentColors,
   onRecentColorAdd,
   deleteDialogTitle,
@@ -575,6 +581,15 @@ function BaseListItem<T extends BaseListItem>({
                   />
                 </DropdownMenuShortcut>
               </DropdownMenuItem>
+              {onArchive && !item.isDefault && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onArchive(item)}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    <span>Archive</span>
+                  </DropdownMenuItem>
+                </>
+              )}
               {onDelete && !item.isDefault && (
                 <>
                   <DropdownMenuSeparator />

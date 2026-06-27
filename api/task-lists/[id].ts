@@ -128,6 +128,22 @@ export default createCrudHandler({
           break;
         }
 
+        case 'archive': {
+          result = await taskListService.archive(taskListId, {
+            userId,
+            requestId: req.headers['x-request-id'] as string,
+          });
+          break;
+        }
+
+        case 'unarchive': {
+          result = await taskListService.unarchive(taskListId, {
+            userId,
+            requestId: req.headers['x-request-id'] as string,
+          });
+          break;
+        }
+
         default: {
           // Regular patch update
           const updateData: UpdateTaskListDTO = req.body;
