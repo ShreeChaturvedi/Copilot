@@ -3,9 +3,10 @@ import { Folder, Plus } from 'lucide-react';
 import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { TaskFolder, Task } from "@shared/types";
+import { TaskFolder, Task } from '@shared/types';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useUIStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 import '@/styles/new-folder.css';
 
@@ -22,12 +23,14 @@ function createTaskFolders(
     color: string;
     description?: string;
   }>,
-  showCompleted: boolean
+  showCompleted: boolean,
+  userId: string
 ): TaskFolder[] {
   return taskGroups.map((group) => {
     const groupTasks = tasks.filter(
       (task) =>
-        task.taskListId === group.id || (!task.taskListId && group.id === 'default')
+        task.taskListId === group.id ||
+        (!task.taskListId && group.id === 'default')
     );
     const activeTasks = groupTasks.filter((task) => !task.completed);
     const completedTasks = groupTasks.filter((task) => task.completed);
@@ -45,7 +48,7 @@ function createTaskFolders(
       completedCount: completedTasks.length,
       tasks: previewTasks,
       description: group.description,
-      userId: 'default-user', // TODO: Get actual user ID from context
+      userId,
     };
   });
 }
@@ -154,14 +157,16 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
 export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   className,
 }) => {
-  const { globalShowCompleted, setTaskViewMode, setSelectedKanbanTaskListId } = useUIStore();
+  const { globalShowCompleted, setTaskViewMode, setSelectedKanbanTaskListId } =
+    useUIStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { tasks, taskGroups, handleSelectTaskGroup, handleCreateTaskGroup } =
     useTaskManagement({ includeTaskOperations: true });
+  const userId = useAuthStore((s) => s.user?.id ?? s.googleUser?.id ?? '');
 
   const folders = useMemo(
-    () => createTaskFolders(tasks, taskGroups, globalShowCompleted),
-    [tasks, taskGroups, globalShowCompleted]
+    () => createTaskFolders(tasks, taskGroups, globalShowCompleted, userId),
+    [tasks, taskGroups, globalShowCompleted, userId]
   );
 
   const handleFolderClick = useCallback(
