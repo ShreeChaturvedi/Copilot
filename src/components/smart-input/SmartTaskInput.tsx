@@ -14,6 +14,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/Input';
 import { HighlightedInput } from './components/HighlightedInput';
 import { InlineHighlightedInput } from './components/InlineHighlightedInput';
 import { OverlayHighlightedInput } from './components/OverlayHighlightedInput';
@@ -110,6 +119,9 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [, setVoiceTranscript] = useState(''); // Voice transcript state maintained for potential future use
+  // Tag currently being edited via the tag editor popover/dialog
+  const [editingTag, setEditingTag] = useState<ParsedTag | null>(null);
+  const [editingValue, setEditingValue] = useState('');
 
   // Initialize text parser
   const { isLoading, error, tags, confidence, hasConflicts, clear } =
@@ -247,10 +259,33 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
     [tags, inputText]
   );
 
-  // Handle tag click
-  const handleTagClick = useCallback((_tag: ParsedTag) => {
-    // TODO: Open tag editor or show tag details
+  // Handle tag click: open the tag editor seeded with the tag's source text
+  const handleTagClick = useCallback((tag: ParsedTag) => {
+    setEditingTag(tag);
+    setEditingValue(tag.originalText);
   }, []);
+
+  // Close the tag editor without applying changes
+  const closeTagEditor = useCallback(() => {
+    setEditingTag(null);
+    setEditingValue('');
+  }, []);
+
+  // Apply the edited tag text back into the input, replacing the tag's span.
+  // Re-parsing is triggered automatically by the input text change.
+  const handleSaveTagEdit = useCallback(() => {
+    if (!editingTag) return;
+
+    const trimmedValue = editingValue.trim();
+    const beforeTag = inputText.substring(0, editingTag.startIndex);
+    const afterTag = inputText.substring(editingTag.endIndex);
+    const newText = (beforeTag + trimmedValue + afterTag)
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    setInputText(newText);
+    closeTagEditor();
+  }, [editingTag, editingValue, inputText, closeTagEditor]);
 
   // Get the icon component for the active task group
   // Emoji replaces icon component for task groups
@@ -549,6 +584,56 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           className="px-1"
         />
       )}
+
+      {/* Tag Editor Dialog */}
+      <Dialog
+        open={editingTag !== null}
+        onOpenChange={(open) => {
+          if (!open) closeTagEditor();
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit tag</DialogTitle>
+            <DialogDescription>
+              {editingTag
+                ? `${editingTag.type} tag - ${Math.round(
+                    editingTag.confidence * 100
+                  )}% confidence`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label
+              htmlFor="smart-tag-editor-input"
+              className="text-sm font-medium text-foreground"
+            >
+              Tag text
+            </label>
+            <Input
+              id="smart-tag-editor-input"
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSaveTagEdit();
+                }
+              }}
+              autoFocus
+              aria-label="Tag text"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={closeTagEditor}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSaveTagEdit}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Error Display */}
       {error && enableSmartParsing && (

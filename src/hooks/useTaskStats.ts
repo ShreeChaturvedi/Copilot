@@ -93,9 +93,8 @@ export function useTaskStats(
             }
         }
       } else {
-        // Current schema: only use completed boolean
-        // For now, all non-completed tasks are "not started"
-        // TODO: Add in_progress support when backend status field is available
+        // No backend status field: derive from the completed boolean
+        // (completed -> done, otherwise not started)
         if (task.completed) {
           done++;
         } else {
