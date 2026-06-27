@@ -9,6 +9,8 @@ const MainLayout = lazy(async () => ({ default: (await import('./components/layo
 const LoginPage = lazy(async () => ({ default: (await import('./pages/Login')).LoginPage }));
 const SignupPage = lazy(async () => ({ default: (await import('./pages/Signup')).SignupPage }));
 const GoogleCallbackPage = lazy(async () => ({ default: (await import('./pages/GoogleCallback')).GoogleCallbackPage }));
+const ForgotPasswordPage = lazy(async () => ({ default: (await import('./pages/ForgotPassword')).ForgotPasswordPage }));
+const ResetPasswordPage = lazy(async () => ({ default: (await import('./pages/ResetPassword')).ResetPasswordPage }));
 
 // Development mode toggle component
 const DevAuthToggle = () => {
@@ -219,6 +221,26 @@ function App() {
                   </AuthLayout>
                 </PublicRoute>
               } 
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicRoute>
+                  <AuthLayout>
+                    <ForgotPasswordPage />
+                  </AuthLayout>
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={
+                <PublicRoute>
+                  <AuthLayout>
+                    <ResetPasswordPage />
+                  </AuthLayout>
+                </PublicRoute>
+              }
             />
             <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
             

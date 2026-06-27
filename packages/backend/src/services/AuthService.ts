@@ -4,6 +4,9 @@ import { query, withTransaction } from '../config/database.js';
 import { generateTokenPair, TokenPair } from '../utils/jwt.js';
 import { refreshTokenService } from './RefreshTokenService.js';
 
+// Password reset tokens are valid for one hour.
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
 export interface RegisterUserData {
   email: string;
   password: string;
@@ -235,46 +238,88 @@ class AuthService {
   }
 
   /**
-   * Request password reset (generates reset token)
+   * Request a password reset. Persists a hashed, single-use token with a ~1h
+   * expiry and emails the reset link (via Resend when configured, otherwise
+   * logs it). Always resolves the same way whether or not the email is
+   * registered, so the response cannot be used to probe for accounts.
    */
-  async requestPasswordReset(email: string): Promise<string> {
-    const result = await query<{ id: string }>(
-      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+  async requestPasswordReset(email: string): Promise<void> {
+    const result = await query<{ id: string; email: string }>(
+      `SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email]
     );
     const user = result.rows[0];
 
+    // Do not reveal whether the email exists: silently return on no match.
     if (!user) {
-      // Don't reveal if user exists or not
-      throw new Error('PASSWORD_RESET_REQUESTED');
+      return;
     }
 
-    // Generate a secure reset token (in production, this should be stored in database)
+    // Generate a high-entropy token; only its SHA-256 hash is persisted.
     const resetToken = this.generateSecureToken();
+    const tokenHash = this.hashToken(resetToken);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
-    // In a real implementation, you would:
-    // 1. Store the reset token in database with expiration
-    // 2. Send email with reset link
-    // For now, we'll just return the token
+    await query(
+      `INSERT INTO password_reset_tokens
+         (id, "userId", "tokenHash", "expiresAt", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())`,
+      [user.id, tokenHash, expiresAt]
+    );
 
-    return resetToken;
+    await this.sendPasswordResetEmail(user.email, resetToken);
   }
 
   /**
-   * Confirm password reset with token
+   * Confirm a password reset: look the token up by hash, verify it is unused
+   * and unexpired, set the new bcrypt password, and mark the token used. The
+   * lookup/update runs in a transaction so a token cannot be redeemed twice.
    */
   async confirmPasswordReset(
-    _token: string,
-    _newPassword: string
+    token: string,
+    newPassword: string
   ): Promise<void> {
-    // In a real implementation, you would:
-    // 1. Verify the reset token from database
-    // 2. Check if token is not expired
-    // 3. Update user password
-    // 4. Invalidate the reset token
+    const tokenHash = this.hashToken(token);
+    const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
 
-    // For now, this is a placeholder
-    throw new Error('PASSWORD_RESET_NOT_IMPLEMENTED');
+    await withTransaction(async (tx) => {
+      const res = await query<{
+        id: string;
+        userId: string;
+        expiresAt: Date;
+        usedAt: Date | null;
+      }>(
+        `SELECT id, "userId", "expiresAt", "usedAt"
+         FROM password_reset_tokens
+         WHERE "tokenHash" = $1
+         LIMIT 1
+         FOR UPDATE`,
+        [tokenHash],
+        tx
+      );
+      const row = res.rows[0];
+
+      if (!row) {
+        throw new Error('INVALID_RESET_TOKEN');
+      }
+      if (row.usedAt) {
+        throw new Error('RESET_TOKEN_USED');
+      }
+      if (new Date(row.expiresAt).getTime() <= Date.now()) {
+        throw new Error('RESET_TOKEN_EXPIRED');
+      }
+
+      await query(
+        `UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`,
+        [hashedPassword, row.userId],
+        tx
+      );
+      await query(
+        `UPDATE password_reset_tokens SET "usedAt" = NOW() WHERE id = $1`,
+        [row.id],
+        tx
+      );
+    });
   }
 
   /**
@@ -282,6 +327,69 @@ class AuthService {
    */
   private generateSecureToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * SHA-256 hash of a reset token. Only the hash is stored, never the raw
+   * token (mirrors RefreshTokenService).
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Send the password reset link. Uses Resend's HTTP API when both
+   * RESEND_API_KEY and FROM_EMAIL are set; otherwise logs the link so the
+   * flow stays usable in local/dev without email configured.
+   */
+  private async sendPasswordResetEmail(
+    email: string,
+    token: string
+  ): Promise<void> {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(
+      token
+    )}`;
+
+    const apiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.FROM_EMAIL;
+
+    if (!apiKey || !fromEmail) {
+      console.log(`[password-reset] Reset link for ${email}: ${resetLink}`);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: email,
+          subject: 'Reset your Taskflow password',
+          html: `<p>We received a request to reset your Taskflow password.</p>
+<p><a href="${resetLink}">Click here to choose a new password</a>. This link expires in 1 hour and can be used once.</p>
+<p>If you did not request this, you can safely ignore this email.</p>`,
+          text: `Reset your Taskflow password using this link (expires in 1 hour, single use): ${resetLink}\n\nIf you did not request this, you can ignore this email.`,
+        }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        console.error(
+          `[password-reset] Resend send failed (${response.status}): ${detail}`
+        );
+      }
+    } catch (err) {
+      // Never surface email-delivery failures to the caller: the request
+      // response must stay generic regardless of email outcome.
+      console.error('[password-reset] Failed to send reset email:', err);
+    }
   }
 
   /**

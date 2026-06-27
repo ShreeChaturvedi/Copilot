@@ -50,6 +50,11 @@ export function LoginForm({
     navigate('/signup');
   };
 
+  const handleForgotPasswordLink = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate('/forgot-password');
+  };
+
   const handleGoogleLogin = () => {
     const redirectUri = `${window.location.origin}/auth/google/callback`;
     const url = authAPI.getGoogleAuthUrl(redirectUri);
@@ -84,7 +89,8 @@ export function LoginForm({
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
                   <a
-                    href="#"
+                    href="/forgot-password"
+                    onClick={handleForgotPasswordLink}
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                   >
                     Forgot your password?
