@@ -1,18 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
+import { googleSyncApi } from '@/services/api/google';
 
 export function GoogleCallbackPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
+    'loading'
+  );
   const [errorMessage, setErrorMessage] = useState<string>('');
-  
+  // 'login' = Google sign-in; 'calendar_connect' = Settings -> Integrations
+  // incremental-auth dance (calendar scope) for the already-signed-in user.
+  const isCalendarConnect = searchParams.get('state') === 'calendar_connect';
+
   const { setGoogleAuth, setError } = useAuthStore();
 
   useEffect(() => {
@@ -30,8 +42,19 @@ export function GoogleCallbackPage() {
           throw new Error('Authorization code not found');
         }
 
-        // Exchange code for tokens
         const redirectUri = `${window.location.origin}/auth/google/callback`;
+
+        if (isCalendarConnect) {
+          // Calendar-connect flow: attach the grant to the logged-in account.
+          await googleSyncApi.connect(code, redirectUri);
+          setStatus('success');
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 1500);
+          return;
+        }
+
+        // Login flow: exchange code for an app session.
         const response = await authAPI.googleAuth({ code, redirectUri });
 
         if (!response.success || !response.data) {
@@ -49,15 +72,17 @@ export function GoogleCallbackPage() {
         });
 
         setStatus('success');
-        
+
         // Redirect after a short delay
         setTimeout(() => {
           navigate('/', { replace: true });
         }, 1500);
-
       } catch (error) {
         console.error('Google callback error:', error);
-        const message = error instanceof Error ? error.message : 'Google authentication failed';
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Google authentication failed';
         setErrorMessage(message);
         setError(message);
         setStatus('error');
@@ -65,10 +90,10 @@ export function GoogleCallbackPage() {
     };
 
     handleGoogleCallback();
-  }, [searchParams, navigate, setGoogleAuth, setError]);
+  }, [searchParams, navigate, setGoogleAuth, setError, isCalendarConnect]);
 
   const handleRetry = () => {
-    navigate('/login', { replace: true });
+    navigate(isCalendarConnect ? '/' : '/login', { replace: true });
   };
 
   return (
@@ -76,12 +101,21 @@ export function GoogleCallbackPage() {
       <Card className="w-full max-w-md mx-auto shadow-2xl border-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            Google Authentication
+            {isCalendarConnect ? 'Google Calendar' : 'Google Authentication'}
           </CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            {status === 'loading' && 'Processing your authentication...'}
-            {status === 'success' && 'Successfully authenticated!'}
-            {status === 'error' && 'Authentication failed'}
+            {status === 'loading' &&
+              (isCalendarConnect
+                ? 'Connecting your Google Calendar...'
+                : 'Processing your authentication...')}
+            {status === 'success' &&
+              (isCalendarConnect
+                ? 'Google Calendar connected!'
+                : 'Successfully authenticated!')}
+            {status === 'error' &&
+              (isCalendarConnect
+                ? 'Connection failed'
+                : 'Authentication failed')}
           </CardDescription>
         </CardHeader>
 
@@ -109,10 +143,12 @@ export function GoogleCallbackPage() {
               </div>
               <div className="text-center">
                 <p className="font-medium text-slate-900 dark:text-slate-100">
-                  Welcome!
+                  {isCalendarConnect ? 'Connected!' : 'Welcome!'}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  You'll be redirected to your dashboard shortly.
+                  {isCalendarConnect
+                    ? 'Open Settings → Integrations to import your calendar.'
+                    : "You'll be redirected to your dashboard shortly."}
                 </p>
               </div>
             </div>
@@ -130,14 +166,14 @@ export function GoogleCallbackPage() {
                   </p>
                 </div>
               </div>
-              
+
               <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50">
                 <AlertDescription className="text-red-800 dark:text-red-200 text-sm">
                   {errorMessage}
                 </AlertDescription>
               </Alert>
 
-              <Button 
+              <Button
                 onClick={handleRetry}
                 className="w-full h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
               >
@@ -149,7 +185,10 @@ export function GoogleCallbackPage() {
           {/* Progress indicator for loading state */}
           {status === 'loading' && (
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 h-1 rounded-full animate-pulse" style={{ width: '60%' }} />
+              <div
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 h-1 rounded-full animate-pulse"
+                style={{ width: '60%' }}
+              />
             </div>
           )}
         </CardContent>

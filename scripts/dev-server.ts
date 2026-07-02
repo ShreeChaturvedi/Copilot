@@ -1251,3 +1251,124 @@ app.listen(PORT, () => {
    Ensure PostgreSQL is running: docker-compose up -d
   `);
 });
+
+// ============================================================================
+// Google Calendar sync routes (M1, issue #27) — mirrors api/google/[...route].ts
+// One self-contained additive block. All endpoint logic lives in
+// lib/google/googleApi.ts (shared with the serverless function); these
+// mirrors only adapt Express req/res and resolve the acting user. Reads
+// GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_TOKEN_ENC_KEY /
+// GOOGLE_REDIRECT_URI (+ optional GOOGLE_SYNC_CRON_SECRET,
+// GOOGLE_REDIRECT_ALLOWLIST) from process env / .env(.local).
+// ============================================================================
+import * as googleApi from '../lib/google/googleApi';
+import { ApiError as GoogleApiRouteError } from '../lib/types/api';
+
+function sendGoogleRouteError(res: express.Response, error: unknown): void {
+  if (error instanceof GoogleApiRouteError) {
+    res.status(error.statusCode).json({
+      success: false,
+      error: { code: error.code, message: error.message },
+    });
+    return;
+  }
+  console.error('Google sync route error:', error);
+  res
+    .status(500)
+    .json({ success: false, error: { message: getErrorMessage(error) } });
+}
+
+app.get('/api/google/status', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: await googleApi.getStatus(await resolveUserId(req)),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.get('/api/google/connect', async (req, res) => {
+  try {
+    const redirectUri =
+      typeof req.query.redirectUri === 'string'
+        ? req.query.redirectUri
+        : undefined;
+    res.json({ success: true, data: googleApi.getConnectUrl(redirectUri) });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.post('/api/google/connect', async (req, res) => {
+  try {
+    const { code, redirectUri } = req.body ?? {};
+    res.json({
+      success: true,
+      data: await googleApi.connect(
+        await resolveUserId(req),
+        code ?? '',
+        redirectUri
+      ),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.get('/api/google/calendars', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: await googleApi.listCalendars(await resolveUserId(req)),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.post('/api/google/link', async (req, res) => {
+  try {
+    const { googleCalendarId } = req.body ?? {};
+    res.json({
+      success: true,
+      data: await googleApi.linkCalendar(
+        await resolveUserId(req),
+        googleCalendarId || 'primary'
+      ),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.post('/api/google/sync', async (req, res) => {
+  try {
+    if (googleApi.isCronRequest(req.headers.authorization)) {
+      return res.json({ success: true, data: await googleApi.syncAllUsers() });
+    }
+    res.json({
+      success: true,
+      data: await googleApi.syncUser(await resolveUserId(req)),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+
+app.post('/api/google/disconnect', async (req, res) => {
+  try {
+    const { removeImportedEvents } = req.body ?? {};
+    res.json({
+      success: true,
+      data: await googleApi.disconnect(
+        await resolveUserId(req),
+        !!removeImportedEvents
+      ),
+    });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
+// ========================= end Google sync block ============================
