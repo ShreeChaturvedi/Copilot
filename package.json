@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "workspaces": [
     "packages/*"
@@ -22,7 +22,7 @@
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test:all",
     "test:run": "npm run test:run --workspaces --if-present",
     "test:ui": "vitest --ui",
     "test:backend": "vitest --config vitest.backend.config.ts",
@@ -30,7 +30,7 @@
     "test:backend:coverage": "vitest run --config vitest.backend.config.ts --coverage",
     "test:frontend": "vitest --config vitest.config.ts",
     "test:frontend:run": "vitest run --config vitest.config.ts",
-    "test:all": "npm run test:run --workspaces --if-present && npm run test:frontend:run",
+    "test:all": "npm run test:run --workspaces --if-present && npm run test:frontend:run && npm run test:backend:run",
     "preview": "vite preview",
     "prepare": "husky",
     "docker:up": "docker-compose up -d",
