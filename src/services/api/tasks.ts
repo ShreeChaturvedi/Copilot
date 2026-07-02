@@ -291,15 +291,10 @@ export const taskApi = {
                 : undefined;
           }
         } catch (e) {
-          if (
-            typeof console !== 'undefined' &&
-            typeof console.error === 'function'
-          ) {
-            console.error(
-              'File upload failed; using provided URL as fallback',
-              e
-            );
-          }
+          // Do not fall back to persisting the raw data: URI: that silently
+          // drops files over the JSON body limit. Surface the failure instead.
+          const message = e instanceof Error ? e.message : 'File upload failed';
+          throw new Error(`Failed to upload attachment "${f.name}": ${message}`);
         }
 
         const attRes = await fetch(`${apiBase}/attachments`, {
@@ -315,12 +310,13 @@ export const taskApi = {
           }),
         });
         if (!attRes.ok) {
-          if (
-            typeof console !== 'undefined' &&
-            typeof console.error === 'function'
-          ) {
-            console.error('Attachment record creation failed');
-          }
+          const attBody = (await attRes
+            .json()
+            .catch(() => ({}))) as { error?: { message?: string } };
+          throw new Error(
+            attBody.error?.message ||
+              `Failed to save attachment "${f.name}"`
+          );
         }
       }
       // Refetch tasks to include attachments
