@@ -21,10 +21,6 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
       "source": "/app",
       "destination": "/app/index.html"
     },
