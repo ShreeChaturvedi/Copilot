@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Allow running the (heavier) E2E job on demand.
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
@@ -105,3 +107,58 @@ jobs:
           DATABASE_URL=$GOOGLE_SYNC_TEST_DB_URL npm run db:migrate
       - name: Google-sync DB integration suites (Fake client, real DB)
         run: npm run test:sync
+
+  # L5 — browser E2E (Playwright). Its OWN job so it never blocks the fast
+  # `checks` job; runs in parallel. Boots the real stack (dev-server + Vite)
+  # against a dedicated taskflow_e2e_test DB via playwright.config.ts's
+  # webServer. It is the heaviest job (real Chromium + on-demand Vite compile);
+  # if it proves flaky it can be gated to `workflow_dispatch` only or marked
+  # non-required in branch protection without touching the fast job above.
+  e2e:
+    name: L5 browser E2E (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/taskflow_e2e_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium (+ system deps)
+        run: npx playwright install --with-deps chromium
+      - name: Create + migrate the E2E database
+        run: |
+          node -e "const {Client}=require('pg');const c=new Client('postgresql://postgres:postgres@localhost:5432/postgres');c.connect().then(()=>c.query('CREATE DATABASE taskflow_e2e_test')).catch(e=>{if(!String(e).includes('already exists'))throw e}).finally(()=>c.end())"
+          DATABASE_URL="$E2E_DATABASE_URL" npm run db:migrate
+      - name: Run E2E suite
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

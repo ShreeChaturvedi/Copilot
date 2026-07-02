@@ -31,6 +31,8 @@ export default defineConfig({
       'api/**',
       'lib/**',
       'test/**',
+      // L5 Playwright specs use their own runner (npm run test:e2e).
+      'e2e/**',
     ],
   },
 });
