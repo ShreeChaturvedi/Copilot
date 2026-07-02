@@ -187,7 +187,7 @@ describe('TaskList Component', () => {
       maxTasks: 1,
     });
 
-    expect(screen.getByText('No Due Date')).toBeInTheDocument();
+    expect(screen.getByText('No date')).toBeInTheDocument();
     expect(screen.getByText('Calendar Task 1')).toBeInTheDocument();
     expect(screen.getByText('+1 more upcoming tasks')).toBeInTheDocument();
   });

@@ -29,12 +29,16 @@ describe('dateGrouping', () => {
 
   describe('getDayKey', () => {
     it.each<[string, Date | null, string]>([
-      ['null date', null, 'No Due Date'],
+      ['null date', null, 'No date'],
       ['a past day', new Date(2026, 0, 10), 'Overdue'],
       ['today', new Date(2026, 0, 14, 15, 0), 'Today'],
       ['tomorrow', new Date(2026, 0, 15, 9, 0), 'Tomorrow'],
       ['later this week', new Date(2026, 0, 16, 9, 0), 'Friday'],
-      ['sunday (this week, Monday-start)', new Date(2026, 0, 18, 9, 0), 'Sunday'],
+      [
+        'sunday (this week, Monday-start)',
+        new Date(2026, 0, 18, 9, 0),
+        'Sunday',
+      ],
       ['beyond this week', new Date(2026, 1, 20, 9, 0), 'Feb 20'],
     ])('%s -> %s', (_label, date, expected) => {
       expect(getDayKey(date)).toBe(expected);
@@ -47,14 +51,23 @@ describe('dateGrouping', () => {
   });
 
   describe('getDayKeyOrder', () => {
-    it('orders known buckets, then date strings, with No Due Date last', () => {
-      expect(getDayKeyOrder(['Jan 15', 'No Due Date', 'Today', 'Overdue', 'Friday', 'Tomorrow'])).toEqual([
+    it('orders known buckets, then date strings, with No date last', () => {
+      expect(
+        getDayKeyOrder([
+          'Jan 15',
+          'No date',
+          'Today',
+          'Overdue',
+          'Friday',
+          'Tomorrow',
+        ])
+      ).toEqual([
         'Overdue',
         'Today',
         'Tomorrow',
         'Friday',
         'Jan 15',
-        'No Due Date',
+        'No date',
       ]);
     });
 
@@ -68,7 +81,9 @@ describe('dateGrouping', () => {
   describe('getTimeString', () => {
     it('formats a time, honors allDay, and returns "" for null', () => {
       expect(getTimeString(new Date(2026, 0, 14, 15, 30))).toBe('3:30 PM');
-      expect(getTimeString(new Date(2026, 0, 14, 15, 30), true)).toBe('All day');
+      expect(getTimeString(new Date(2026, 0, 14, 15, 30), true)).toBe(
+        'All day'
+      );
       expect(getTimeString(null)).toBe('');
     });
   });
@@ -95,7 +110,11 @@ describe('dateGrouping', () => {
 
     it('drops past-dated items, keeps today/future and no-date items, sorted by date', () => {
       const result = filterUpcomingItems(items, (i) => i.d);
-      expect(result.map((i) => (i.d ? i.d.getDate() : 'none'))).toEqual([14, 20, 'none']);
+      expect(result.map((i) => (i.d ? i.d.getDate() : 'none'))).toEqual([
+        14,
+        20,
+        'none',
+      ]);
     });
 
     it('honors maxItems', () => {
@@ -110,13 +129,17 @@ describe('dateGrouping', () => {
       const items = [
         { id: 'a', d: new Date(2026, 0, 14, 9, 0) }, // Today
         { id: 'b', d: new Date(2026, 0, 15, 9, 0) }, // Tomorrow
-        { id: 'c', d: null }, // No Due Date
+        { id: 'c', d: null }, // No date
         { id: 'd', d: new Date(2026, 0, 14, 18, 0) }, // Today
       ];
       const grouped = groupItemsByDate(items, (i) => i.d);
-      expect(Object.keys(grouped).sort()).toEqual(['No Due Date', 'Today', 'Tomorrow']);
+      expect(Object.keys(grouped).sort()).toEqual([
+        'No date',
+        'Today',
+        'Tomorrow',
+      ]);
       expect(grouped['Today'].map((i) => i.id)).toEqual(['a', 'd']);
-      expect(grouped['No Due Date'].map((i) => i.id)).toEqual(['c']);
+      expect(grouped['No date'].map((i) => i.id)).toEqual(['c']);
     });
   });
 });
