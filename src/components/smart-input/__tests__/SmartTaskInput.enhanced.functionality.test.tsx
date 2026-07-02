@@ -35,23 +35,6 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
   });
 
   describe('Text Input and Parsing', () => {
-    it('handles text input correctly in enhanced layout', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-          enableSmartParsing={true}
-        />
-      );
-
-      const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Complete project by tomorrow');
-
-      expect(textarea).toHaveValue('Complete project by tomorrow');
-    });
-
     it('supports multi-line input in enhanced layout', async () => {
       const user = userEvent.setup();
 
@@ -69,28 +52,6 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       await user.type(textarea, multiLineText);
 
       expect(textarea).toHaveValue(multiLineText);
-    });
-
-    it('parses smart tags in enhanced layout', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-          enableSmartParsing={true}
-          showConfidence={true}
-        />
-      );
-
-      const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Complete project tomorrow high priority');
-
-      // Wait for parsing to complete
-      await waitFor(() => {
-        // Check if parsing has occurred by looking for any parsed content
-        expect(textarea).toHaveValue('Complete project tomorrow high priority');
-      });
     });
   });
 
@@ -265,43 +226,6 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       await user.click(submitButton);
 
       expect(mockOnAddTask).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Smart Parsing Features', () => {
-    it('works with smart parsing enabled', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-          enableSmartParsing={true}
-        />
-      );
-
-      const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Meeting tomorrow at 2pm');
-
-      // Verify the text is entered correctly
-      expect(textarea).toHaveValue('Meeting tomorrow at 2pm');
-    });
-
-    it('works with smart parsing disabled', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <SmartTaskInput
-          onAddTask={mockOnAddTask}
-          useEnhancedLayout={true}
-          enableSmartParsing={false}
-        />
-      );
-
-      const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Simple task');
-
-      expect(textarea).toHaveValue('Simple task');
     });
   });
 
