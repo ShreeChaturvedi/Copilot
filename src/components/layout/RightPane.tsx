@@ -1,10 +1,12 @@
 import { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { CalendarView, CalendarViewType } from '../calendar';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useUIStore } from '@/stores/uiStore';
 import {
   useKeyboardShortcuts,
   type CalendarViewKey,
 } from '@/hooks/useKeyboardShortcuts';
+import { APP_EVENT_CALENDAR_TODAY } from '@/components/command/actions';
 import { lazy, Suspense } from 'react';
 const LazyConsolidatedCalendarHeader = lazy(async () => ({
   default: (await import('../calendar/ConsolidatedCalendarHeader'))
@@ -51,6 +53,27 @@ export const RightPane = ({
   const [initialEventData, setInitialEventData] = useState<
     Partial<CalendarEvent> | undefined
   >();
+
+  // Cmd+K / global-shortcut bridges (design-brief §4.6):
+  // uiStore.openEventModal() opens the create dialog even when this pane
+  // mounts after the command ran; the today event jumps a live calendar.
+  const eventModalOpen = useUIStore((s) => s.eventModalOpen);
+  const closeEventModal = useUIStore((s) => s.closeEventModal);
+  useEffect(() => {
+    if (eventModalOpen) {
+      setInitialEventData(undefined);
+      setCreateDialogOpen(true);
+      closeEventModal();
+    }
+  }, [eventModalOpen, closeEventModal]);
+
+  useEffect(() => {
+    const onToday = () => {
+      calendarRef.current?.getApi()?.today();
+    };
+    window.addEventListener(APP_EVENT_CALENDAR_TODAY, onToday);
+    return () => window.removeEventListener(APP_EVENT_CALENDAR_TODAY, onToday);
+  }, [calendarRef]);
 
   /**
    * Handle event click from calendar

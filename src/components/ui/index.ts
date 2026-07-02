@@ -33,7 +33,13 @@ export { DateTimeInput } from './datetime-input';
 
 export { ViewToggle, type ViewMode } from './ViewToggle';
 
-export { SharedToggleButton, type SharedToggleButtonProps, type ToggleOption } from './SharedToggleButton';
+export { Keycap } from './Keycap';
+
+export {
+  SharedToggleButton,
+  type SharedToggleButtonProps,
+  type ToggleOption,
+} from './SharedToggleButton';
 
 export { RangeSlider, type RangeSliderProps } from './RangeSlider';
 

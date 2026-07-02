@@ -132,6 +132,13 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     setShowEnhancedInput(enhancedInputVisible);
   }, [enhancedInputVisible]);
 
+  // Cmd+K "New task" / global N open the enhanced input (design-brief §4.6)
+  useEffect(() => {
+    const onNewTask = () => setShowEnhancedInput(true);
+    window.addEventListener('app:new-task', onNewTask);
+    return () => window.removeEventListener('app:new-task', onNewTask);
+  }, []);
+
   // Board scope for the back chevron label (#56)
   const kanbanListId = selectedKanbanTaskListId ?? activeTaskGroupId;
   const kanbanListName =
