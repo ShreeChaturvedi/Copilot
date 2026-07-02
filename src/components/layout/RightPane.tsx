@@ -1,6 +1,10 @@
 import { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { CalendarView, CalendarViewType } from '../calendar';
 import { useSettingsStore } from '@/stores/settingsStore';
+import {
+  useKeyboardShortcuts,
+  type CalendarViewKey,
+} from '@/hooks/useKeyboardShortcuts';
 import { lazy, Suspense } from 'react';
 const LazyConsolidatedCalendarHeader = lazy(async () => ({
   default: (await import('../calendar/ConsolidatedCalendarHeader'))
@@ -122,6 +126,30 @@ export const RightPane = ({
     const calendarApi = calendarRef.current?.getApi();
     calendarApi?.next();
   }, [calendarRef]);
+
+  /**
+   * Single-key calendar shortcuts: T today, D/W/M/L views, arrows navigate
+   * (design-brief §4.4). Keyboard nav never animates (§5).
+   */
+  const handleViewKey = useCallback(
+    (key: CalendarViewKey) => {
+      const viewByKey: Record<CalendarViewKey, CalendarViewType> = {
+        D: 'timeGridDay',
+        W: 'timeGridWeek',
+        M: 'dayGridMonth',
+        L: 'listWeek',
+      };
+      handleViewChange(viewByKey[key]);
+    },
+    [handleViewChange]
+  );
+
+  useKeyboardShortcuts({
+    onToday: handleTodayClick,
+    onViewKey: handleViewKey,
+    onPrev: handlePrevClick,
+    onNext: handleNextClick,
+  });
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden right-pane-container">

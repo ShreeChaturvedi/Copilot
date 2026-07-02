@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Search, Filter, X } from 'lucide-react';
+import {
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  X,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import type FullCalendar from '@fullcalendar/react';
@@ -17,7 +24,11 @@ import { toLocal } from '@/utils/date';
 /**
  * Calendar view types
  */
-export type CalendarViewType = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
+export type CalendarViewType =
+  | 'dayGridMonth'
+  | 'timeGridWeek'
+  | 'timeGridDay'
+  | 'listWeek';
 
 export interface ConsolidatedCalendarHeaderProps {
   currentView: CalendarViewType;
@@ -32,12 +43,28 @@ export interface ConsolidatedCalendarHeaderProps {
   onSearchChange?: (value: string) => void;
 }
 
-// Define view options outside component to avoid recreating on every render
+// Define view options outside component to avoid recreating on every render.
+// Shortcuts are the real single-key bindings from useKeyboardShortcuts.
 const VIEW_OPTIONS = [
-  { value: 'dayGridMonth' as const, label: 'Month', shortLabel: 'M' },
-  { value: 'timeGridWeek' as const, label: 'Week', shortLabel: 'W' },
-  { value: 'timeGridDay' as const, label: 'Day', shortLabel: 'D' },
-  { value: 'listWeek' as const, label: 'List', shortLabel: 'L' }
+  {
+    value: 'dayGridMonth' as const,
+    label: 'Month',
+    shortLabel: 'M',
+    shortcut: 'M',
+  },
+  {
+    value: 'timeGridWeek' as const,
+    label: 'Week',
+    shortLabel: 'W',
+    shortcut: 'W',
+  },
+  {
+    value: 'timeGridDay' as const,
+    label: 'Day',
+    shortLabel: 'D',
+    shortcut: 'D',
+  },
+  { value: 'listWeek' as const, label: 'List', shortLabel: 'L', shortcut: 'L' },
 ];
 
 /**
@@ -48,7 +75,10 @@ interface CalendarViewSwitcherProps {
   onViewChange: (view: CalendarViewType) => void;
 }
 
-const CalendarViewSwitcher: React.FC<CalendarViewSwitcherProps> = ({ currentView, onViewChange }) => {
+const CalendarViewSwitcher: React.FC<CalendarViewSwitcherProps> = ({
+  currentView,
+  onViewChange,
+}) => {
   return (
     <ViewSwitcher
       value={currentView}
@@ -196,7 +226,7 @@ const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
       {/* Animated Search */}
       <AnimatedSearch
         value={searchValue}
-        onChange={onSearchChange || (() => { })}
+        onChange={onSearchChange || (() => {})}
       />
 
       {/* Filter Button (Future Enhancement) */}
@@ -259,21 +289,21 @@ const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
             onClick={onCreateEvent}
             size="sm"
             className={cn(
-              "h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out",
+              'h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out',
               // Base secondary color with subtle diagonal gradient
-              "bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95",
-              "text-secondary-foreground shadow-xs border border-border/20",
+              'bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95',
+              'text-secondary-foreground shadow-xs border border-border/20',
               // Hover effects - subtle scaling and enhanced gradient
-              "hover:scale-105 hover:shadow-lg hover:shadow-secondary/20",
-              "hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90",
+              'hover:scale-105 hover:shadow-lg hover:shadow-secondary/20',
+              'hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90',
               // Enhanced shimmer effect for visibility
-              "before:absolute before:inset-0 before:bg-gradient-to-r",
-              "before:from-transparent before:via-black/15 before:to-transparent",
-              "dark:before:via-white/15",
-              "before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]",
-              "hover:before:translate-x-[150%]",
+              'before:absolute before:inset-0 before:bg-gradient-to-r',
+              'before:from-transparent before:via-black/15 before:to-transparent',
+              'dark:before:via-white/15',
+              'before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]',
+              'hover:before:translate-x-[150%]',
               // Active state
-              "active:scale-[1.02] active:shadow-md"
+              'active:scale-[1.02] active:shadow-md'
             )}
             aria-label="New Event"
           >
@@ -291,7 +321,11 @@ const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
 /**
  * Get the calendar title based on current view and date
  */
-const getCalendarTitle = (currentView: CalendarViewType, calendarRef?: React.RefObject<FullCalendar | null>, fallbackDate?: Date): string => {
+const getCalendarTitle = (
+  currentView: CalendarViewType,
+  calendarRef?: React.RefObject<FullCalendar | null>,
+  fallbackDate?: Date
+): string => {
   let currentDate = fallbackDate || new Date();
 
   // Try to get the current date from the calendar API
@@ -326,7 +360,10 @@ const getCalendarTitle = (currentView: CalendarViewType, calendarRef?: React.Ref
 /**
  * Check if today button should be disabled/grayed
  */
-const isTodayDisabled = (currentView: CalendarViewType, calendarRef?: React.RefObject<FullCalendar | null>): boolean => {
+const isTodayDisabled = (
+  currentView: CalendarViewType,
+  calendarRef?: React.RefObject<FullCalendar | null>
+): boolean => {
   if (!calendarRef?.current) return false;
 
   try {
@@ -347,7 +384,9 @@ const isTodayDisabled = (currentView: CalendarViewType, calendarRef?: React.RefO
         return today >= weekStart && today < weekEnd;
       }
       case 'timeGridDay': {
-        return format(currentDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+        return (
+          format(currentDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+        );
       }
       case 'listWeek': {
         const weekStart = calendarApi.view.activeStart;
@@ -365,7 +404,9 @@ const isTodayDisabled = (currentView: CalendarViewType, calendarRef?: React.RefO
 /**
  * ConsolidatedCalendarHeader component that combines sidebar toggle, title, navigation, view switcher, and new event button
  */
-export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProps> = ({
+export const ConsolidatedCalendarHeader: React.FC<
+  ConsolidatedCalendarHeaderProps
+> = ({
   currentView,
   onViewChange,
   onTodayClick,
@@ -375,10 +416,14 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
   className,
   calendarRef,
   searchValue = '',
-  onSearchChange
+  onSearchChange,
 }) => {
-  const [calendarTitle, setCalendarTitle] = useState(() => getCalendarTitle(currentView, calendarRef));
-  const [todayDisabled, setTodayDisabled] = useState(() => isTodayDisabled(currentView, calendarRef));
+  const [calendarTitle, setCalendarTitle] = useState(() =>
+    getCalendarTitle(currentView, calendarRef)
+  );
+  const [todayDisabled, setTodayDisabled] = useState(() =>
+    isTodayDisabled(currentView, calendarRef)
+  );
 
   // Update title and today button state when view or calendar changes
   useEffect(() => {
@@ -407,24 +452,28 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
   }, [currentView, calendarRef]);
 
   return (
-    <div className={cn(
-      "flex-shrink-0 p-4 border-b border-border bg-background",
-      "transition-all duration-200 ease-out",
-      className
-    )}>
+    <div
+      className={cn(
+        'flex-shrink-0 p-4 border-b border-border bg-background',
+        'transition-all duration-200 ease-out',
+        className
+      )}
+    >
       {/* Three-section layout: Left, Center, Right */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        {/* Left Section: Sidebar trigger and title */}
+        {/* Left Section: Sidebar trigger and title.
+            Month name is Sentient (serif = time at rest, never a digit);
+            the numerals stay Inter muted, baseline-aligned (§4.4). */}
         <div className="flex items-center gap-3 flex-shrink-0 justify-self-start">
           <SmoothSidebarTrigger position="rightPane" />
-          <h2 className="text-lg font-semibold text-foreground">
-            {calendarTitle.includes(' ') ? (
-              <>
-                <span className="font-bold">{calendarTitle.split(' ')[0]}</span>
-                <span className="font-normal"> {calendarTitle.split(' ').slice(1).join(' ')}</span>
-              </>
-            ) : (
-              calendarTitle
+          <h2 className="flex items-baseline gap-2 whitespace-nowrap">
+            <span className="font-serif text-lg font-normal leading-none text-foreground">
+              {calendarTitle.split(' ')[0]}
+            </span>
+            {calendarTitle.includes(' ') && (
+              <span className="text-[13px] leading-none text-muted-foreground">
+                {calendarTitle.split(' ').slice(1).join(' ')}
+              </span>
             )}
           </h2>
         </div>
@@ -439,18 +488,25 @@ export const ConsolidatedCalendarHeader: React.FC<ConsolidatedCalendarHeaderProp
 
         {/* Right Section: Today Button and Toolbar */}
         <div className="flex items-center gap-3 flex-shrink-0 justify-self-end">
-          {/* Today Button */}
+          {/* Today chiclet + T keycap (§4.4) */}
           <Button
             variant="outline"
             size="sm"
             onClick={onTodayClick}
             disabled={todayDisabled}
             className={cn(
-              "font-medium transition-all duration-200",
-              todayDisabled && "opacity-50 cursor-not-allowed"
+              'font-medium transition-all duration-200',
+              todayDisabled && 'opacity-50 cursor-not-allowed'
             )}
           >
             Today
+            <kbd
+              className="ml-0.5 hidden h-[18px] min-w-[18px] items-center justify-center rounded-[4px] bg-surface-2 px-1 font-mono text-[11px] leading-none text-muted-foreground sm:inline-flex"
+              style={{ boxShadow: 'var(--edge-machined)' }}
+              aria-hidden="true"
+            >
+              T
+            </kbd>
           </Button>
 
           {/* Calendar Toolbar */}

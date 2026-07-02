@@ -6,12 +6,19 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export interface ViewSwitcherOption<T extends string = string> {
   value: T;
   label: string;
   shortLabel?: string;
   disabled?: boolean;
+  /** Single-key shortcut shown as a keycap tooltip (e.g. 'W') */
+  shortcut?: string;
 }
 
 export interface ViewSwitcherProps<T extends string = string> {
@@ -28,13 +35,10 @@ export interface ViewSwitcherProps<T extends string = string> {
 }
 
 /**
- * ViewSwitcher - A premium segmented control with animated sliding indicator
- *
- * Features:
- * - Smooth sliding background animation
- * - Dark mode support with subtle transparency
- * - Responsive short labels for mobile
- * - Disabled state support
+ * ViewSwitcher - A segmented control with an animated sliding indicator,
+ * built on the SETTLE tokens (surface well, surface-1 pill, hairline).
+ * Keyboard-initiated view changes suppress the slide via [data-kbd-nav]
+ * (design-brief §5: never animate keyboard-initiated actions).
  */
 export function ViewSwitcher<T extends string = string>({
   value,
@@ -89,9 +93,8 @@ export function ViewSwitcher<T extends string = string>({
     <div
       ref={containerRef}
       className={cn(
-        'relative inline-flex rounded-lg border bg-background shadow-xs',
-        'hover:bg-accent/50 dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
-        'p-0.5 transition-all duration-200',
+        'relative inline-flex rounded-lg border border-hairline bg-surface-2',
+        'p-0.5',
         className
       )}
       role="group"
@@ -99,42 +102,63 @@ export function ViewSwitcher<T extends string = string>({
     >
       {/* Sliding background indicator */}
       <div
-        className="absolute bg-background dark:bg-background rounded-md shadow-sm transition-all duration-200 ease-out"
+        className={cn(
+          'view-switcher-slider absolute rounded-md bg-surface-1 shadow-xs',
+          'transition-all duration-200 ease-out',
+          '[[data-kbd-nav]_&]:transition-none'
+        )}
         style={sliderStyle}
         aria-hidden="true"
       />
 
       {options.map(
-        ({ value: optValue, label, shortLabel, disabled }, index) => (
-          <button
-            key={optValue}
-            ref={(el) => {
-              buttonRefs.current[index] = el;
-            }}
-            onClick={() => !disabled && onChange(optValue)}
-            disabled={disabled}
-            className={cn(
-              'relative z-10 font-medium rounded-md transition-colors duration-150',
-              sizeClasses[size],
-              value === optValue
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-              disabled && 'opacity-50 cursor-not-allowed',
-              !disabled && 'cursor-pointer'
-            )}
-            aria-pressed={value === optValue}
-            aria-label={label}
-          >
-            {shortLabel ? (
-              <>
-                <span className="hidden sm:inline">{label}</span>
-                <span className="sm:hidden">{shortLabel}</span>
-              </>
-            ) : (
-              label
-            )}
-          </button>
-        )
+        ({ value: optValue, label, shortLabel, disabled, shortcut }, index) => {
+          const button = (
+            <button
+              key={optValue}
+              ref={(el) => {
+                buttonRefs.current[index] = el;
+              }}
+              onClick={() => !disabled && onChange(optValue)}
+              disabled={disabled}
+              className={cn(
+                'relative z-10 rounded-md text-xs font-medium transition-colors duration-150',
+                sizeClasses[size],
+                value === optValue
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+                disabled && 'opacity-50 cursor-not-allowed',
+                !disabled && 'cursor-pointer'
+              )}
+              aria-pressed={value === optValue}
+              aria-label={label}
+            >
+              {shortLabel ? (
+                <>
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{shortLabel}</span>
+                </>
+              ) : (
+                label
+              )}
+            </button>
+          );
+          if (!shortcut) return button;
+          return (
+            <Tooltip key={optValue}>
+              <TooltipTrigger asChild>{button}</TooltipTrigger>
+              <TooltipContent className="flex items-center gap-1.5">
+                {label}
+                <kbd
+                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[4px] bg-surface-2 px-1 font-mono text-[11px] leading-none text-muted-foreground"
+                  style={{ boxShadow: 'var(--edge-machined)' }}
+                >
+                  {shortcut}
+                </kbd>
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
       )}
     </div>
   );

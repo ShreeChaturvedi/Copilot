@@ -25,9 +25,10 @@ describe('ConsolidatedCalendarHeader', () => {
     // Check for sidebar trigger
     expect(screen.getByTestId('sidebar-trigger-rightPane')).toBeInTheDocument();
 
-    // Check for title (should show current month/year)
+    // Check for title (month name + year render as separate baseline-aligned
+    // spans: serif month, muted numerals — design-brief §4.4)
     const title = screen.getByRole('heading', { level: 2 });
-    expect(title).toHaveTextContent(/\w+\s+\d{4}/);
+    expect(title).toHaveTextContent(/\w+\s*\d{4}/);
 
     // Check for navigation buttons
     expect(screen.getByText('Today')).toBeInTheDocument();
