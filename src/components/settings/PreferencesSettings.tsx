@@ -69,7 +69,14 @@ export function PreferencesSettings() {
       setSaving(true);
       setError(null);
       setSuccess(false);
-      const saved = await userAPI.updatePreferences(preferences);
+      // Send only the fields this panel edits. Theme is owned by the
+      // appearance control in General; including the stale value fetched at
+      // panel-open would overwrite a newer toggle (#68, #69).
+      const saved = await userAPI.updatePreferences({
+        defaultView: preferences.defaultView,
+        weekStartsOn: preferences.weekStartsOn,
+        notificationsEnabled: preferences.notificationsEnabled,
+      });
       setPreferences(saved);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);

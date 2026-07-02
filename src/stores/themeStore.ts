@@ -7,9 +7,17 @@ export type ResolvedTheme = 'light' | 'dark';
 interface ThemeState {
   theme: Theme;
   resolvedTheme: ResolvedTheme;
+  /**
+   * True once the user has explicitly chosen a theme in this browser.
+   * Server preference sync must never override an explicit local choice
+   * (#68, #69).
+   */
+  hasExplicitPreference: boolean;
 
   // Actions
   setTheme: (theme: Theme) => void;
+  /** Apply a server-synced theme without marking it as a user choice. */
+  applySyncedTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   initializeTheme: () => void;
 }
@@ -59,12 +67,38 @@ export const useThemeStore = create<ThemeState>()(
       (set, get) => ({
         theme: 'system',
         resolvedTheme: 'light',
+        hasExplicitPreference: false,
 
         setTheme: (theme) => {
           const resolvedTheme = resolveTheme(theme);
           applyThemeToDocument(resolvedTheme);
 
-          set({ theme, resolvedTheme }, false, 'setTheme');
+          set(
+            { theme, resolvedTheme, hasExplicitPreference: true },
+            false,
+            'setTheme'
+          );
+
+          // Write the choice through to the account preferences so the
+          // server value stays in sync with the in-app control (#69).
+          // Best-effort and async: a failure never affects the local theme.
+          void (async () => {
+            try {
+              const { useAuthStore } = await import('@/stores/authStore');
+              if (!useAuthStore.getState().isAuthenticated) return;
+              const { userAPI } = await import('@/services/api/user');
+              await userAPI.updatePreferences({ theme });
+            } catch {
+              // Preference write-through is optional.
+            }
+          })();
+        },
+
+        applySyncedTheme: (theme) => {
+          const resolvedTheme = resolveTheme(theme);
+          applyThemeToDocument(resolvedTheme);
+
+          set({ theme, resolvedTheme }, false, 'applySyncedTheme');
         },
 
         toggleTheme: () => {
@@ -82,11 +116,20 @@ export const useThemeStore = create<ThemeState>()(
         },
 
         initializeTheme: () => {
-          const { theme } = get();
+          const { theme, hasExplicitPreference } = get();
           const resolvedTheme = resolveTheme(theme);
           applyThemeToDocument(resolvedTheme);
 
-          set({ resolvedTheme }, false, 'initializeTheme');
+          set(
+            {
+              resolvedTheme,
+              // Migration: stores persisted before the flag existed carry a
+              // non-default theme only when the user picked one.
+              hasExplicitPreference: hasExplicitPreference || theme !== 'system',
+            },
+            false,
+            'initializeTheme'
+          );
 
           // Listen for system theme changes
           if (typeof window !== 'undefined') {
@@ -119,7 +162,10 @@ export const useThemeStore = create<ThemeState>()(
       }),
       {
         name: 'theme-store',
-        partialize: (state) => ({ theme: state.theme }),
+        partialize: (state) => ({
+          theme: state.theme,
+          hasExplicitPreference: state.hasExplicitPreference,
+        }),
         onRehydrateStorage: () => (state) => {
           // Initialize theme after rehydration
           if (state) {

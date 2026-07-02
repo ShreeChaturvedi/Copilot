@@ -28,8 +28,14 @@ export function usePreferencesSync() {
       try {
         const prefs = await userAPI.getPreferences();
 
-        // Theme (server value wins for the logged-in user)
-        useThemeStore.getState().setTheme(prefs.theme as Theme);
+        // Theme: an explicit in-app choice always wins over the server
+        // value (#68, #69). The server theme only applies in a browser
+        // where the user has never touched the appearance control, and it
+        // is applied without being marked as a user choice.
+        const themeStore = useThemeStore.getState();
+        if (!themeStore.hasExplicitPreference) {
+          themeStore.applySyncedTheme(prefs.theme as Theme);
+        }
 
         // First day of the week for the calendar grid
         useCalendarSettingsStore.getState().setWeekStartsOn(prefs.weekStartsOn);
