@@ -90,7 +90,7 @@ export function GoogleCallbackPage() {
     };
 
     handleGoogleCallback();
-  }, [searchParams, navigate, setGoogleAuth, setError]);
+  }, [searchParams, navigate, setGoogleAuth, setError, isCalendarConnect]);
 
   const handleRetry = () => {
     navigate(isCalendarConnect ? '/' : '/login', { replace: true });
