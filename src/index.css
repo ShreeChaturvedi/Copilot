@@ -5,6 +5,12 @@
 
 @import 'tailwindcss';
 
+/* Make Tailwind's `dark:` variant follow the `.dark` class toggled by the
+   theme store (themeStore.ts) instead of the OS `prefers-color-scheme`.
+   Under Tailwind v4 the JS config's `darkMode: 'class'` is dead config; this
+   custom variant is what wires `dark:*` utilities to the in-app toggle (#47). */
+@custom-variant dark (&:is(.dark *));
+
 :root {
   font-family:
     'Inter',
