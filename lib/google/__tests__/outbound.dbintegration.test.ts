@@ -17,10 +17,15 @@
  * drain -> pull -> drain.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import type { PoolClient } from 'pg';
 import { FakeGoogleCalendarClient } from '../FakeGoogleCalendarClient.js';
 import { GoogleApiError } from '../types.js';
 
 const DB_URL = process.env.GOOGLE_SYNC_TEST_DB_URL;
+
+// Serializes the google db suites: the M3 file's syncAllUsers/renewChannels
+// sweeps scan every account, so the files must not interleave on one DB.
+const GOOGLE_DB_SUITE_LOCK = 271_828;
 
 // Imported dynamically AFTER pointing DATABASE_URL at the test database
 // (test/backend-setup.ts overrides it with a bogus URL).
@@ -41,6 +46,7 @@ describe.skipIf(!DB_URL)(
     let userId: string;
     let appCalendarId: string;
     let ctx: { userId: string };
+    let lockClient: PoolClient;
 
     const CAL_ID = 'fake-primary@example.com';
 
@@ -59,9 +65,19 @@ describe.skipIf(!DB_URL)(
         '../../services/EventService.js'
       );
       events = new esMod.EventService({ enableLogging: false });
-    });
+      lockClient = await db.pool.connect();
+      await lockClient.query('SELECT pg_advisory_lock($1)', [
+        GOOGLE_DB_SUITE_LOCK,
+      ]);
+    }, 120_000);
 
     afterAll(async () => {
+      if (lockClient) {
+        await lockClient.query('SELECT pg_advisory_unlock($1)', [
+          GOOGLE_DB_SUITE_LOCK,
+        ]);
+        lockClient.release();
+      }
       await db.pool.end();
     });
 
