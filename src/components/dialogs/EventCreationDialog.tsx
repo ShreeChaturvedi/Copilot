@@ -809,7 +809,7 @@ function EventCreationDialogContent({
                 onCheckedChange={handleAllDayChange}
               />
               <Label htmlFor="all-day" className="text-sm font-medium">
-                All Day
+                All day
               </Label>
             </div>
             <div className="flex items-center gap-2">
@@ -822,10 +822,10 @@ function EventCreationDialogContent({
                 }
               >
                 <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Never Repeats" />
+                  <SelectValue placeholder="Never repeats" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Never Repeats</SelectItem>
+                  <SelectItem value="none">Never repeats</SelectItem>
                   <SelectSeparator />
                   <SelectGroup>
                     <SelectLabel>Frequency</SelectLabel>
@@ -974,7 +974,7 @@ function EventCreationDialogContent({
                 : 'Creating...'
               : isEditing
                 ? 'Save'
-                : 'Create Event'}
+                : 'Create event'}
           </Button>
         </div>
       )}
@@ -1112,7 +1112,7 @@ export function EventCreationDialog({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>
-              {initialEventData?.id ? 'Edit Event' : 'Create Event'}
+              {initialEventData?.id ? 'Edit event' : 'Create event'}
             </SheetTitle>
             <SheetDescription>
               {initialEventData?.id
@@ -1133,7 +1133,7 @@ export function EventCreationDialog({
           className="max-h-[90vh] overflow-y-auto"
           showCloseButton={false}
         >
-          <DialogTitle className="sr-only">Create Event</DialogTitle>
+          <DialogTitle className="sr-only">Create event</DialogTitle>
           <DialogDescription className="sr-only">
             Create a new event with title, date, time, location, and description
           </DialogDescription>

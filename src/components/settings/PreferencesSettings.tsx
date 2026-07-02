@@ -117,10 +117,7 @@ export function PreferencesSettings() {
                   <Select
                     value={preferences.defaultView}
                     onValueChange={(v) =>
-                      update(
-                        'defaultView',
-                        v as UserPreferences['defaultView']
-                      )
+                      update('defaultView', v as UserPreferences['defaultView'])
                     }
                   >
                     <SelectTrigger id="default-view" className="w-full">
@@ -190,7 +187,7 @@ export function PreferencesSettings() {
               )}
 
               {success && (
-                <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200">
+                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
                   <AlertDescription>Preferences saved.</AlertDescription>
                 </Alert>
               )}

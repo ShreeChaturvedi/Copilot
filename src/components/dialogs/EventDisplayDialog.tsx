@@ -16,11 +16,21 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { sanitizeHtml } from '@/utils/validation';
 import { IntegratedActionBar } from './IntegratedActionBar';
-import { useUpdateEvent, useCreateEvent, useDeleteEvent } from '@/hooks/useEvents';
+import {
+  useUpdateEvent,
+  useCreateEvent,
+  useDeleteEvent,
+} from '@/hooks/useEvents';
 import { toHumanText, clampRRuleUntil } from '@/utils/recurrence';
 import {
   AlertDialog,
@@ -33,7 +43,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import type { CalendarEvent } from "@shared/types";
+import type { CalendarEvent } from '@shared/types';
 import { useCalendars } from '@/hooks/useCalendars';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -44,13 +54,21 @@ interface EventDisplayDialogProps {
   onEdit?: (event: CalendarEvent) => void;
 }
 
-function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; actions?: React.ReactNode }) {
+function EventDisplayDialogContent({
+  event,
+  actions,
+}: {
+  event: CalendarEvent;
+  actions?: React.ReactNode;
+}) {
   const { data: calendars = [] } = useCalendars();
   // Mutations are lazily used in actions; keep declarations close to use sites to avoid unused warnings
   // Lazy usage within action handlers; define here to initialize hooks
   // Keep hooks declarations but reference variables to satisfy linter until used in handlers
-  const updateEventMutation = useUpdateEvent(); void updateEventMutation;
-  const createEventMutation = useCreateEvent(); void createEventMutation;
+  const updateEventMutation = useUpdateEvent();
+  void updateEventMutation;
+  const createEventMutation = useCreateEvent();
+  void createEventMutation;
 
   const calendar = React.useMemo(() => {
     if (!event) return null;
@@ -116,7 +134,7 @@ function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; a
 
       {event.allDay && (
         <Badge variant="secondary" className="w-fit mt-2">
-          All Day
+          All day
         </Badge>
       )}
 
@@ -188,13 +206,13 @@ function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; a
             </div>
             <div className="flex-1">
               {(() => {
-                const safeHtml = sanitizeHtml(event.description || '')
+                const safeHtml = sanitizeHtml(event.description || '');
                 return (
                   <div
                     className="text-sm rte-display"
                     dangerouslySetInnerHTML={{ __html: safeHtml }}
                   />
-                )
+                );
               })()}
             </div>
           </div>
@@ -208,7 +226,12 @@ function EventDisplayDialogContent({ event, actions }: { event: CalendarEvent; a
             <CalendarIcon className="h-4 w-4" />
           </div>
           <div className="flex-1">
-            <p className="text-sm">{toHumanText(event.recurrence, new Date(event.start))?.replace(/^\s*([a-z])/, (_m, c) => c.toUpperCase())}</p>
+            <p className="text-sm">
+              {toHumanText(event.recurrence, new Date(event.start))?.replace(
+                /^\s*([a-z])/,
+                (_m, c) => c.toUpperCase()
+              )}
+            </p>
           </div>
         </div>
       )}
@@ -296,7 +319,9 @@ export function EventDisplayDialog({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>{event.title}</SheetTitle>
-            <SheetDescription>Event details for {event.title} - view, edit, or delete this event</SheetDescription>
+            <SheetDescription>
+              Event details for {event.title} - view, edit, or delete this event
+            </SheetDescription>
           </SheetHeader>
           <EventDisplayDialogContent event={event} actions={actionButtons} />
         </SheetContent>
@@ -328,9 +353,16 @@ export function EventDisplayDialog({
               <AlertDialogAction
                 onClick={async () => {
                   // Delete this occurrence only
-                  const iso = new Date(event.occurrenceInstanceStart || event.start).toISOString();
-                  const newExceptions = Array.from(new Set([...(event.exceptions || []), iso]));
-                  await updateEventMutation.mutateAsync({ id: event.id, data: { exceptions: newExceptions } });
+                  const iso = new Date(
+                    event.occurrenceInstanceStart || event.start
+                  ).toISOString();
+                  const newExceptions = Array.from(
+                    new Set([...(event.exceptions || []), iso])
+                  );
+                  await updateEventMutation.mutateAsync({
+                    id: event.id,
+                    data: { exceptions: newExceptions },
+                  });
                   setDeleteDialogOpen(false);
                   handleClose();
                 }}
@@ -340,9 +372,14 @@ export function EventDisplayDialog({
               <AlertDialogAction
                 onClick={async () => {
                   // This and following events: clamp series UNTIL to just before this instance
-                  const occStart = new Date(event.occurrenceInstanceStart || event.start);
+                  const occStart = new Date(
+                    event.occurrenceInstanceStart || event.start
+                  );
                   const clamped = clampRRuleUntil(event.recurrence!, occStart);
-                  await updateEventMutation.mutateAsync({ id: event.id, data: { recurrence: clamped } });
+                  await updateEventMutation.mutateAsync({
+                    id: event.id,
+                    data: { recurrence: clamped },
+                  });
                   setDeleteDialogOpen(false);
                   handleClose();
                 }}
@@ -376,11 +413,16 @@ export function EventDisplayDialog({
               <AlertDialogAction
                 onClick={async () => {
                   // Edit this occurrence only (create one-off, exclude from series, then open editor)
-                  const occStart = (event.occurrenceInstanceStart || event.start);
-                  const occEnd = (event.occurrenceInstanceEnd || event.end);
+                  const occStart = event.occurrenceInstanceStart || event.start;
+                  const occEnd = event.occurrenceInstanceEnd || event.end;
                   const iso = new Date(occStart).toISOString();
-                  const newExceptions = Array.from(new Set([...(event.exceptions || []), iso]));
-                  await updateEventMutation.mutateAsync({ id: event.id, data: { exceptions: newExceptions } });
+                  const newExceptions = Array.from(
+                    new Set([...(event.exceptions || []), iso])
+                  );
+                  await updateEventMutation.mutateAsync({
+                    id: event.id,
+                    data: { exceptions: newExceptions },
+                  });
                   const oneOff = await createEventMutation.mutateAsync({
                     title: event.title,
                     start: occStart,
@@ -401,10 +443,15 @@ export function EventDisplayDialog({
               <AlertDialogAction
                 onClick={() => {
                   // This and following: convert series at this point into a split by clamping and creating a new follow-up
-                  const occStart = new Date(event.occurrenceInstanceStart || event.start);
+                  const occStart = new Date(
+                    event.occurrenceInstanceStart || event.start
+                  );
                   const clamped = clampRRuleUntil(event.recurrence!, occStart);
                   // Update current series to end before this occurrence
-                  updateEventMutation.mutate({ id: event.id, data: { recurrence: clamped } });
+                  updateEventMutation.mutate({
+                    id: event.id,
+                    data: { recurrence: clamped },
+                  });
                   setEditDialogOpen(false);
                   handleEdit();
                 }}

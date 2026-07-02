@@ -566,7 +566,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     <span
                       className={`text-xs font-semibold uppercase tracking-wider ${
                         dayKey === 'Overdue'
-                          ? 'text-red-500'
+                          ? 'text-destructive'
                           : 'text-muted-foreground'
                       }`}
                     >

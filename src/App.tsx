@@ -7,6 +7,7 @@ import {
 import { QueryProvider, ThemeProvider } from './components/providers';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
 import { useAuthStore } from './stores/authStore';
+import { useThemeStore } from './stores/themeStore';
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 
@@ -206,6 +207,9 @@ const DevAuthToggle = () => {
 
 function App() {
   const [showDevToggle, setShowDevToggle] = useState(false);
+  // Toasts follow the in-app theme control, not the OS (#68 companion):
+  // the app's dark class is driven by themeStore, so the Toaster must be too.
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   useEffect(() => {
     // Show dev toggle in development mode
@@ -223,16 +227,18 @@ function App() {
           <Toaster
             position="top-right"
             closeButton
-            theme="system"
-            richColors
+            theme={resolvedTheme}
             toastOptions={{
               classNames: {
+                // Feedback chrome on tokens (design-brief 2.3): success and
+                // "placed" are aqua, red only for errors.
                 toast:
-                  'rounded-md shadow-lg border border-border text-foreground bg-background',
+                  'rounded-[10px] shadow-lg border border-border text-foreground bg-popover',
                 description: 'text-muted-foreground',
-                success: 'bg-emerald-600 text-white',
-                error: 'bg-red-600 text-white',
-                warning: 'bg-amber-600 text-white',
+                success:
+                  'bg-success text-success-foreground border-transparent',
+                error: 'bg-destructive text-white border-transparent',
+                warning: 'bg-warning text-[#11191a] border-transparent',
               },
             }}
           />

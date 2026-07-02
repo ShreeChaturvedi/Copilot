@@ -1,9 +1,9 @@
 /**
  * SmartParsingToggle - Toggle component for smart parsing functionality
- * 
+ *
  * Replaces the three-dot dropdown menu with a proper shadcn Toggle component.
  * Shows Brain/Zap icon and "Autotag" label when pressed (on state).
- * Uses calendar's today background green color system for theme consistency.
+ * On state uses the aqua film + rim tokens (design-brief 2.3).
  */
 
 import React from 'react';
@@ -24,11 +24,11 @@ export interface SmartParsingToggleProps {
 
 /**
  * Smart parsing toggle component using shadcn Toggle
- * 
+ *
  * Features:
  * - Uses Tag icon from Lucide
  * - Shows "Autotag" label when toggle is pressed (on state)
- * - Calendar green color system with subtle border and transparency
+ * - Aqua film + rim on-state, hover raises the rim to full aqua
  * - Theme responsive (light/dark mode support)
  * - Connects to existing enableSmartParsing prop
  */
@@ -53,23 +53,17 @@ export const SmartParsingToggle: React.FC<SmartParsingToggleProps> = ({
         'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         // Off state - transparent background and border
         'data-[state=off]:bg-transparent data-[state=off]:border-transparent',
-        // On state - calendar green with visible border and transparency
-        'data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.15)] data-[state=on]:text-foreground',
-        'data-[state=on]:border-[oklch(0.7_0.15_140)]',
-        // Dark mode adjustments
-        'dark:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.1)]',
-        'dark:data-[state=on]:border-[oklch(0.7_0.15_140)]',
-        // Hover states for on state
-        'hover:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.2)]',
-        'dark:hover:data-[state=on]:bg-[oklch(0.7_0.15_140_/_0.15)]',
+        // On state - aqua film + rim (retired today-green is gone; aqua
+        // means live, design-brief 2.3)
+        'data-[state=on]:bg-aqua-film-08 data-[state=on]:text-foreground',
+        'data-[state=on]:border-aqua-rim',
+        'hover:data-[state=on]:border-aqua',
         className
       )}
       aria-label={pressed ? 'Disable smart parsing' : 'Enable smart parsing'}
     >
       <Tag className="w-4 h-4" />
-      {pressed && (
-        <span className="text-xs font-medium ml-1">Autotag</span>
-      )}
+      {pressed && <span className="text-xs font-medium ml-1">Autotag</span>}
     </Toggle>
   );
 };

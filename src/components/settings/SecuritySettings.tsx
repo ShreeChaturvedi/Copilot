@@ -139,7 +139,7 @@ export function SecuritySettings() {
                 </Alert>
               )}
               {pwSuccess && (
-                <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200">
+                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
                   <AlertDescription>
                     Password changed successfully.
                   </AlertDescription>
@@ -162,7 +162,7 @@ export function SecuritySettings() {
                       Updating...
                     </>
                   ) : (
-                    'Update Password'
+                    'Update password'
                   )}
                 </Button>
               </div>

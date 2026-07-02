@@ -11,15 +11,19 @@ interface ProtectedRouteProps {
 /**
  * Component that protects routes requiring authentication
  */
-export function ProtectedRoute({ children, redirectTo = '/login' }: ProtectedRouteProps) {
-  const { isLoading, isAuthenticated, shouldRedirect, redirectPath } = useRequireAuth(redirectTo);
+export function ProtectedRoute({
+  children,
+  redirectTo = '/login',
+}: ProtectedRouteProps) {
+  const { isLoading, isAuthenticated, shouldRedirect, redirectPath } =
+    useRequireAuth(redirectTo);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
             Verifying your session...
           </p>
         </div>

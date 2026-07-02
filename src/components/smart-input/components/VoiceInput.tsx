@@ -304,7 +304,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             className={cn(
               sizeClasses[size],
               'p-0 transition-colors',
-              listening && 'bg-red-500 hover:bg-red-600 text-white',
+              listening && 'bg-destructive hover:bg-destructive/90 text-white',
               className
             )}
           >
@@ -335,7 +335,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           disabled={disabled}
           className={cn(
             'transition-colors',
-            listening && 'bg-red-500 hover:bg-red-600 text-white'
+            listening && 'bg-destructive hover:bg-destructive/90 text-white'
           )}
         >
           {listening ? (

@@ -21,7 +21,11 @@ import { Badge } from '@/components/ui/badge';
 // import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { truncateMiddle } from '@shared/utils';
-import { ALL_ACCEPTED_FILES, validateFile, formatFileSize as sharedFormatFileSize } from '@shared/config/fileTypes';
+import {
+  ALL_ACCEPTED_FILES,
+  validateFile,
+  formatFileSize as sharedFormatFileSize,
+} from '@shared/config/fileTypes';
 import { FilePreviewProvider } from './previews/FilePreviewProvider';
 
 /**
@@ -70,7 +74,7 @@ export interface FileUploadZoneProps {
  */
 // function getFileTypeInfo(file: File) {
 //   const displayInfo = getFileDisplayInfo(file);
-//   
+//
 //   // Return format compatible with old FilePreview component expectations
 //   return {
 //     icon: File, // Default icon, will be replaced by FilePreviewProvider
@@ -127,7 +131,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           >
             {sharedFormatFileSize(file.size)}
           </span>
-          
+
           {/* File Extension Badge */}
           <Badge variant="outline" className="text-xs">
             {file.name.split('.').pop()?.toLowerCase() || 'file'}
@@ -140,7 +144,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
             </Badge>
           )}
           {file.status === 'completed' && (
-            <CheckCircle className="w-3 h-3 text-green-500" />
+            <CheckCircle className="w-3 h-3 text-success" />
           )}
           {file.status === 'error' && (
             <AlertCircle className="w-3 h-3 text-destructive" />

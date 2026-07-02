@@ -29,10 +29,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     task.status ?? (task.completed ? 'done' : 'not_started');
   const label =
     status === 'in_progress'
-      ? 'In Progress'
+      ? 'In progress'
       : status === 'done'
         ? 'Done'
-        : 'Not Started';
+        : 'Not started';
   const Icon =
     status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
   // Status inks re-based onto tokens (design-brief §2.3): in-progress =
@@ -77,7 +77,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             status === 'not_started' && 'bg-accent text-accent-foreground'
           )}
         >
-          <Circle className="w-3 h-3" /> Not Started
+          <Circle className="w-3 h-3" /> Not started
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={(e) => {
@@ -89,7 +89,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             status === 'in_progress' && 'bg-accent text-accent-foreground'
           )}
         >
-          <PlayCircle className="w-3 h-3" /> In Progress
+          <PlayCircle className="w-3 h-3" /> In progress
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={(e) => {

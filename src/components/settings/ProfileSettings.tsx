@@ -277,7 +277,7 @@ export function ProfileSettings() {
               )}
 
               {updateSuccess && (
-                <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200">
+                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
                   <AlertDescription>
                     Profile updated successfully!
                   </AlertDescription>
@@ -288,7 +288,7 @@ export function ProfileSettings() {
               <div className="flex items-center justify-between pt-4">
                 <div className="text-sm text-muted-foreground">
                   {isDirty && (
-                    <span className="text-amber-600 dark:text-amber-400">
+                    <span className="text-warning">
                       You have unsaved changes
                     </span>
                   )}
