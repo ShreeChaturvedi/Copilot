@@ -38,10 +38,21 @@ export interface UpdateTaskData {
   title?: string;
   description?: string;
   completed?: boolean;
-  scheduledDate?: Date;
+  /** Pass null to clear the due date. */
+  scheduledDate?: Date | null;
   priority?: 'low' | 'medium' | 'high';
   /** Frontend status; maps to backend enum. */
   status?: 'not_started' | 'in_progress' | 'done';
+  /** Move the task to another list. */
+  taskListId?: string;
+  /** When provided, REPLACES the task's full tag set (backend semantics). */
+  tags?: Array<{
+    type: string;
+    value: string | Date;
+    displayText: string;
+    iconName?: string;
+    color?: string;
+  }>;
 }
 
 const apiBase = '/api';
@@ -294,7 +305,9 @@ export const taskApi = {
           // Do not fall back to persisting the raw data: URI: that silently
           // drops files over the JSON body limit. Surface the failure instead.
           const message = e instanceof Error ? e.message : 'File upload failed';
-          throw new Error(`Failed to upload attachment "${f.name}": ${message}`);
+          throw new Error(
+            `Failed to upload attachment "${f.name}": ${message}`
+          );
         }
 
         const attRes = await fetch(`${apiBase}/attachments`, {
@@ -310,12 +323,11 @@ export const taskApi = {
           }),
         });
         if (!attRes.ok) {
-          const attBody = (await attRes
-            .json()
-            .catch(() => ({}))) as { error?: { message?: string } };
+          const attBody = (await attRes.json().catch(() => ({}))) as {
+            error?: { message?: string };
+          };
           throw new Error(
-            attBody.error?.message ||
-              `Failed to save attachment "${f.name}"`
+            attBody.error?.message || `Failed to save attachment "${f.name}"`
           );
         }
       }
@@ -356,14 +368,19 @@ export const taskApi = {
         ...(data.status && data.completed === undefined
           ? { completed: data.status === 'done' }
           : {}),
-        scheduledDate: data.scheduledDate?.toISOString(),
+        // null clears the due date server-side; undefined leaves it untouched
+        scheduledDate:
+          data.scheduledDate === null
+            ? null
+            : data.scheduledDate?.toISOString(),
         priority: data.priority?.toUpperCase(),
       }),
     });
     if (!isJson(res)) {
       const ok = taskStorage.updateTask(id, {
         ...data,
-      });
+        scheduledDate: data.scheduledDate ?? undefined,
+      } as Partial<Task>);
       if (!ok) throw new Error('Failed to update task');
       const tasks = taskStorage.getTasks();
       const updated = tasks.find((t) => t.id === id);

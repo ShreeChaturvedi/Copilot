@@ -59,9 +59,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           <Icon className={cn(iconOnly ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5')} />
-          {!iconOnly && (
-            <span className="hidden sm:inline leading-[1.1rem]">{label}</span>
-          )}
+          {/* Label stays visible at every width (#58: the chip used to render
+              as an empty outline at 390px) */}
+          {!iconOnly && <span className="leading-[1.1rem]">{label}</span>}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="w-44">

@@ -150,10 +150,19 @@ export const useTasks = (filters: TaskFilters = {}) => {
     },
   });
 
-  // Update task mutation (optimistic)
+  // Update task mutation (optimistic).
+  // `scheduledDate: null` clears the due date (serialized as null, cached as
+  // undefined); Partial<Task> alone cannot express "clear this field".
   const updateTask = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Task> }) =>
-      taskApi.updateTask(id, updates),
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string;
+      updates: Omit<Partial<Task>, 'scheduledDate'> & {
+        scheduledDate?: Date | null;
+      };
+    }) => taskApi.updateTask(id, updates),
     onMutate: async ({ id, updates }) => {
       await queryClient.cancelQueries({ queryKey: taskQueryKeys.all });
       const previousTasks = queryClient.getQueryData<Task[]>(taskQueryKeys.all);
@@ -163,7 +172,11 @@ export const useTasks = (filters: TaskFilters = {}) => {
           if (!oldData) return [];
           return oldData.map((task) => {
             if (task.id !== id) return task;
-            const merged: Task = { ...task, ...updates };
+            const { scheduledDate: scheduledUpdate, ...restUpdates } = updates;
+            const merged: Task = { ...task, ...restUpdates };
+            if (scheduledUpdate !== undefined) {
+              merged.scheduledDate = scheduledUpdate ?? undefined;
+            }
             // Keep checkbox <-> status linkage optimistic in cache
             const status = updates.status;
             const hasCompletedUpdate = Object.prototype.hasOwnProperty.call(
