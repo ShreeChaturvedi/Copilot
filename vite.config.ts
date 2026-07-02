@@ -118,7 +118,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001', // Local Express backend
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3001', // Local Express backend
         changeOrigin: true,
         secure: false,
       },
