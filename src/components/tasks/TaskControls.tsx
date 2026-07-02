@@ -405,17 +405,14 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             </span>
           </Button>
         ) : (
-          <h2 className="text-lg font-semibold text-foreground">
-            {todayTitle.includes(' ') ? (
-              <>
-                <span className="font-bold">{todayTitle.split(' ')[0]}</span>
-                <span className="font-normal">
-                  {' '}
-                  {todayTitle.split(' ').slice(1).join(' ')}
-                </span>
-              </>
-            ) : (
-              todayTitle
+          <h2 className="flex items-baseline gap-2 whitespace-nowrap">
+            <span className="font-serif text-lg font-normal leading-none text-foreground">
+              {todayTitle.split(' ')[0]}
+            </span>
+            {todayTitle.includes(' ') && (
+              <span className="text-[13px] leading-none text-muted-foreground">
+                {todayTitle.split(' ').slice(1).join(' ')}
+              </span>
             )}
           </h2>
         )}
