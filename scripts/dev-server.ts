@@ -170,12 +170,13 @@ app.put(
       }
 
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        // Same 503 JSON shape as the serverless handler (api/_handlers/upload).
         return res.status(503).json({
           success: false,
           error: {
             code: 'BLOB_NOT_CONFIGURED',
             message:
-              'BLOB_READ_WRITE_TOKEN is not set; file uploads cannot be persisted locally. Set it in .env.local to test attachments.',
+              'BLOB_READ_WRITE_TOKEN is not set; file uploads cannot be persisted.',
           },
         });
       }
