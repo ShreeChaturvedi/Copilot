@@ -1,0 +1,44 @@
+---
+// §6.8 — hairline, mono 11px, builder credit + GitHub. Nothing else.
+---
+
+<footer class="footer">
+  <div class="container foot-row">
+    <span class="mono foot-text">BUILT BY SHREE CHATURVEDI</span>
+    <a
+      class="mono foot-text foot-link"
+      href="https://github.com/ShreeChaturvedi/taskflow-calendar"
+      rel="noopener"
+      >GITHUB</a
+    >
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--hairline);
+    padding-block: 28px;
+  }
+
+  .foot-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .foot-text {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+  }
+
+  .foot-link {
+    text-decoration: none;
+    transition: color var(--dur-2) var(--ease-out);
+  }
+
+  .foot-link:hover {
+    color: var(--ink);
+  }
+</style>

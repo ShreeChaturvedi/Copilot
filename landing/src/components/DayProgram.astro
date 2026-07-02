@@ -1,0 +1,114 @@
+---
+// §6.5 — "Thursday, as a program." THEME INVERSION: this section renders
+// on the light --background with the light chip formula, proving light
+// and dark are one system on one page. The rows are the hero's Thursday.
+const rows = [
+  { time: '09:00', dur: '30 MIN', title: 'Standup', list: 'Work', hue: 'blue' },
+  { time: '10:30', dur: '90 MIN', title: 'Interview loop', list: 'People', hue: 'magenta' },
+  { time: '13:30', dur: '45 MIN', title: 'Renew passport', list: 'Errands', hue: 'orange' },
+  { time: '16:00', dur: '60 MIN', title: 'Budget pass', list: 'Finance', hue: 'yellow' },
+];
+---
+
+<section class="section theme-light program" id="day">
+  <div class="container">
+    <div class="copy" data-reveal>
+      <h2 class="display-section">Thursday, as a program.</h2>
+      <p class="body-copy">
+        Taskflow ships in light and dark. Same chips, same times, brighter
+        room.
+      </p>
+    </div>
+    <div class="agenda" data-reveal>
+      {
+        rows.map((r) => (
+          <div class="row">
+            <span class="time mono">
+              {r.time} <span class="dur">&middot; {r.dur}</span>
+            </span>
+            <span class="title">{r.title}</span>
+            <span class="chip pill" style={`--chip-c: var(--hue-${r.hue})`}>
+              {r.list}
+            </span>
+          </div>
+        ))
+      }
+      <p class="done-line">That&#39;s everything for Thursday.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .program {
+    background: var(--background);
+    color: var(--ink);
+  }
+
+  .copy .body-copy {
+    margin-top: 16px;
+  }
+
+  .agenda {
+    max-width: 620px;
+    margin-top: 48px;
+  }
+
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .row:first-child {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .time {
+    font-size: 13px;
+    color: var(--ink-2);
+    flex: none;
+    width: 138px;
+  }
+
+  .dur {
+    color: var(--ink-muted);
+    font-size: 11px;
+  }
+
+  .title {
+    font-size: 15px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pill {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 6px; /* chips are 6px wherever they appear (§2.6) */
+    white-space: nowrap;
+  }
+
+  /* the serif closes the day (§4.7 register, one serif line per surface) */
+  .done-line {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 18px;
+    color: var(--ink-2);
+    margin: 28px 0 0;
+  }
+
+  @media (max-width: 640px) {
+    .time {
+      width: auto;
+    }
+
+    .row {
+      flex-wrap: wrap;
+      gap: 8px 16px;
+    }
+  }
+</style>

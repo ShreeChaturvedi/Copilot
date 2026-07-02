@@ -1,0 +1,77 @@
+---
+// §6.6 — the receipts ticker: only shipped facts, all verified at merge
+// time. 4 views = CalendarView.tsx:25; natural dates = ChronoDateParser;
+// RRULE = src/utils/recurrence.ts; Google sync = api/google/*; keyboard
+// first = useGlobalShortcuts.ts.
+const facts = [
+  '4 CALENDAR VIEWS',
+  'NATURAL DATES',
+  'RRULE RECURRENCE',
+  'GOOGLE SYNC',
+  'KEYBOARD FIRST',
+];
+const line = facts.join(' - ') + ' - ';
+---
+
+<aside class="receipts" aria-label="What ships today">
+  <p class="sr-only">
+    Shipped today: four calendar views, natural language dates, RRULE
+    recurrence, Google Calendar sync, keyboard-first control.
+  </p>
+  <div class="band" aria-hidden="true">
+    <div class="track">
+      <span class="mono run">{line}</span>
+      <span class="mono run">{line}</span>
+    </div>
+  </div>
+</aside>
+
+<style>
+  .receipts {
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+    padding-block: 18px;
+  }
+
+  .band {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .track {
+    display: inline-flex;
+    animation: tick 45s linear infinite;
+    will-change: transform;
+  }
+
+  .run {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    flex: none;
+    white-space: pre;
+  }
+
+  @keyframes tick {
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  /* reduced motion: the band holds still and wraps, nothing is clipped */
+  @media (prefers-reduced-motion: reduce) {
+    .track {
+      animation: none;
+    }
+
+    .band,
+    .track,
+    .track .run {
+      white-space: normal;
+    }
+
+    .track :last-child {
+      display: none;
+    }
+  }
+</style>

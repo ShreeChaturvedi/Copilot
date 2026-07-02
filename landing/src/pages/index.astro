@@ -1,0 +1,29 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Hero from '../components/Hero.astro';
+import TypeIt from '../components/TypeIt.astro';
+import ThreePlaces from '../components/ThreePlaces.astro';
+import Keys from '../components/Keys.astro';
+import DayProgram from '../components/DayProgram.astro';
+import Receipts from '../components/Receipts.astro';
+import Closing from '../components/Closing.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout
+  title="Taskflow - Everything has a time."
+  description="Taskflow is a task list and a calendar on one grid. Type a task in plain words, give it a time, and your week fills in. Four calendar views, recurring events, Google Calendar sync, keyboard first. Free."
+>
+  <Nav />
+  <main id="main">
+    <Hero />
+    <TypeIt />
+    <ThreePlaces />
+    <Keys />
+    <DayProgram />
+    <Receipts />
+    <Closing />
+  </main>
+  <Footer />
+</Layout>
