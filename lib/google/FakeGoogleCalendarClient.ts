@@ -265,10 +265,13 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
     channel: WatchRequest
   ): Promise<WatchResponse> {
     this.watchedChannels.push(channel);
+    // Real watch responses expire relative to the wall clock (now + ttl);
+    // renewal-window tests depend on that, so use Date.now(), not the fake's
+    // frozen etag clock.
     return {
       id: channel.id,
       resourceId: `fake-resource-${channel.id}`,
-      expiration: String(this.clock + 604_800_000),
+      expiration: String(Date.now() + 604_800_000),
     };
   }
 

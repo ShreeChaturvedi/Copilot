@@ -241,6 +241,76 @@ export async function deleteLinksForUser(userId: string): Promise<void> {
   ]);
 }
 
+// --- push channels (M3) --------------------------------------------------------
+
+/** Webhook lookup: the notification's X-Goog-Channel-ID -> link. */
+export async function getLinkByChannelId(
+  channelId: string
+): Promise<CalendarLinkRow | null> {
+  const res = await query<CalendarLinkRow>(
+    `SELECT ${LINK_COLUMNS} FROM google_calendar_links WHERE "channelId" = $1`,
+    [channelId]
+  );
+  return res.rows[0] ?? null;
+}
+
+/** Persist (or clear, with null) a link's watch-channel state atomically. */
+export async function setLinkChannel(
+  linkId: string,
+  channel: {
+    channelId: string;
+    channelResourceId: string;
+    channelExpiration: Date;
+    channelToken: string;
+  } | null
+): Promise<void> {
+  await query(
+    `UPDATE google_calendar_links SET
+       "channelId" = $2, "channelResourceId" = $3, "channelExpiration" = $4,
+       "channelToken" = $5, "updatedAt" = NOW()
+     WHERE id = $1`,
+    [
+      linkId,
+      channel?.channelId ?? null,
+      channel?.channelResourceId ?? null,
+      channel?.channelExpiration?.toISOString() ?? null,
+      channel?.channelToken ?? null,
+    ]
+  );
+}
+
+/**
+ * Enabled links of healthy accounts whose channel is missing or expires at or
+ * before `cutoff` (the renewal sweep's now + 48h window).
+ */
+export async function listLinksDueForChannelRenewal(
+  cutoff: Date
+): Promise<CalendarLinkRow[]> {
+  const res = await query<CalendarLinkRow>(
+    `SELECT l.id, l."userId", l."googleCalendarId", l."appCalendarId",
+            l."syncToken", l."syncEnabled", l."lastFullSyncAt", l."lastSyncedAt",
+            l."lastError", l."lastErrorAt", l."channelId", l."channelResourceId",
+            l."channelExpiration", l."channelToken"
+     FROM google_calendar_links l
+     JOIN google_accounts a ON a."userId" = l."userId"
+     WHERE l."syncEnabled" AND a."syncEnabled" AND NOT a."needsReauth"
+       AND (l."channelId" IS NULL OR l."channelResourceId" IS NULL
+            OR l."channelExpiration" IS NULL OR l."channelExpiration" <= $1)
+     ORDER BY l."userId" ASC, l."createdAt" ASC`,
+    [cutoff.toISOString()]
+  );
+  return res.rows;
+}
+
+/** Users with a due outbox op (the renewal cron's opportunistic drain). */
+export async function listUserIdsWithDueOps(): Promise<string[]> {
+  const res = await query<{ userId: string }>(
+    `SELECT DISTINCT "userId" FROM google_sync_ops WHERE "nextAttemptAt" <= NOW()`,
+    []
+  );
+  return res.rows.map((r) => r.userId);
+}
+
 // --- app calendars -------------------------------------------------------------
 
 /**
