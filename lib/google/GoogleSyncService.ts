@@ -15,22 +15,43 @@
  *    rows missing from the fresh feed.
  *  - Recurring-instance shells (recurringEventId set) are buffered and
  *    processed after all pages so their masters exist locally first.
- *  - Echo suppression (live in M2, written now): items whose etag equals the
- *    stored events.googleEtag are our own writes coming back -> skipped.
+ *  - Echo suppression: items whose etag equals the stored events.googleEtag
+ *    are our own writes coming back -> skipped (the outbox drain records the
+ *    response etag after every successful outbound write).
  *
- * M2 will add: outbox drain (google_sync_ops), per-field three-way merge via
- * googleSyncSnapshot, tombstone-aware edit-vs-delete resolution.
+ * M2 conflict handling (plan §5):
+ *  - Changed item + existing mapped row -> per-field three-way merge against
+ *    googleSyncSnapshot; app-winning fields re-enqueue ONE outbound patch
+ *    with If-Match of the newly stored etag. Pending upsert ops for the row
+ *    are replaced by that patch (their payload/etag predate the merge).
+ *  - Edit-vs-delete by timestamps, tombstone-aware:
+ *      Google cancelled + app edited since last sync: app updatedAt newer ->
+ *      re-insert to Google as a NEW event (cancelled ids are not revivable);
+ *      else delete the app row.
+ *      App deleted (tombstone) + Google edited: Google `updated` newer than
+ *      deletedAt -> resurrect locally (tombstone + pending delete dropped);
+ *      else re-enqueue the outbound delete with the fresh etag.
+ *      Both deleted -> clear tombstone + pending delete op.
  */
 import type { PoolClient } from 'pg';
 import type { GoogleCalendarClient } from './GoogleCalendarClient.js';
 import { SyncTokenGoneError, type GCalEvent } from './types.js';
 import {
+  appEventToGoogle,
   googleEventToApp,
   originalStartToIso,
   MappingError,
+  type AppEventFields,
 } from './mapping.js';
+import {
+  appFieldsToSynced,
+  normalizeSnapshot,
+  syncedFieldsEqual,
+  syncedToAppFields,
+  threeWayMergeEvent,
+} from './merge.js';
 import * as repo from './syncRepo.js';
-import type { CalendarLinkRow } from './syncRepo.js';
+import type { CalendarLinkRow, MappedEventRow } from './syncRepo.js';
 
 export interface SyncStats {
   mode: 'full' | 'incremental';
@@ -39,6 +60,8 @@ export interface SyncStats {
   deleted: number;
   exceptionsApplied: number;
   skipped: number;
+  /** Rows that went through the three-way merge (subset of updated). */
+  merged: number;
   pages: number;
 }
 
@@ -53,7 +76,22 @@ function newStats(mode: SyncStats['mode']): SyncStats {
     deleted: 0,
     exceptionsApplied: 0,
     skipped: 0,
+    merged: 0,
     pages: 0,
+  };
+}
+
+/** Current synced-field values of a local row, shaped for the merge. */
+function rowToAppFields(row: MappedEventRow): AppEventFields {
+  return {
+    title: row.title,
+    description: row.description ?? null,
+    location: row.location ?? null,
+    start: row.start,
+    end: row.end,
+    allDay: row.allDay,
+    recurrence: row.recurrence ?? null,
+    exceptions: row.exceptions ?? [],
   };
 }
 
@@ -220,16 +258,46 @@ export class GoogleSyncService {
     stats: SyncStats
   ): Promise<void> {
     if (item.status === 'cancelled') {
-      stats.deleted += await repo.deleteEventByGoogleId(
-        tx,
-        link.userId,
-        item.id
-      );
-      return;
+      return this.applyInboundCancellation(tx, link, item, stats);
+    }
+    return this.applyInboundItem(tx, link, item, stats);
+  }
+
+  /**
+   * Apply one active inbound item: tombstone-aware edit-vs-delete first, then
+   * echo suppression, then plain insert or three-way merge (plan §5).
+   */
+  private async applyInboundItem(
+    tx: PoolClient,
+    link: CalendarLinkRow,
+    item: GCalEvent,
+    stats: SyncStats
+  ): Promise<void> {
+    // App deleted this event locally? The tombstone decides edit-vs-delete.
+    const tomb = await repo.getTombstone(link.userId, item.id, tx);
+    if (tomb) {
+      const googleUpdated = item.updated ? new Date(item.updated) : null;
+      if (googleUpdated && googleUpdated.getTime() > tomb.deletedAt.getTime()) {
+        // Google edited AFTER our delete -> Google wins: resurrect locally.
+        await repo.deleteTombstone(tx, link.userId, item.id);
+        await repo.deletePendingDeleteOps(tx, link.userId, item.id);
+        // fall through: no local row exists, so this upserts a fresh one
+      } else {
+        // Our delete is newer -> app wins: refresh the outbound delete so
+        // its If-Match matches Google's current etag, and keep the tombstone
+        // until that delete succeeds.
+        await repo.enqueueDeleteOp(tx, {
+          userId: link.userId,
+          googleCalendarId: link.googleCalendarId,
+          googleEventId: item.id,
+          ifMatchEtag: item.etag,
+        });
+        stats.skipped++;
+        return;
+      }
     }
 
-    // Echo suppression: our own write coming back (M2 sets googleEtag on
-    // outbound writes; harmless and correct for inbound-only M1 re-lists).
+    // Echo suppression: our own outbound write coming back.
     const existing = await repo.getEventByGoogleId(link.userId, item.id, tx);
     if (existing && existing.googleEtag === item.etag) {
       stats.skipped++;
@@ -251,17 +319,110 @@ export class GoogleSyncService {
       throw error;
     }
 
-    const result = await repo.upsertEventFromGoogle(tx, {
-      userId: link.userId,
-      appCalendarId: link.appCalendarId,
-      googleCalendarId: link.googleCalendarId,
-      googleEventId: item.id,
+    const googleUpdatedAt = item.updated ? new Date(item.updated) : null;
+
+    if (!existing) {
+      const result = await repo.upsertEventFromGoogle(tx, {
+        userId: link.userId,
+        appCalendarId: link.appCalendarId,
+        googleCalendarId: link.googleCalendarId,
+        googleEventId: item.id,
+        etag: item.etag,
+        googleUpdatedAt,
+        fields,
+      });
+      if (result === 'inserted') stats.inserted++;
+      else stats.updated++;
+      return;
+    }
+
+    // Existing mapped row with a real inbound change: three-way merge.
+    const base = normalizeSnapshot(existing.googleSyncSnapshot);
+    const merge = threeWayMergeEvent(
+      base,
+      appFieldsToSynced(rowToAppFields(existing)),
+      appFieldsToSynced(fields),
+      existing.updatedAt,
+      googleUpdatedAt
+    );
+    await repo.applyMergedEvent(tx, {
+      eventId: existing.id,
+      fields: syncedToAppFields(merge.merged),
       etag: item.etag,
-      googleUpdatedAt: item.updated ? new Date(item.updated) : null,
-      fields,
+      googleUpdatedAt,
     });
-    if (result === 'inserted') stats.inserted++;
-    else stats.updated++;
+    // Pending upsert ops for this row predate the merge (stale payload and a
+    // stale If-Match): replace them with one fresh patch when the app side
+    // still has something to say.
+    await repo.deletePendingUpsertOps(tx, link.userId, existing.id);
+    if (merge.needsOutbound) {
+      const timezone = await repo.getUserTimezone(link.userId);
+      await repo.enqueuePatchOp(tx, {
+        userId: link.userId,
+        eventId: existing.id,
+        googleCalendarId: link.googleCalendarId,
+        googleEventId: item.id,
+        payload: appEventToGoogle(
+          syncedToAppFields(merge.merged),
+          timezone
+        ) as unknown as Record<string, unknown>,
+        ifMatchEtag: item.etag,
+      });
+    }
+    stats.updated++;
+    stats.merged++;
+  }
+
+  /**
+   * Inbound cancellation (status='cancelled'): edit-vs-delete rules (plan §5).
+   */
+  private async applyInboundCancellation(
+    tx: PoolClient,
+    link: CalendarLinkRow,
+    item: GCalEvent,
+    stats: SyncStats
+  ): Promise<void> {
+    // Both sides deleted: clear the bookkeeping and drop the outbound delete.
+    const tomb = await repo.getTombstone(link.userId, item.id, tx);
+    if (tomb) {
+      await repo.deleteTombstone(tx, link.userId, item.id);
+      await repo.deletePendingDeleteOps(tx, link.userId, item.id);
+    }
+
+    const existing = await repo.getEventByGoogleId(link.userId, item.id, tx);
+    if (!existing) return;
+
+    // Was the app row edited since the last successful sync?
+    const base = normalizeSnapshot(existing.googleSyncSnapshot);
+    const appChanged =
+      !!base &&
+      !syncedFieldsEqual(appFieldsToSynced(rowToAppFields(existing)), base);
+    const googleUpdated = item.updated ? new Date(item.updated) : null;
+
+    if (
+      appChanged &&
+      (!googleUpdated || existing.updatedAt.getTime() > googleUpdated.getTime())
+    ) {
+      // The app's edit outlived Google's cancellation -> app wins: re-insert
+      // to Google as a NEW event (cancelled ids are not reliably revivable).
+      const timezone = await repo.getUserTimezone(link.userId);
+      await repo.clearEventMapping(tx, existing.id);
+      await repo.deletePendingUpsertOps(tx, link.userId, existing.id);
+      await repo.enqueueInsertOp(tx, {
+        userId: link.userId,
+        eventId: existing.id,
+        googleCalendarId: link.googleCalendarId,
+        payload: appEventToGoogle(
+          rowToAppFields(existing),
+          timezone
+        ) as unknown as Record<string, unknown>,
+      });
+      stats.updated++;
+      return;
+    }
+
+    await repo.deletePendingUpsertOps(tx, link.userId, existing.id);
+    stats.deleted += await repo.deleteEventByGoogleId(tx, link.userId, item.id);
   }
 
   /**
@@ -297,44 +458,13 @@ export class GoogleSyncService {
     }
 
     if (item.status === 'cancelled') {
-      // Cancelled instance: exception on the master is the whole story;
-      // also drop any previously-imported standalone row for this instance.
-      stats.deleted += await repo.deleteEventByGoogleId(
-        tx,
-        link.userId,
-        item.id
-      );
-      return;
+      // Cancelled instance: the exception on the master is the main story;
+      // a previously-imported standalone row for this instance goes through
+      // the same edit-vs-delete rules as any other cancellation.
+      return this.applyInboundCancellation(tx, link, item, stats);
     }
 
-    const existing = await repo.getEventByGoogleId(link.userId, item.id, tx);
-    if (existing && existing.googleEtag === item.etag) {
-      stats.skipped++;
-      return;
-    }
-
-    let fields;
-    try {
-      fields = googleEventToApp(item);
-    } catch (error) {
-      if (error instanceof MappingError) {
-        stats.skipped++;
-        return;
-      }
-      throw error;
-    }
-
-    const result = await repo.upsertEventFromGoogle(tx, {
-      userId: link.userId,
-      appCalendarId: link.appCalendarId,
-      googleCalendarId: link.googleCalendarId,
-      googleEventId: item.id,
-      etag: item.etag,
-      googleUpdatedAt: item.updated ? new Date(item.updated) : null,
-      fields,
-    });
-    if (result === 'inserted') stats.inserted++;
-    else stats.updated++;
+    return this.applyInboundItem(tx, link, item, stats);
   }
 }
 

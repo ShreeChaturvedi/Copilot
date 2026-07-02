@@ -28,6 +28,13 @@ export interface ServiceContext {
   requestId?: string;
   userAgent?: string;
   ip?: string;
+  /**
+   * Belt-and-braces escape hatch for the Google outbound hooks (#27 M2):
+   * engine-internal writes must never re-enqueue outbound sync ops. The sync
+   * engine writes through its own repository (lib/google/syncRepo), so this
+   * is only needed by callers that reuse EventService for engine-side work.
+   */
+  skipGoogleSync?: boolean;
 }
 
 /**
