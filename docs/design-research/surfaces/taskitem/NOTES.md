@@ -15,10 +15,12 @@ Captured 2026-07-02, playwright-cli headless, 1440x900 and 390x844, both themes 
 
 ## Shots
 
-- `taskitem-completion-sequence-light-1440.png`: 6-frame strip at 120/340/700/1330/1520/2100ms (draw, fill+check, struck grace, settling fade, gap closing, committed with siblings closed).
-- `taskitem-drag-mirror-dark-1440.png`: mid-drag from sidebar to WED 10:00, mirror renders as a clean chip, no ghosting, drop-cancel verified (no event, no dialog).
-- `taskitem-focus-selected-light-1440.png`: row 1 keyboard focus (aqua ring + quick-schedule revealed via focus-within), row 3 staged `data-selected`.
-- Render sites x themes: sidebar calendarMode, main list, kanban cards, 1440 + 390.
+- Render sites x widths x themes: sidebar calendarMode, main list, kanban cards, each at 1440 + 390 in BOTH themes (12 shots). The main-list 390 pair is the one that exercises the 4.9 mobile 44px row treatment plus the full meta second line (due chip + tags + overflow `+N`) wrapping at 390.
+- `taskitem-completion-sequence-{light,dark}-1440.png`: 6-frame strips at 120/340/700/1330/1520/2100ms (draw, fill+check, struck grace, settling fade, gap closing, committed with siblings closed). Ring fill = the list color (green here), distinct from the amber in-progress arc visible on the row below.
+- `taskitem-drag-mirror-{dark,light}-1440.png`: mid-drag from sidebar to WED 10:00, mirror renders as a clean chip, no ghosting, drop-cancel verified in both themes (no event, no dialog, task keeps `scheduledDate: null`).
+- `taskitem-focus-selected-{light,dark}-1440.png`: row 1 keyboard focus (aqua ring + quick-schedule revealed via focus-within), row 3 staged `data-selected`.
+- `taskitem-reduced-motion-grace-{light,dark}-1440.png`: `emulateMedia` reduce, ring fill + strike end states shown at ~700ms mid-grace with no motion, commit still runs after.
+- Frontend suite on THIS branch: 804/804 across 67 files (`npm run test:frontend:run`), TaskItem.test.tsx 25/25, `tsc -b` clean. Without this branch's 3945fec (three added timeline tests, TaskItem at 22) the suite reports 801/801, so quote 804 only against this branch.
 
 ## Deviations and notes for later agents
 
