@@ -28,10 +28,10 @@ export interface AuthenticatedRequest extends VercelRequest {
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
-    error?: {
+  error?: {
     code: string;
-      message: string;
-      details?: unknown;
+    message: string;
+    details?: unknown;
     timestamp: string;
     requestId?: string;
   };
@@ -124,7 +124,7 @@ export enum HttpMethod {
 export type RouteHandler = (
   req: AuthenticatedRequest,
   res: VercelResponse
-) => Promise<void> | void;
+) => Promise<void | VercelResponse> | void | VercelResponse;
 
 /**
  * Route configuration

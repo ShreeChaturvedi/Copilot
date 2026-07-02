@@ -856,7 +856,7 @@ export class AttachmentService extends BaseService<
         this.db
       );
 
-      if (orphanedRes.rowCount > 0) {
+      if ((orphanedRes.rowCount ?? 0) > 0) {
         const orphanedIds = orphanedRes.rows.map((att) => att.id);
         await query(
           'DELETE FROM attachments WHERE id = ANY($1::text[])',
@@ -875,7 +875,7 @@ export class AttachmentService extends BaseService<
         { deletedCount: orphanedRes.rowCount },
         context
       );
-      return { deletedCount: orphanedRes.rowCount };
+      return { deletedCount: orphanedRes.rowCount ?? 0 };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.log('cleanupOrphanedAttachments:error', { error: message }, context);

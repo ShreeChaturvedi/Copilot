@@ -324,6 +324,47 @@ describe.skipIf(!L2_DB_URL)('TaskListService (real Postgres, L2)', () => {
       );
       expect(rows.rowCount).toBe(1);
     });
+
+    it('setDefault flags one list, unsets the previous default, and getDefault honors it', async () => {
+      const { userId, ctx } = await freshUser();
+      const a = await service.create(
+        { name: `A ${uid()}`, color: '#111111' },
+        ctx
+      );
+      const b = await service.create(
+        { name: `B ${uid()}`, color: '#222222' },
+        ctx
+      );
+
+      // Set A as the default.
+      const firstDefault = await service.setDefault(a.id, ctx);
+      expect(firstDefault?.id).toBe(a.id);
+      expect(firstDefault?.isDefault).toBe(true);
+      expect((await service.getDefault(ctx)).id).toBe(a.id);
+
+      // Switching to B must unset A (at most one default per owner).
+      const secondDefault = await service.setDefault(b.id, ctx);
+      expect(secondDefault?.isDefault).toBe(true);
+      expect((await service.getDefault(ctx)).id).toBe(b.id);
+
+      const flagged = await db.query<{ id: string }>(
+        `SELECT id FROM task_lists WHERE "userId" = $1 AND "isDefault" = true`,
+        [userId]
+      );
+      expect(flagged.rows.map((r) => r.id)).toEqual([b.id]);
+    });
+
+    it("setDefault rejects a list the caller doesn't own", async () => {
+      const owner = await freshUser();
+      const other = await freshUser();
+      const list = await service.create(
+        { name: `Owned ${uid()}`, color: '#333333' },
+        owner.ctx
+      );
+      await expect(service.setDefault(list.id, other.ctx)).rejects.toThrow(
+        /AUTHORIZATION_ERROR/
+      );
+    });
   });
 
   describe('cascade deletes', () => {

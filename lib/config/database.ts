@@ -1,7 +1,13 @@
 /**
  * Database configuration for Vercel API routes (Pure SQL via pg)
  */
-import { Pool, types, type PoolClient, type QueryResult } from 'pg';
+import {
+  Pool,
+  types,
+  type PoolClient,
+  type QueryResult,
+  type QueryResultRow,
+} from 'pg';
 
 // Configure pg to parse TIMESTAMP WITHOUT TIME ZONE as UTC
 // PostgreSQL TIMESTAMP WITHOUT TIME ZONE strips timezone info.
@@ -84,7 +90,7 @@ export async function cleanupDatabase(): Promise<void> {
 }
 
 // Simple query helper
-export async function query<T = unknown>(
+export async function query<T extends QueryResultRow = QueryResultRow>(
   sql: string,
   params: unknown[] = [],
   client?: SqlClient

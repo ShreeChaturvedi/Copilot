@@ -174,7 +174,7 @@ export class CalendarService extends BaseService<
         this.db
       );
 
-      if (existingCalendar.rowCount > 0) {
+      if ((existingCalendar.rowCount ?? 0) > 0) {
         throw new Error('VALIDATION_ERROR: Calendar name already exists');
       }
     }
@@ -213,7 +213,7 @@ export class CalendarService extends BaseService<
         [data.name.trim(), context.userId, id],
         this.db
       );
-      if (existingCalendar.rowCount > 0) {
+      if ((existingCalendar.rowCount ?? 0) > 0) {
         throw new Error('VALIDATION_ERROR: Calendar name already exists');
       }
     }
@@ -389,7 +389,7 @@ export class CalendarService extends BaseService<
 
         if (firstCalendar) {
           // Set first calendar as default
-          const updated = await query(
+          const updated = await query<CalendarEntity>(
             'UPDATE calendars SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 RETURNING *',
             [firstCalendar.id],
             this.db

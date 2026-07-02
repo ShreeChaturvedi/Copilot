@@ -388,7 +388,10 @@ export class TaskService extends BaseService<
       createdAt: Date;
       thumbnailUrl?: string;
     }
-    const attachmentsByTask = new Map<string, AttachmentRow[]>();
+    const attachmentsByTask = new Map<
+      string,
+      Omit<AttachmentRow, 'taskId'>[]
+    >();
     attachmentsRes.rows.forEach((row) => {
       const arr = attachmentsByTask.get(row.taskId) || [];
       arr.push({
@@ -1192,7 +1195,7 @@ export class TaskService extends BaseService<
       [userId],
       this.db
     );
-    if (existing.rowCount > 0) return existing.rows[0];
+    if ((existing.rowCount ?? 0) > 0) return existing.rows[0];
     const created = await query<{ id: string; name: string; color: string }>(
       `INSERT INTO "task_lists" (id, name, color, "userId", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, 'General', '#8B5CF6', $1, NOW(), NOW()) RETURNING id, name, color`,

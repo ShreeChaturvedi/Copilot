@@ -285,7 +285,7 @@ export class TagService extends BaseService<
       this.db
     );
 
-    if (existingTag.rowCount > 0) {
+    if ((existingTag.rowCount ?? 0) > 0) {
       throw new Error('VALIDATION_ERROR: Tag name already exists');
     }
 
@@ -331,7 +331,7 @@ export class TagService extends BaseService<
         [data.name.trim().toLowerCase(), id],
         this.db
       );
-      if (existingTag.rowCount > 0) {
+      if ((existingTag.rowCount ?? 0) > 0) {
         throw new Error('VALIDATION_ERROR: Tag name already exists');
       }
     }
@@ -454,7 +454,7 @@ export class TagService extends BaseService<
         [normalizedName],
         this.db
       );
-      if (existingTag.rowCount > 0) {
+      if ((existingTag.rowCount ?? 0) > 0) {
         const row = existingTag.rows[0];
         this.log('findOrCreate:found', { id: row.id }, context);
         return this.transformEntity(row);

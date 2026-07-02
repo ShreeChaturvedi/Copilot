@@ -6,7 +6,7 @@ import {
   type ServiceContext,
   type UserOwnedEntity,
 } from './BaseService.js';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { taskListCache, createCacheKey } from '../utils/cache.js';
 
 /**
@@ -19,6 +19,9 @@ export interface TaskListEntity extends UserOwnedEntity {
   description: string | null;
   isArchived: boolean;
   archivedAt: Date | null;
+  // Whether this list is the user's explicitly-chosen default (set via
+  // setDefault). Optional because several column-projected queries omit it.
+  isDefault?: boolean;
   createdAt: Date;
   updatedAt: Date;
 
@@ -236,7 +239,7 @@ export class TaskListService extends BaseService<
         this.db
       );
 
-      if (existingTaskList.rowCount > 0) {
+      if ((existingTaskList.rowCount ?? 0) > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
       }
     }
@@ -275,7 +278,7 @@ export class TaskListService extends BaseService<
         [data.name.trim(), context.userId, id],
         this.db
       );
-      if (existingTaskList.rowCount > 0) {
+      if ((existingTaskList.rowCount ?? 0) > 0) {
         throw new Error('VALIDATION_ERROR: Task list name already exists');
       }
     }
@@ -343,13 +346,23 @@ export class TaskListService extends BaseService<
     try {
       this.log('getDefault', {}, context);
 
-      // Try to find "General" task list first
-      const generalRes = await query(
-        'SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 AND "isArchived" = false LIMIT 1',
-        [context.userId!, 'General'],
+      // Prefer a list the user explicitly flagged as default (via setDefault).
+      const flaggedRes = await query(
+        'SELECT * FROM task_lists WHERE "userId" = $1 AND "isDefault" = true AND "isArchived" = false LIMIT 1',
+        [context.userId!],
         this.db
       );
-      let defaultTaskList = generalRes.rows[0];
+      let defaultTaskList = flaggedRes.rows[0];
+
+      // Otherwise fall back to the "General" task list.
+      if (!defaultTaskList) {
+        const generalRes = await query(
+          'SELECT * FROM task_lists WHERE "userId" = $1 AND name = $2 AND "isArchived" = false LIMIT 1',
+          [context.userId!, 'General'],
+          this.db
+        );
+        defaultTaskList = generalRes.rows[0];
+      }
 
       // If no "General" list, get the first task list
       if (!defaultTaskList) {
@@ -384,11 +397,61 @@ export class TaskListService extends BaseService<
   }
 
   /**
+   * Set the given task list as the user's default, clearing any previous
+   * default for that owner. Owner-scoped: rejects lists the caller doesn't own.
+   * Returns the updated list, or null if it doesn't exist.
+   */
+  async setDefault(
+    id: string,
+    context?: ServiceContext
+  ): Promise<TaskListEntity | null> {
+    if (!context?.userId) {
+      throw new Error('AUTHORIZATION_ERROR: User ID required');
+    }
+
+    try {
+      this.log('setDefault', { id }, context);
+
+      const hasAccess = await this.checkOwnership(id, context.userId);
+      if (!hasAccess) {
+        throw new Error('AUTHORIZATION_ERROR: Access denied');
+      }
+
+      const updatedRow = await withTransaction(async (client) => {
+        // Unset the previous default for this owner.
+        await query(
+          'UPDATE task_lists SET "isDefault" = false, "updatedAt" = NOW() WHERE "userId" = $1 AND "isDefault" = true',
+          [context.userId!],
+          client
+        );
+        // Flag the requested list as the default (owner-scoped).
+        const res = await query<TaskListEntity>(
+          'UPDATE task_lists SET "isDefault" = true, "updatedAt" = NOW() WHERE id = $1 AND "userId" = $2 RETURNING *',
+          [id, context.userId!],
+          client
+        );
+        return res.rows[0] ?? null;
+      });
+
+      if (!updatedRow) return null;
+
+      const cacheKey = createCacheKey('task-lists', context.userId);
+      taskListCache.invalidate(cacheKey);
+
+      this.log('setDefault:success', { id }, context);
+      return this.transformEntity(updatedRow);
+    } catch (error) {
+      this.log('setDefault:error', { error: error.message, id }, context);
+      throw error;
+    }
+  }
+
+  /**
    * Get task lists with task counts
    */
   async getWithTaskCount(
     context?: ServiceContext
-  ): Promise<TaskListWithCounts[]> {
+  ): Promise<Omit<TaskListWithCounts, 'isArchived' | 'archivedAt'>[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }
@@ -413,20 +476,22 @@ export class TaskListService extends BaseService<
         this.db
       );
 
-      const results: TaskListWithCounts[] = res.rows.map((row) => ({
-        // Database row
-        id: row.id,
-        name: row.name,
-        color: row.color,
-        icon: row.icon,
-        description: row.description,
-        userId: row.userId,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt),
-        taskCount: Number(row.task_count),
-        completedTaskCount: Number(row.completed_count),
-        pendingTaskCount: Number(row.task_count) - Number(row.completed_count),
-      }));
+      const results: Omit<TaskListWithCounts, 'isArchived' | 'archivedAt'>[] =
+        res.rows.map((row) => ({
+          // Database row
+          id: row.id,
+          name: row.name,
+          color: row.color,
+          icon: row.icon,
+          description: row.description,
+          userId: row.userId,
+          createdAt: new Date(row.createdAt),
+          updatedAt: new Date(row.updatedAt),
+          taskCount: Number(row.task_count),
+          completedTaskCount: Number(row.completed_count),
+          pendingTaskCount:
+            Number(row.task_count) - Number(row.completed_count),
+        }));
 
       this.log('getWithTaskCount:success', { count: results.length }, context);
       return results;
@@ -439,7 +504,9 @@ export class TaskListService extends BaseService<
   /**
    * Get task lists with detailed task information
    */
-  async getWithTasks(context?: ServiceContext): Promise<TaskListEntity[]> {
+  async getWithTasks(
+    context?: ServiceContext
+  ): Promise<Omit<TaskListEntity, 'isArchived' | 'archivedAt'>[]> {
     if (!context?.userId) {
       throw new Error('AUTHORIZATION_ERROR: User ID required');
     }

@@ -1006,7 +1006,7 @@ export class EventService extends BaseService<
     eventId: string,
     newCalendarId: string,
     context?: ServiceContext
-  ): Promise<EventEntity> {
+  ): Promise<EventEntity | null> {
     return await this.update(eventId, { calendarId: newCalendarId }, context);
   }
 
@@ -1024,12 +1024,12 @@ export class EventService extends BaseService<
       title: `Copy of ${originalEvent.title}`,
       start: originalEvent.start,
       end: originalEvent.end,
-      description: originalEvent.description,
-      location: originalEvent.location,
-      notes: originalEvent.notes,
+      description: originalEvent.description ?? undefined,
+      location: originalEvent.location ?? undefined,
+      notes: originalEvent.notes ?? undefined,
       calendarId: originalEvent.calendarId,
       allDay: originalEvent.allDay,
-      recurrence: originalEvent.recurrence,
+      recurrence: originalEvent.recurrence ?? undefined,
       color: originalEvent.color ?? undefined,
       exceptions: originalEvent.exceptions,
     };

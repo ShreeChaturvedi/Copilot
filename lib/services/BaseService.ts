@@ -361,7 +361,7 @@ export abstract class BaseService<
         [id],
         this.db
       );
-      return res.rowCount > 0;
+      return (res.rowCount ?? 0) > 0;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.log('exists:error', { error: message, id }, context);
