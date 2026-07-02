@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
-import { createMockAuthRequest, createMockResponse } from '../../../../lib/__tests__/helpers';
+import {
+  createMockAuthRequest,
+  createMockResponse,
+} from '../../../../lib/__tests__/helpers';
 
 /**
  * Regression for issue #33: the cleanup endpoint bound the whole
@@ -31,17 +34,35 @@ vi.mock('../../../../lib/services/index.js', () => ({
   getAllServices: mockGetAllServices,
 }));
 
-vi.mock('../../../../lib/middleware/errorHandler.js', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('../../../../lib/middleware/errorHandler.js')
-  >();
+// The route now authenticates (issue #64), so stub the auth middleware as a
+// pass-through — this test exercises the handler's response shape (issue #33),
+// with req.user supplied by createMockAuthRequest, not the JWT pipeline.
+vi.mock('../../../../lib/middleware/auth.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../lib/middleware/auth.js')>();
   return {
     ...actual,
-    asyncHandler: (handler: any) => handler,
-    sendSuccess: mockSendSuccess,
-    sendError: mockSendError,
+    authenticateJWT: () => async (_req: any, _res: any, next: () => void) =>
+      next(),
+    devAuth: () => async (_req: any, _res: any, next: () => void) => next(),
   };
 });
+
+vi.mock(
+  '../../../../lib/middleware/errorHandler.js',
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import('../../../../lib/middleware/errorHandler.js')
+      >();
+    return {
+      ...actual,
+      asyncHandler: (handler: any) => handler,
+      sendSuccess: mockSendSuccess,
+      sendError: mockSendError,
+    };
+  }
+);
 
 let cleanupHandler: typeof import('../cleanup').default;
 
@@ -56,10 +77,13 @@ describe('Attachments cleanup endpoint (issue #33)', () => {
 
   it('returns a numeric deletedCount and a correctly interpolated message', async () => {
     mockCleanup.mockResolvedValue({ deletedCount: 3 });
-    const r = createMockAuthRequest({ id: 'user-1', email: 'u@example.com' }, {
-      method: 'DELETE',
-      url: '/api/attachments/cleanup',
-    });
+    const r = createMockAuthRequest(
+      { id: 'user-1', email: 'u@example.com' },
+      {
+        method: 'DELETE',
+        url: '/api/attachments/cleanup',
+      }
+    );
     const s = createMockResponse();
 
     await cleanupHandler(r as any, s as any);

@@ -87,12 +87,12 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
       const r = await req<Envelope>('GET', '/api/tasks/stats', {
         token: u.accessToken,
       });
-      // Discriminator: the stats handler (createMethodHandler, never
-      // authenticated, issue #64) answers 401 UNAUTHORIZED. tasks/[id] would
-      // have answered 404 NOT_FOUND ("Task not found") for id="stats". So a
-      // 401 here proves the static route won.
-      expect(r.status).toBe(401);
-      expect(r.body.error?.code).toBe('UNAUTHORIZED');
+      // Discriminator: the stats handler now authenticates (issue #64 fixed) and
+      // answers 200 with stats. tasks/[id] would have answered 404 NOT_FOUND
+      // ("Task not found") for id="stats", so a 200 here proves the static route
+      // won.
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
     });
 
     it('dynamic [id] segment is injected into req.query (unknown id -> 404 Task not found)', async () => {

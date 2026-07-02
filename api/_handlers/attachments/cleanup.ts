@@ -16,47 +16,49 @@ import {
   InternalServerError,
 } from '../../../lib/types/api.js';
 
-export default createMethodHandler({
-  [HttpMethod.DELETE]: async (
-    req: AuthenticatedRequest,
-    res: VercelResponse
-  ) => {
-    try {
-      const { attachment: attachmentService } = getAllServices();
-      const userId = req.user?.id;
+export default createMethodHandler(
+  {
+    [HttpMethod.DELETE]: async (
+      req: AuthenticatedRequest,
+      res: VercelResponse
+    ) => {
+      try {
+        const { attachment: attachmentService } = getAllServices();
+        const userId = req.user?.id;
 
-      if (!userId) {
-        return sendError(
+        if (!userId) {
+          return sendError(
+            res,
+            new UnauthorizedError('User authentication required')
+          );
+        }
+
+        const { deletedCount } =
+          await attachmentService.cleanupOrphanedAttachments({
+            userId,
+            requestId: req.headers['x-request-id'] as string,
+          });
+
+        sendSuccess(res, {
+          cleaned: true,
+          deletedCount,
+          message: `${deletedCount} orphaned attachments were removed`,
+        });
+      } catch (error) {
+        console.error('DELETE /api/attachments/cleanup error:', error);
+
+        if (error.message?.includes('AUTHORIZATION_ERROR')) {
+          return sendError(res, new ForbiddenError('Access denied'));
+        }
+
+        sendError(
           res,
-          new UnauthorizedError('User authentication required')
+          new InternalServerError(
+            error.message || 'Failed to cleanup orphaned attachments'
+          )
         );
       }
-
-      const { deletedCount } = await attachmentService.cleanupOrphanedAttachments(
-        {
-          userId,
-          requestId: req.headers['x-request-id'] as string,
-        }
-      );
-
-      sendSuccess(res, {
-        cleaned: true,
-        deletedCount,
-        message: `${deletedCount} orphaned attachments were removed`,
-      });
-    } catch (error) {
-      console.error('DELETE /api/attachments/cleanup error:', error);
-
-      if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, new ForbiddenError('Access denied'));
-      }
-
-      sendError(
-        res,
-        new InternalServerError(
-          error.message || 'Failed to cleanup orphaned attachments'
-        )
-      );
-    }
+    },
   },
-});
+  { requireAuth: true }
+);
