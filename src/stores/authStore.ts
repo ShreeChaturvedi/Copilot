@@ -43,22 +43,22 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   authMethod: AuthMethod;
-  
+
   // JWT authentication
   jwtTokens: JWTTokens | null;
   user: User | null;
-  
+
   // Google authentication
   googleTokens: GoogleAuthTokens | null;
   googleUser: GoogleUserInfo | null;
-  
+
   // Error handling
   error: string | null;
-  
+
   // Actions
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  
+
   // JWT Authentication
   setJWTAuth: (tokens: JWTTokens, user: User) => void;
   updateJWTTokens: (tokens: Partial<JWTTokens>) => void;
@@ -66,22 +66,31 @@ interface AuthState {
 
   // Profile updates (reflect persisted profile changes across the app)
   updateUser: (updates: Partial<User>) => void;
-  
+
   // Google Authentication
   setGoogleAuth: (tokens: GoogleAuthTokens, user: GoogleUserInfo) => void;
   updateGoogleTokens: (tokens: Partial<GoogleAuthTokens>) => void;
   clearGoogleAuth: () => void;
-  
+
   // General
   logout: () => void;
   logoutEverywhere: () => Promise<void>;
-  
+
   // Token management
   isTokenExpired: () => boolean;
   isTokenExpiringSoon: (thresholdMinutes?: number) => boolean;
   getValidAccessToken: () => string | null;
   refreshTokenIfNeeded: () => Promise<boolean>;
 }
+
+/**
+ * Single-flight guard for the refresh-token exchange. The server rotates the
+ * refresh token on every exchange and treats reuse of the old one as theft,
+ * so two concurrent refreshes (e.g. StrictMode double effects, parallel auth
+ * guards) would revoke the whole session (#57). All concurrent callers share
+ * one in-flight exchange.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
 
 const initialState = {
   isAuthenticated: false,
@@ -99,56 +108,47 @@ export const useAuthStore = create<AuthState>()(
     persist(
       (set, get) => ({
         ...initialState,
-        
-        setLoading: (loading) => set(
-          { isLoading: loading },
-          false,
-          'setLoading'
-        ),
-        
-        setError: (error) => set(
-          { error },
-          false,
-          'setError'
-        ),
-        
+
+        setLoading: (loading) =>
+          set({ isLoading: loading }, false, 'setLoading'),
+
+        setError: (error) => set({ error }, false, 'setError'),
+
         // JWT Authentication
-        setJWTAuth: (tokens, user) => set(
-          {
-            isAuthenticated: true,
-            authMethod: 'jwt',
-            jwtTokens: tokens,
-            user,
-            error: null,
-            isLoading: false,
-          },
-          false,
-          'setJWTAuth'
-        ),
-        
+        setJWTAuth: (tokens, user) =>
+          set(
+            {
+              isAuthenticated: true,
+              authMethod: 'jwt',
+              jwtTokens: tokens,
+              user,
+              error: null,
+              isLoading: false,
+            },
+            false,
+            'setJWTAuth'
+          ),
+
         updateJWTTokens: (tokenUpdates) => {
           const { jwtTokens } = get();
           if (!jwtTokens) return;
-          
+
           const updatedTokens = { ...jwtTokens, ...tokenUpdates };
-          set(
-            { jwtTokens: updatedTokens },
-            false,
-            'updateJWTTokens'
-          );
+          set({ jwtTokens: updatedTokens }, false, 'updateJWTTokens');
         },
-        
-        clearJWTAuth: () => set(
-          {
-            isAuthenticated: false,
-            authMethod: null,
-            jwtTokens: null,
-            user: null,
-            error: null,
-          },
-          false,
-          'clearJWTAuth'
-        ),
+
+        clearJWTAuth: () =>
+          set(
+            {
+              isAuthenticated: false,
+              authMethod: null,
+              jwtTokens: null,
+              user: null,
+              error: null,
+            },
+            false,
+            'clearJWTAuth'
+          ),
 
         updateUser: (updates) => {
           const { user, googleUser, authMethod } = get();
@@ -167,69 +167,64 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
           if (user) {
-            set(
-              { user: { ...user, ...updates } },
-              false,
-              'updateUser'
-            );
+            set({ user: { ...user, ...updates } }, false, 'updateUser');
           }
         },
-        
+
         // Google Authentication
-        setGoogleAuth: (tokens, user) => set(
-          {
-            isAuthenticated: true,
-            authMethod: 'google',
-            googleTokens: tokens,
-            googleUser: user,
-            error: null,
-            isLoading: false,
-          },
-          false,
-          'setGoogleAuth'
-        ),
-        
+        setGoogleAuth: (tokens, user) =>
+          set(
+            {
+              isAuthenticated: true,
+              authMethod: 'google',
+              googleTokens: tokens,
+              googleUser: user,
+              error: null,
+              isLoading: false,
+            },
+            false,
+            'setGoogleAuth'
+          ),
+
         updateGoogleTokens: (tokenUpdates) => {
           const { googleTokens } = get();
           if (!googleTokens) return;
-          
+
           const updatedTokens = { ...googleTokens, ...tokenUpdates };
-          set(
-            { googleTokens: updatedTokens },
-            false,
-            'updateGoogleTokens'
-          );
+          set({ googleTokens: updatedTokens }, false, 'updateGoogleTokens');
         },
-        
-        clearGoogleAuth: () => set(
-          {
-            isAuthenticated: false,
-            authMethod: null,
-            googleTokens: null,
-            googleUser: null,
-            error: null,
-          },
-          false,
-          'clearGoogleAuth'
-        ),
-        
+
+        clearGoogleAuth: () =>
+          set(
+            {
+              isAuthenticated: false,
+              authMethod: null,
+              googleTokens: null,
+              googleUser: null,
+              error: null,
+            },
+            false,
+            'clearGoogleAuth'
+          ),
+
         logout: async () => {
           const { authMethod, jwtTokens, getValidAccessToken } = get();
-          
+
           try {
             // Get current access token for API call
             const accessToken = getValidAccessToken();
-            
+
             if (accessToken) {
               // Call backend logout API with refresh token
-              const refreshToken = authMethod === 'jwt' ? jwtTokens?.refreshToken : undefined;
+              const refreshToken =
+                authMethod === 'jwt' ? jwtTokens?.refreshToken : undefined;
               await authAPI.logout(accessToken, refreshToken);
             }
           } catch (error) {
             console.error('Backend logout error:', error);
             // Continue with local logout even if backend call fails
           }
-          
+
           // Clear all authentication state
           set(
             {
@@ -260,90 +255,117 @@ export const useAuthStore = create<AuthState>()(
 
         isTokenExpired: () => {
           const { authMethod, jwtTokens, googleTokens } = get();
-          
+
           if (authMethod === 'jwt' && jwtTokens) {
             return Date.now() >= jwtTokens.expiresAt;
           }
-          
+
           if (authMethod === 'google' && googleTokens) {
             return Date.now() >= googleTokens.expiresAt;
           }
-          
+
           return true;
         },
-        
+
         isTokenExpiringSoon: (thresholdMinutes = 5) => {
           const { authMethod, jwtTokens, googleTokens } = get();
           const thresholdMs = thresholdMinutes * 60 * 1000;
-          
+
           if (authMethod === 'jwt' && jwtTokens) {
-            return Date.now() >= (jwtTokens.expiresAt - thresholdMs);
+            return Date.now() >= jwtTokens.expiresAt - thresholdMs;
           }
-          
+
           if (authMethod === 'google' && googleTokens) {
-            return Date.now() >= (googleTokens.expiresAt - thresholdMs);
+            return Date.now() >= googleTokens.expiresAt - thresholdMs;
           }
-          
+
           return true;
         },
-        
+
         getValidAccessToken: () => {
           const { authMethod, jwtTokens, googleTokens, isTokenExpired } = get();
-          
+
           if (isTokenExpired()) {
             return null;
           }
-          
+
           if (authMethod === 'jwt' && jwtTokens) {
             return jwtTokens.accessToken;
           }
-          
+
           if (authMethod === 'google' && googleTokens) {
             return googleTokens.accessToken;
           }
-          
+
           return null;
         },
-        
+
         refreshTokenIfNeeded: async () => {
-          const { authMethod, jwtTokens, isTokenExpiringSoon, updateJWTTokens, clearJWTAuth, setError } = get();
-          
+          const { authMethod, jwtTokens, isTokenExpiringSoon } = get();
+
           if (authMethod !== 'jwt' || !jwtTokens || !isTokenExpiringSoon()) {
             return true; // No refresh needed
           }
-          
-          try {
-            const response = await fetch('/api/auth/refresh', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                refreshToken: jwtTokens.refreshToken,
-              }),
-            });
-            
-            if (!response.ok) {
-              throw new Error('Token refresh failed');
-            }
-            
-            const data = await response.json();
-            
-            if (data.success && data.data.accessToken) {
-              updateJWTTokens({
-                accessToken: data.data.accessToken,
-                expiresAt: data.data.expiresAt || Date.now() + (60 * 60 * 1000), // 1 hour default
-              });
-              return true;
-            } else {
-              throw new Error(data.message || 'Token refresh failed');
-            }
-          } catch (error) {
-            console.error('Token refresh error:', error);
-            setError('Session expired. Please log in again.');
-            clearJWTAuth();
-            return false;
+
+          // Share one in-flight exchange between concurrent callers: the
+          // rotated refresh token makes a second parallel exchange fatal.
+          if (refreshInFlight) {
+            return refreshInFlight;
           }
+
+          refreshInFlight = (async () => {
+            // Re-read state inside the exchange so the freshest refresh
+            // token is used.
+            const {
+              jwtTokens: tokens,
+              updateJWTTokens,
+              clearJWTAuth,
+              setError,
+            } = get();
+            if (!tokens) return false;
+
+            try {
+              const response = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  refreshToken: tokens.refreshToken,
+                }),
+              });
+
+              if (!response.ok) {
+                throw new Error('Token refresh failed');
+              }
+
+              const data = await response.json();
+
+              if (data.success && data.data.accessToken) {
+                updateJWTTokens({
+                  accessToken: data.data.accessToken,
+                  // The server rotates the refresh token on every exchange;
+                  // keeping the old one would trip reuse detection next time.
+                  ...(data.data.refreshToken
+                    ? { refreshToken: data.data.refreshToken }
+                    : {}),
+                  expiresAt: data.data.expiresAt || Date.now() + 60 * 60 * 1000, // 1 hour default
+                });
+                return true;
+              } else {
+                throw new Error(data.message || 'Token refresh failed');
+              }
+            } catch (error) {
+              console.error('Token refresh error:', error);
+              setError('Session expired. Please log in again.');
+              clearJWTAuth();
+              return false;
+            }
+          })().finally(() => {
+            refreshInFlight = null;
+          });
+
+          return refreshInFlight;
         },
       }),
       {
@@ -362,11 +384,16 @@ export const useAuthStore = create<AuthState>()(
             // Reset transient state on rehydration
             state.isLoading = false;
             state.error = null;
-            
+
             // Check if stored tokens are still valid
             if (state.isTokenExpired()) {
               if (state.authMethod === 'jwt') {
-                state.clearJWTAuth();
+                // An expired access token is recoverable while a refresh
+                // token exists: keep the session and let the auth guard
+                // exchange it (#57). Only a missing refresh token is fatal.
+                if (!state.jwtTokens?.refreshToken) {
+                  state.clearJWTAuth();
+                }
               } else if (state.authMethod === 'google') {
                 state.clearGoogleAuth();
               }

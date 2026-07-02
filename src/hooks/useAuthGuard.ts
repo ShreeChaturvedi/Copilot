@@ -26,7 +26,9 @@ export interface AuthGuardState {
 /**
  * Hook for protecting routes and managing authentication state
  */
-export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState {
+export function useAuthGuard(
+  options: UseAuthGuardOptions = {}
+): AuthGuardState {
   const {
     requireAuth = true,
     redirectTo = '/login',
@@ -91,31 +93,37 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
 
         // If authenticated, check token validity if requested
         if (isAuthenticated && checkTokenValidity) {
-          // Check if token is expired
+          // Check if the access token is fully expired
           if (isTokenExpired()) {
-            console.log('Token expired, clearing auth');
-            if (authMethod === 'jwt') {
-              clearJWTAuth();
-            } else if (authMethod === 'google') {
-              clearGoogleAuth();
-            }
-            
-            if (requireAuth) {
-              if (isMounted) {
-                setState({
-                  isLoading: false,
-                  isAuthenticated: false,
-                  user: null,
-                  shouldRedirect: true,
-                  redirectPath: redirectTo,
-                });
-              }
-            }
-            return;
-          }
+            // A fully expired access token is recoverable while the refresh
+            // token is still valid: attempt the exchange before giving up (#57).
+            const canRecover =
+              authMethod === 'jwt' && !!jwtTokens?.refreshToken;
+            const recovered = canRecover ? await refreshTokenIfNeeded() : false;
 
-          // Try to refresh JWT token if needed
-          if (authMethod === 'jwt') {
+            if (!recovered) {
+              console.log('Token expired and not recoverable, clearing auth');
+              if (authMethod === 'jwt') {
+                clearJWTAuth();
+              } else if (authMethod === 'google') {
+                clearGoogleAuth();
+              }
+
+              if (requireAuth) {
+                if (isMounted) {
+                  setState({
+                    isLoading: false,
+                    isAuthenticated: false,
+                    user: null,
+                    shouldRedirect: true,
+                    redirectPath: redirectTo,
+                  });
+                }
+              }
+              return;
+            }
+          } else if (authMethod === 'jwt') {
+            // Not expired yet: refresh proactively while "expiring soon"
             const refreshSuccess = await refreshTokenIfNeeded();
             if (!refreshSuccess && requireAuth) {
               if (isMounted) {
@@ -132,16 +140,22 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
           }
 
           // Verify token with backend (optional, can be expensive)
+          // Read tokens from the store, not the render closure: the refresh
+          // above may have just rotated them.
+          const currentTokens = useAuthStore.getState().jwtTokens;
           // Skip verification for mock tokens in development
-          const isMockToken = jwtTokens?.accessToken === 'mock-access-token';
-          if (authMethod === 'jwt' && jwtTokens && !isMockToken) {
+          const isMockToken =
+            currentTokens?.accessToken === 'mock-access-token';
+          if (authMethod === 'jwt' && currentTokens && !isMockToken) {
             try {
-              const verification = await authAPI.verifyToken(jwtTokens.accessToken);
+              const verification = await authAPI.verifyToken(
+                currentTokens.accessToken
+              );
               if (!verification.valid) {
                 console.log('Token verification failed, clearing auth');
                 clearJWTAuth();
                 setError('Session expired. Please log in again.');
-                
+
                 if (requireAuth) {
                   if (isMounted) {
                     setState({
@@ -161,8 +175,13 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
             }
           } else if (isMockToken) {
             // Reduce noisy logs in dev; log only once per mount/session
-            if (process.env.NODE_ENV !== 'production' && !hasLoggedMockSkipRef.current) {
-              console.debug('Mock token detected, skipping backend verification');
+            if (
+              process.env.NODE_ENV !== 'production' &&
+              !hasLoggedMockSkipRef.current
+            ) {
+              console.debug(
+                'Mock token detected, skipping backend verification'
+              );
               hasLoggedMockSkipRef.current = true;
             }
           }
@@ -178,7 +197,6 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): AuthGuardState 
             redirectPath: null,
           });
         }
-
       } catch (error) {
         console.error('Auth guard error:', error);
         if (isMounted) {
