@@ -38,11 +38,19 @@ const envSchema = z.object({
   VERCEL_ENV: z.string().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+// Parsing eagerly at import time meant merely importing this module threw
+// whenever a required var (e.g. JWT_SECRET) was unset. Verified unimported
+// anywhere in the runtime graph or test/ as of 2026-07-02 (see notes); parse
+// lazily on first access so that stays true if something starts importing it.
+let _env: z.infer<typeof envSchema> | undefined;
+export function getEnv() {
+  if (!_env) _env = envSchema.parse(process.env);
+  return _env;
+}
 
-export const isDevelopment = env.NODE_ENV === 'development';
-export const isProduction = env.NODE_ENV === 'production';
-export const isTest = env.NODE_ENV === 'test';
+export const isDevelopment = () => getEnv().NODE_ENV === 'development';
+export const isProduction = () => getEnv().NODE_ENV === 'production';
+export const isTest = () => getEnv().NODE_ENV === 'test';
 
 export const getBaseUrl = () => {
   // An explicit FRONTEND_URL always wins so emailed links point at the

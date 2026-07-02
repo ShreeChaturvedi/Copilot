@@ -32,7 +32,7 @@ export const config = {
 
   // JWT settings (will be used in task 4.1)
   JWT: {
-    SECRET: process.env.JWT_SECRET || 'your-secret-key',
+    SECRET: process.env.JWT_SECRET,
     EXPIRES_IN: '15m',
     REFRESH_EXPIRES_IN: '7d',
   },
