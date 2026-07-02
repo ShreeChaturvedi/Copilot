@@ -709,9 +709,9 @@ function EventCreationDialogContent({
           value="event"
           className={`space-y-6 ${isEditing ? 'mt-0' : 'mt-6'}`}
         >
-          {/* Event Name and Calendar Selection */}
-          <div className="flex items-end gap-3 min-w-0">
-            <div className="flex-1">
+          {/* Event Name and Calendar Selection. Stacks below 640px (#46). */}
+          <div className="flex items-end gap-3 min-w-0 max-sm:flex-col max-sm:items-stretch">
+            <div className="flex-1 max-sm:w-full">
               <Input
                 ref={titleInputRef}
                 id="event-title"
@@ -721,7 +721,9 @@ function EventCreationDialogContent({
                 className="w-full"
               />
             </div>
-            <div className={`${calendarSelectWidth} max-w-[50%]`}>
+            <div
+              className={`${calendarSelectWidth} max-w-[50%] max-sm:w-full max-sm:max-w-full`}
+            >
               <Combobox
                 options={calendarOptions}
                 value={formData.calendarName}
@@ -734,8 +736,8 @@ function EventCreationDialogContent({
             </div>
           </div>
 
-          {/* Date and Time Selection */}
-          <div className="flex items-center gap-3 min-w-0">
+          {/* Date and Time Selection. Wraps on narrow viewports (#46). */}
+          <div className="flex items-center gap-3 min-w-0 flex-wrap gap-y-2">
             <CustomDateInput
               value={
                 formData.startDate
@@ -954,7 +956,7 @@ function EventCreationDialogContent({
       {activeTab === 'event' && <ConflictWarning conflicts={conflicts} />}
 
       {activeTab === 'event' && (
-        <div className="flex justify-end gap-2 mt-6">
+        <div className="flex justify-end gap-2 mt-6 border-t border-hairline pt-4 -mx-5 px-5">
           <Button
             variant="outline"
             onClick={handleCancel}
@@ -1106,7 +1108,7 @@ export function EventCreationDialog({
       <Sheet open={open && isSheetMode} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden"
+          className="w-full sm:max-w-lg md:max-w-xl p-5 overflow-y-auto [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>

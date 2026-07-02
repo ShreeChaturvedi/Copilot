@@ -793,6 +793,164 @@ body {
 }
 
 /* ==========================================
+   SETTLE dialogs and sheets (design-brief §4.5, §5)
+   Material and motion are bound to the shadcn data-slots so dialog.tsx,
+   alert-dialog.tsx, and sheet.tsx stay thin. Scrim = the void at 60% with
+   a 4px blur; center dialogs settle in (translateY 8px + scale 0.98 ->
+   identity, 240ms --ease-settle) and fade out in 160ms; sheets slide 280ms.
+   Below 640px every dialog becomes a bottom sheet sliding up (#46).
+   ========================================== */
+@layer components {
+  [data-slot='dialog-overlay'],
+  [data-slot='alert-dialog-overlay'],
+  [data-slot='sheet-overlay'] {
+    background-color: color-mix(in oklab, var(--void) 60%, transparent);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  [data-slot='dialog-overlay'][data-state='open'],
+  [data-slot='alert-dialog-overlay'][data-state='open'],
+  [data-slot='sheet-overlay'][data-state='open'] {
+    animation: settle-fade-in var(--dur-3) var(--ease-settle);
+  }
+  [data-slot='dialog-overlay'][data-state='closed'],
+  [data-slot='alert-dialog-overlay'][data-state='closed'],
+  [data-slot='sheet-overlay'][data-state='closed'] {
+    animation: settle-fade-out 160ms var(--ease-out) forwards;
+  }
+
+  [data-slot='dialog-content'][data-state='open'],
+  [data-slot='alert-dialog-content'][data-state='open'] {
+    animation: dialog-settle-in var(--dur-3) var(--ease-settle);
+  }
+  [data-slot='dialog-content'][data-state='closed'],
+  [data-slot='alert-dialog-content'][data-state='closed'] {
+    animation: settle-fade-out 160ms var(--ease-out) forwards;
+  }
+
+  /* Side sheets: slide 280ms in with the settle curve, 200ms out */
+  [data-slot='sheet-content'][data-side='right'][data-state='open'] {
+    animation: sheet-in-right 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='right'][data-state='closed'] {
+    animation: sheet-out-right 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='left'][data-state='open'] {
+    animation: sheet-in-left 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='left'][data-state='closed'] {
+    animation: sheet-out-left 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='top'][data-state='open'] {
+    animation: sheet-in-top 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='top'][data-state='closed'] {
+    animation: sheet-out-top 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='bottom'][data-state='open'] {
+    animation: sheet-in-bottom 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='bottom'][data-state='closed'] {
+    animation: sheet-out-bottom 200ms var(--ease-out) forwards;
+  }
+
+  @keyframes settle-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes settle-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes dialog-settle-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+  @keyframes sheet-in-right {
+    from {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-out-right {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes sheet-out-left {
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes sheet-in-top {
+    from {
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes sheet-out-top {
+    to {
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes sheet-in-bottom {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out-bottom {
+    to {
+      transform: translateY(100%);
+    }
+  }
+
+  /* Below 640px, center dialogs are bottom sheets: slide up instead of
+     settling from above (#46). Matches the max-sm positional classes in
+     dialog.tsx / alert-dialog.tsx. */
+  @media (width < 40rem) {
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'] {
+      animation: sheet-in-bottom 280ms var(--ease-settle);
+    }
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'] {
+      animation: sheet-out-bottom 200ms var(--ease-out) forwards;
+    }
+  }
+
+  /* Reduced motion: everything becomes a 120ms crossfade (design-brief §5) */
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot='dialog-overlay'][data-state='open'],
+    [data-slot='alert-dialog-overlay'][data-state='open'],
+    [data-slot='sheet-overlay'][data-state='open'],
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'],
+    [data-slot='sheet-content'][data-state='open'] {
+      animation: settle-fade-in 120ms ease-out;
+    }
+    [data-slot='dialog-overlay'][data-state='closed'],
+    [data-slot='alert-dialog-overlay'][data-state='closed'],
+    [data-slot='sheet-overlay'][data-state='closed'],
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'],
+    [data-slot='sheet-content'][data-state='closed'] {
+      animation: settle-fade-out 120ms ease-out forwards;
+    }
+  }
+}
+
+/* ==========================================
    Auth Pages: Animated OKLCH Gradient + Frosted Panels + Cursor Glow Border
    ========================================== */
 @layer components {
