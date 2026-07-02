@@ -1,13 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { format } from 'date-fns';
-import {
-  Calendar as CalendarIcon,
-  Clock as ClockIcon,
-  MapPin,
-  Tag as TagIcon,
-  FileText,
-  Loader,
-} from 'lucide-react';
+import { format, isToday, isBefore, startOfDay } from 'date-fns';
+import { MapPin, Paperclip, FileText, Plus, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 import {
   Sheet,
@@ -15,11 +9,25 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { IntegratedActionBar } from '@/components/dialogs/IntegratedActionBar';
 import { cn } from '@/lib/utils';
-import type { FileAttachment, Task } from '@shared/types';
+import type { FileAttachment, Task, TaskTag, Priority } from '@shared/types';
 import { useUIStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,24 +38,95 @@ import { DefaultPreview } from '@/components/smart-input/components/previews/Def
 import { useTasks } from '@/hooks/useTasks';
 import StatusBadge from './StatusBadge';
 
-// Local utils
-function getTagIcon(type: string) {
-  switch (type) {
-    case 'priority':
-      return TagIcon;
-    case 'location':
-      return MapPin;
-    default:
-      return TagIcon;
-  }
+/* ----------------------------------------------------------------------------
+ * Permanent field rows (#45): SCHEDULE, PRIORITY, LIST, TAGS are always
+ * drawn. Unset fields render etched (SSM 11 label in --etch-text + a dashed
+ * ghost slot), per design-brief §4.5 / §2.5: unset is drawn, not hidden.
+ * Every control writes through the real task update API.
+ * ------------------------------------------------------------------------- */
+
+interface TaskListOption {
+  id: string;
+  name: string;
+  color: string;
 }
 
-function isSameDay(date: Date) {
-  const now = new Date(date);
+function useTaskListOptions(): TaskListOption[] {
+  const query = useQuery({
+    // Same key as useTaskManagement's list query so React Query dedupes
+    queryKey: ['task-lists', { withTaskCount: false }],
+    queryFn: async () => {
+      const token = useAuthStore.getState().getValidAccessToken();
+      const res = await fetch('/api/task-lists', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!(res.headers.get('content-type') || '').includes('json')) return [];
+      const body = await res.json();
+      if (!res.ok || !body.success) return [];
+      const items = Array.isArray(body.data?.data)
+        ? body.data.data
+        : Array.isArray(body.data)
+          ? body.data
+          : [];
+      return items.map((item: Record<string, unknown>) => ({
+        id: String(item.id),
+        name: String(item.name ?? 'Tasks'),
+        emoji: String(item.icon ?? ''),
+        color: String(item.color ?? '#789296'),
+      }));
+    },
+    staleTime: 30_000,
+  });
+  return (query.data as TaskListOption[] | undefined) ?? [];
+}
+
+function FieldRow({
+  label,
+  isSet,
+  children,
+}: {
+  label: string;
+  isSet: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0
+    <div className="grid grid-cols-[92px_1fr] items-center gap-3 min-h-9">
+      <span
+        className={cn(
+          'font-mono text-[11px] uppercase tracking-[0.06em] select-none',
+          isSet ? 'text-ink-muted' : 'text-etch-text'
+        )}
+      >
+        {label}
+      </span>
+      <div className="min-w-0 flex items-center">{children}</div>
+    </div>
   );
 }
+
+/** Dashed etched slot for an unset value (§2.5: dashed = planned/not yet real) */
+const ghostTriggerClass = cn(
+  'inline-flex items-center gap-1.5 rounded-md border border-dashed border-etch-strong',
+  'px-2.5 py-1 text-[13px] text-faint',
+  'hover:bg-surface-2 hover:text-ink-muted transition-colors duration-150',
+  'outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
+);
+
+const setTriggerClass = cn(
+  'inline-flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 text-[13px] text-ink',
+  'hover:bg-surface-2 transition-colors duration-150',
+  'outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
+);
+
+const PRIORITY_LABELS: Record<Priority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
 
 export interface TaskDetailSheetProps {
   open: boolean;
@@ -69,9 +148,13 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   const { peekMode, setPeekMode } = useUIStore();
   const { updateTask } = useTasks();
   const queryClient = useQueryClient();
+  const taskLists = useTaskListOptions();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeAttachment, setActiveAttachment] =
     useState<FileAttachment | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
+  const [addTagOpen, setAddTagOpen] = useState(false);
 
   const handlePeekToggle = useCallback(() => {
     setPeekMode(peekMode === 'center' ? 'right' : 'center');
@@ -131,7 +214,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     () => task.tags?.find((t) => t.type === 'location'),
     [task.tags]
   );
-  const otherTags = useMemo(
+  const labelTags = useMemo(
     () =>
       (task.tags || []).filter(
         (t) => t.type !== 'date' && t.type !== 'time' && t.type !== 'location'
@@ -139,7 +222,116 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     [task.tags]
   );
 
-  // No client-side fetching needed for previews; use direct URLs for images
+  const currentList = useMemo(
+    () => taskLists.find((l) => l.id === task.taskListId),
+    [taskLists, task.taskListId]
+  );
+
+  /* ---- field mutations (all through the real update API) ---- */
+
+  const setSchedule = useCallback(
+    (date: Date | null) => {
+      updateTask.mutate({ id: task.id, updates: { scheduledDate: date } });
+    },
+    [task.id, updateTask]
+  );
+
+  const handleDaySelect = useCallback(
+    (day: Date | undefined) => {
+      if (!day) return;
+      const next = new Date(day);
+      if (task.scheduledDate) {
+        // Keep the existing time of day when only the date changes
+        const prev = new Date(task.scheduledDate);
+        next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+      } else {
+        next.setHours(0, 0, 0, 0);
+      }
+      setSchedule(next);
+    },
+    [task.scheduledDate, setSchedule]
+  );
+
+  const handleTimeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value; // "HH:mm" or ""
+      const base = task.scheduledDate
+        ? new Date(task.scheduledDate)
+        : new Date();
+      if (!value) {
+        base.setHours(0, 0, 0, 0);
+        setSchedule(base);
+        return;
+      }
+      const [h, m] = value.split(':').map(Number);
+      base.setHours(h, m, 0, 0);
+      setSchedule(base);
+    },
+    [task.scheduledDate, setSchedule]
+  );
+
+  const setPriority = useCallback(
+    (priority: Priority) => {
+      updateTask.mutate({ id: task.id, updates: { priority } });
+    },
+    [task.id, updateTask]
+  );
+
+  const setList = useCallback(
+    (taskListId: string) => {
+      updateTask.mutate({ id: task.id, updates: { taskListId } });
+    },
+    [task.id, updateTask]
+  );
+
+  const replaceTags = useCallback(
+    (tags: TaskTag[]) => {
+      updateTask.mutate({ id: task.id, updates: { tags } });
+    },
+    [task.id, updateTask]
+  );
+
+  const addTag = useCallback(() => {
+    const value = tagDraft.trim().replace(/^#/, '');
+    if (!value) return;
+    const exists = (task.tags || []).some(
+      (t) =>
+        t.type === 'label' &&
+        String(t.value).toLowerCase() === value.toLowerCase()
+    );
+    if (!exists) {
+      const newTag: TaskTag = {
+        id: `tag-${Date.now()}`,
+        type: 'label',
+        value,
+        displayText: `#${value}`,
+        iconName: 'Tag',
+      };
+      replaceTags([...(task.tags || []), newTag]);
+    }
+    setTagDraft('');
+    setAddTagOpen(false);
+  }, [tagDraft, task.tags, replaceTags]);
+
+  const removeTag = useCallback(
+    (tagId: string) => {
+      replaceTags((task.tags || []).filter((t) => t.id !== tagId));
+    },
+    [task.tags, replaceTags]
+  );
+
+  /* ---- display helpers ---- */
+
+  const scheduled = task.scheduledDate ? new Date(task.scheduledDate) : null;
+  const scheduledHasTime =
+    !!scheduled && (scheduled.getHours() !== 0 || scheduled.getMinutes() !== 0);
+  const scheduleInk = scheduled
+    ? isBefore(scheduled, startOfDay(new Date())) && !task.completed
+      ? 'text-destructive'
+      : isToday(scheduled)
+        ? 'text-aqua'
+        : 'text-ink'
+    : '';
 
   const handleEdit = useCallback(() => {
     onEdit?.(task.id);
@@ -154,17 +346,17 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
       <SheetContent
         side="right"
         className={cn(
-          'w-full sm:max-w-lg md:max-w-xl p-6 overflow-y-auto [&>button]:hidden',
+          'w-full sm:max-w-lg md:max-w-xl p-5 overflow-y-auto [&>button]:hidden',
           className
         )}
       >
         <SheetDescription className="sr-only">
           Task details for {task.title}
         </SheetDescription>
-        {/* Header: Title + action bar (Edit / Delete / Peek toggle / Close) */}
+        {/* Header: Title + action bar (Edit / Delete / Close) */}
         <div className="flex items-start justify-between gap-2">
           <SheetTitle
-            className="text-xl font-semibold leading-tight truncate whitespace-nowrap"
+            className="text-lg font-semibold leading-tight tracking-[-0.01em] truncate whitespace-nowrap"
             title={task.title}
           >
             {task.title}
@@ -178,25 +370,245 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               onClose={() => onOpenChange(false)}
               isDeleting={false}
               showPeekToggle={false}
+              subject="task"
             />
           </div>
         </div>
 
-        <div className="space-y-6 mt-4">
-          {/* Status property at top */}
-          <div className="flex items-center gap-3">
-            <div className="text-muted-foreground flex-shrink-0">
-              <Loader className="h-4 w-4" />
+        {/* Permanent field rows (#45): drawn whether set or not */}
+        <div className="mt-2 space-y-1">
+          <FieldRow label="Status" isSet>
+            <StatusBadge
+              task={task}
+              onChange={(status) =>
+                updateTask.mutate({ id: task.id, updates: { status } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Schedule" isSet={!!scheduled}>
+            <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={scheduled ? setTriggerClass : ghostTriggerClass}
+                  aria-label={
+                    scheduled
+                      ? `Change date, currently ${format(scheduled, 'EEEE, MMMM d')}`
+                      : 'Set a date'
+                  }
+                >
+                  {scheduled ? (
+                    <span
+                      className={cn(
+                        'font-mono text-xs uppercase tracking-[0.02em]',
+                        scheduleInk
+                      )}
+                    >
+                      {format(scheduled, 'EEE, MMM d')}
+                      {scheduledHasTime
+                        ? ` · ${format(scheduled, 'h:mm a')}`
+                        : ''}
+                    </span>
+                  ) : (
+                    'No date'
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarPicker
+                  mode="single"
+                  selected={scheduled ?? undefined}
+                  onSelect={handleDaySelect}
+                  initialFocus
+                />
+                <div className="flex items-center gap-2 border-t border-hairline p-3">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-muted">
+                    Time
+                  </span>
+                  <Input
+                    type="time"
+                    aria-label="Time"
+                    className="h-8 w-auto font-mono text-xs"
+                    value={
+                      scheduled && scheduledHasTime
+                        ? format(scheduled, 'HH:mm')
+                        : ''
+                    }
+                    onChange={handleTimeChange}
+                    disabled={!scheduled}
+                  />
+                  {scheduled && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto text-ink-muted"
+                      onClick={() => {
+                        setSchedule(null);
+                        setScheduleOpen(false);
+                      }}
+                    >
+                      Remove date
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </FieldRow>
+
+          <FieldRow label="Priority" isSet={!!task.priority}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={
+                    task.priority ? setTriggerClass : ghostTriggerClass
+                  }
+                  aria-label={
+                    task.priority
+                      ? `Change priority, currently ${PRIORITY_LABELS[task.priority]}`
+                      : 'Set a priority'
+                  }
+                >
+                  {task.priority
+                    ? PRIORITY_LABELS[task.priority]
+                    : 'No priority'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-36">
+                {(['high', 'medium', 'low'] as Priority[]).map((p) => (
+                  <DropdownMenuItem
+                    key={p}
+                    onClick={() => setPriority(p)}
+                    className={cn(
+                      'cursor-pointer',
+                      task.priority === p && 'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    {PRIORITY_LABELS[p]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </FieldRow>
+
+          <FieldRow label="List" isSet={!!currentList}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={currentList ? setTriggerClass : ghostTriggerClass}
+                  aria-label={
+                    currentList
+                      ? `Move to another list, currently in ${currentList.name}`
+                      : 'Add to a list'
+                  }
+                >
+                  {currentList ? (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: currentList.color }}
+                      />
+                      <span className="truncate">{currentList.name}</span>
+                    </>
+                  ) : (
+                    'No list'
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                {taskLists.map((list) => (
+                  <DropdownMenuItem
+                    key={list.id}
+                    onClick={() => setList(list.id)}
+                    className={cn(
+                      'cursor-pointer gap-2',
+                      list.id === task.taskListId &&
+                        'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: list.color }}
+                    />
+                    <span className="truncate">{list.name}</span>
+                  </DropdownMenuItem>
+                ))}
+                {taskLists.length === 0 && (
+                  <DropdownMenuItem disabled>No lists yet</DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </FieldRow>
+
+          <FieldRow label="Tags" isSet={labelTags.length > 0}>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {labelTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="group/tag inline-flex h-5 items-center gap-1 rounded-full px-2 font-mono text-[11px]"
+                  style={{
+                    backgroundColor: `${tag.color || '#789296'}1f`,
+                    color: tag.color || 'var(--ink-2)',
+                  }}
+                >
+                  {tag.displayText}
+                  <button
+                    type="button"
+                    aria-label={`Remove tag ${tag.displayText}`}
+                    className="opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none"
+                    onClick={() => removeTag(tag.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <Popover open={addTagOpen} onOpenChange={setAddTagOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={
+                      labelTags.length > 0
+                        ? cn(setTriggerClass, 'text-ink-muted mx-0 px-1.5')
+                        : ghostTriggerClass
+                    }
+                    aria-label="Add tag"
+                  >
+                    {labelTags.length > 0 ? (
+                      <Plus className="h-3.5 w-3.5" />
+                    ) : (
+                      'No tags'
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      addTag();
+                    }}
+                  >
+                    <Input
+                      autoFocus
+                      value={tagDraft}
+                      onChange={(e) => setTagDraft(e.target.value)}
+                      placeholder="Tag name"
+                      aria-label="Tag name"
+                      className="h-8 text-[13px]"
+                    />
+                  </form>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div className="flex-1">
-              <StatusBadge
-                task={task}
-                onChange={(status) =>
-                  updateTask.mutate({ id: task.id, updates: { status } })
-                }
-              />
-            </div>
-          </div>
+          </FieldRow>
+        </div>
+
+        {/* Content rows: render only when data exists */}
+        <div className="space-y-5 mt-5 border-t border-hairline pt-5">
           {/* Description */}
           {task.description || task.parsedMetadata?.originalInput ? (
             <div className="flex items-start gap-3">
@@ -213,27 +625,6 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
             </div>
           ) : null}
 
-          {/* Due Date (and time) */}
-          {task.scheduledDate && (
-            <div className="flex items-center gap-3">
-              <div className="text-muted-foreground flex-shrink-0">
-                {isSameDay(task.scheduledDate) ? (
-                  <CalendarIcon className="h-4 w-4" />
-                ) : (
-                  <ClockIcon className="h-4 w-4" />
-                )}
-              </div>
-              <div className="flex-1 text-sm font-medium">
-                <span>{format(task.scheduledDate, 'MMM dd, yyyy')}</span>
-                {!isSameDay(task.scheduledDate) && (
-                  <span className="ml-2 text-muted-foreground">
-                    {format(task.scheduledDate, 'h:mm a')}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Location */}
           {locationTag && (
             <div className="flex items-center gap-3">
@@ -246,52 +637,13 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
             </div>
           )}
 
-          {/* Other Tags */}
-          {otherTags.length > 0 && (
-            <div className="flex items-start gap-3">
-              <div className="text-muted-foreground flex-shrink-0 mt-0.5">
-                <TagIcon className="h-4 w-4" />
-              </div>
-              <div className="flex-1">
-                <div className="flex flex-wrap gap-1">
-                  {otherTags.map((tag) => {
-                    const Icon = getTagIcon(tag.type);
-                    return (
-                      <Badge
-                        key={`${tag.id}_${String(tag.value)}`}
-                        variant="outline"
-                        className={cn(
-                          'text-xs px-2 py-1 gap-1 text-muted-foreground border-muted-foreground/30',
-                          tag.color &&
-                            `border-[${tag.color}]/30 text-[${tag.color}]`
-                        )}
-                        style={
-                          tag.color
-                            ? {
-                                borderColor: `${tag.color}30`,
-                                color: tag.color,
-                                backgroundColor: `${tag.color}1A`,
-                              }
-                            : undefined
-                        }
-                      >
-                        <Icon
-                          className="w-3 h-3"
-                          style={{ color: tag.color }}
-                        />
-                        {tag.displayText}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* File Attachments - reuse CompactFilePreview visuals; disable removal */}
+          {/* File Attachments - reuse CompactFilePreview visuals */}
           {task.attachments && task.attachments.length > 0 && (
             <div className="space-y-2">
-              <div className="text-sm font-medium">Attachments</div>
+              <div className="flex items-center gap-3">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm font-medium">Attachments</div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {task.attachments.map((att) => {
                   const isImage = (att.type || '').startsWith('image/');
@@ -301,7 +653,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                   return (
                     <div
                       key={att.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-background cursor-pointer hover:bg-muted transition-colors"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-hairline bg-surface-1 cursor-pointer hover:bg-surface-2 transition-colors"
                       onClick={() => openAttachment(att)}
                       title={`Preview ${att.name}`}
                     >

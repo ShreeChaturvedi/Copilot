@@ -1,4 +1,12 @@
-import { format, isToday, isTomorrow, isThisWeek, isAfter, isBefore, startOfDay } from 'date-fns';
+import {
+  format,
+  isToday,
+  isTomorrow,
+  isThisWeek,
+  isAfter,
+  isBefore,
+  startOfDay,
+} from 'date-fns';
 
 /**
  * Date grouping utilities for tasks and events
@@ -14,7 +22,7 @@ export interface GroupedItems<T> {
  */
 export const getDayKey = (date: Date | null): string => {
   if (!date) {
-    return 'No Due Date';
+    return 'No date';
   }
 
   const itemDate = new Date(date);
@@ -61,27 +69,27 @@ export const groupItemsByDate = <T>(
  */
 export const getDayKeyOrder = (dayKeys: string[]): string[] => {
   const orderMap: Record<string, number> = {
-    'Overdue': 0,
-    'Today': 1,
-    'Tomorrow': 2,
-    'Monday': 3,
-    'Tuesday': 4,
-    'Wednesday': 5,
-    'Thursday': 6,
-    'Friday': 7,
-    'Saturday': 8,
-    'Sunday': 9,
-    'No Due Date': 100, // Should appear last
+    Overdue: 0,
+    Today: 1,
+    Tomorrow: 2,
+    Monday: 3,
+    Tuesday: 4,
+    Wednesday: 5,
+    Thursday: 6,
+    Friday: 7,
+    Saturday: 8,
+    Sunday: 9,
+    'No date': 100, // Should appear last
   };
 
   return dayKeys.sort((a, b) => {
     const orderA = orderMap[a] ?? 50; // Default order for date strings (e.g., "Jan 15")
     const orderB = orderMap[b] ?? 50;
-    
+
     if (orderA !== orderB) {
       return orderA - orderB;
     }
-    
+
     // For date strings with same default order, sort alphabetically
     return a.localeCompare(b);
   });
@@ -118,7 +126,7 @@ export const filterUpcomingItems = <T>(
     .filter((item) => {
       const itemDate = getDateFn(item);
       if (!itemDate) return true; // Include items without dates
-      
+
       const itemStart = new Date(itemDate);
       // Show items from today forward
       return isAfter(itemStart, now) || isToday(itemStart);
@@ -126,7 +134,7 @@ export const filterUpcomingItems = <T>(
     .sort((a, b) => {
       const dateA = getDateFn(a);
       const dateB = getDateFn(b);
-      
+
       // Sort by date, items with dates come first
       if (dateA && dateB) {
         return new Date(dateA).getTime() - new Date(dateB).getTime();

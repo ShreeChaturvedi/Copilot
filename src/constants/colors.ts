@@ -21,5 +21,19 @@ export const COLOR_PRESETS = [
 
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
 
+/** Human names for the curated swatches (picker aria-labels). */
+export const COLOR_PRESET_NAMES: Record<ColorPreset, string> = {
+  '#d8625c': 'Red',
+  '#cf6f19': 'Orange',
+  '#c0a320': 'Yellow',
+  '#629f39': 'Green',
+  '#0d97d5': 'Blue',
+  '#6875d8': 'Indigo',
+  '#a272d4': 'Violet',
+  '#c265b0': 'Magenta',
+  '#936b4a': 'Brown',
+  '#789296': 'Slate',
+};
+
 /** Default swatch for new lists/calendars (blue, matching the old default). */
 export const DEFAULT_PRESET_COLOR: ColorPreset = '#0d97d5';

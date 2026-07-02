@@ -39,7 +39,9 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
   onDeleteCalendar,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
-  const [editingItem, setEditingItem] = React.useState<CheckboxModeItem | null>(null);
+  const [editingItem, setEditingItem] = React.useState<CheckboxModeItem | null>(
+    null
+  );
 
   // Convert calendars to base list items
   const baseItems = calendars.map(calendarToBaseItem);
@@ -58,8 +60,8 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
 
   const handleDelete = onDeleteCalendar
     ? (item: CheckboxModeItem) => {
-      onDeleteCalendar(item.name);
-    }
+        onDeleteCalendar(item.name);
+      }
     : undefined;
 
   const handleCreateFromDialog = (data: {
@@ -77,7 +79,9 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
     }
   };
 
-  const currentCal = editingItem ? calendars.find(c => c.name === editingItem.name) : undefined;
+  const currentCal = editingItem
+    ? calendars.find((c) => c.name === editingItem.name)
+    : undefined;
 
   return (
     <BaseList<CheckboxModeItem>
@@ -100,14 +104,18 @@ const CalendarListComponent: React.FC<CalendarListProps> = ({
       }}
       onCreateDialogSubmit={handleCreateFromDialog}
       CreateDialogComponent={CreateCalendarDialog}
-      createDialogInitialData={editingItem ? {
-        name: currentCal?.name || editingItem.name,
-        description: currentCal?.description || '',
-        iconId: 'Calendar',
-        color: currentCal?.color || editingItem.color,
-        submitLabel: 'Save Changes',
-        titleLabel: 'Edit Calendar',
-      } : undefined}
+      createDialogInitialData={
+        editingItem
+          ? {
+              name: currentCal?.name || editingItem.name,
+              description: currentCal?.description || '',
+              iconId: 'Calendar',
+              color: currentCal?.color || editingItem.color,
+              submitLabel: 'Save changes',
+              titleLabel: 'Edit calendar',
+            }
+          : undefined
+      }
       addButtonLabel="Calendar"
       emptyStateText="No calendars yet"
       createFirstItemText="Create your first calendar"

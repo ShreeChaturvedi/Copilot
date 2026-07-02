@@ -3,13 +3,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 
@@ -76,120 +69,101 @@ function ResetPasswordForm({
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card className="bg-transparent shadow-none border-transparent">
-        <CardHeader>
-          <CardTitle>Choose a new password</CardTitle>
-          <CardDescription>
-            Enter a new password for your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {missingToken ? (
-            <div className="flex flex-col gap-6">
-              <p className="text-sm text-destructive" role="alert">
-                This password reset link is missing its token. Please request a
-                new reset link.
-              </p>
-              <Button
-                type="button"
-                variant="authPrimary"
-                className="w-full cursor-glow-border transition-colors duration-200"
-                onClick={handleRequestNew}
-              >
-                Request a new link
-              </Button>
+      <div className="grid gap-1.5">
+        <h1 className="text-xl font-semibold tracking-[-0.01em]">
+          Choose a new password
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Enter a new password for your account.
+        </p>
+      </div>
+      {missingToken ? (
+        <div className="flex flex-col gap-5">
+          <p className="text-sm text-destructive" role="alert">
+            This password reset link is missing its token. Please request a new
+            reset link.
+          </p>
+          <Button type="button" className="w-full" onClick={handleRequestNew}>
+            Request a new link
+          </Button>
+        </div>
+      ) : done ? (
+        <div className="flex flex-col gap-5">
+          <p className="text-sm text-muted-foreground" role="status">
+            Your password has been reset. You can now sign in with your new
+            password.
+          </p>
+          <Button type="button" className="w-full" onClick={handleBackToLogin}>
+            Go to sign in
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="password">New password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+                required
+              />
             </div>
-          ) : done ? (
-            <div className="flex flex-col gap-6">
-              <p className="text-sm text-muted-foreground" role="status">
-                Your password has been reset. You can now sign in with your new
-                password.
-              </p>
-              <Button
-                type="button"
-                variant="authPrimary"
-                className="w-full cursor-glow-border transition-colors duration-200"
-                onClick={handleBackToLogin}
-              >
-                Go to login
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="password">New password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    autoComplete="new-password"
-                    required
-                  />
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="confirmPassword">Confirm new password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    autoComplete="new-password"
-                    aria-invalid={confirm.length > 0 && !passwordsMatch}
-                    required
-                  />
-                  {confirm.length > 0 && (
-                    <p
-                      className={cn(
-                        'text-xs',
-                        passwordsMatch ? 'text-success' : 'text-destructive'
-                      )}
-                    >
-                      {passwordsMatch
-                        ? 'Passwords match'
-                        : 'Passwords do not match'}
-                    </p>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Confirm new password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+                aria-invalid={confirm.length > 0 && !passwordsMatch}
+                required
+              />
+              {confirm.length > 0 && (
+                <p
+                  className={cn(
+                    'text-xs',
+                    passwordsMatch ? 'text-success' : 'text-destructive'
                   )}
-                </div>
-                {error && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {error}
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  variant="authPrimary"
-                  disabled={isSubmitting}
-                  className="w-full cursor-glow-border transition-colors duration-200"
                 >
-                  {isSubmitting ? 'Resetting...' : 'Reset password'}
-                </Button>
-              </div>
-              <div className="mt-4 text-center text-sm">
-                <a
-                  href="/login"
-                  onClick={handleBackToLogin}
-                  className="underline underline-offset-4"
-                >
-                  Back to login
-                </a>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+                  {passwordsMatch
+                    ? 'Passwords match'
+                    : 'Passwords do not match'}
+                </p>
+              )}
+            </div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? 'Resetting...' : 'Reset password'}
+            </Button>
+          </div>
+          <div className="mt-5 text-center text-sm text-muted-foreground">
+            <a
+              href="/login"
+              onClick={handleBackToLogin}
+              className="text-foreground underline underline-offset-4"
+            >
+              Back to sign in
+            </a>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
 
 export function ResetPasswordPage() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-4 sm:p-6 md:p-10">
-      <div className="w-full max-w-md rounded-xl frosted-panel p-4 sm:p-6 md:p-8">
-        <ResetPasswordForm />
-      </div>
+    <div className="auth-card w-full max-w-[400px] p-8 max-sm:p-6">
+      <ResetPasswordForm />
     </div>
   );
 }

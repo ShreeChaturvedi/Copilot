@@ -641,8 +641,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
         initialDescription={activeTaskGroup.description || ''}
         initialEmoji={activeTaskGroup.emoji}
         initialColor={activeTaskGroup.color}
-        submitLabel="Save Changes"
-        titleLabel="Edit Task List"
+        submitLabel="Save changes"
+        titleLabel="Edit list"
         onCreateTask={(data) => {
           onEditTaskGroup?.(activeTaskGroup.id, {
             name: data.name,

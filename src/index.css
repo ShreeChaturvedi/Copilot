@@ -793,136 +793,185 @@ body {
 }
 
 /* ==========================================
-   Auth Pages: Animated OKLCH Gradient + Frosted Panels + Cursor Glow Border
+   SETTLE dialogs and sheets (design-brief §4.5, §5)
+   Material and motion are bound to the shadcn data-slots so dialog.tsx,
+   alert-dialog.tsx, and sheet.tsx stay thin. Scrim = the void at 60% with
+   a 4px blur; center dialogs settle in (translateY 8px + scale 0.98 ->
+   identity, 240ms --ease-settle) and fade out in 160ms; sheets slide 280ms.
+   Below 640px every dialog becomes a bottom sheet sliding up (#46).
    ========================================== */
 @layer components {
-  /* Smoothly animatable custom property for conic-gradient angle */
-  @property --auth-angle {
-    syntax: '<angle>';
-    inherits: false;
-    initial-value: 0turn;
+  [data-slot='dialog-overlay'],
+  [data-slot='alert-dialog-overlay'],
+  [data-slot='sheet-overlay'] {
+    background-color: color-mix(in oklab, var(--void) 60%, transparent);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
-  /* Full-page animated background using smooth OKLCH conic gradient overlay */
-  .auth-gradient-bg {
-    position: relative;
-    overflow: hidden;
-    background-color: var(--background);
-    isolation: isolate;
+  [data-slot='dialog-overlay'][data-state='open'],
+  [data-slot='alert-dialog-overlay'][data-state='open'],
+  [data-slot='sheet-overlay'][data-state='open'] {
+    animation: settle-fade-in var(--dur-3) var(--ease-settle);
   }
-  .auth-gradient-bg::before {
-    content: '';
-    position: fixed;
-    inset: -35%;
-    z-index: 0;
-    /* Smooth, continuous hues across the full spectrum in OKLCH */
-    background-image: conic-gradient(
-      in oklch from var(--auth-angle),
-      oklch(0.9 0.12 0) 0deg,
-      oklch(0.9 0.12 60) 60deg,
-      oklch(0.9 0.12 120) 120deg,
-      oklch(0.9 0.12 180) 180deg,
-      oklch(0.9 0.12 240) 240deg,
-      oklch(0.9 0.12 300) 300deg,
-      oklch(0.9 0.12 360) 360deg
-    );
-    filter: blur(120px) saturate(115%);
-    opacity: 0.55;
-    transform: translate3d(0, 0, 0) scale(1.06);
-    /* Two animations: a very slow, continuous angle rotation; and a subtle breathing scale */
-    animation:
-      auth-angle-rotate 90s linear infinite,
-      auth-breathe 24s ease-in-out infinite;
-    pointer-events: none;
-  }
-  .dark .auth-gradient-bg::before {
-    opacity: 0.35; /* slightly subtler in dark mode */
+  [data-slot='dialog-overlay'][data-state='closed'],
+  [data-slot='alert-dialog-overlay'][data-state='closed'],
+  [data-slot='sheet-overlay'][data-state='closed'] {
+    animation: settle-fade-out 160ms var(--ease-out) forwards;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .auth-gradient-bg::before {
-      animation: none;
-      transform: none;
+  [data-slot='dialog-content'][data-state='open'],
+  [data-slot='alert-dialog-content'][data-state='open'] {
+    animation: dialog-settle-in var(--dur-3) var(--ease-settle);
+  }
+  [data-slot='dialog-content'][data-state='closed'],
+  [data-slot='alert-dialog-content'][data-state='closed'] {
+    animation: settle-fade-out 160ms var(--ease-out) forwards;
+  }
+
+  /* Side sheets: slide 280ms in with the settle curve, 200ms out */
+  [data-slot='sheet-content'][data-side='right'][data-state='open'] {
+    animation: sheet-in-right 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='right'][data-state='closed'] {
+    animation: sheet-out-right 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='left'][data-state='open'] {
+    animation: sheet-in-left 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='left'][data-state='closed'] {
+    animation: sheet-out-left 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='top'][data-state='open'] {
+    animation: sheet-in-top 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='top'][data-state='closed'] {
+    animation: sheet-out-top 200ms var(--ease-out) forwards;
+  }
+  [data-slot='sheet-content'][data-side='bottom'][data-state='open'] {
+    animation: sheet-in-bottom 280ms var(--ease-settle);
+  }
+  [data-slot='sheet-content'][data-side='bottom'][data-state='closed'] {
+    animation: sheet-out-bottom 200ms var(--ease-out) forwards;
+  }
+
+  @keyframes settle-fade-in {
+    from {
+      opacity: 0;
     }
   }
-
-  /* No explicit dark override: tokens already swap under .dark */
-
-  /* Continuous rotation of the conic gradient's angle (no element rotation, so no corners) */
-  @keyframes auth-angle-rotate {
+  @keyframes settle-fade-out {
     to {
-      --auth-angle: 1turn;
+      opacity: 0;
+    }
+  }
+  @keyframes dialog-settle-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+  @keyframes sheet-in-right {
+    from {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-out-right {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes sheet-out-left {
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes sheet-in-top {
+    from {
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes sheet-out-top {
+    to {
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes sheet-in-bottom {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out-bottom {
+    to {
+      transform: translateY(100%);
     }
   }
 
-  /* Gentle scale breathing */
-  @keyframes auth-breathe {
-    0% {
-      transform: translate3d(0, 0, 0) scale(1.06);
-      filter: blur(120px) saturate(110%);
+  /* Below 640px, center dialogs are bottom sheets: slide up instead of
+     settling from above (#46). Matches the max-sm positional classes in
+     dialog.tsx / alert-dialog.tsx. */
+  @media (width < 40rem) {
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'] {
+      animation: sheet-in-bottom 280ms var(--ease-settle);
     }
-    50% {
-      transform: translate3d(0, 0, 0) scale(1.1);
-      filter: blur(120px) saturate(118%);
-    }
-    100% {
-      transform: translate3d(0, 0, 0) scale(1.06);
-      filter: blur(120px) saturate(110%);
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'] {
+      animation: sheet-out-bottom 200ms var(--ease-out) forwards;
     }
   }
 
-  /* Frosted glass panel for light and dark modes */
-  .frosted-panel {
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
-    background: color-mix(in oklch, var(--card) 65%, transparent);
-    border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
-    box-shadow: 0 10px 30px oklch(0 0 0 / 0.12);
+  /* Reduced motion: everything becomes a 120ms crossfade (design-brief §5) */
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot='dialog-overlay'][data-state='open'],
+    [data-slot='alert-dialog-overlay'][data-state='open'],
+    [data-slot='sheet-overlay'][data-state='open'],
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'],
+    [data-slot='sheet-content'][data-state='open'] {
+      animation: settle-fade-in 120ms ease-out;
+    }
+    [data-slot='dialog-overlay'][data-state='closed'],
+    [data-slot='alert-dialog-overlay'][data-state='closed'],
+    [data-slot='sheet-overlay'][data-state='closed'],
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'],
+    [data-slot='sheet-content'][data-state='closed'] {
+      animation: settle-fade-out 120ms ease-out forwards;
+    }
   }
-  .dark .frosted-panel {
-    background: color-mix(in oklch, oklch(0.16 0.02 260) 60%, transparent);
-    border: 1px solid oklch(1 0 0 / 0.1);
-    box-shadow: 0 12px 36px oklch(0 0 0 / 0.45);
-  }
+}
 
-  /* Cursor-following aqua glow border (border-only effect; hue re-based
-     from green to the aqua accent — auth anatomy redesign comes later) */
-  .cursor-glow-border {
-    position: relative;
-    isolation: isolate;
+/* ==========================================
+   Auth pages: the room (design-brief §4.8)
+   The rainbow conic gradient, frosted panel, and cursor glow are gone.
+   Auth is the app canvas + one centered 400px machined card; the card's
+   rim lifts to the aqua rim while any field inside has focus.
+   ========================================== */
+@layer components {
+  .auth-card {
+    background: var(--surface-1);
+    border-radius: 12px; /* dialog radius (§2.6) */
+    box-shadow: var(--edge-machined), var(--shadow-2);
+    transition: box-shadow 150ms var(--ease-out);
   }
-  .cursor-glow-border::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px; /* border width */
-    /* Radial gradient in OKLCH centered at cursor position, only visible on border area via mask */
-    background: radial-gradient(
-        in oklch var(--glow-radius, 200px) circle at
-          var(--glow-x, var(--glow-page-x, 50%))
-          var(--glow-y, var(--glow-page-y, 50%)),
-        color-mix(in oklab, var(--aqua) 85%, transparent) 0%,
-        color-mix(in oklab, var(--aqua) 40%, transparent) 35%,
-        color-mix(in oklab, var(--aqua) 10%, transparent) 60%,
-        transparent 70%
-      )
-      border-box;
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.9;
-    transition: opacity 150ms ease;
-    z-index: -1; /* keep it behind button content */
+  .auth-card:focus-within {
+    box-shadow:
+      var(--edge-machined),
+      var(--shadow-2),
+      0 0 0 1px var(--aqua-rim);
   }
-  .cursor-glow-border:hover::before {
-    opacity: 1;
-    /* On hover, stronger and wider glow all around the button */
-    --glow-radius: 340px;
+  @media (prefers-reduced-motion: reduce) {
+    .auth-card {
+      transition: none;
+    }
   }
 }

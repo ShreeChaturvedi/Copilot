@@ -19,7 +19,7 @@ import {
 import { TaskGroupCombobox } from '@/components/smart-input/components/TaskGroupCombobox';
 import { TaskList } from './TaskList';
 import { cn } from '@/lib/utils';
-import { Task, TaskPaneData } from "@shared/types";
+import { Task, TaskPaneData } from '@shared/types';
 import { useUIStore, TaskPaneConfig, TaskGrouping } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
@@ -185,7 +185,7 @@ function getPaneTitle(
         case 'later':
           return 'Due Later';
         case 'no-date':
-          return 'No Due Date';
+          return 'No date';
         default:
           return 'All Due Dates';
       }
@@ -215,7 +215,13 @@ interface TaskPaneProps {
   paneData: TaskPaneData;
   canRemove: boolean;
   onRemove: (paneId: string) => void;
-  taskGroups: Array<{ id: string; name: string; emoji: string; color: string; description?: string }>;
+  taskGroups: Array<{
+    id: string;
+    name: string;
+    emoji: string;
+    color: string;
+    description?: string;
+  }>;
   onUpdateTaskList: (paneId: string, taskListId: string | null) => void;
 }
 
@@ -229,7 +235,8 @@ const TaskPane: React.FC<TaskPaneProps> = ({
 }) => {
   // Get task management operations and UI state
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
-  const { showTaskListContextInAll, setShowTaskListContextInAll } = useUIStore();
+  const { showTaskListContextInAll, setShowTaskListContextInAll } =
+    useUIStore();
 
   return (
     <div className="h-full flex flex-col">
@@ -260,33 +267,38 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             </Badge>
 
             {/* Eye toggle - only show when "All Tasks" is selected (not a specific task list) */}
-            {paneConfig.selectedTaskListId === null && paneConfig.grouping === 'taskList' && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowTaskListContextInAll(!showTaskListContextInAll)}
-                    className={cn(
-                      'h-6 w-6 p-0 ml-1',
-                      showTaskListContextInAll
-                        ? 'bg-muted text-foreground border border-border'
-                        : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
-                    )}
-                    aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
-                  >
-                    {showTaskListContextInAll ? (
-                      <Eye className="w-3.5 h-3.5" />
-                    ) : (
-                      <EyeOff className="w-3.5 h-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{showTaskListContextInAll ? 'Hide' : 'Show'} list context</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
+            {paneConfig.selectedTaskListId === null &&
+              paneConfig.grouping === 'taskList' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setShowTaskListContextInAll(!showTaskListContextInAll)
+                      }
+                      className={cn(
+                        'h-6 w-6 p-0 ml-1',
+                        showTaskListContextInAll
+                          ? 'bg-muted text-foreground border border-border'
+                          : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
+                      )}
+                      aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
+                    >
+                      {showTaskListContextInAll ? (
+                        <Eye className="w-3.5 h-3.5" />
+                      ) : (
+                        <EyeOff className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {showTaskListContextInAll ? 'Hide' : 'Show'} list context
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
           </div>
           {canRemove && (
             <Button
@@ -327,7 +339,9 @@ const TaskPane: React.FC<TaskPaneProps> = ({
             showCreateTaskDialog={taskManagement.showCreateTaskDialog}
             onShowCreateTaskDialog={taskManagement.setShowCreateTaskDialog}
             hideHeader={true}
-            showTaskListLabels={paneConfig.selectedTaskListId === null && showTaskListContextInAll}
+            showTaskListLabels={
+              paneConfig.selectedTaskListId === null && showTaskListContextInAll
+            }
           />
         )}
       </div>
@@ -342,8 +356,14 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
   className,
   searchValue,
 }) => {
-  const { taskPanes, sortBy, sortOrder, removeTaskPane, updateTaskPane, addTaskPane } =
-    useUIStore();
+  const {
+    taskPanes,
+    sortBy,
+    sortOrder,
+    removeTaskPane,
+    updateTaskPane,
+    addTaskPane,
+  } = useUIStore();
   const { taskPaneSetup, setTaskPaneSetup } = useSettingsStore();
 
   // Robust hydration loop: keep adjusting until UI matches saved config
@@ -380,12 +400,11 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
       const pane = taskPanes[i];
       const saved = taskPaneSetup[i];
       if (
-        pane && (
-          pane.grouping !== saved.grouping ||
+        pane &&
+        (pane.grouping !== saved.grouping ||
           pane.selectedTaskListId !== saved.selectedTaskListId ||
           pane.showCompleted !== saved.showCompleted ||
-          pane.filterValue !== saved.filterValue
-        )
+          pane.filterValue !== saved.filterValue)
       ) {
         needsAnotherPass = true;
         updateTaskPane(pane.id, {
@@ -475,16 +494,13 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
   return (
     <div className={cn('h-full', className)}>
       {/* Resizable Panes */}
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="h-full"
-      >
+      <ResizablePanelGroup direction="horizontal" className="h-full">
         {paneData.map((pane, index) => (
           <React.Fragment key={pane.id}>
             <ResizablePanel
               id={pane.id}
               order={index}
-              defaultSize={(100 / paneData.length)}
+              defaultSize={100 / paneData.length}
               minSize={25}
               className="min-w-0"
             >

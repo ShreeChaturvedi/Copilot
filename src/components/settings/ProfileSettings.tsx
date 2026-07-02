@@ -172,9 +172,11 @@ export function ProfileSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...(form as unknown as import('react-hook-form').UseFormReturn)}>
+          <Form
+            {...(form as unknown as import('react-hook-form').UseFormReturn)}
+          >
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Name Field */}
                 <FormField
                   control={form.control}
@@ -200,7 +202,12 @@ export function ProfileSettings() {
                 {/* Email is not editable. Display-only row mirrors form inputs for consistency. */}
                 <div className="space-y-2">
                   <FormLabel>Email Address</FormLabel>
-                  <Input type="email" value={profileData.email} readOnly disabled />
+                  <Input
+                    type="email"
+                    value={profileData.email}
+                    readOnly
+                    disabled
+                  />
                   <FormDescription>
                     {profileData.canEditEmail
                       ? 'Email changes are restricted for security reasons. Contact support to update.'
@@ -244,7 +251,7 @@ export function ProfileSettings() {
                       <select
                         {...field}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        className="h-9 w-full px-3 border border-input rounded-md bg-background text-sm outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 disabled:opacity-40"
                       >
                         <option value="">Select timezone...</option>
                         {TIMEZONE_OPTIONS.map((tz) => (
