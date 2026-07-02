@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 
 // Mock database module
@@ -291,6 +291,65 @@ describe('AuthService', () => {
         expect.stringContaining('UPDATE users SET password'),
         [expect.any(String), 'user-123']
       );
+    });
+  });
+
+  describe('requestPasswordReset reset-link host (issue #34)', () => {
+    const URL_KEYS = [
+      'FRONTEND_URL',
+      'VERCEL_PROJECT_PRODUCTION_URL',
+      'VERCEL_URL',
+      'RESEND_API_KEY',
+      'FROM_EMAIL',
+    ] as const;
+    const savedEnv: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+      for (const k of URL_KEYS) {
+        savedEnv[k] = process.env[k];
+        delete process.env[k];
+      }
+    });
+
+    afterEach(() => {
+      for (const k of URL_KEYS) {
+        if (savedEnv[k] === undefined) delete process.env[k];
+        else process.env[k] = savedEnv[k];
+      }
+    });
+
+    // With RESEND unconfigured the service logs the reset link; assert the host.
+    async function capturedResetLink(): Promise<string> {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      // SELECT user, then INSERT token.
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: 'user-123', email: 'test@example.com' }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await authService.requestPasswordReset('test@example.com');
+
+      const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      logSpy.mockRestore();
+      const match = logged.match(/Reset link for [^:]+: (\S+)/);
+      return match ? match[1] : '';
+    }
+
+    it('uses an explicit FRONTEND_URL over Vercel variables', async () => {
+      process.env.FRONTEND_URL = 'https://app.taskflow.com';
+      process.env.VERCEL_URL = 'taskflow-abc123-user.vercel.app';
+      const link = await capturedResetLink();
+      expect(link.startsWith('https://app.taskflow.com/reset-password?token=')).toBe(
+        true
+      );
+    });
+
+    it('defaults to the local Vite port 5173 (not 3000) when nothing is set', async () => {
+      const link = await capturedResetLink();
+      expect(
+        link.startsWith('http://localhost:5173/reset-password?token=')
+      ).toBe(true);
     });
   });
 });

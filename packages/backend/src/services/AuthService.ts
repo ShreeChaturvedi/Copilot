@@ -346,9 +346,16 @@ class AuthService {
     email: string,
     token: string
   ): Promise<void> {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.FRONTEND_URL || 'http://localhost:3000';
+    // Prefer an explicit FRONTEND_URL so links point at the canonical host,
+    // then the stable Vercel production domain, then the deployment-specific
+    // VERCEL_URL, and finally the real local Vite dev port (5173, not 3000).
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'http://localhost:5173');
     const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(
       token
     )}`;

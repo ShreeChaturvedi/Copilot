@@ -27,11 +27,12 @@ const envSchema = z.object({
   // Application
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).default('3001'),
-  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   BACKEND_URL: z.string().url().default('http://localhost:3001'),
 
   // Vercel
   VERCEL_URL: z.string().optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
   VERCEL_ENV: z.string().optional(),
 });
 
@@ -42,6 +43,13 @@ export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
 
 export const getBaseUrl = () => {
-  if (env.VERCEL_URL) return `https://${env.VERCEL_URL}`;
-  return env.FRONTEND_URL;
+  // An explicit FRONTEND_URL always wins so emailed links point at the
+  // canonical host. On Vercel, prefer the stable production domain over the
+  // deployment-specific VERCEL_URL (which changes on every deploy). Fall back
+  // to the real local Vite dev port (5173, strictPort in vite.config).
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL)
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'http://localhost:5173';
 };
