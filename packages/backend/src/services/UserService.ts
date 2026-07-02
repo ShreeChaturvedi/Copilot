@@ -246,6 +246,14 @@ class UserService {
        WHERE tk."userId" = $1`,
       [userId]
     );
+    // task_tags mapping rows so tag-to-task assignments round-trip on re-import
+    // (the distinct tags above lose which task carries which tag).
+    const taskTags = await query(
+      `SELECT tt.* FROM task_tags tt
+       JOIN tasks tk ON tk.id = tt."taskId"
+       WHERE tk."userId" = $1`,
+      [userId]
+    );
     const attachments = await query(
       `SELECT a.* FROM attachments a
        JOIN tasks tk ON tk.id = a."taskId"
@@ -270,6 +278,7 @@ class UserService {
       taskLists: taskLists.rows,
       tasks: tasks.rows,
       tags: tags.rows,
+      taskTags: taskTags.rows,
       attachments: attachments.rows,
     };
   }
