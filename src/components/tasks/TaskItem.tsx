@@ -293,7 +293,19 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         },
       });
 
+      // Scope the transition-kill (index.css) to an active drag only. Adding
+      // `is-dragging` on dragstart (before FullCalendar lazily clones the row
+      // into its drag mirror) means the mirror clone inherits the class, so
+      // the mirror doesn't ghost, while at-rest rows keep their transitions.
+      const handleDragStart = () => element.classList.add('is-dragging');
+      const handleDragEnd = () => element.classList.remove('is-dragging');
+      draggable.dragging.emitter.on('dragstart', handleDragStart);
+      draggable.dragging.emitter.on('dragend', handleDragEnd);
+
       return () => {
+        draggable.dragging.emitter.off('dragstart', handleDragStart);
+        draggable.dragging.emitter.off('dragend', handleDragEnd);
+        element.classList.remove('is-dragging');
         draggable.destroy();
       };
     }

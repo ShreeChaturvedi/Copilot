@@ -601,15 +601,15 @@ h1 {
       background 0.3s ease;
   }
 
-  /* Disable transitions on draggable task elements */
-  .group\/task,
-  .group\/task * {
+  /* Kill transitions ONLY during an active FullCalendar drag so the drag
+     mirror (a deep clone of the task row) doesn't ghost while it tracks the
+     pointer. TaskItem toggles `.is-dragging` on the row from the Draggable's
+     dragstart/dragend emitter events; the class is present before the mirror
+     is cloned, so the clone inherits it too. Outside of a drag, task rows keep
+     their normal transitions. */
+  .group\/task.is-dragging,
+  .group\/task.is-dragging * {
     transition: none !important;
-  }
-
-  /* Re-enable only safe transitions for hover states */
-  .group\/task:not(:active):not([draggable]):hover {
-    transition: background-color 0.2s ease !important;
   }
 
   @keyframes gradient-shift {
