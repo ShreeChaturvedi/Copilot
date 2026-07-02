@@ -1,5 +1,8 @@
 /**
- * TaskItem - Professional design matching screenshot
+ * TaskItem — the single task row used in all three list surfaces
+ * (sidebar calendarMode, main list panes, kanban cards).
+ * Redesigned per design-brief §4.1 (SETTLE): status ring, meta second
+ * line, quick-schedule hover action, and the completion settle-out.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -15,12 +18,10 @@ import {
   Music as MusicIcon,
   Video as VideoIcon,
   CornerDownRight,
+  CalendarPlus,
 } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
 import { Button } from '@/components/ui/Button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,9 +40,9 @@ import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
 import TaskDetailSheet from './TaskDetailSheet';
 import StatusBadge from './StatusBadge';
+import StatusRing from './StatusRing';
 import { useSettingsStore } from '@/stores/settingsStore';
-
-// StatusBadge now a separate component
+import './task-item.css';
 
 export interface TaskItemProps {
   task: Task;
@@ -57,13 +58,28 @@ export interface TaskItemProps {
   showTaskListLabel?: boolean;
   /** Whether to hide checkboxes (for kanban view) */
   hideCheckbox?: boolean;
+  /** Selected row: aqua film + left bar (design-brief §4.1) */
+  selected?: boolean;
 }
 
 // Constants
 const CONTEXT_MENU_OFFSET = 8;
-const COMPLETED_TASK_OPACITY = 0.6;
 
-// (file type color helpers removed; handled elsewhere)
+/**
+ * Completion timeline (design-brief §4.1), all times from click:
+ *   0ms      ring stroke draws (160) -> fill pops (120) -> check draws (120)
+ *   400ms    title strikes, row to 55% opacity (real class)
+ *   1200ms   grace over (second click before this reverses) -> settle out
+ *   +240ms   inner wrapper translateY(6px) scale(.985) fade (cal: 160 fade)
+ *   +200ms   gap closes (grid-rows) -> commit onToggle
+ */
+const STRIKE_AT_MS = 400;
+const GRACE_MS = 800;
+const SETTLE_MS = 240;
+const SETTLE_CAL_MS = 160;
+const CLOSE_MS = 200;
+
+type CompletionPhase = 'idle' | 'completing' | 'struck' | 'settling';
 
 // Helper function to get the appropriate icon for each tag type
 const getTagIcon = (type: string) => {
@@ -103,6 +119,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   calendarMode = false,
   showTaskListLabel = false,
   hideCheckbox = false,
+  selected = false,
 }) => {
   // Consolidated UI state for better performance
   const [uiState, setUiState] = useState({
@@ -124,6 +141,18 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     NonNullable<Task['attachments']>[number] | null
   >(null);
   const queryClient = useQueryClient();
+
+  // Completion-moment state machine
+  const [phase, setPhase] = useState<CompletionPhase>('idle');
+  const [collapsed, setCollapsed] = useState(false);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }, []);
+
+  useEffect(() => clearTimers, [clearTimers]);
 
   const openAttachment = useCallback(
     (att: NonNullable<Task['attachments']>[number]) => {
@@ -183,8 +212,45 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     [task.id, queryClient]
   );
 
-  const handleToggle = () => {
-    onToggle(task.id);
+  /**
+   * Ring click. Completing runs the §4.1 timeline with an 800ms grace
+   * during which a second click reverses. Un-completing and
+   * keyboard-initiated toggles commit immediately (§5: never animate
+   * keyboard-initiated actions).
+   */
+  const handleToggle = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (task.completed) {
+      onToggle(task.id);
+      return;
+    }
+    if (phase === 'settling') return; // past the grace; committing
+    if (phase !== 'idle') {
+      // Second click during the grace window: reverse
+      clearTimers();
+      setPhase('idle');
+      return;
+    }
+    if (e && e.detail === 0) {
+      // Keyboard-initiated: commit without the theater
+      onToggle(task.id);
+      return;
+    }
+    const settleMs = calendarMode ? SETTLE_CAL_MS : SETTLE_MS;
+    const settleAt = STRIKE_AT_MS + GRACE_MS;
+    setPhase('completing');
+    timersRef.current = [
+      setTimeout(() => setPhase('struck'), STRIKE_AT_MS),
+      setTimeout(() => setPhase('settling'), settleAt),
+      setTimeout(() => setCollapsed(true), settleAt + settleMs),
+      setTimeout(
+        () => {
+          onToggle(task.id);
+          setPhase('idle');
+          setCollapsed(false);
+        },
+        settleAt + settleMs + CLOSE_MS
+      ),
+    ];
   };
 
   const handleDelete = useCallback(() => {
@@ -320,173 +386,221 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     calendars,
   ]);
 
+  // Derived render state
+  // THE row's list color (brief §4.1: ring hover/fill use the row's list
+  // color) — resolve from the task's own list first; the groupColor prop is
+  // the surrounding pane's group and can be a different list in "All Tasks".
+  const rowListColor =
+    taskGroups.find((group) => group.id === (task.taskListId ?? 'default'))
+      ?.color ?? groupColor;
+  const struck = task.completed || phase === 'struck' || phase === 'settling';
+  const ringStatus: 'rest' | 'in-progress' | 'done' =
+    task.completed || phase !== 'idle'
+      ? 'done'
+      : task.status === 'in_progress'
+        ? 'in-progress'
+        : 'rest';
+
+  const visibleTags = (task.tags ?? []).filter(
+    (tag) => tag.type !== 'date' && tag.type !== 'time'
+  );
+  const shownTags = visibleTags.slice(0, 2);
+  const extraTagCount = visibleTags.length - shownTags.length;
+  const attachments = task.attachments ?? [];
+  const shownAttachments = attachments.slice(0, 2);
+  const extraAttachmentCount = attachments.length - shownAttachments.length;
+  const hasMeta =
+    !calendarMode &&
+    (Boolean(task.scheduledDate) ||
+      visibleTags.length > 0 ||
+      attachments.length > 0);
+
+  const showQuickSchedule = Boolean(onSchedule) && !task.completed;
+
   return (
-    <div className="relative">
-      <div
-        ref={dragElementRef}
-        className={cn(
-          'group/task py-2 px-3 rounded-md',
-          calendarMode &&
-            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          calendarMode &&
-            !task.completed &&
-            !uiState.isEditing &&
-            'cursor-grab',
-          className
-        )}
-        style={
-          calendarMode
-            ? {
-                transition: 'none',
-                transform: 'none',
-                animation: 'none',
-              }
-            : undefined
-        }
-        onContextMenu={handleContextMenu}
-      >
-        {/* Top row: checkbox, title, actions */}
-        <div className="flex items-center gap-3">
-          {/* Completion control: either checkbox or status icon (icon-only badge), depending on settings. */}
-          {!hideCheckbox &&
-            (taskCompletionControl === 'checkbox' ? (
-              <Checkbox
-                checked={task.completed}
-                onCheckedChange={handleToggle}
-                aria-label={`Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
-                className="flex-shrink-0"
-                customColor={task.completed ? groupColor : undefined}
-              />
-            ) : (
-              <StatusBadge
-                task={task}
-                iconOnly
-                className="flex-shrink-0"
-                onChange={(status) =>
-                  updateTask.mutate({ id: task.id, updates: { status } })
+    <div className="ti-shell" data-collapsed={collapsed || undefined}>
+      <div className="ti-clip">
+        <div
+          ref={dragElementRef}
+          className={cn(
+            'group/task ti-row',
+            calendarMode &&
+              !task.completed &&
+              !uiState.isEditing &&
+              'cursor-grab',
+            className
+          )}
+          data-in-card={hideCheckbox || undefined}
+          data-selected={selected || undefined}
+          tabIndex={hideCheckbox ? undefined : 0}
+          style={
+            calendarMode
+              ? {
+                  // FullCalendar Draggable rows must never carry a transform
+                  transform: 'none',
                 }
-              />
-            ))}
+              : undefined
+          }
+          onContextMenu={handleContextMenu}
+        >
+          {/* Inner wrapper: the ONLY element the completion keyframes touch
+              (never the Draggable row root) */}
+          <div
+            className="ti-inner"
+            data-phase={phase}
+            data-struck={struck || undefined}
+            data-cal={calendarMode || undefined}
+          >
+            <div className="ti-grid" data-no-ring={hideCheckbox || undefined}>
+              {/* Completion control: status ring (default) or status tag,
+                  honoring the settings toggle */}
+              {!hideCheckbox &&
+                (taskCompletionControl === 'checkbox' ? (
+                  <StatusRing
+                    status={ringStatus}
+                    animating={phase === 'completing'}
+                    checked={task.completed || phase !== 'idle'}
+                    listColor={rowListColor}
+                    aria-label={`Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
+                    onClick={handleToggle}
+                  />
+                ) : (
+                  <StatusBadge
+                    task={task}
+                    iconOnly
+                    className="flex-shrink-0"
+                    onChange={(status) =>
+                      updateTask.mutate({ id: task.id, updates: { status } })
+                    }
+                  />
+                ))}
 
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            {/* No secondary inline status badge when using list view controls. The primary control is either the checkbox or the icon-only status badge rendered on the left. */}
-            {uiState.isEditing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                id={`task-edit-${task.id}`}
-                name={`task-edit-${task.id}`}
-                value={uiState.editTitle}
-                onChange={(e) =>
-                  setUiState((prev) => ({ ...prev, editTitle: e.target.value }))
-                }
-                onBlur={handleEditSave}
-                onKeyDown={handleKeyDown}
-                className={cn(
-                  'w-full bg-transparent border border-transparent outline-none text-foreground',
-                  'text-sm font-medium focus:border-primary/30 rounded px-1 py-0.5',
-                  'h-[1.25rem] leading-5 box-border flex items-center'
-                )}
-                aria-label="Edit task title"
-              />
-            ) : (
-              <div
-                onClick={handleEditStart}
-                className={cn(
-                  'cursor-pointer text-sm font-medium transition-colors duration-200',
-                  'px-1 py-0.5 h-[1.25rem] leading-5 rounded box-border',
-                  'flex items-center w-full',
-                  task.completed &&
-                    `line-through text-muted-foreground opacity-[${COMPLETED_TASK_OPACITY}]`
-                )}
-                title={task.title}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="truncate overflow-hidden text-ellipsis whitespace-nowrap min-w-0 flex-1">
-                    {task.title}
-                  </span>
-                  {/* Task list context - LEFT ALIGNED inline label with icon */}
-                  {showTaskListLabel &&
-                    !calendarMode &&
-                    (() => {
-                      const resolvedGroupId = task.taskListId ?? 'default';
-                      const taskList =
-                        taskGroups.find(
-                          (group) => group.id === resolvedGroupId
-                        ) ||
-                        (!task.taskListId
-                          ? {
-                              id: 'default',
-                              name: 'Tasks',
-                              emoji: '📋',
-                              color: '#0d97d5',
-                            }
-                          : undefined);
-                      return taskList ? (
-                        <span
-                          className={cn(
-                            'group/label relative inline-flex items-center gap-1.5 text-sm ml-2 flex-shrink-0',
-                            'cursor-pointer text-foreground opacity-60',
-                            'transition-opacity duration-150 ease-out',
-                            'hover:opacity-100'
-                          )}
-                        >
-                          <CornerDownRight className="w-3 h-3 opacity-70" />
-                          <span className="text-base">{taskList.emoji}</span>
-                          <span className="inline-block whitespace-nowrap">
-                            {taskList.name}
+              {/* Title cell */}
+              <div className="min-w-0 flex items-center gap-2">
+                {uiState.isEditing ? (
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    id={`task-edit-${task.id}`}
+                    name={`task-edit-${task.id}`}
+                    value={uiState.editTitle}
+                    onChange={(e) =>
+                      setUiState((prev) => ({
+                        ...prev,
+                        editTitle: e.target.value,
+                      }))
+                    }
+                    onBlur={handleEditSave}
+                    onKeyDown={handleKeyDown}
+                    className={cn(
+                      'w-full bg-transparent border border-transparent outline-none text-foreground',
+                      'text-[13px] font-medium leading-5 focus:border-primary/30 rounded px-0 py-0'
+                    )}
+                    aria-label="Edit task title"
+                  />
+                ) : (
+                  <div
+                    onClick={handleEditStart}
+                    className="cursor-pointer flex items-center w-full min-w-0"
+                  >
+                    <span
+                      className={cn(
+                        'ti-title truncate min-w-0',
+                        struck && 'line-through'
+                      )}
+                      title={task.title}
+                    >
+                      {task.title}
+                    </span>
+                    {/* Task list context - inline label with icon */}
+                    {showTaskListLabel &&
+                      !calendarMode &&
+                      (() => {
+                        const resolvedGroupId = task.taskListId ?? 'default';
+                        const taskList =
+                          taskGroups.find(
+                            (group) => group.id === resolvedGroupId
+                          ) ||
+                          (!task.taskListId
+                            ? {
+                                id: 'default',
+                                name: 'Tasks',
+                                emoji: '📋',
+                                color: '#0d97d5',
+                              }
+                            : undefined);
+                        return taskList ? (
+                          <span
+                            className={cn(
+                              'group/label relative inline-flex items-center gap-1.5 ml-2 flex-shrink-0',
+                              'cursor-pointer text-xs text-muted-foreground',
+                              'transition-opacity duration-150 ease-out opacity-70 hover:opacity-100'
+                            )}
+                          >
+                            <CornerDownRight className="w-3 h-3 opacity-70" />
+                            <span className="text-sm leading-none">
+                              {taskList.emoji}
+                            </span>
+                            <span className="inline-block whitespace-nowrap">
+                              {taskList.name}
+                            </span>
                           </span>
-                        </span>
-                      ) : null;
-                    })()}
-                </div>
+                        ) : null;
+                      })()}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Three-dot button - only shown in non-calendar mode */}
-          {!calendarMode && (
-            <div className="flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity duration-200 relative">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              {/* Hover actions: quick-schedule (visible path to a date, #45)
+                  + 3-dot menu. Opacity-only reveal, hover-gated in CSS. */}
+              <div className="ti-actions">
+                {showQuickSchedule && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
-                    aria-label={`Task options for "${task.title}"`}
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    aria-label={`Schedule "${task.title}"`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSchedule?.(task.id);
+                    }}
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    <CalendarPlus className="w-3.5 h-3.5" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  side="right"
-                  className="w-48"
-                >
-                  <TaskActionMenuItems
-                    taskId={task.id}
-                    taskCompleted={task.completed}
-                    onSchedule={onSchedule}
-                    onDelete={handleDelete}
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
-        </div>
+                )}
+                {!calendarMode && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        aria-label={`Task options for "${task.title}"`}
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      side="right"
+                      className="w-48"
+                    >
+                      <TaskActionMenuItems
+                        taskId={task.id}
+                        taskCompleted={task.completed}
+                        onSchedule={onSchedule}
+                        onDelete={handleDelete}
+                      />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
 
-        {/* Tags - Hidden in calendar mode */}
-        {!calendarMode && (
-          <div className={cn('mt-1 space-y-1', !hideCheckbox && 'ml-7')}>
-            {/* First row: Due date and other tags - Horizontal scrolling */}
-            <ScrollArea className="w-full" orientation="horizontal">
-              <div
-                className="flex flex-nowrap gap-1 pb-1 min-w-max"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                {/* Canonical Due Date tag - only render when set */}
-                {task.scheduledDate && (
-                  <div className="flex-shrink-0">
+              {/* Meta second line: only when data exists (§4.1). Due chip,
+                  tags max 2 + `+N` mono, compact attachment chips. */}
+              {hasMeta && (
+                <div className="ti-cell-meta">
+                  {task.scheduledDate && (
                     <DueDateBadge
                       taskId={task.id}
                       date={task.scheduledDate}
@@ -497,82 +611,63 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                         })
                       }
                     />
-                  </div>
-                )}
+                  )}
 
-                {/* Show non-date/time smart tags */}
-                {task.tags
-                  ?.filter((tag) => tag.type !== 'date' && tag.type !== 'time')
-                  .map((tag) => {
+                  {shownTags.map((tag) => {
                     const IconComponent = getTagIcon(
                       tag.type
                     ) as React.ComponentType<{
                       className?: string;
-                      style?: React.CSSProperties;
-                    }>;
+                    }> | null;
                     return (
-                      <div
+                      <span
                         key={`${tag.id}_${String(tag.value)}`}
-                        className="flex-shrink-0"
+                        className={cn(
+                          'ti-tag group/tag',
+                          onRemoveTag && 'cursor-pointer'
+                        )}
+                        style={
+                          tag.color
+                            ? ({
+                                '--tag-c': tag.color,
+                              } as React.CSSProperties)
+                            : undefined
+                        }
+                        onClick={
+                          onRemoveTag
+                            ? (e) => {
+                                e.stopPropagation();
+                                onRemoveTag(task.id, tag.id);
+                              }
+                            : undefined
+                        }
                       >
-                        <Badge
-                          variant="outline"
-                          size="md"
-                          className={cn(
-                            'text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50 transition-all duration-100 ease-out group/tag',
-                            onRemoveTag && 'cursor-pointer',
-                            tag.color &&
-                              `border-[${tag.color}]/30 text-[${tag.color}]`
+                        {/* Icon that becomes X on hover - same size, no layout shift */}
+                        <span className="w-3 h-3 relative inline-block">
+                          {IconComponent && (
+                            <IconComponent className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0" />
                           )}
-                          style={
-                            tag.color
-                              ? {
-                                  borderColor: `${tag.color}30`,
-                                  color: tag.color,
-                                  backgroundColor: `${tag.color}1A`,
-                                }
-                              : undefined
-                          }
-                          onClick={
-                            onRemoveTag
-                              ? (e) => {
-                                  e.stopPropagation();
-                                  onRemoveTag(task.id, tag.id);
-                                }
-                              : undefined
-                          }
-                        >
-                          {/* Icon that becomes X on hover - same size, no layout shift */}
-                          <div className="w-3 h-3 relative">
-                            {IconComponent && (
-                              <IconComponent
-                                className="w-3 h-3 absolute inset-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-0"
-                                style={{ color: tag.color }}
-                              />
-                            )}
-                            {onRemoveTag && (
-                              <X
-                                className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100"
-                                style={{ color: tag.color }}
-                              />
-                            )}
-                          </div>
-                          {tag.displayText}
-                        </Badge>
-                      </div>
+                          {onRemoveTag && (
+                            <X className="w-3 h-3 absolute inset-0 opacity-0 transition-opacity duration-150 ease-out group-hover/tag:opacity-100" />
+                          )}
+                        </span>
+                        <span className="truncate">{tag.displayText}</span>
+                      </span>
                     );
                   })}
-              </div>
-            </ScrollArea>
+                  {extraTagCount > 0 && (
+                    <span
+                      className="ti-more"
+                      title={visibleTags
+                        .slice(2)
+                        .map((t) => t.displayText)
+                        .join(', ')}
+                    >
+                      +{extraTagCount}
+                    </span>
+                  )}
 
-            {/* Second row: Attachments preview (compact) - Horizontal scrolling */}
-            {task.attachments && task.attachments.length > 0 && (
-              <ScrollArea className="w-full">
-                <div
-                  className="flex flex-nowrap items-center gap-1 pb-1 min-w-max"
-                  style={{ WebkitOverflowScrolling: 'touch' }}
-                >
-                  {task.attachments.map((att) => {
+                  {shownAttachments.map((att) => {
                     const isImage = att.type?.startsWith('image/');
                     const isAudio = att.type?.startsWith('audio/');
                     const isVideo = att.type?.startsWith('video/');
@@ -585,35 +680,31 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                           : FileIcon;
 
                     return (
-                      <div key={att.id} className="flex-shrink-0">
-                        <Badge
-                          variant="outline"
-                          size="md"
-                          className={cn(
-                            'text-muted-foreground border-muted-foreground/30 cursor-pointer',
-                            'hover:border-muted-foreground/50 transition-all duration-150 group/attachment'
-                          )}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAttachment(att);
-                          }}
-                          title={`Preview ${att.name}`}
-                        >
-                          <Icon className="w-3 h-3 flex-shrink-0" />
-                          <span className="max-w-[120px] truncate inline-block align-middle">
-                            {att.name}
-                          </span>
-                        </Badge>
-                      </div>
+                      <button
+                        key={att.id}
+                        type="button"
+                        className="ti-chip"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAttachment(att);
+                        }}
+                        title={`Preview ${att.name}`}
+                      >
+                        <Icon className="w-3 h-3 flex-shrink-0" />
+                        <span className="max-w-[96px] truncate inline-block">
+                          {att.name}
+                        </span>
+                      </button>
                     );
                   })}
+                  {extraAttachmentCount > 0 && (
+                    <span className="ti-more">+{extraAttachmentCount}</span>
+                  )}
                 </div>
-              </ScrollArea>
-            )}
-
-            {/* Intentionally remove the legacy auto-created creation date badge */}
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Calendar mode: cursor-positioned context menu */}
