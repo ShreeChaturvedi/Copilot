@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
 import { googleSyncApi } from '@/services/api/google';
+import { googleRedirectUri } from '@/lib/urls';
 
 export function GoogleCallbackPage() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export function GoogleCallbackPage() {
           throw new Error('Authorization code not found');
         }
 
-        const redirectUri = `${window.location.origin}/auth/google/callback`;
+        const redirectUri = googleRedirectUri();
 
         if (isCalendarConnect) {
           // Calendar-connect flow: attach the grant to the logged-in account.

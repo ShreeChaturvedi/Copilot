@@ -217,7 +217,7 @@ function App() {
   return (
     <QueryProvider>
       <ThemeProvider>
-        <Router>
+        <Router basename="/app">
           {/* Development auth toggle */}
           {showDevToggle && <DevAuthToggle />}
           <Toaster

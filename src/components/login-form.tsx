@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
+import { googleRedirectUri } from '@/lib/urls';
 import { useAuthStore } from '@/stores/authStore';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
@@ -51,7 +52,7 @@ export function LoginForm({
   };
 
   const handleGoogleLogin = () => {
-    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = googleRedirectUri();
     const url = authAPI.getGoogleAuthUrl(redirectUri);
     window.location.href = url;
   };

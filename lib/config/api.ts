@@ -8,19 +8,20 @@
 export const config = {
   // Environment
   NODE_ENV: process.env.NODE_ENV || 'development',
-  
+
   // API settings
   API_VERSION: 'v1',
   API_PREFIX: '/api',
-  
+
   // CORS settings
-  CORS_ORIGINS: process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
-        process.env.FRONTEND_URL || '',
-      ].filter(Boolean)
-    : ['http://localhost:3000', 'http://localhost:5173'], // Common dev ports
-  
+  CORS_ORIGINS:
+    process.env.NODE_ENV === 'production'
+      ? [
+          process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+          process.env.FRONTEND_URL || '',
+        ].filter(Boolean)
+      : ['http://localhost:3000', 'http://localhost:5173'], // Common dev ports
+
   // Rate limiting
   RATE_LIMIT: {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
@@ -28,20 +29,22 @@ export const config = {
     AUTH_MAX_REQUESTS: 5,
     UPLOAD_MAX_REQUESTS: 10,
   },
-  
+
   // JWT settings (will be used in task 4.1)
   JWT: {
     SECRET: process.env.JWT_SECRET || 'your-secret-key',
     EXPIRES_IN: '15m',
     REFRESH_EXPIRES_IN: '7d',
   },
-  
+
   // Database settings (will be used in task 3.1)
   DATABASE: {
-    URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/react_calendar_dev',
+    URL:
+      process.env.DATABASE_URL ||
+      'postgresql://localhost:5432/react_calendar_dev',
     MAX_CONNECTIONS: parseInt(process.env.DB_MAX_CONNECTIONS || '10'),
   },
-  
+
   // File upload settings (will be used in task 8.1)
   UPLOAD: {
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
@@ -57,20 +60,22 @@ export const config = {
       'text/plain',
     ],
   },
-  
+
   // Google OAuth settings (will be used in task 4.3)
   GOOGLE_OAUTH: {
     CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
     CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
-    REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
+    REDIRECT_URI:
+      process.env.GOOGLE_REDIRECT_URI ||
+      'http://localhost:5180/app/auth/google/callback',
   },
-  
+
   // Email settings (will be used in task 11.2)
   EMAIL: {
     FROM: process.env.EMAIL_FROM || 'noreply@example.com',
     RESEND_API_KEY: process.env.RESEND_API_KEY || '',
   },
-  
+
   // Redis settings (will be used in task 12.1)
   REDIS: {
     URL: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -86,7 +91,7 @@ export const API_CODES = {
   CREATED: 'CREATED',
   UPDATED: 'UPDATED',
   DELETED: 'DELETED',
-  
+
   // Client error codes
   BAD_REQUEST: 'BAD_REQUEST',
   UNAUTHORIZED: 'UNAUTHORIZED',
@@ -95,17 +100,17 @@ export const API_CODES = {
   CONFLICT: 'CONFLICT',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-  
+
   // Server error codes
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   DATABASE_ERROR: 'DATABASE_ERROR',
-  
+
   // Auth specific codes
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   TOKEN_INVALID: 'TOKEN_INVALID',
-  
+
   // Business logic codes
   RESOURCE_NOT_OWNED: 'RESOURCE_NOT_OWNED',
   DUPLICATE_RESOURCE: 'DUPLICATE_RESOURCE',
@@ -151,11 +156,11 @@ export const VALIDATION = {
   MAX_EMAIL_LENGTH: 255,
   MAX_TITLE_LENGTH: 500,
   MAX_DESCRIPTION_LENGTH: 2000,
-  
+
   // Array limits
   MAX_TAGS_PER_TASK: 20,
   MAX_ATTACHMENTS_PER_TASK: 10,
-  
+
   // Date limits
   MIN_DATE: new Date('1900-01-01'),
   MAX_DATE: new Date('2100-12-31'),
@@ -186,27 +191,29 @@ export const FEATURES = {
  * Validate required environment variables
  */
 export function validateEnvironment(): void {
-  const required = [
-    'DATABASE_URL',
-  ];
-  
-  const missing = required.filter(key => !process.env[key]);
-  
+  const required = ['DATABASE_URL'];
+
+  const missing = required.filter((key) => !process.env[key]);
+
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`
+    );
   }
-  
+
   // Warn about optional but recommended variables
   const recommended = [
     'JWT_SECRET',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
   ];
-  
-  const missingRecommended = recommended.filter(key => !process.env[key]);
-  
+
+  const missingRecommended = recommended.filter((key) => !process.env[key]);
+
   if (missingRecommended.length > 0 && config.NODE_ENV === 'production') {
-    console.warn(`Missing recommended environment variables: ${missingRecommended.join(', ')}`);
+    console.warn(
+      `Missing recommended environment variables: ${missingRecommended.join(', ')}`
+    );
   }
 }
 
@@ -217,13 +224,13 @@ export function getBaseUrl(): string {
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
-  
+
   if (process.env.FRONTEND_URL) {
     return process.env.FRONTEND_URL;
   }
-  
-  return config.NODE_ENV === 'production' 
-    ? 'https://your-domain.com' 
+
+  return config.NODE_ENV === 'production'
+    ? 'https://your-domain.com'
     : 'http://localhost:3000';
 }
 

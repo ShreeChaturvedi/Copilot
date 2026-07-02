@@ -342,14 +342,14 @@ describe('AuthService', () => {
       process.env.VERCEL_URL = 'taskflow-abc123-user.vercel.app';
       const link = await capturedResetLink();
       expect(
-        link.startsWith('https://app.taskflow.com/reset-password?token=')
+        link.startsWith('https://app.taskflow.com/app/reset-password?token=')
       ).toBe(true);
     });
 
-    it('defaults to the local Vite port 5173 (not 3000) when nothing is set', async () => {
+    it('defaults to the local Vite port 5180 under /app when nothing is set', async () => {
       const link = await capturedResetLink();
       expect(
-        link.startsWith('http://localhost:5173/reset-password?token=')
+        link.startsWith('http://localhost:5180/app/reset-password?token=')
       ).toBe(true);
     });
   });
