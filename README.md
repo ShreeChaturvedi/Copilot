@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml"><img src="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1803-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1824-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/TypeScript-5.8-blue" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-19.1-61dafb" alt="React">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
@@ -32,7 +32,7 @@
 Taskflow Calendar ships as one Vercel project: an Astro landing page at `/` and a Vite + React 19 SPA at `/app`, backed by exactly two serverless functions and a Postgres database (Neon in production, Docker locally). Type "Email vendor about invoice friday 4pm urgent" and the smart input extracts the date, time, and priority as you type.
 
 - **Two-way Google Calendar sync.** Push notifications via watch channels, incremental pull with full resync on HTTP 410, an outbox for local edits, a 15-minute reconcile workflow, and daily channel renewal.
-- **1,803 tests across seven suites**, from pure parser units to handler contract tests that exercise the real router against a real Postgres. Counts and commands in [Testing](#testing).
+- **1,824 tests across eight suites**, from pure parser units to handler contract tests that exercise the real router against a real Postgres. Counts and commands in [Testing](#testing).
 - **Two serverless functions total** (fits the Vercel Hobby limit): a catch-all router dispatching 38 routes, plus a second function for Google sync.
 - **Keyboard-first.** Cmd+K command bar, single-key navigation (T today, D/W/M/L views, N new task).
 
@@ -71,7 +71,7 @@ flowchart LR
 - **API**: two Vercel functions. `api/[...route].ts` matches 38 routes and dispatches to one handler file per endpoint in `api/_handlers/`, each wrapped in the same middleware chain (CORS, request ID, rate limiting, JWT auth, Zod validation). `api/google/[...route].ts` is a separate function for Calendar sync: 8 routes including the webhook receiver and a daily `cron/renew` Vercel cron.
 - **Database**: plain SQL over the `pg` driver, no ORM. 9 migrations in `lib/config/migrations/`, applied transactionally by `npm run db:migrate` and recorded in `schema_migrations`.
 - **Files and email**: Vercel Blob stores attachments, Resend sends password-reset mail.
-- **CI**: GitHub Actions with two jobs. `checks` runs lint, typecheck, the no-DB test suites, and both builds. `backend-db` boots a Postgres 16 service, runs the migrations, then runs the real-database suites (backend workspace, L2, L3). A third workflow triggers the production sync reconcile every 15 minutes.
+- **CI**: GitHub Actions with three jobs. `checks` runs lint, typecheck, the no-DB test suites, and both builds. `backend-db` boots a Postgres 16 service, runs the migrations, then runs the real-database suites (backend workspace, L2, L3, Google sync). `e2e` boots the full stack and runs the Playwright browser suite in parallel. A separate scheduled workflow triggers the production sync reconcile every 15 minutes.
 
 ## Testing
 
@@ -86,10 +86,11 @@ The suite is layered: pure units at the bottom, real infrastructure toward the t
 | L3 handler contracts | the actual `api/[...route].ts` and `api/google/[...route].ts` dispatchers mounted on an Express adapter: real routing, middleware, and SQL | `npm run test:l3:run`                           | 107   |
 | Google sync          | the sync engine (channels, outbound writes, merge) against a real Postgres with a fake Google client                                       | gated on `GOOGLE_SYNC_TEST_DB_URL`              | 33    |
 | Backend workspace    | auth SQL round-trips, refresh-token rotation, schema and access-control checks                                                             | `npm run test:run --workspace=packages/backend` | 89    |
+| L5 browser E2E       | signup, login, reset-password round trip, task and event CRUD, recurrence, kanban drag, settings, all driven through a real Chromium       | `npm run test:e2e`                              | 21    |
 
-Total: 1,803 cases. The frontend layer includes the L4 optimistic-update suites: mutation hooks run against an MSW server, the request fails, and the test asserts the cache rolls back.
+Total: 1,824 cases. The frontend layer includes the L4 optimistic-update suites: mutation hooks run against an MSW server, the request fails, and the test asserts the cache rolls back. The L5 layer drives the built app in a real browser against a real backend and database.
 
-The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` reports 638 passed and 111 skipped without a database. CI's `backend-db` job provides the database and runs the L2, L3, and workspace layers on every push. There is no browser-level E2E layer yet.
+The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` reports 638 passed and 111 skipped without a database. CI's `backend-db` job provides the database and runs the L2, L3, sync, and workspace layers on every push. A separate `e2e` job boots the stack and runs the Playwright suite in parallel, so it never slows the fast checks.
 
 ## Performance
 
