@@ -394,7 +394,7 @@ export const CalendarView = ({
   })();
 
   const calendarEvents = transformEventsForCalendar(expandedEvents);
-  const { getSlotTimes } = useCalendarSettingsStore();
+  const { getSlotTimes, weekStartsOn } = useCalendarSettingsStore();
   const { slotMinTime, slotMaxTime } = getSlotTimes();
 
   // Force calendar to re-render when slot times change by keying the component
@@ -420,6 +420,7 @@ export const CalendarView = ({
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
             initialView={currentView}
+            firstDay={weekStartsOn}
             headerToolbar={false}
             height={height}
             events={calendarEvents}

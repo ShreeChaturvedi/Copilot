@@ -79,6 +79,10 @@ export function useTextParser(
   // Debounced parsing function - using useRef to maintain timeout across renders
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   useEffect(() => {
+    // Reset on (re)mount: React StrictMode runs the cleanup below on the first
+    // dev mount, and refs survive the simulated remount, so without this the
+    // flag would stay false and every debounced parse would bail silently.
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (timeoutRef.current) {
