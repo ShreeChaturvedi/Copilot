@@ -821,7 +821,10 @@ body {
 
   [data-slot='dialog-content'][data-state='open'],
   [data-slot='alert-dialog-content'][data-state='open'] {
-    animation: dialog-settle-in var(--dur-3) var(--ease-settle);
+    /* Scale about the box centre; `both` so the very first paint uses the
+       keyframe `from` (opacity 0 / scaled) instead of flashing the base style. */
+    transform-origin: center;
+    animation: dialog-settle-in var(--dur-3) var(--ease-settle) both;
   }
   [data-slot='dialog-content'][data-state='closed'],
   [data-slot='alert-dialog-content'][data-state='closed'] {
@@ -864,14 +867,22 @@ body {
       opacity: 0;
     }
   }
+  /* Center dialogs are already centred by the static `translate: -50% -50%`
+     Tailwind utility, which under Tailwind v4 is the dedicated `translate` CSS
+     property, independent of `transform`. So this keyframe must NOT re-apply the
+     -50%/-50% centering via `transform`, or the two translations stack and the
+     box paints double-translated (up and to the left, off-centre) for the whole
+     animation, then snaps to true centre the instant `transform` reverts to
+     `none` at the end. It only fades and scales about the centre, with a small
+     8px settle drift that is additive to the utility's translate. */
   @keyframes dialog-settle-in {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+      transform: translateY(8px) scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: translateY(0) scale(1);
     }
   }
   @keyframes sheet-in-right {
@@ -953,23 +964,141 @@ body {
 /* ==========================================
    Auth pages: the room (design-brief §4.8)
    The rainbow conic gradient, frosted panel, and cursor glow are gone.
-   Auth is the app canvas + one centered 400px machined card; the card's
-   rim lifts to the aqua rim while any field inside has focus.
+   Auth is the app canvas + one centered 400px machined card. Depth comes from
+   the app's own language: a faint schematic grid (the calendar etched behind,
+   §2.5) and a soft aqua light — the room the instrument lives in — plus a
+   settle-in entrance and a focus-within aqua rim. Quiet in either theme.
    ========================================== */
+
+/* The card (and its brand lockup) settle onto the grid the way a chip does */
+@keyframes auth-settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @layer components {
+  .auth-room {
+    position: relative;
+    isolation: isolate;
+    /* Faint schematic hairlines; the emptiness language (§2.5), tuned quiet */
+    --auth-grid: color-mix(in oklab, var(--ink) 4.5%, transparent);
+    --auth-glow: 6%; /* aqua light strength (aqua is deep enamel in light) */
+  }
+  .auth-room > *:not(.auth-room__bg) {
+    position: relative;
+    z-index: 1;
+  }
+  /* Ambient background layers, behind everything, non-interactive */
+  .auth-room__bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  /* Schematic grid: a 40px calendar mesh, faded to nothing at the edges so the
+     room has depth without a hard frame */
+  .auth-room__bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        var(--auth-grid) 0 1px,
+        transparent 1px 40px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        var(--auth-grid) 0 1px,
+        transparent 1px 40px
+      );
+    -webkit-mask-image: radial-gradient(
+      120% 100% at 50% 44%,
+      #000 0%,
+      #000 30%,
+      transparent 78%
+    );
+    mask-image: radial-gradient(
+      120% 100% at 50% 44%,
+      #000 0%,
+      #000 30%,
+      transparent 78%
+    );
+  }
+  /* Soft aqua light pooling behind the card — the instrument's glow */
+  .auth-room__bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      58% 46% at 50% 44%,
+      color-mix(in oklab, var(--aqua) var(--auth-glow), transparent) 0%,
+      transparent 70%
+    );
+  }
+  .dark .auth-room {
+    /* Dark: aqua is literally the light (§2.3); phosphor grid, not white */
+    --auth-grid: color-mix(in oklab, oklch(0.8 0.09 190) 7%, transparent);
+    --auth-glow: 12%;
+  }
+
+  /* Brand lockup: machined icon tile (§4.2) + wordmark */
+  .auth-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px; /* icon-tile radius (§2.6) */
+    background: var(--surface-1);
+    box-shadow: var(--edge-machined), var(--shadow-1);
+  }
+  .auth-brand {
+    animation: auth-settle-in 420ms var(--ease-settle) both;
+  }
+
   .auth-card {
+    position: relative;
     background: var(--surface-1);
     border-radius: 12px; /* dialog radius (§2.6) */
-    box-shadow: var(--edge-machined), var(--shadow-2);
+    box-shadow: var(--edge-machined), var(--shadow-3);
     transition: box-shadow 150ms var(--ease-out);
+    animation: auth-settle-in 460ms var(--ease-settle) 80ms both;
+  }
+  /* Aqua crown: the card is where you go live (§2.3, aqua = live/placed) */
+  .auth-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--aqua-rim),
+      transparent
+    );
+    pointer-events: none;
   }
   .auth-card:focus-within {
     box-shadow:
       var(--edge-machined),
-      var(--shadow-2),
+      var(--shadow-3),
       0 0 0 1px var(--aqua-rim);
   }
   @media (prefers-reduced-motion: reduce) {
+    .auth-brand,
+    .auth-card {
+      animation: none;
+    }
     .auth-card {
       transition: none;
     }
