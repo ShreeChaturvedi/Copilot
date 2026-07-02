@@ -105,6 +105,14 @@ export class TagService extends BaseService<
     return 'Tag';
   }
 
+  /**
+   * Tags are global (shared, unique name, no userId column), so the base
+   * owner-scoping (#62) does not apply — findById/delete are not user-scoped.
+   */
+  protected getOwnerColumn(): string | null {
+    return null;
+  }
+
   protected buildWhereClause(
     filters: TagFilters,
     _context?: ServiceContext

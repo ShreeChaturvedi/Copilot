@@ -170,6 +170,38 @@ export class AttachmentService extends BaseService<
     return 'Attachment';
   }
 
+  /**
+   * Attachments have no userId column: ownership is derived from the parent
+   * task. Opt out of the base column owner-scoping (#62) and enforce ownership
+   * via a task join in findById/delete instead.
+   */
+  protected getOwnerColumn(): string | null {
+    return null;
+  }
+
+  /**
+   * Find an attachment by id, scoped to the caller via its parent task's owner
+   * so one user cannot read another user's attachment by id (#62 IDOR). A
+   * cross-user id matches zero rows → returns null → 404. With no userId in the
+   * context (engine/system callers) this falls back to the unscoped base read.
+   */
+  async findById(
+    id: string,
+    context?: ServiceContext
+  ): Promise<AttachmentEntity | null> {
+    const userId = context?.userId;
+    if (!userId) return super.findById(id, context);
+    const res = await query<AttachmentEntity>(
+      `SELECT a.* FROM attachments a
+       JOIN tasks t ON t.id = a."taskId"
+       WHERE a.id = $1 AND t."userId" = $2 LIMIT 1`,
+      [id, userId],
+      this.db
+    );
+    const row = res.rows[0];
+    return row ? this.transformEntity(row) : null;
+  }
+
   protected buildWhereClause(
     filters: AttachmentFilters,
     _context?: ServiceContext
@@ -647,7 +679,10 @@ export class AttachmentService extends BaseService<
 
       // Clean up the underlying blob(s) so deleted attachments do not leak
       // storage. Skips data: URIs and tolerates already-missing blobs.
-      await this.deleteFileFromStorage(attachment.fileUrl, attachment.thumbnailUrl);
+      await this.deleteFileFromStorage(
+        attachment.fileUrl,
+        attachment.thumbnailUrl
+      );
 
       this.log(
         'delete:success',

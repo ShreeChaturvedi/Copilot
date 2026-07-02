@@ -548,9 +548,12 @@ describe('Tasks API Integration Tests', () => {
 
       await taskHandler(req, res);
 
-      // TaskService.delete takes only the id (it derives context internally),
-      // so the handler must call it with a single argument.
-      expect(mockTaskService.delete).toHaveBeenCalledWith('task-123');
+      // The handler owner-scopes the delete by threading the caller's context
+      // (userId) into TaskService.delete (#62).
+      expect(mockTaskService.delete).toHaveBeenCalledWith('task-123', {
+        userId: 'user-123',
+        requestId: 'test-request-123',
+      });
       expect(mockSendSuccess).toHaveBeenCalledWith(res, { deleted: true });
     });
 

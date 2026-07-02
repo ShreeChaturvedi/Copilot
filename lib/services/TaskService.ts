@@ -805,14 +805,18 @@ export class TaskService extends BaseService<
   /**
    * Delete task
    */
-  async delete(id: string): Promise<boolean> {
-    // Ownership already validated via routes/use of service; keep as is
+  async delete(id: string, context?: ServiceContext): Promise<boolean> {
     // Capture attachment blob URLs before the ON DELETE CASCADE removes the
     // rows, so the underlying files can be cleaned up afterwards.
     const blobUrls = await this.collectAttachmentBlobUrls([id]);
-    await query('DELETE FROM tasks WHERE id = $1', [id], this.db);
-    await deleteBlobs(blobUrls);
-    return true;
+    // Owner-scope the delete so one authenticated user cannot delete another
+    // user's task just by knowing its id (#62 IDOR). A cross-user (or missing)
+    // id matches zero rows, so we return false → the handler responds 404.
+    const { sql, params } = this.ownerScopedWhere(id, context);
+    const res = await query(`DELETE FROM tasks ${sql}`, params, this.db);
+    const deleted = (res.rowCount ?? 0) > 0;
+    if (deleted) await deleteBlobs(blobUrls);
+    return deleted;
   }
 
   /**
@@ -844,9 +848,12 @@ export class TaskService extends BaseService<
     id: string,
     context?: ServiceContext
   ): Promise<TaskEntity | null> {
+    // Owner-scope the read so one user cannot fetch another user's task by id
+    // (#62 IDOR). A cross-user id matches zero rows → returns null → 404.
+    const { sql, params } = this.ownerScopedWhere(id, context);
     const res = await query<TaskRow>(
-      'SELECT * FROM tasks WHERE id = $1 LIMIT 1',
-      [id],
+      `SELECT * FROM tasks ${sql} LIMIT 1`,
+      params,
       this.db
     );
     if (res.rowCount === 0) return null;
