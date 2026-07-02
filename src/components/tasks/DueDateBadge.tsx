@@ -121,36 +121,24 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
           className={cn(
             'text-xs px-2 py-1 gap-1 transition-colors cursor-pointer',
             (() => {
+              // Proximity ink (design-brief §4.1): overdue = --destructive,
+              // live/upcoming = the aqua, unset = --muted
               const hasReminder = remind !== 'none';
               const overdue =
                 hasReminder && selectedDate
                   ? selectedDate.getTime() < Date.now()
                   : false;
               if (hasReminder && overdue)
-                return 'text-[#ef4444] border-[#ef4444] hover:border-[#ef4444]';
+                return 'text-destructive border-destructive hover:border-destructive';
               if (hasReminder)
-                return 'text-[#3b82f6] border-[#3b82f6] hover:border-[#3b82f6]';
+                return 'text-primary border-primary hover:border-primary';
               return 'text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50';
             })()
           )}
-          style={(() => {
-            const hasReminder = remind !== 'none';
-            if (!hasReminder) {
-              return {
-                backgroundColor:
-                  'color-mix(in srgb, currentColor 10%, transparent)',
-              } as React.CSSProperties;
-            }
-            const overdue = selectedDate
-              ? selectedDate.getTime() < Date.now()
-              : false;
-            const hex = overdue ? '#ef4444' : '#3b82f6';
-            return {
-              backgroundColor: `${hex}1A`,
-              borderColor: hex,
-              color: hex,
-            } as React.CSSProperties;
-          })()}
+          style={{
+            backgroundColor:
+              'color-mix(in oklab, currentColor 10%, transparent)',
+          }}
           aria-label="Edit due date"
           data-testid="due-date-badge"
         >

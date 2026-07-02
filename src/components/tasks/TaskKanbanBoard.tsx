@@ -30,48 +30,43 @@ function getTaskStatus(task: Task): ColumnKey {
   return task.completed ? 'done' : 'not_started';
 }
 
-// Status configuration with icons, colors, and styling
+// Status configuration with icons, colors, and styling.
+// Colors re-based onto theme tokens (design-brief §2.3): in-progress = the
+// sanctioned amber --warning, done = --success (the aqua), not-started =
+// neutral. Tokens swap per theme, so the dark* fields are no longer needed
+// (kept in the shape for the coming kanban surface redesign).
 function getStatusConfig(status: ColumnKey) {
   switch (status) {
-    case 'not_started':
-      return {
-        label: 'Not Started',
-        icon: Circle,
-        iconColor: 'text-muted-foreground',
-        backgroundColor: 'bg-gray-500/10',
-        borderColor: 'border-gray-500',
-        darkBackgroundColor: 'dark:bg-gray-400/10',
-        darkBorderColor: 'dark:border-gray-400',
-      };
     case 'in_progress':
       return {
         label: 'In Progress',
         icon: PlayCircle,
-        iconColor: 'text-amber-500',
-        backgroundColor: 'bg-amber-500/10',
-        borderColor: 'border-amber-500',
-        darkBackgroundColor: 'dark:bg-amber-400/10',
-        darkBorderColor: 'dark:border-amber-400',
+        iconColor: 'text-warning',
+        backgroundColor: 'bg-warning/10',
+        borderColor: 'border-warning',
+        darkBackgroundColor: '',
+        darkBorderColor: '',
       };
     case 'done':
       return {
         label: 'Done',
         icon: Flag,
-        iconColor: 'text-emerald-600',
-        backgroundColor: 'bg-emerald-600/10',
-        borderColor: 'border-emerald-600',
-        darkBackgroundColor: 'dark:bg-emerald-500/10',
-        darkBorderColor: 'dark:border-emerald-500',
+        iconColor: 'text-success',
+        backgroundColor: 'bg-success/10',
+        borderColor: 'border-success',
+        darkBackgroundColor: '',
+        darkBorderColor: '',
       };
+    case 'not_started':
     default:
       return {
-        label: 'Unknown',
+        label: status === 'not_started' ? 'Not Started' : 'Unknown',
         icon: Circle,
         iconColor: 'text-muted-foreground',
-        backgroundColor: 'bg-gray-500/10',
-        borderColor: 'border-gray-500',
-        darkBackgroundColor: 'dark:bg-gray-400/10',
-        darkBorderColor: 'dark:border-gray-400',
+        backgroundColor: 'bg-muted/40',
+        borderColor: 'border-border',
+        darkBackgroundColor: '',
+        darkBorderColor: '',
       };
   }
 }

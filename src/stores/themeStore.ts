@@ -7,7 +7,7 @@ export type ResolvedTheme = 'light' | 'dark';
 interface ThemeState {
   theme: Theme;
   resolvedTheme: ResolvedTheme;
-  
+
   // Actions
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -17,7 +17,9 @@ interface ThemeState {
 // Helper function to get system theme preference
 const getSystemTheme = (): ResolvedTheme => {
   if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 };
 
 // Helper function to resolve theme based on current setting
@@ -31,21 +33,22 @@ const resolveTheme = (theme: Theme): ResolvedTheme => {
 // Helper function to apply theme to document
 const applyThemeToDocument = (resolvedTheme: ResolvedTheme) => {
   if (typeof document === 'undefined') return;
-  
+
   const root = document.documentElement;
-  
+
   if (resolvedTheme === 'dark') {
     root.classList.add('dark');
   } else {
     root.classList.remove('dark');
   }
-  
+
   // Update meta theme-color for mobile browsers
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor) {
     metaThemeColor.setAttribute(
-      'content', 
-      resolvedTheme === 'dark' ? '#1f2937' : '#ffffff'
+      'content',
+      // Canvas hexes from the SETTLE token system (design-brief §2.1)
+      resolvedTheme === 'dark' ? '#0c1112' : '#fafbfc'
     );
   }
 };
@@ -56,21 +59,17 @@ export const useThemeStore = create<ThemeState>()(
       (set, get) => ({
         theme: 'system',
         resolvedTheme: 'light',
-        
+
         setTheme: (theme) => {
           const resolvedTheme = resolveTheme(theme);
           applyThemeToDocument(resolvedTheme);
-          
-          set(
-            { theme, resolvedTheme },
-            false,
-            'setTheme'
-          );
+
+          set({ theme, resolvedTheme }, false, 'setTheme');
         },
-        
+
         toggleTheme: () => {
           const { theme, resolvedTheme } = get();
-          
+
           // If system theme, toggle to opposite of current resolved theme
           if (theme === 'system') {
             const newTheme = resolvedTheme === 'light' ? 'dark' : 'light';
@@ -81,22 +80,20 @@ export const useThemeStore = create<ThemeState>()(
             get().setTheme(newTheme);
           }
         },
-        
+
         initializeTheme: () => {
           const { theme } = get();
           const resolvedTheme = resolveTheme(theme);
           applyThemeToDocument(resolvedTheme);
-          
-          set(
-            { resolvedTheme },
-            false,
-            'initializeTheme'
-          );
-          
+
+          set({ resolvedTheme }, false, 'initializeTheme');
+
           // Listen for system theme changes
           if (typeof window !== 'undefined') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            
+            const mediaQuery = window.matchMedia(
+              '(prefers-color-scheme: dark)'
+            );
+
             const handleSystemThemeChange = () => {
               const currentState = get();
               if (currentState.theme === 'system') {
@@ -109,7 +106,7 @@ export const useThemeStore = create<ThemeState>()(
                 );
               }
             };
-            
+
             // Modern browsers
             if (mediaQuery.addEventListener) {
               mediaQuery.addEventListener('change', handleSystemThemeChange);

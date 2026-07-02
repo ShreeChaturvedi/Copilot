@@ -134,7 +134,7 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
 
       // Add highlighted tag with precise styling
       const tagText = value.substring(tag.startIndex, tag.endIndex);
-      const color = tag.color || '#3b82f6';
+      const color = tag.color || '#0d97d5';
 
       // EXACT fix from Enhanced textarea: no border or margin, vertical padding only via CSS
       html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</mark>`;

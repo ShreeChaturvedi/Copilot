@@ -2,6 +2,7 @@
  * TaskList - Modern professional design with React.memo optimization
  */
 
+import { COLOR_PRESETS } from '@/constants/colors';
 import React, { useState, useMemo, memo } from 'react';
 import {
   ChevronDown,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react';
 // Emoji-based task group UI
 import { TaskItem } from './TaskItem';
-import type { Task } from "@shared/types";
+import type { Task } from '@shared/types';
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import { groupItemsByDate, getDayKeyOrder } from '@/utils/dateGrouping';
 import { Button } from '@/components/ui/Button';
@@ -50,7 +51,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { lazy, Suspense } from 'react';
-const EmojiPicker = lazy(async () => ({ default: (await import('@/components/ui/emoji-picker')).EmojiPicker }));
+const EmojiPicker = lazy(async () => ({
+  default: (await import('@/components/ui/emoji-picker')).EmojiPicker,
+}));
 import { CreateTaskDialog } from '@/components/dialogs/CreateTaskDialog';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -80,7 +83,12 @@ export interface TaskListProps {
   }) => void;
   onEditTaskGroup?: (
     id: string,
-    updates: { name: string; emoji: string; color: string; description?: string }
+    updates: {
+      name: string;
+      emoji: string;
+      color: string;
+      description?: string;
+    }
   ) => void;
   onSelectTaskGroup?: (groupId: string) => void;
   onUpdateTaskGroupIcon?: (groupId: string, iconId: string) => void;
@@ -95,16 +103,8 @@ export interface TaskListProps {
   showTaskListLabels?: boolean;
 }
 
-const TASK_COLORS = [
-  '#3b82f6', // Blue
-  '#ef4444', // Red
-  '#10b981', // Green
-  '#f59e0b', // Amber
-  '#8b5cf6', // Purple
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#84cc16', // Lime
-];
+// Curated swatch palette shared app-wide (design-brief §2.4)
+const TASK_COLORS = [...COLOR_PRESETS];
 
 const TaskListComponent: React.FC<TaskListProps> = ({
   tasks,
@@ -140,7 +140,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#3b82f6',
+    color: '#0d97d5',
     description: 'Default task group',
   };
 
@@ -154,7 +154,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     // Filter tasks by active task group
     const groupTasks = tasks.filter((task) => {
       // Treat 'default' as an alias for "All Tasks" so backend-linked tasks are visible
-      if (activeTaskGroupId === 'all' || activeTaskGroupId === 'default') return true;
+      if (activeTaskGroupId === 'all' || activeTaskGroupId === 'default')
+        return true;
       return task.taskListId === activeTaskGroupId;
     });
 
@@ -177,7 +178,11 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   // Calendar mode: Group tasks by date and limit count
   const { groupedTasks, totalTaskCount, groupedAllTotals } = useMemo(() => {
     if (!calendarMode) {
-      return { groupedTasks: null, totalTaskCount: 0, groupedAllTotals: {} as Record<string, number> };
+      return {
+        groupedTasks: null,
+        totalTaskCount: 0,
+        groupedAllTotals: {} as Record<string, number>,
+      };
     }
 
     // In calendar mode, filter to only show active tasks (no completed)
@@ -185,16 +190,29 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     const totalCount = activeTasks.length;
 
     // Group tasks by scheduled date (canonical due date for tasks)
-    const grouped = groupItemsByDate(tasksForCalendar, (task) => task.scheduledDate ?? null);
+    const grouped = groupItemsByDate(
+      tasksForCalendar,
+      (task) => task.scheduledDate ?? null
+    );
 
     // Compute totals across all active tasks (not truncated) for accurate badges
-    const groupedAll = groupItemsByDate(activeTasks, (task) => task.scheduledDate ?? null);
-    const totals = Object.keys(groupedAll).reduce<Record<string, number>>((acc, key) => {
-      acc[key] = groupedAll[key].length;
-      return acc;
-    }, {});
+    const groupedAll = groupItemsByDate(
+      activeTasks,
+      (task) => task.scheduledDate ?? null
+    );
+    const totals = Object.keys(groupedAll).reduce<Record<string, number>>(
+      (acc, key) => {
+        acc[key] = groupedAll[key].length;
+        return acc;
+      },
+      {}
+    );
 
-    return { groupedTasks: grouped, totalTaskCount: totalCount, groupedAllTotals: totals };
+    return {
+      groupedTasks: grouped,
+      totalTaskCount: totalCount,
+      groupedAllTotals: totals,
+    };
   }, [calendarMode, activeTasks, maxTasks]);
 
   // Get the icon component for the active task group
@@ -316,9 +334,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                   className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                   aria-label={`Task group: ${activeTaskGroup.name}`}
                 >
-                  <span className="text-base">
-                    {activeTaskGroup.emoji}
-                  </span>
+                  <span className="text-base">{activeTaskGroup.emoji}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-fit p-0" align="start">
@@ -332,9 +348,14 @@ const TaskListComponent: React.FC<TaskListProps> = ({
             </Popover>
 
             {/* Task Group Name with Tooltip */}
-            <CursorTooltip content={tooltipContent} containerClassName="inline-block">
+            <CursorTooltip
+              content={tooltipContent}
+              containerClassName="inline-block"
+            >
               <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                {activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name}
+                {activeTaskGroupId === 'all'
+                  ? 'All Tasks'
+                  : activeTaskGroup.name}
               </div>
             </CursorTooltip>
           </div>
@@ -362,7 +383,10 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     })
                   }
                 >
-                  <span className="mr-2" style={{ color: activeTaskGroup.color }}>
+                  <span
+                    className="mr-2"
+                    style={{ color: activeTaskGroup.color }}
+                  >
                     <Settings className="h-4 w-4" />
                   </span>
                   <span>Settings</span>
@@ -377,7 +401,10 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     })
                   }
                 >
-                  <span className="mr-2" style={{ color: activeTaskGroup.color }}>
+                  <span
+                    className="mr-2"
+                    style={{ color: activeTaskGroup.color }}
+                  >
                     <Edit className="h-4 w-4" />
                   </span>
                   <span>Edit</span>
@@ -455,9 +482,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
                     aria-label={`Task group: ${activeTaskGroup.name}`}
                   >
-                    <span className="text-base">
-                      {activeTaskGroup.emoji}
-                    </span>
+                    <span className="text-base">{activeTaskGroup.emoji}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-fit p-0" align="start">
@@ -476,7 +501,9 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 containerClassName="inline-block"
               >
                 <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                  {activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name}
+                  {activeTaskGroupId === 'all'
+                    ? 'All Tasks'
+                    : activeTaskGroup.name}
                 </div>
               </CursorTooltip>
             </div>
@@ -498,9 +525,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setShowEditDialog(true)}
-                  >
+                  <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
                     <Edit className="mr-2 h-4 w-4" />
                     <span>Edit</span>
                   </DropdownMenuItem>
@@ -538,8 +563,13 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                 <div key={dayKey} className="space-y-2">
                   {/* Day heading with improved styling */}
                   <div className="flex items-center gap-2 mb-3">
-                    <span className={`text-xs font-semibold uppercase tracking-wider ${dayKey === 'Overdue' ? 'text-red-500' : 'text-muted-foreground'
-                      }`}>
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-wider ${
+                        dayKey === 'Overdue'
+                          ? 'text-red-500'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
                       {dayKey}
                     </span>
                     <Badge variant="outline" className="text-xs h-5">
@@ -666,7 +696,8 @@ const TaskListMemoComparison = (
   if (prevProps.hideHeader !== nextProps.hideHeader) return false;
   // Props that impact rendering mode and label visibility
   if (prevProps.calendarMode !== nextProps.calendarMode) return false;
-  if (prevProps.showTaskListLabels !== nextProps.showTaskListLabels) return false;
+  if (prevProps.showTaskListLabels !== nextProps.showTaskListLabels)
+    return false;
   if (prevProps.maxTasks !== nextProps.maxTasks) return false;
 
   // Function props are assumed to be stable (will be optimized in LeftPane with useCallback)

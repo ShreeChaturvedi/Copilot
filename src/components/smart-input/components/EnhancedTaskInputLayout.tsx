@@ -179,7 +179,7 @@ export const EnhancedTaskInputLayout: React.FC<
                 fontSize: 'inherit',
                 lineHeight: 'inherit',
                 letterSpacing: 'inherit',
-                caretColor: isRecording ? '#3b82f6' : 'inherit',
+                caretColor: isRecording ? 'var(--primary)' : 'inherit',
               }}
               aria-label="Task input"
             />

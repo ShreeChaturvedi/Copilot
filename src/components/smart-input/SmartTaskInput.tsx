@@ -136,7 +136,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#3b82f6',
+    color: '#0d97d5',
     description: 'Default task group',
   };
 

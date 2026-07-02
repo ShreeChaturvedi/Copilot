@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useRef, useEffect } from 'react';
-import { ParsedTag } from "@shared/types";
+import { ParsedTag } from '@shared/types';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
@@ -56,15 +56,15 @@ export const HighlightedInput: React.FC<HighlightedInputProps> = ({
   useEffect(() => {
     const input = inputRef.current;
     const highlight = highlightRef.current;
-    
+
     if (input && highlight) {
       const syncScroll = () => {
         highlight.scrollLeft = input.scrollLeft;
       };
-      
+
       input.addEventListener('scroll', syncScroll);
       input.addEventListener('input', syncScroll);
-      
+
       return () => {
         input.removeEventListener('scroll', syncScroll);
         input.removeEventListener('input', syncScroll);
@@ -90,11 +90,11 @@ export const HighlightedInput: React.FC<HighlightedInputProps> = ({
 
       // Add highlighted tag with subtle background
       const tagText = value.substring(tag.startIndex, tag.endIndex);
-      const color = tag.color || '#3b82f6';
-      
+      const color = tag.color || '#0d97d5';
+
       // Create a more sophisticated highlight style
       html += `<mark class="smart-highlight" style="background-color: ${color}20; color: inherit; padding: 0; border-radius: 2px; box-shadow: 0 0 0 1px ${color}30;">${escapeHtml(tagText)}</mark>`;
-      
+
       lastIndex = tag.endIndex;
     }
 
@@ -164,11 +164,14 @@ export const HighlightedInput: React.FC<HighlightedInputProps> = ({
       {/* Confidence indicator */}
       {showConfidence && confidence < 1 && tags.length > 0 && (
         <div className="absolute -bottom-1 right-1 flex items-center gap-1 z-20">
-          <div 
+          <div
             className={cn(
               'w-2 h-2 rounded-full',
-              confidence >= 0.8 ? 'bg-green-400' : 
-              confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
+              confidence >= 0.8
+                ? 'bg-green-400'
+                : confidence >= 0.6
+                  ? 'bg-yellow-400'
+                  : 'bg-red-400'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />
