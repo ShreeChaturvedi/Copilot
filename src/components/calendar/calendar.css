@@ -8,8 +8,8 @@
   --fc-today-bg-color: oklch(
     0.7 0.15 140 / 0.15
   ) !important; /* Muted green for today */
-  --fc-page-bg-color: hsl(var(--background)) !important;
-  --fc-neutral-bg-color: hsl(var(--background)) !important;
+  --fc-page-bg-color: var(--background) !important;
+  --fc-neutral-bg-color: var(--background) !important;
 }
 
 .dark .fc {
@@ -17,8 +17,8 @@
   --fc-today-bg-color: oklch(
     0.7 0.15 140 / 0.1
   ) !important; /* Muted green for dark mode */
-  --fc-page-bg-color: hsl(var(--background)) !important;
-  --fc-neutral-bg-color: hsl(var(--background)) !important;
+  --fc-page-bg-color: var(--background) !important;
+  --fc-neutral-bg-color: var(--background) !important;
 }
 
 /* Consolidated muted foreground usage */
@@ -28,7 +28,7 @@
 .fc .fc-timegrid-axis-cushion,
 .fc-list-event-time,
 .fc-popover-close {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
 
 /* ================================
@@ -37,8 +37,8 @@
 
 /* Main calendar container */
 .fc {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: var(--background);
+  color: var(--foreground);
   height: 100% !important;
 }
 
@@ -72,7 +72,7 @@
 
 /* NO SPECIAL STYLING FOR TODAY'S COLUMN HEADER - BOTH LIGHT AND DARK MODE */
 .fc-col-header-cell.fc-day-today {
-  background-color: hsl(var(--muted)) !important;
+  background-color: var(--muted) !important;
 }
 
 /* Custom day header styling for React components */
@@ -88,7 +88,7 @@
 .fc-dayGridMonth-view .day-header-name {
   text-transform: uppercase;
   font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   opacity: 0.5; /* match AM/PM time label style */
 }
 
@@ -100,7 +100,7 @@
   border-radius: 4px;
   min-width: 24px;
   text-align: center;
-  color: hsl(var(--secondary-foreground));
+  color: var(--secondary-foreground);
 }
 
 .day-header-number.today {
@@ -135,8 +135,8 @@
    ================================ */
 
 .fc-col-header-cell {
-  background-color: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
+  background-color: var(--muted);
+  color: var(--muted-foreground);
   font-weight: 600;
 }
 
@@ -147,12 +147,12 @@
 
 /* Keep hover subtle without blocking navlink underline */
 .fc-col-header-cell-cushion:hover:not(.fc-navlink) {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   text-decoration: none;
 }
 
 .fc-col-header-cell.fc-sticky {
-  background-color: hsl(var(--muted));
+  background-color: var(--muted);
   z-index: 2;
 }
 
@@ -163,21 +163,21 @@
 /* day cells inherit page background */
 
 .fc-daygrid-day-number {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   text-decoration: none; /* remove underline */
   padding: 4px;
 }
 
 /* Do not suppress underline when element is a navlink */
 .fc-daygrid-day:not(.fc-day-today) .fc-daygrid-day-number:hover:not(.fc-navlink) {
-  background-color: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+  background-color: var(--accent);
+  color: var(--accent-foreground);
   border-radius: 4px;
   text-decoration: none;
 }
 
 .fc-daygrid-day:not(.fc-day-today):hover {
-  background-color: hsl(var(--accent) / 0.3);
+  background-color: color-mix(in oklab, var(--accent) 30%, transparent);
 }
 
 /* ================================
@@ -204,7 +204,7 @@
   font-size: 1.2em;
 }
 .fc .fc-timegrid-slot-label-cushion .fc-slot-meridiem {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   opacity: 0.5;
   font-weight: 500;
   font-size: 0.8em;
@@ -228,7 +228,7 @@
 }
 
 .fc-timegrid-slot:hover {
-  background-color: hsl(var(--accent) / 0.1);
+  background-color: color-mix(in oklab, var(--accent) 10%, transparent);
 }
 
 /* Minor grid lines - consolidated */
@@ -247,9 +247,9 @@
    ================================ */
 
 .fc-event {
-  background-color: hsl(var(--primary));
-  border-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
   border-radius: 4px;
   font-size: 0.875rem;
   cursor: pointer;
@@ -264,17 +264,17 @@
 .fc .fc-event.fc-event-mirror.fc-event-preview,
 .fc .fc-event-preview {
   border-radius: 4px !important;
-  background-color: var(--default-calendar-color, hsl(var(--primary))) !important;
-  border-color: var(--default-calendar-color, hsl(var(--primary))) !important;
+  background-color: var(--default-calendar-color, var(--primary)) !important;
+  border-color: var(--default-calendar-color, var(--primary)) !important;
   color: #fff !important;
   opacity: 0.9;
 }
 
 .fc-event:hover {
-  background-color: hsl(var(--primary) / 0.9);
-  border-color: hsl(var(--primary) / 0.9);
+  background-color: color-mix(in oklab, var(--primary) 90%, transparent);
+  border-color: color-mix(in oklab, var(--primary) 90%, transparent);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px hsl(var(--primary) / 0.3);
+  box-shadow: 0 4px 8px color-mix(in oklab, var(--primary) 30%, transparent);
 }
 
 /* .fc-event-main inherits color from .fc-event */
@@ -332,7 +332,7 @@
 }
 
 .fc-event-resizer {
-  background-color: hsl(var(--primary-foreground));
+  background-color: var(--primary-foreground);
   opacity: 0.8;
 }
 
@@ -342,13 +342,13 @@
 
 /* Selection styling */
 .fc-highlight {
-  background-color: color-mix(in srgb, var(--default-calendar-color, hsl(var(--primary))) 20%, transparent) !important;
-  border-color: var(--default-calendar-color, hsl(var(--primary))) !important;
+  background-color: color-mix(in srgb, var(--default-calendar-color, var(--primary)) 20%, transparent) !important;
+  border-color: var(--default-calendar-color, var(--primary)) !important;
   border-radius: 4px;
 }
 
 .fc-timegrid-slot.fc-highlight {
-  background-color: color-mix(in srgb, var(--default-calendar-color, hsl(var(--primary))) 10%, transparent) !important;
+  background-color: color-mix(in srgb, var(--default-calendar-color, var(--primary)) 10%, transparent) !important;
 }
 
 /* ================================
@@ -359,8 +359,8 @@
 /* list table inherits page background */
 
 .fc-list-day-cushion {
-  background-color: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
+  background-color: var(--muted);
+  color: var(--muted-foreground);
   font-weight: 600;
   padding: 8px 12px;
 }
@@ -368,7 +368,7 @@
 /* list event background inherits from table/page background */
 
 .fc-list-event:hover {
-  background-color: hsl(var(--accent) / 0.5);
+  background-color: color-mix(in oklab, var(--accent) 50%, transparent);
   cursor: pointer;
 }
 
@@ -377,17 +377,17 @@
 }
 
 .fc-list-event-title {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   width: 100%;
 }
 
 .fc-list-event-dot {
-  background-color: hsl(var(--primary));
-  border-color: hsl(var(--primary));
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .fc-list-empty {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   text-align: center;
   padding: 2rem;
   font-style: italic;
@@ -413,36 +413,36 @@
    ================================ */
 
 .fc-more-link {
-  color: hsl(var(--primary));
+  color: var(--primary);
   text-decoration: none;
   font-weight: 500;
 }
 
 .fc-more-link:hover {
-  color: hsl(var(--primary) / 0.8);
+  color: color-mix(in oklab, var(--primary) 80%, transparent);
   text-decoration: underline;
 }
 
 .fc-popover {
-  background-color: hsl(var(--popover));
-  border: 1px solid hsl(var(--border));
+  background-color: var(--popover);
+  border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow:
-    0 10px 15px -3px hsl(var(--foreground) / 0.1),
-    0 4px 6px -2px hsl(var(--foreground) / 0.05);
+    0 10px 15px -3px color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 4px 6px -2px color-mix(in oklab, var(--foreground) 5%, transparent);
 }
 
 .fc-popover-header {
-  background-color: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  border-bottom: 1px solid hsl(var(--border));
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
   padding: 8px 12px;
   font-weight: 600;
 }
 
 .fc-popover-body {
-  background-color: hsl(var(--popover));
-  color: hsl(var(--popover-foreground));
+  background-color: var(--popover);
+  color: var(--popover-foreground);
   padding: 8px;
 }
 
@@ -455,8 +455,8 @@
 }
 
 .fc-popover-close:hover {
-  color: hsl(var(--foreground));
-  background-color: hsl(var(--accent));
+  color: var(--foreground);
+  background-color: var(--accent);
   border-radius: 4px;
 }
 
@@ -466,7 +466,7 @@
 
 .fc-daygrid-day-number.fc-navlink:hover,
 .fc-col-header-cell-cushion.fc-navlink:hover {
-  color: hsl(var(--primary));
+  color: var(--primary);
   text-decoration: underline;
 }
 
@@ -475,12 +475,12 @@
    ================================ */
 
 .fc-non-business {
-  background-color: hsl(var(--muted) / 0.3);
+  background-color: color-mix(in oklab, var(--muted) 30%, transparent);
 }
 
 .fc-day-sat,
 .fc-day-sun {
-  background-color: hsl(var(--muted) / 0.1);
+  background-color: color-mix(in oklab, var(--muted) 10%, transparent);
 }
 
 .fc-event-past {
@@ -488,13 +488,13 @@
 }
 
 .fc-day-disabled {
-  background-color: hsl(var(--muted) / 0.5);
-  color: hsl(var(--muted-foreground));
+  background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+  color: var(--muted-foreground);
 }
 
 .fc-loading {
-  background-color: hsl(var(--background) / 0.8);
-  color: hsl(var(--muted-foreground));
+  background-color: color-mix(in oklab, var(--background) 80%, transparent);
+  color: var(--muted-foreground);
 }
 
 /* ================================
@@ -507,17 +507,17 @@
 }
 
 .fc-scroller::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: var(--muted);
   border-radius: 4px;
 }
 
 .fc-scroller::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
   border-radius: 4px;
 }
 
 .fc-scroller::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
 }
 
 /* ================================
@@ -548,7 +548,7 @@
 .fc-daygrid-day-number:focus,
 .fc-event:focus,
 .fc-more-link:focus {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 
