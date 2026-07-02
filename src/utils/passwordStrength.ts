@@ -11,7 +11,9 @@ export interface PasswordStrengthResult {
   };
 }
 
-export function calculatePasswordStrength(password: string): PasswordStrengthResult {
+export function calculatePasswordStrength(
+  password: string
+): PasswordStrengthResult {
   const checks = {
     length: password.length >= 8,
     lowercase: /[a-z]/.test(password),
@@ -28,7 +30,8 @@ export function calculatePasswordStrength(password: string): PasswordStrengthRes
   else feedback.push('Use at least 8 characters');
 
   if (password.length >= 12) score += 1;
-  else if (password.length >= 8) feedback.push('Consider using 12+ characters for better security');
+  else if (password.length >= 8)
+    feedback.push('Consider using 12+ characters for better security');
 
   // Character variety
   if (checks.lowercase && checks.uppercase) score += 1;
@@ -76,22 +79,28 @@ export function calculatePasswordStrength(password: string): PasswordStrengthRes
   };
 }
 
-export function getStrengthColor(strength: PasswordStrengthResult['strength']): string {
+export function getStrengthColor(
+  strength: PasswordStrengthResult['strength']
+): string {
+  // Token ladder: red = not there yet, amber = fair, aqua = confirmed
+  // (raw Tailwind hues retired with the SETTLE palette, refs #28)
   switch (strength) {
     case 'very-weak':
-      return 'bg-red-500';
+      return 'bg-destructive';
     case 'weak':
-      return 'bg-orange-500';
+      return 'bg-destructive/70';
     case 'fair':
-      return 'bg-yellow-500';
+      return 'bg-warning';
     case 'strong':
-      return 'bg-blue-500';
+      return 'bg-aqua/70';
     case 'very-strong':
-      return 'bg-green-500';
+      return 'bg-aqua';
   }
 }
 
-export function getStrengthText(strength: PasswordStrengthResult['strength']): string {
+export function getStrengthText(
+  strength: PasswordStrengthResult['strength']
+): string {
   switch (strength) {
     case 'very-weak':
       return 'Very Weak';

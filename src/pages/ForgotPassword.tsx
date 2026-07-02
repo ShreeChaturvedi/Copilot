@@ -3,13 +3,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 
@@ -49,83 +42,68 @@ function ForgotPasswordForm({
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card className="bg-transparent shadow-none border-transparent">
-        <CardHeader>
-          <CardTitle>Reset your password</CardTitle>
-          <CardDescription>
-            Enter your email and we will send you a link to reset your password.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {submitted ? (
-            <div className="flex flex-col gap-6">
-              <p className="text-sm text-muted-foreground" role="status">
-                If an account exists for that email, a password reset link has
-                been sent. Check your inbox and follow the link to choose a new
-                password.
-              </p>
-              <Button
-                type="button"
-                variant="authPrimary"
-                className="w-full cursor-glow-border transition-colors duration-200"
-                onClick={handleBackToLogin}
-              >
-                Back to login
-              </Button>
+      <div className="grid gap-1.5">
+        <h1 className="text-xl font-semibold tracking-[-0.01em]">
+          Reset your password
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your email and we will send you a link to reset your password.
+        </p>
+      </div>
+      {submitted ? (
+        <div className="flex flex-col gap-5">
+          <p className="text-sm text-muted-foreground" role="status">
+            If an account exists for that email, a password reset link has been
+            sent. Check your inbox and follow the link to choose a new password.
+          </p>
+          <Button type="button" className="w-full" onClick={handleBackToLogin}>
+            Back to sign in
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-6">
-                <div className="grid gap-3">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                  />
-                </div>
-                {error && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {error}
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  variant="authPrimary"
-                  disabled={isSubmitting}
-                  className="w-full cursor-glow-border transition-colors duration-200"
-                >
-                  {isSubmitting ? 'Sending...' : 'Send reset link'}
-                </Button>
-              </div>
-              <div className="mt-4 text-center text-sm">
-                Remembered your password?{' '}
-                <a
-                  href="/login"
-                  onClick={handleBackToLogin}
-                  className="underline underline-offset-4"
-                >
-                  Back to login
-                </a>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? 'Sending...' : 'Send reset link'}
+            </Button>
+          </div>
+          <div className="mt-5 text-center text-sm text-muted-foreground">
+            Remembered your password?{' '}
+            <a
+              href="/login"
+              onClick={handleBackToLogin}
+              className="text-foreground underline underline-offset-4"
+            >
+              Back to sign in
+            </a>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
 
 export function ForgotPasswordPage() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-4 sm:p-6 md:p-10">
-      <div className="w-full max-w-md rounded-xl frosted-panel p-4 sm:p-6 md:p-8">
-        <ForgotPasswordForm />
-      </div>
+    <div className="auth-card w-full max-w-[400px] p-8 max-sm:p-6">
+      <ForgotPasswordForm />
     </div>
   );
 }
