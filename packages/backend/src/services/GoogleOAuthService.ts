@@ -33,7 +33,7 @@ class GoogleOAuthService {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const redirectUri =
       process.env.GOOGLE_REDIRECT_URI ||
-      'http://localhost:3001/auth/google/callback';
+      'http://localhost:5180/app/auth/google/callback';
 
     if (!clientId || !clientSecret) {
       // Don't throw - just create a non-functional client

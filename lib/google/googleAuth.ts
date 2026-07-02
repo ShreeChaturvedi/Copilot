@@ -50,6 +50,10 @@ export function redirectUriAllowlist(): string[] {
     if (uri.trim()) allow.add(uri.trim());
   }
   if (process.env.NODE_ENV !== 'production') {
+    // SPA now lives under /app; keep the pre-rebase URIs allowed during the
+    // transition so an in-flight consent round trip still validates.
+    allow.add('http://localhost:5180/app/auth/google/callback');
+    allow.add('http://localhost:5173/app/auth/google/callback');
     allow.add('http://localhost:5180/auth/google/callback');
     allow.add('http://localhost:5173/auth/google/callback');
   }
