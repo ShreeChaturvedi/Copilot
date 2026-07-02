@@ -1,39 +1,34 @@
-/* ================================
-   FULLCALENDAR THEME INTEGRATION
-   ================================ */
+/* ==========================================================================
+   FULLCALENDAR SKIN — SETTLE aqua (design-brief §4.4)
+   Chips = the §2.4 alpha-film formula keyed off --chip-c (set per event by
+   CalendarView's eventDidMount). Today = instrument intensity (film wash,
+   aqua rails, fixed 24px disc). Now-line = 2px aqua + gutter chip + ghost.
+   ========================================================================== */
 
-/* CSS Custom Properties for theme consistency */
 .fc {
-  /* Today wash = aqua film (design-brief §2.3/§4.4); the token itself is
-     theme-tiered (5% light / 6% dark), so no .dark override is needed */
-  --fc-border-color: var(--border);
-  --fc-today-bg-color: var(--aqua-film-04) !important;
-  --fc-page-bg-color: var(--background) !important;
-  --fc-neutral-bg-color: var(--background) !important;
-}
-
-/* Consolidated muted foreground usage */
-.day-header-name,
-.fc-col-header-cell-cushion,
-.fc .fc-timegrid-slot-label-cushion,
-.fc .fc-timegrid-axis-cushion,
-.fc-list-event-time,
-.fc-popover-close {
-  color: var(--muted-foreground);
+  /* FullCalendar variables. The today wash is applied by targeted rules
+     below (the flood-everything var was an audited defect), so keep the
+     var transparent. */
+  --fc-border-color: var(--hairline);
+  --fc-today-bg-color: transparent;
+  --fc-page-bg-color: var(--background);
+  --fc-neutral-bg-color: var(--background);
+  --fc-now-indicator-color: var(--aqua);
+  --fc-event-bg-color: transparent;
+  --fc-event-border-color: transparent;
+  --fc-small-font-size: 12px;
 }
 
 /* ================================
-   CALENDAR CONTAINER & LAYOUT
+   CONTAINER & LAYOUT
    ================================ */
 
-/* Main calendar container */
 .fc {
   background-color: var(--background);
   color: var(--foreground);
   height: 100% !important;
 }
 
-/* Calendar content area */
 .fc-view-harness,
 .fc-scroller-harness,
 .fc-scroller {
@@ -45,162 +40,164 @@
 }
 
 /* ================================
-   CURRENT DAY STYLING
+   TODAY — the brightest surface is now (§4.4)
+   Wash on the week-view body column and the month cell only: the all-day
+   lane and header stay clean, and Day view gets NO wash (the disc and the
+   now-line carry it).
    ================================ */
 
-/* Today highlighting - aqua film wash for the current day COLUMN (not
-   headers). Token is theme-tiered, no .dark override. */
-.fc-day-today {
-  background-color: var(--aqua-film-04) !important;
+.fc-timeGridWeek-view .fc-timegrid-col.fc-day-today {
+  background-color: var(--aqua-film-04);
 }
 
-/* NO SPECIAL STYLING FOR TODAY'S COLUMN HEADER - BOTH LIGHT AND DARK MODE */
-.fc-col-header-cell.fc-day-today {
-  background-color: var(--muted) !important;
+.fc-dayGridMonth-view .fc-daygrid-day.fc-day-today {
+  background-color: var(--aqua-film-04);
 }
 
-/* Custom day header styling for React components */
-.day-header-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Capitalize weekday label strictly in Week and Month views */
-.fc-timeGridWeek-view .day-header-name,
-.fc-dayGridMonth-view .day-header-name {
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-  opacity: 0.5; /* match AM/PM time label style */
-}
-
-.fc-timeGridWeek-view .day-header-number,
-.fc-dayGridMonth-view .day-header-number {
-  font-weight: 500;
-  font-size: 1rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  min-width: 24px;
-  text-align: center;
-  color: var(--secondary-foreground);
-}
-
-/* Today pill: aqua carries --aqua-ink per theme (white on deep enamel in
-   light, ink on bright aqua in dark). Fixed-disc anatomy lands with the
-   calendar surface pass; colors re-base now. */
-.day-header-number.today {
-  background-color: var(--aqua);
-  color: var(--aqua-ink);
-  font-weight: 600;
-}
-
-/* Today's date number - circular highlight */
-.fc-day-today .fc-daygrid-day-number {
-  background-color: var(--aqua);
-  color: var(--aqua-ink);
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
+/* Today's own left/right hairlines switch to the aqua rim (week view; the
+   rail runs through header, all-day lane, and body). */
+.fc-timeGridWeek-view .fc-timegrid-col.fc-day-today,
+.fc-timeGridWeek-view .fc-timegrid-col.fc-day-today + .fc-timegrid-col,
+.fc-timeGridWeek-view .fc-col-header-cell.fc-day-today,
+.fc-timeGridWeek-view .fc-col-header-cell.fc-day-today + .fc-col-header-cell,
+.fc-timeGridWeek-view .fc-daygrid-day.fc-day-today,
+.fc-timeGridWeek-view .fc-daygrid-day.fc-day-today + .fc-daygrid-day,
+.fc-dayGridMonth-view .fc-daygrid-day.fc-day-today,
+.fc-dayGridMonth-view .fc-daygrid-day.fc-day-today + .fc-daygrid-day {
+  border-left-color: var(--aqua-rim);
 }
 
 /* ================================
-   COLUMN HEADERS
+   COLUMN HEADERS — micro label + fixed 24px disc (kills #55)
    ================================ */
 
 .fc-col-header-cell {
-  background-color: var(--muted);
-  color: var(--muted-foreground);
-  font-weight: 600;
+  background: transparent;
 }
 
 .fc-col-header-cell-cushion {
-  text-decoration: none; /* remove underline */
-  padding: 8px 4px;
+  text-decoration: none;
+  padding: 6px 4px;
 }
 
-/* Keep hover subtle without blocking navlink underline */
 .fc-col-header-cell-cushion:hover:not(.fc-navlink) {
   color: var(--muted-foreground);
   text-decoration: none;
 }
 
-.fc-col-header-cell.fc-sticky {
-  background-color: var(--muted);
-  z-index: 2;
+.day-header-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.day-header-name {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Every date numeral gets the same fixed 24px box so today's disc never
+   reflows or squishes (width AND height locked — fixes #55). */
+.day-header-number {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink-2);
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+}
+
+.day-header-number.today {
+  background-color: var(--aqua);
+  color: var(--aqua-ink);
+  font-weight: 500;
 }
 
 /* ================================
-   DAY GRID CELLS
+   DAY GRID (month) CELLS
    ================================ */
 
-/* day cells inherit page background */
-
 .fc-daygrid-day-number {
-  color: var(--foreground);
-  text-decoration: none; /* remove underline */
-  padding: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 4px 6px;
 }
 
-/* Do not suppress underline when element is a navlink */
-.fc-daygrid-day:not(.fc-day-today)
-  .fc-daygrid-day-number:hover:not(.fc-navlink) {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
-  border-radius: 4px;
-  text-decoration: none;
+.fc-day-other .fc-daygrid-day-number {
+  color: var(--faint);
+}
+
+/* Month today = the same fixed 24px aqua disc */
+.fc-day-today .fc-daygrid-day-number {
+  background-color: var(--aqua);
+  color: var(--aqua-ink);
+  border-radius: 9999px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
 }
 
 .fc-daygrid-day:not(.fc-day-today):hover {
   background-color: color-mix(in oklab, var(--accent) 30%, transparent);
 }
 
+/* "+2 more" — 11px mono (§4.4) */
+.fc-more-link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  padding: 0 4px;
+}
+
+.fc-more-link:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+
 /* ================================
-   TIME GRID
+   TIME GRID GUTTER — 11px mono --faint (§4.4)
    ================================ */
 
-/* timegrid slots inherit page background */
-
-/* Increase specificity and force styles to take effect */
 .fc .fc-timegrid-slot-label-cushion {
-  /* Smaller and lower-contrast for time labels; remains theme-aware */
-  /* Do NOT fade the whole container; it would dim children too */
-  opacity: 1 !important;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
   text-align: right;
   padding-right: 8px;
-  font-weight: 500;
-  font-size: 0.72em;
 }
 
-/* Hour/minute split styling injected by slotLabelContent */
-.fc .fc-timegrid-slot-label-cushion .fc-slot-hour {
-  /* Force bright hour text regardless of inherited color */
-  opacity: 1;
-  font-size: 1.2em;
-}
-.fc .fc-timegrid-slot-label-cushion .fc-slot-meridiem {
-  color: var(--muted-foreground);
-  opacity: 0.5;
-  font-weight: 500;
-  font-size: 0.8em;
-}
-
-/* All-day axis label styling to match time labels */
+/* ALL DAY axis label */
 .fc .fc-timegrid-axis-cushion {
-  opacity: 0.65;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-weight: 500;
-  font-size: 0.72em;
+  color: var(--faint);
 }
 
 .fc-timegrid-axis {
   border-left: none !important;
-  opacity: 1; /* Show left time bar */
 }
 
 .fc-timegrid-axis.fc-sticky {
@@ -211,7 +208,7 @@
   background-color: color-mix(in oklab, var(--accent) 10%, transparent);
 }
 
-/* Minor (:30) grid lines - hairline at half opacity (design-brief §4.4) */
+/* Minor (:30) grid lines - hairline at half opacity (§4.4) */
 .fc-timegrid-slot-minor,
 .fc-timegrid-slot-minor td {
   border-color: color-mix(
@@ -222,165 +219,412 @@
 }
 
 /* ================================
-   EVENTS
+   EVENT CHIPS — §2.4 alpha-film formula, verbatim
+   One stored color (--chip-c per event, set by eventDidMount); everything
+   derives at runtime. Light: 12% film + 3px bar + sunk text. Dark: 24%
+   film + 0.5px full-alpha rim + lifted text.
    ================================ */
 
-.fc-event {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-  border-radius: 4px;
-  font-size: 0.875rem;
+.fc .fc-event {
+  --_c: var(--chip-c, var(--default-calendar-color, var(--aqua)));
+  background: color-mix(in oklab, var(--_c) 12%, transparent);
+  border: none;
+  border-left: 3px solid var(--_c);
+  border-radius: var(--radius-chip, 6px);
+  color: oklch(from var(--_c) 0.5 c h);
+  box-shadow: none;
+  font-size: 12px;
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: background-color var(--dur-2) var(--ease-out);
 }
 
-/* Mirror/preview event (selection or drag) should match real event styling and use default calendar color */
-.fc .fc-event.fc-event-mirror.fc-event-preview,
-.fc .fc-event-preview {
-  border-radius: 4px !important;
-  background-color: var(--default-calendar-color, var(--primary)) !important;
-  border-color: var(--default-calendar-color, var(--primary)) !important;
-  color: #fff !important;
-  opacity: 0.9;
+/* hover moves toward higher contrast (film steps up) */
+.fc .fc-event:hover {
+  background: color-mix(in oklab, var(--_c) 16%, transparent);
 }
 
-.fc-event:hover {
-  background-color: color-mix(in oklab, var(--primary) 90%, transparent);
-  border-color: color-mix(in oklab, var(--primary) 90%, transparent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px color-mix(in oklab, var(--primary) 30%, transparent);
+.dark .fc .fc-event {
+  border-left: none;
+  background: color-mix(in oklab, var(--_c) 24%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--_c);
+  color: oklch(from var(--_c) 0.82 min(c, 0.1) h);
 }
 
-/* .fc-event-main inherits color from .fc-event */
+.dark .fc .fc-event:hover {
+  background: color-mix(in oklab, var(--_c) 30%, transparent);
+}
 
-.fc-event-title {
-  font-size: 0.8em;
-  font-weight: 600;
+/* FullCalendar paints .fc-event-main with its own text-color var */
+.fc .fc-event .fc-event-main {
   color: inherit;
 }
 
-.fc-event-time {
-  font-size: 0.8em;
+/* §9.3.3 contrast guard: legacy stored colors whose derived text would land
+   under 4.5:1 fall back to ink text over a 32% film (class from JS). */
+.fc .fc-event.chip-guard,
+.dark .fc .fc-event.chip-guard {
+  color: var(--ink);
+  background: color-mix(in oklab, var(--_c) 32%, transparent);
+}
+
+/* Past settles back: 55% + desaturate (§2.4) */
+.fc .fc-event.fc-event-past {
+  opacity: 0.55;
+  filter: saturate(0.65);
+}
+
+/* Chip anatomy: `09:30` 11px mono then title 12px/500 (§4.4) */
+.chip-body {
+  min-width: 0;
+  padding: 2px 5px;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.chip-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 500;
-  color: inherit;
+  margin-right: 5px;
 }
 
-/* Event areas */
-.fc-daygrid-event-harness {
-  margin: 1px 2px;
+.chip-title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* <30min and month bars: one line, truncate */
+.chip-oneline {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.chip-oneline .chip-time {
+  flex: none;
+}
+
+.chip-oneline .chip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Month/all-day bars: 18px film bars; radius only on terminating ends */
+.fc .fc-daygrid-event {
+  min-height: 18px;
+  margin: 1px 4px;
+  align-items: center;
+}
+
+.fc .fc-h-event:not(.fc-event-start) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+}
+
+.fc .fc-h-event:not(.fc-event-end) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .fc-timegrid-event-harness {
   margin-right: 2px;
 }
 
+/* Selected / dragging / mirror = solid chip + white text (§2.4 states).
+   Both theme variants spelled out so state always beats the hover rules. */
+.fc .fc-event.fc-event-mirror,
+.dark .fc .fc-event.fc-event-mirror,
+.fc .fc-event.fc-event-dragging,
+.dark .fc .fc-event.fc-event-dragging,
+.fc .fc-event.fc-event-selected,
+.dark .fc .fc-event.fc-event-selected {
+  background: var(--_c);
+  color: #ffffff;
+  box-shadow: var(--shadow-2);
+  opacity: 1;
+  filter: none;
+}
+
+/* External task drag-in mirror keeps the default calendar color */
+.fc .fc-event.fc-event-preview {
+  --chip-c: var(--default-calendar-color, var(--aqua));
+}
+
+/* Focus ring (§2.3): every focusable surface */
+.fc .fc-event:focus-visible,
+.fc-daygrid-day-number:focus-visible,
+.fc-more-link:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--aqua));
+  outline-offset: 1px;
+}
+
+/* New chip settles in: scale(.97) + fade 240ms + aqua rim flash (§4.4).
+   Applied only to events flagged newly-created this session, so the
+   key={slotMinTime} remounts never replay it. */
+.fc .fc-event.chip-enter {
+  animation: chip-settle-in var(--dur-3) var(--ease-settle) both;
+}
+
+.fc .fc-event.chip-enter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--aqua);
+  opacity: 0;
+  animation: chip-rim-flash var(--dur-3) var(--ease-out) both;
+  pointer-events: none;
+}
+
+@keyframes chip-settle-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chip-rim-flash {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* ================================
-   NOW INDICATOR
+   DIMENSION ANNOTATIONS (§4.4, SCHEMATIC vector)
+   Drag: |-- 90 MIN --| beside the chip. Resize: live start/end pinned to
+   the chip's top/bottom edges. SSM 11 aqua, tick-ended extension lines.
    ================================ */
 
-/* Now-line is aqua: aqua means live, red means only errors/overdue/delete
-   (design-brief §2.3). Full now-line anatomy (gutter chip, ghost line) lands
-   with the calendar surface pass. */
-.fc-timegrid-now-indicator-line {
-  background: var(--aqua) !important;
-  height: 2px;
+.fc .fc-event.fc-event-mirror,
+.fc .fc-event.fc-event-mirror .fc-event-main,
+.fc .fc-event.fc-event-mirror .chip-body {
+  overflow: visible;
 }
 
-/* Ensure the now-indicator arrow renders as a triangle. FullCalendar builds it with
-   borders; we must keep three sides transparent and only color the side that points
-   toward the grid. Handle both LTR and RTL directions. */
-.fc .fc-now-indicator-arrow {
-  border-color: transparent !important;
+.dim-note {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--aqua);
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
 }
-.fc:not(.fc-direction-rtl) .fc-now-indicator-arrow {
-  border-left-color: var(--aqua) !important;
+
+.dim-note::before,
+.dim-note::after {
+  content: '';
+  width: 14px;
+  height: 7px;
+  flex: none;
+  background: linear-gradient(currentColor, currentColor) center / 100% 1px
+    no-repeat;
 }
-.fc.fc-direction-rtl .fc-now-indicator-arrow {
-  border-right-color: var(--aqua) !important;
+
+.dim-note::before {
+  border-left: 1px solid currentColor;
+}
+
+.dim-note::after {
+  border-right: 1px solid currentColor;
+}
+
+.dim-time {
+  position: absolute;
+  right: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--aqua);
+  background: var(--background);
+  padding: 1px 4px;
+  border-radius: 4px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dim-time-start {
+  top: -8px;
+}
+
+.dim-time-end {
+  bottom: -8px;
+}
+
+/* ================================
+   NOW-LINE — 2px aqua, today only (§4.4)
+   ================================ */
+
+.fc-timegrid-now-indicator-line {
+  border: none !important;
+  background: var(--aqua);
+  height: 2px;
+  z-index: 5;
+}
+
+/* 6px dot at the left edge of today's column */
+.fc-timegrid-now-indicator-line::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--aqua);
+}
+
+/* Dark theme: the line is the light source (glow on the line only) */
+.dark .fc-timegrid-now-indicator-line {
+  box-shadow: 0 0 8px color-mix(in oklab, var(--aqua) 25%, transparent);
+}
+
+.fc-timegrid-now-indicator-container {
+  overflow: visible;
+}
+
+/* The gutter time chip replaces the stock triangle */
+.fc .fc-timegrid-now-indicator-arrow {
+  display: none !important;
+}
+
+/* JS-positioned overlay (CalendarView.updateNowOverlay): live gutter time
+   chip + 1px 20% ghost across the other visible days. Updates are
+   transform-only, once per minute. */
+.now-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.now-ghost {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in oklab, var(--aqua) 20%, transparent);
+  will-change: transform;
+}
+
+.now-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+  will-change: transform;
+}
+
+/* canvas-colored chip hugging the live numeral */
+.now-chip > span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--aqua);
+  background: var(--background);
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 
 /* ================================
    DRAG & DROP
    ================================ */
 
-.fc-event-dragging {
-  opacity: 0.75;
-  z-index: 999;
-}
-
 .fc-event-resizer {
-  background-color: var(--primary-foreground);
-  opacity: 0.8;
+  background-color: transparent;
 }
 
-.fc-event-resizer:hover {
-  opacity: 1;
-}
-
-/* Selection styling */
+/* Selection highlight while drag-creating */
 .fc-highlight {
   background-color: color-mix(
-    in srgb,
-    var(--default-calendar-color, var(--primary)) 20%,
+    in oklab,
+    var(--default-calendar-color, var(--aqua)) 10%,
     transparent
   ) !important;
-  border-color: var(--default-calendar-color, var(--primary)) !important;
-  border-radius: 4px;
-}
-
-.fc-timegrid-slot.fc-highlight {
-  background-color: color-mix(
-    in srgb,
-    var(--default-calendar-color, var(--primary)) 10%,
-    transparent
-  ) !important;
+  border-radius: var(--radius-chip, 6px);
 }
 
 /* ================================
    LIST VIEW
    ================================ */
 
-/* Shared list backgrounds */
-/* list table inherits page background */
+.fc .fc-list {
+  border-color: var(--hairline);
+}
+
+/* Reset the chip film on list rows (they are table rows, not chips) */
+.fc .fc-list-event,
+.dark .fc .fc-list-event {
+  background: transparent;
+  border: none;
+  border-left: none;
+  box-shadow: none;
+  color: var(--foreground);
+}
 
 .fc-list-day-cushion {
-  background-color: var(--muted);
+  background-color: var(--surface-2);
   color: var(--muted-foreground);
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   padding: 8px 12px;
 }
 
-/* list event background inherits from table/page background */
-
-.fc-list-event:hover {
-  background-color: color-mix(in oklab, var(--accent) 50%, transparent);
+.fc .fc-list-event:hover,
+.fc .fc-list-event:hover td {
+  background-color: var(--surface-2);
   cursor: pointer;
 }
 
 .fc-list-event-time {
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
 }
 
-.fc-list-event-title {
+.fc-list-event-title,
+.chip-list-title {
   color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
   width: 100%;
 }
 
-.fc-list-event-dot {
-  background-color: var(--primary);
-  border-color: var(--primary);
+.fc .fc-list-event-dot {
+  border-color: var(--chip-c, var(--default-calendar-color, var(--aqua)));
 }
 
 .fc-list-empty {
+  background: transparent;
   color: var(--muted-foreground);
   text-align: center;
   padding: 2rem;
-  font-style: italic;
 }
 
 /* ================================
@@ -393,41 +637,26 @@
   border-left: none !important;
 }
 
-/* section background inherits from parent */
-
-/* Border coloring should rely on FullCalendar CSS variables defined at the top
-   (e.g., --fc-border-color) to avoid clobbering border-based shapes like arrows. */
-
 /* ================================
-   POPOVER & MORE LINKS
+   POPOVER (+n more)
    ================================ */
-
-.fc-more-link {
-  color: var(--primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.fc-more-link:hover {
-  color: color-mix(in oklab, var(--primary) 80%, transparent);
-  text-decoration: underline;
-}
 
 .fc-popover {
   background-color: var(--popover);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow:
-    0 10px 15px -3px color-mix(in oklab, var(--foreground) 10%, transparent),
-    0 4px 6px -2px color-mix(in oklab, var(--foreground) 5%, transparent);
+  border-radius: var(--radius-card, 10px);
+  box-shadow: var(--shadow-2);
 }
 
 .fc-popover-header {
-  background-color: var(--muted);
+  background-color: var(--surface-2);
   color: var(--muted-foreground);
   border-bottom: 1px solid var(--border);
   padding: 8px 12px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .fc-popover-body {
@@ -437,9 +666,10 @@
 }
 
 .fc-popover-close {
+  color: var(--muted-foreground);
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   padding: 4px;
 }
@@ -451,16 +681,6 @@
 }
 
 /* ================================
-   NAVIGATION LINKS
-   ================================ */
-
-.fc-daygrid-day-number.fc-navlink:hover,
-.fc-col-header-cell-cushion.fc-navlink:hover {
-  color: var(--primary);
-  text-decoration: underline;
-}
-
-/* ================================
    SPECIAL DAY STYLING
    ================================ */
 
@@ -468,14 +688,10 @@
   background-color: color-mix(in oklab, var(--muted) 30%, transparent);
 }
 
-/* Weekend wash: neutral ink at 2% (design-brief §4.4) */
+/* Weekend wash: neutral ink at 2% (§4.4) */
 .fc-day-sat,
 .fc-day-sun {
   background-color: color-mix(in oklab, var(--ink) 2%, transparent);
-}
-
-.fc-event-past {
-  opacity: 0.8;
 }
 
 .fc-day-disabled {
@@ -498,7 +714,7 @@
 }
 
 .fc-scroller::-webkit-scrollbar-track {
-  background: var(--muted);
+  background: transparent;
   border-radius: 4px;
 }
 
@@ -517,17 +733,27 @@
 
 @media (max-width: 768px) {
   .fc-event {
-    font-size: 0.75rem;
-    padding: 1px 2px;
+    font-size: 11px;
+  }
+
+  .chip-body {
+    padding: 1px 3px;
+  }
+
+  .chip-time {
+    margin-right: 3px;
   }
 
   .fc-daygrid-day-number {
-    font-size: 0.875rem;
+    font-size: 11px;
   }
 
   .fc-col-header-cell-cushion {
     padding: 4px 2px;
-    font-size: 0.875rem;
+  }
+
+  .day-header-name {
+    font-size: 10px;
   }
 }
 
@@ -535,37 +761,49 @@
    ACCESSIBILITY
    ================================ */
 
-/* Focus states */
-.fc-daygrid-day-number:focus,
-.fc-event:focus,
-.fc-more-link:focus {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
 /* High contrast mode */
 @media (prefers-contrast: high) {
-  .fc-event {
-    border-width: 2px;
+  .fc .fc-event {
+    border: 1px solid var(--_c);
     font-weight: 600;
   }
 
   .fc-daygrid-day-number {
     font-weight: 700;
   }
+}
 
-  .fc-col-header-cell-cushion {
-    font-weight: 700;
+/* Reduced motion (§5): travel becomes a 120ms crossfade; the rim flash
+   becomes a 240ms static ring at 20%. */
+@media (prefers-reduced-motion: reduce) {
+  .fc .fc-event {
+    transition: none;
+  }
+
+  .fc .fc-event.chip-enter {
+    animation: chip-fade-in 120ms linear both;
+  }
+
+  .fc .fc-event.chip-enter::after {
+    animation: chip-rim-static var(--dur-3) step-start both;
   }
 }
 
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .fc-event,
-  .fc-daygrid-day-number,
-  .fc-more-link,
-  .fc-popover-close {
-    transition: none;
+@keyframes chip-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chip-rim-static {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -579,7 +817,7 @@
     color: black !important;
   }
 
-  .fc-event {
+  .fc .fc-event {
     background-color: #f0f0f0 !important;
     color: black !important;
     border: 1px solid #ccc !important;

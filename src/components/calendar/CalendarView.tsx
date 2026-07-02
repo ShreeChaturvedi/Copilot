@@ -10,6 +10,7 @@ import type {
   DateSelectArg,
   EventClickArg,
   EventChangeArg,
+  EventContentArg,
   EventInput,
 } from '@fullcalendar/core';
 import { clsx } from 'clsx';
@@ -20,9 +21,26 @@ import { useEvents, useUpdateEvent, useSwipeDetection } from '../../hooks';
 import { useCalendars } from '../../hooks';
 import type { CalendarEvent } from '@shared/types';
 import { toLocal } from '../../utils/date';
+import { chipTextPasses } from '../../utils/chipColor';
 import { expandOccurrences } from '@/utils/recurrence';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useCalendarSettingsStore } from '@/stores/calendarSettingsStore';
+import { useThemeStore } from '@/stores/themeStore';
+
+/** Mono chip time, 24h zero-padded per the §3 numeral law ("09:30"). */
+const fmtChipTime = (d: Date): string =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/**
+ * New-chip tracking for the §4.4 enter animation (scale .97 + fade + rim
+ * flash). Module-level so the `key={slotMinTime}` remounts and view unmounts
+ * never replay it: only events first seen AFTER the initial load animate.
+ * Optimistic temp events register a title+start signature so the real event
+ * that replaces them does not flash twice.
+ */
+const seenChipIds = new Set<string>();
+const seenChipSigs = new Set<string>();
+let chipsPrimed = false;
 
 /**
  * Calendar view types
@@ -137,12 +155,14 @@ export const CalendarView = ({
   const defaultCalendar =
     calendars.find((cal) => cal.isDefault) || visibleCalendars[0];
 
-  const { data: events = [] } = useEvents(
+  const { data: events = [], isSuccess: eventsFetched } = useEvents(
     {
       calendarNames: visibleCalendarNames,
     },
     { enabled: visibleCalendarNames.length > 0 && !calendarsLoading }
   );
+
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const updateEventMutation = useUpdateEvent();
 
@@ -223,6 +243,13 @@ export const CalendarView = ({
         const instanceKey = new Date(occurrenceStart).toISOString();
         const eventId = `${event.id}::${instanceKey}`;
 
+        // §4.4 enter flash: only chips first seen after the initial load.
+        const chipSig = `${event.title}|${instanceKey}`;
+        const isNewChip =
+          chipsPrimed &&
+          !seenChipIds.has(eventId) &&
+          !seenChipSigs.has(chipSig);
+
         return {
           id: eventId,
           groupId: event.id, // stable master/series id
@@ -232,21 +259,88 @@ export const CalendarView = ({
           allDay: event.allDay || false,
           // Disable drag/resize for optimistic temp events to avoid 404 updates
           editable: !String(event.id).startsWith('temp-'),
-          backgroundColor: event.color || calendar?.color || '#3788d8',
-          borderColor: event.color || calendar?.color || '#3788d8',
-          textColor: '#ffffff',
+          // Chip visuals are token-driven (§2.4 alpha-film formula in
+          // calendar.css keyed off --chip-c) — no inline colors here.
           extendedProps: {
             description: event.description,
             location: event.location,
             notes: event.notes,
             calendarName: event.calendarName,
             originalEvent: event,
+            chipColor: event.color || calendar?.color || undefined,
+            isNewChip,
           },
         };
       });
     },
     [calendars]
   );
+
+  /**
+   * §4.4 now-line assembly (JS-positioned parts). FullCalendar draws the 2px
+   * aqua line in today's column; this overlay adds the live gutter time chip
+   * and the 1px 20% ghost across the other visible days. One interval, and
+   * per-minute updates drive `transform: translateY` only.
+   */
+  const nowOverlayRef = useRef<HTMLDivElement | null>(null);
+
+  const updateNowOverlay = useCallback(() => {
+    const root = combinedRef.current;
+    if (!root) return;
+    const body = root.querySelector<HTMLElement>('.fc-timegrid-body');
+    const line = root.querySelector<HTMLElement>(
+      '.fc-timegrid-now-indicator-line'
+    );
+    if (!body || !line) {
+      nowOverlayRef.current?.remove();
+      nowOverlayRef.current = null;
+      return;
+    }
+    let overlay = nowOverlayRef.current;
+    if (!overlay || !overlay.isConnected || overlay.parentElement !== body) {
+      overlay?.remove();
+      overlay = document.createElement('div');
+      overlay.className = 'now-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML =
+        '<div class="now-ghost"></div><div class="now-chip"><span></span></div>';
+      body.appendChild(overlay);
+      nowOverlayRef.current = overlay;
+    }
+    const ghost = overlay.firstElementChild as HTMLElement;
+    const chip = overlay.lastElementChild as HTMLElement;
+    const bodyRect = body.getBoundingClientRect();
+    const lineRect = line.getBoundingClientRect();
+    const y = lineRect.top - bodyRect.top + 1; // center of the 2px line
+    const axis = body.querySelector<HTMLElement>('td.fc-timegrid-slot-label');
+    const axisW = axis ? axis.offsetWidth : 48;
+    ghost.style.left = `${axisW}px`;
+    ghost.style.transform = `translateY(${y}px)`;
+    chip.style.width = `${axisW}px`;
+    chip.style.transform = `translateY(${y}px) translateY(-50%)`;
+    (chip.firstElementChild as HTMLElement).textContent = fmtChipTime(
+      new Date()
+    );
+    // The chip occludes the nearest hour label instead of colliding with it.
+    body
+      .querySelectorAll<HTMLElement>('.fc-timegrid-slot-label-cushion')
+      .forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const centerY = r.top + r.height / 2 - bodyRect.top;
+        el.style.visibility = Math.abs(centerY - y) < 14 ? 'hidden' : '';
+      });
+  }, []);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(updateNowOverlay);
+    const id = setInterval(updateNowOverlay, 60_000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(id);
+      nowOverlayRef.current?.remove();
+      nowOverlayRef.current = null;
+    };
+  }, [updateNowOverlay, currentView]);
 
   /**
    * Handle date selection for creating new events
@@ -446,6 +540,19 @@ export const CalendarView = ({
   })();
 
   const calendarEvents = transformEventsForCalendar(expandedEvents);
+
+  // Mark rendered chips as seen AFTER commit (keeps the transform pure and
+  // survives StrictMode double-renders); prime once the first fetch lands so
+  // the initial event load never animates.
+  useEffect(() => {
+    for (const ev of calendarEvents) {
+      if (ev.id) seenChipIds.add(ev.id);
+      const sig = `${ev.title}|${ev.id?.split('::')[1] ?? ''}`;
+      if (String(ev.id).startsWith('temp-')) seenChipSigs.add(sig);
+    }
+    if (eventsFetched) chipsPrimed = true;
+  }, [calendarEvents, eventsFetched]);
+
   const { getSlotTimes, weekStartsOn } = useCalendarSettingsStore();
   const { slotMinTime, slotMaxTime } = getSlotTimes();
 
@@ -508,15 +615,12 @@ export const CalendarView = ({
               if (arg.view?.type?.startsWith('timeGrid') && isNoon) {
                 return 'NOON';
               }
-              // For whole hours (minutes === 0): show "H AM/PM" and style hour/meridiem separately
+              // Whole hours read `9 AM` — one register, 11px mono --faint
+              // (§4.4 gutter); styling lives in calendar.css.
               if (minutes === 0) {
                 const hour12 = (hours24 % 12 || 12).toString();
-                const meridiem = hours24 < 12 ? 'AM' : 'PM';
-                return {
-                  html: `<span class="fc-slot-hour">${hour12}</span><span class="fc-slot-meridiem"> ${meridiem}</span>`,
-                };
+                return `${hour12} ${hours24 < 12 ? 'AM' : 'PM'}`;
               }
-              // Otherwise, use the default generated label
               return arg.text;
             }}
             slotMinTime={slotMinTime}
@@ -528,30 +632,101 @@ export const CalendarView = ({
             datesSet={(arg) => {
               // Track the active visible range for expansion and memoization
               setVisibleRange({ start: arg.start, end: arg.end });
+              // Re-anchor the now-line overlay once the new view DOM exists
+              setTimeout(updateNowOverlay, 50);
             }}
             themeSystem="standard"
             dayCellClassNames="hover:bg-accent/50 cursor-pointer transition-colors duration-200"
             eventClassNames={(arg) => {
-              const classes = [
-                'cursor-pointer',
-                'transition-all',
-                'duration-200',
-              ];
+              const classes = ['cursor-pointer'];
+              const xp = (
+                arg.event as unknown as {
+                  extendedProps?: {
+                    isFromTask?: boolean;
+                    chipColor?: string;
+                    isNewChip?: boolean;
+                  };
+                }
+              ).extendedProps;
               // Only mark external task mirrors as preview to style with default calendar color
-              const isExternalTask = Boolean(
-                (
-                  arg.event as unknown as {
-                    extendedProps?: { isFromTask?: boolean };
-                  }
-                ).extendedProps?.isFromTask
-              );
-              if (arg.isMirror && isExternalTask) {
+              if (arg.isMirror && xp?.isFromTask) {
                 classes.push('fc-event-preview');
+              }
+              // §4.4 settle-in for chips created this session
+              if (xp?.isNewChip && !arg.isMirror) {
+                classes.push('chip-enter');
+              }
+              // §9.3.3 contrast guard for legacy stored colors
+              if (
+                xp?.chipColor &&
+                !chipTextPasses(xp.chipColor, resolvedTheme)
+              ) {
+                classes.push('chip-guard');
               }
               return classes;
             }}
-            eventBackgroundColor={defaultCalendar?.color}
-            eventBorderColor={defaultCalendar?.color}
+            eventDidMount={(info) => {
+              // Feed the stored calendar/event color into the §2.4 film
+              // formula; CSS falls back to --default-calendar-color.
+              const c = (
+                info.event.extendedProps as { chipColor?: string } | undefined
+              )?.chipColor;
+              if (c) info.el.style.setProperty('--chip-c', c);
+            }}
+            eventContent={(arg: EventContentArg) => {
+              const viewType = arg.view?.type ?? '';
+              // List view keeps FullCalendar's row anatomy (time and dot
+              // cells render outside this hook); only the title is ours.
+              if (viewType.startsWith('list')) {
+                return (
+                  <span className="chip-list-title">
+                    {arg.event.title || '(untitled)'}
+                  </span>
+                );
+              }
+              const { start, end, allDay } = arg.event;
+              const durationMin =
+                start && end
+                  ? Math.round((end.getTime() - start.getTime()) / 60000)
+                  : null;
+              const isShort =
+                !allDay && durationMin !== null && durationMin < 30;
+              const oneLine = isShort || viewType === 'dayGridMonth';
+              return (
+                <div className={clsx('chip-body', oneLine && 'chip-oneline')}>
+                  {!allDay && start && (
+                    <span className="chip-time">{fmtChipTime(start)}</span>
+                  )}
+                  <span className="chip-title">
+                    {arg.event.title || '(untitled)'}
+                  </span>
+                  {/* §4.4 dimension annotations: the data model drawn under
+                      the cursor. Drag = duration beside the chip; resize =
+                      live start/end pinned to the chip edges. */}
+                  {arg.isMirror && arg.isDragging && !allDay && durationMin ? (
+                    <span className="dim-note" aria-hidden="true">
+                      {durationMin} MIN
+                    </span>
+                  ) : null}
+                  {arg.isResizing && !allDay && start && end ? (
+                    <>
+                      <span
+                        className="dim-time dim-time-start"
+                        aria-hidden="true"
+                      >
+                        {fmtChipTime(start)}
+                      </span>
+                      <span
+                        className="dim-time dim-time-end"
+                        aria-hidden="true"
+                      >
+                        {fmtChipTime(end)}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              );
+            }}
             aspectRatio={isMobile ? 1.0 : undefined}
             handleWindowResize={true}
             contentHeight="100%"
@@ -568,12 +743,14 @@ export const CalendarView = ({
             windowResizeDelay={0}
             eventDisplay="block"
             displayEventTime={true}
-            displayEventEnd={true}
+            displayEventEnd={false}
             eventTimeFormat={{
-              hour: 'numeric',
+              // List-view time cells (grid chips format their own time):
+              // 24h mono per the §3 numeral law.
+              hour: '2-digit',
               minute: '2-digit',
               omitZeroMinute: false,
-              hour12: true,
+              hour12: false,
             }}
             dayHeaderContent={(args) => {
               const viewType = args.view?.type ?? '';
