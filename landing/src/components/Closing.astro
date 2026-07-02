@@ -61,6 +61,12 @@
 </script>
 
 <style>
+  .closing {
+    /* the offstage chip travels in from outside the frame; never let it
+       widen the document */
+    overflow: hidden;
+  }
+
   .closing-inner {
     display: flex;
     flex-direction: column;

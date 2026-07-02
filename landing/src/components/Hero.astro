@@ -254,17 +254,27 @@ const hourLabels = [
           ' - ' + DAYS[t.getDay()] + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
       if (!line) return;
       var mins = t.getHours() * 60 + t.getMinutes();
-      var visible = todayCol !== -1 && mins >= 480 && mins <= 1080;
+      var colEl = document.querySelector('[data-col="' + todayCol + '"]');
+      // measured, so hidden mobile columns and breakpoints stay correct
+      var visible =
+        todayCol !== -1 &&
+        mins >= 480 &&
+        mins <= 1080 &&
+        colEl &&
+        colEl.offsetParent !== null;
       line.hidden = !visible;
       if (!visible) return;
-      line.style.left = 'calc(' + todayCol + ' * var(--cw))';
-      line.style.width = 'var(--cw)';
+      var colsBox = colEl.parentElement.getBoundingClientRect();
+      var colBox = colEl.getBoundingClientRect();
+      line.style.left = colBox.left - colsBox.left + 'px';
+      line.style.width = colBox.width + 'px';
       line.style.top = ((mins - 480) / 600) * 100 + '%';
       if (lineTime)
         lineTime.textContent = pad(t.getHours()) + ':' + pad(t.getMinutes());
     }
     tick();
     setInterval(tick, 60000);
+    window.addEventListener('resize', tick);
   })();
 </script>
 
