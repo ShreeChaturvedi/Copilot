@@ -3,7 +3,7 @@
  * Orchestrates all individual parsers and resolves overlapping detections
  */
 
-import { Parser, ParseResult, ParsedTag, Conflict } from "@shared/types";
+import { Parser, ParseResult, ParsedTag, Conflict } from '@shared/types';
 import { ChronoDateParser } from './ChronoDateParser';
 import { PriorityParser } from './PriorityParser';
 import { CompromiseNLPParser } from './CompromiseNLPParser';
@@ -102,7 +102,10 @@ export class SmartParser {
         if (processedPairs.has(pairKey)) continue;
         processedPairs.add(pairKey);
 
-        if (this.tagsOverlap(tag1, tag2)) {
+        if (
+          !this.areRangeSiblings(tag1, tag2) &&
+          this.tagsOverlap(tag1, tag2)
+        ) {
           // Find existing conflict or create new one
           let conflict = conflicts.find((c) =>
             this.rangesOverlap(
@@ -236,6 +239,16 @@ export class SmartParser {
     }
 
     return totalWeight > 0 ? Math.min(1.0, weightedSum / totalWeight) : 0.5;
+  }
+
+  /**
+   * Check if two tags are siblings of the same parsed range (e.g. the start and
+   * end of a date range emitted over one span). Siblings describe a single range
+   * rather than competing interpretations, so they must not be treated as a
+   * conflict even though their spans coincide.
+   */
+  private areRangeSiblings(tag1: ParsedTag, tag2: ParsedTag): boolean {
+    return tag1.rangeId !== undefined && tag1.rangeId === tag2.rangeId;
   }
 
   /**

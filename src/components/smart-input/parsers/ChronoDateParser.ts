@@ -3,7 +3,7 @@
  */
 
 import * as chrono from 'chrono-node';
-import { Parser, ParsedTag } from "@shared/types";
+import { Parser, ParsedTag } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChronoParseComponent {
@@ -58,6 +58,17 @@ export class ChronoDateParser implements Parser {
             normalizedEnd.setHours(0, 0, 0, 0);
           }
         }
+
+        // A true range yields a distinct end date. Chrono reports the start and
+        // end over one identical span, so link the two tags with a shared
+        // rangeId; this marks them as siblings (not competing interpretations)
+        // and keeps conflict resolution from dropping the end tag.
+        const isRange =
+          isDateRange &&
+          !!normalizedEnd &&
+          normalizedEnd.getTime() !== normalizedStart.getTime();
+        const rangeId = isRange ? uuidv4() : undefined;
+
         const dateTag: ParsedTag = {
           id: uuidv4(),
           type: hasTime ? 'time' : 'date',
@@ -70,21 +81,18 @@ export class ChronoDateParser implements Parser {
           confidence: this.calculateConfidence(result),
           source: this.id,
           color: '#3b82f6', // Blue color for dates
+          rangeId,
         };
 
         tags.push(dateTag);
 
         // If it's a date range, create a separate end date tag
-        if (
-          isDateRange &&
-          normalizedEnd &&
-          normalizedEnd.getTime() !== normalizedStart.getTime()
-        ) {
+        if (isRange) {
           const endTag: ParsedTag = {
             id: uuidv4(),
             type: hasTime ? 'time' : 'date',
-            value: normalizedEnd,
-            displayText: `Until ${this.formatDisplayText(normalizedEnd, hasTime)}`,
+            value: normalizedEnd!,
+            displayText: `Until ${this.formatDisplayText(normalizedEnd!, hasTime)}`,
             iconName: hasTime ? 'Clock' : 'Calendar',
             startIndex: result.index,
             endIndex: result.index + result.text.length,
@@ -92,6 +100,7 @@ export class ChronoDateParser implements Parser {
             confidence: this.calculateConfidence(result),
             source: this.id,
             color: '#3b82f6',
+            rangeId,
           };
 
           tags.push(endTag);
