@@ -1,0 +1,28 @@
+# 15-minute pull reconciliation for Google Calendar sync (issue #27, plan §3).
+# Calls POST /api/google/sync in cron mode: the bearer GOOGLE_SYNC_CRON_SECRET
+# makes the endpoint sync every enabled link of every connected user
+# (incremental pull; 410 -> full resync). GH cron is best-effort and may lag
+# a few minutes; the endpoint self-budgets ~45s per invocation.
+#
+# Requirements:
+#   - repo secret GOOGLE_SYNC_CRON_SECRET (already set) matching the Vercel env
+#   - repo variable PROD_URL, e.g. https://<project>.vercel.app
+# Note: scheduled workflows on public repos are disabled after 60 days without
+# repo activity; any push re-enables them.
+name: Google sync reconciliation
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+concurrency:
+  group: google-sync-reconcile
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync endpoint
+        run: |
+          curl -sS -X POST "${{ vars.PROD_URL }}/api/google/sync" \
+            -H "Authorization: Bearer ${{ secrets.GOOGLE_SYNC_CRON_SECRET }}" \
+            --fail-with-body --max-time 290
