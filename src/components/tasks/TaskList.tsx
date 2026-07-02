@@ -11,10 +11,10 @@ import {
   Settings,
   Edit,
   Trash2,
-  CheckSquare,
 } from 'lucide-react';
 // Emoji-based task group UI
 import { TaskItem } from './TaskItem';
+import { UpcomingEmptyState } from './UpcomingTasksEmpty';
 import type { Task } from '@shared/types';
 import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import { groupItemsByDate, getDayKeyOrder } from '@/utils/dateGrouping';
@@ -302,20 +302,14 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   // Handle empty state - different for calendar mode
   if (activeTasks.length === 0 && completedTasks.length === 0) {
     if (calendarMode) {
-      // Calendar mode empty state - similar to EventOverview
+      // Calendar mode empty state - the §4.7 schedule etch, shared with the
+      // upcoming events list so tasks and events read as one system.
       return (
-        <div className="space-y-3 mt-4">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-sidebar-foreground" />
-            <h3 className="text-sm font-semibold text-sidebar-foreground">
-              {activeTaskGroupId === 'all' ? 'All Tasks' : 'Upcoming Tasks'}
-            </h3>
-          </div>
-
-          <div className="text-center py-4 text-muted-foreground">
-            <CheckSquare className="w-6 h-6 mx-auto mb-2 opacity-50" />
-            <p className="text-xs">No upcoming tasks</p>
-          </div>
+        <div className="mt-4">
+          <UpcomingEmptyState
+            voice="You're all caught up."
+            note="Upcoming tasks appear here as their dates approach."
+          />
         </div>
       );
     }

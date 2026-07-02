@@ -3,11 +3,12 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useEvents } from '@/hooks/useEvents';
 import { useCalendars } from '@/hooks/useCalendars';
-import { type CalendarEvent } from "@shared/types";
+import { type CalendarEvent } from '@shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { groupItemsByDate, filterUpcomingItems } from '@/utils/dateGrouping';
 import { expandOccurrences } from '@/utils/recurrence';
+import { UpcomingEmptyState } from '@/components/tasks/UpcomingTasksEmpty';
 
 // How far ahead the sidebar expands recurring series to surface their next
 // occurrences, in days.
@@ -63,7 +64,10 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
         expanded.push(event);
       }
     }
-    return filterUpcomingItems(expanded, (e: CalendarEvent) => new Date(e.start));
+    return filterUpcomingItems(
+      expanded,
+      (e: CalendarEvent) => new Date(e.start)
+    );
   }, [allEvents, visibleCalendarNames]);
 
   // Apply display limit for the overview list
@@ -79,7 +83,10 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
 
   // Group all upcoming events to compute accurate totals per day key
   const groupedEventTotals: Record<string, number> = React.useMemo(() => {
-    const totals = groupItemsByDate(upcomingEventsAll, (e) => new Date(e.start));
+    const totals = groupItemsByDate(
+      upcomingEventsAll,
+      (e) => new Date(e.start)
+    );
     return Object.keys(totals).reduce<Record<string, number>>((acc, key) => {
       acc[key] = totals[key].length;
       return acc;
@@ -92,23 +99,15 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
     return calendar?.color || '#6366f1';
   };
 
-  // If no events, show empty state
+  // If no events, show the shared §4.7 schedule-empty state (matches the
+  // upcoming tasks list so the two sidebar lists read as one system).
   if (upcomingEvents.length === 0) {
     return (
-      <div className={cn('space-y-3', className)}>
-        {showHeader && (
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-sidebar-foreground" />
-            <h3 className="text-sm font-semibold text-sidebar-foreground">
-              Upcoming Events
-            </h3>
-          </div>
-        )}
-
-        <div className="text-center py-4 text-muted-foreground">
-          <CalendarIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
-          <p className="text-xs">No upcoming events</p>
-        </div>
+      <div className={cn(className)}>
+        <UpcomingEmptyState
+          voice="The calendar's clear."
+          note="Upcoming events appear here once you add them."
+        />
       </div>
     );
   }
@@ -143,7 +142,7 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
                 <div
                   key={event.id}
                   className={cn(
-                    'flex items-center gap-3 py-2 px-3 rounded-md shadow-sm hover:shadow-md transition-all duration-200 ease-out group cursor-pointer',
+                    'flex items-center gap-3 py-2 px-3 rounded-md shadow-sm hover:shadow-md transition-all duration-200 ease-out group cursor-pointer'
                   )}
                   style={{
                     backgroundColor: `${getEventColor(event.calendarName || '')}1A`,
@@ -157,7 +156,11 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
                   <div className="relative flex-shrink-0">
                     <div
                       className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: getEventColor(event.calendarName || '') }}
+                      style={{
+                        backgroundColor: getEventColor(
+                          event.calendarName || ''
+                        ),
+                      }}
                     />
                   </div>
 
