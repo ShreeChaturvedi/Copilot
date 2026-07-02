@@ -731,24 +731,32 @@ export class EventService extends BaseService<
         }
       }
 
-      const conflicts: EventConflict[] = candidates.map((conflictEvent) => {
-        const overlapStart = new Date(
-          Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
-        );
-        const overlapEnd = new Date(
-          Math.min(rangeEnd.getTime(), conflictEvent.end.getTime())
-        );
-        const overlapDuration = Math.round(
-          (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
-        );
+      // Enrich with each conflicting event's calendar so callers can name the
+      // calendar it belongs to. Conflicts span all of the user's calendars
+      // (unless a calendarId was explicitly passed), so this disambiguates
+      // cross-calendar double-bookings in the warning UI (#41).
+      const enrichedCandidates = await this.enrichEntities(candidates, context);
 
-        return {
-          conflictingEvent: conflictEvent,
-          overlapStart,
-          overlapEnd,
-          overlapDuration,
-        };
-      });
+      const conflicts: EventConflict[] = enrichedCandidates.map(
+        (conflictEvent) => {
+          const overlapStart = new Date(
+            Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
+          );
+          const overlapEnd = new Date(
+            Math.min(rangeEnd.getTime(), conflictEvent.end.getTime())
+          );
+          const overlapDuration = Math.round(
+            (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
+          );
+
+          return {
+            conflictingEvent: conflictEvent,
+            overlapStart,
+            overlapEnd,
+            overlapDuration,
+          };
+        }
+      );
 
       this.log(
         'getConflicts:success',

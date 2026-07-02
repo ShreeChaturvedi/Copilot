@@ -711,9 +711,16 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(
-        createQueryResult([eventFixtures.meeting])
-      );
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([eventFixtures.meeting]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([eventFixtures.meeting]));
+        }
+        return createQueryResult([]);
+      });
 
       const conflicts = await eventService.getConflicts(
         newEvent,
@@ -752,9 +759,21 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(
-        createQueryResult([eventFixtures.meeting, eventFixtures.allDay])
-      );
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([
+            eventFixtures.meeting,
+            eventFixtures.allDay,
+          ]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(
+            calendarsForEvents([eventFixtures.meeting, eventFixtures.allDay])
+          );
+        }
+        return createQueryResult([]);
+      });
 
       const conflicts = await eventService.getConflicts(
         newEvent,
@@ -790,9 +809,16 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:30:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(
-        createQueryResult([eventFixtures.meeting])
-      );
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([eventFixtures.meeting]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([eventFixtures.meeting]));
+        }
+        return createQueryResult([]);
+      });
 
       const conflicts = await eventService.getConflicts(
         newEvent,
@@ -821,6 +847,51 @@ describe('EventService', () => {
       expect(eventCall).toBeTruthy();
       expect(eventCall?.[0]).toContain('e.id <> $');
       expect(eventCall?.[1]).toContain(eventId);
+    });
+
+    it('flags cross-calendar overlaps and names each conflict calendar (#41)', async () => {
+      // No calendarId passed: conflicts should span calendars.
+      const newEvent = {
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
+      };
+      // meeting lives on the primary calendar, allDay on the personal one.
+      const conflictingEvents = [eventFixtures.meeting, eventFixtures.allDay];
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult(conflictingEvents);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents(conflictingEvents));
+        }
+        return createQueryResult([]);
+      });
+
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
+
+      // The events query must not be scoped to a single calendar.
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events e')
+      );
+      expect(eventCall?.[0]).not.toContain('e."calendarId" =');
+
+      // Both cross-calendar overlaps surface, each carrying its calendar name.
+      expect(conflicts).toHaveLength(2);
+      const byId = new Map(
+        conflicts.map((c) => [c.conflictingEvent.id, c.conflictingEvent])
+      );
+      expect(byId.get(eventFixtures.meeting.id)?.calendar?.name).toBe(
+        testCalendars.primary.name
+      );
+      expect(byId.get(eventFixtures.allDay.id)?.calendar?.name).toBe(
+        testCalendars.personal.name
+      );
     });
   });
 
