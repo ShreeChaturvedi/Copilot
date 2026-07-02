@@ -34,11 +34,14 @@ const fmtChipTime = (d: Date): string =>
 /**
  * New-chip tracking for the §4.4 enter animation (scale .97 + fade + rim
  * flash). Module-level so the `key={slotMinTime}` remounts and view unmounts
- * never replay it: only events first seen AFTER the initial load animate.
+ * never replay it: only events created AFTER the initial load animate.
+ * Seen-ness is keyed on the MASTER event id (not per-occurrence ids) and
+ * seeded from every fetched event, so recurring occurrences first revealed
+ * by date navigation never read as "new" — the flash fires once, at create.
  * Optimistic temp events register a title+start signature so the real event
  * that replaces them does not flash twice.
  */
-const seenChipIds = new Set<string>();
+const seenMasterIds = new Set<string>();
 const seenChipSigs = new Set<string>();
 let chipsPrimed = false;
 
@@ -243,11 +246,12 @@ export const CalendarView = ({
         const instanceKey = new Date(occurrenceStart).toISOString();
         const eventId = `${event.id}::${instanceKey}`;
 
-        // §4.4 enter flash: only chips first seen after the initial load.
+        // §4.4 enter flash: only events created this session. Keyed on the
+        // master id so range-revealed recurring occurrences never re-flash.
         const chipSig = `${event.title}|${instanceKey}`;
         const isNewChip =
           chipsPrimed &&
-          !seenChipIds.has(eventId) &&
+          !seenMasterIds.has(event.id) &&
           !seenChipSigs.has(chipSig);
 
         return {
@@ -541,17 +545,19 @@ export const CalendarView = ({
 
   const calendarEvents = transformEventsForCalendar(expandedEvents);
 
-  // Mark rendered chips as seen AFTER commit (keeps the transform pure and
-  // survives StrictMode double-renders); prime once the first fetch lands so
-  // the initial event load never animates.
+  // Mark events as seen AFTER commit (keeps the transform pure and survives
+  // StrictMode double-renders). Master ids are seeded from the FULL fetched
+  // list — not just rendered occurrences — so navigating to a range that
+  // reveals fresh occurrence ids never replays the §4.4 enter flash; prime
+  // once the first fetch lands so the initial event load never animates.
   useEffect(() => {
+    for (const ev of events) seenMasterIds.add(ev.id);
     for (const ev of calendarEvents) {
-      if (ev.id) seenChipIds.add(ev.id);
       const sig = `${ev.title}|${ev.id?.split('::')[1] ?? ''}`;
       if (String(ev.id).startsWith('temp-')) seenChipSigs.add(sig);
     }
     if (eventsFetched) chipsPrimed = true;
-  }, [calendarEvents, eventsFetched]);
+  }, [events, calendarEvents, eventsFetched]);
 
   const { getSlotTimes, weekStartsOn } = useCalendarSettingsStore();
   const { slotMinTime, slotMaxTime } = getSlotTimes();
