@@ -179,6 +179,15 @@ describe('GoogleOAuthService', () => {
       expect(result.user.email).toBe(mockGoogleUserInfo.email.toLowerCase());
       expect(result.isNewUser).toBe(true);
       expect(result.tokens.accessToken).toBe('mock-access-token');
+
+      // A default 'Personal' calendar is created for the new user in the same
+      // transaction, so a brand-new account isn't left with zero calendars.
+      const calendarInsert = mockedQuery.mock.calls.find(([sql]) =>
+        String(sql).toLowerCase().includes('insert into calendars')
+      );
+      expect(calendarInsert).toBeDefined();
+      expect(String(calendarInsert![0])).toContain("'Personal'");
+      expect(String(calendarInsert![0])).toContain('"isDefault"');
     });
 
     it('should handle OAuth callback for existing Google user', async () => {
@@ -212,6 +221,13 @@ describe('GoogleOAuthService', () => {
       expect(result.user.email).toBe(mockGoogleUserInfo.email);
       expect(result.isNewUser).toBe(false);
       expect(result.tokens.accessToken).toBe('mock-access-token');
+
+      // Logging in an EXISTING user must not create a second calendar: only the
+      // new-user branch inserts one.
+      const calendarInsert = mockedQuery.mock.calls.find(([sql]) =>
+        String(sql).toLowerCase().includes('insert into calendars')
+      );
+      expect(calendarInsert).toBeUndefined();
     });
 
     it('should link Google account to existing email user', async () => {

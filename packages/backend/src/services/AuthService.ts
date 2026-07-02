@@ -80,6 +80,15 @@ class AuthService {
         [u.id],
         tx
       );
+      // Give every new user a default calendar so the calendar view isn't empty
+      // on first load. The design-system blue (#0d97d5) matches the frontend
+      // preset; hardcoded here so the backend stays free of frontend imports.
+      await query(
+        `INSERT INTO calendars (id, name, color, description, "isDefault", "isVisible", "userId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, 'Personal', '#0d97d5', 'Personal events and appointments', true, true, $1, NOW(), NOW())`,
+        [u.id],
+        tx
+      );
       return u;
     });
 

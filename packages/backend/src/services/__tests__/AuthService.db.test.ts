@@ -92,6 +92,21 @@ describe.skipIf(!DB_URL)('AuthService (real Postgres, L2)', () => {
       );
       expect(profile.rows[0].timezone).toBe('UTC');
 
+      // A single default 'Personal' calendar is created at registration so the
+      // calendar view isn't empty on first load.
+      const calendars = await db.query<{
+        name: string;
+        isDefault: boolean;
+        isVisible: boolean;
+      }>(
+        `SELECT name, "isDefault", "isVisible" FROM calendars WHERE "userId" = $1`,
+        [result.user.id]
+      );
+      expect(calendars.rowCount).toBe(1);
+      expect(calendars.rows[0].name).toBe('Personal');
+      expect(calendars.rows[0].isDefault).toBe(true);
+      expect(calendars.rows[0].isVisible).toBe(true);
+
       // The refresh token is persisted (hashed) and linked to the user.
       const stored = await db.query<{ userId: string }>(
         `SELECT "userId" FROM refresh_tokens WHERE "tokenHash" = $1`,
