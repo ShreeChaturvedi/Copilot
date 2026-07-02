@@ -1,0 +1,388 @@
+/* ============================================================
+   Taskflow landing — SETTLE token system (design-brief §2, §3, §5).
+   Values are copied verbatim from src/index.css so the landing and the
+   app are one brand. The landing is the night room (--void); the light
+   set is scoped to .theme-light for the "Thursday, as a program" section.
+   ============================================================ */
+
+/* §3 Fonts — the same self-hosted woff2 the app ships */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('/fonts/spline-sans-mono-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sentient';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/sentient-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sentient';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/sentient-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sentient-fallback';
+  src: local('Georgia');
+  size-adjust: 106%;
+  ascent-override: 92%;
+}
+
+:root {
+  /* Landing = the night room. Dark token set from src/index.css .dark */
+  --void: oklch(0.155 0.009 200); /* #080d0e */
+  --background: var(--void); /* landing canvas IS the void (§6) */
+  --surface-1: oklch(0.197 0.012 202); /* #0f1718 — the grid slab */
+  --surface-2: oklch(0.22 0.014 203); /* #131d1d — wells, keycaps */
+  --surface-3: oklch(0.242 0.015 204); /* #172223 */
+  --hairline: oklch(0.279 0.019 202); /* #1e2c2d */
+  --hairline-strong: oklch(0.332 0.023 203); /* #283a3b */
+
+  --ink: oklch(0.978 0.003 190); /* #f6f8f8 */
+  --ink-2: oklch(0.874 0.012 195); /* #cdd8d8 */
+  --ink-muted: oklch(0.649 0.015 200); /* #859292 */
+  --faint: oklch(0.509 0.012 200); /* decorative only, fails AA by design */
+
+  --aqua: oklch(0.72 0.125 182); /* #1bbeaa — the light source */
+  --aqua-ink: oklch(0.174 0.008 200); /* #0c1112 */
+  --aqua-hover: oklch(0.76 0.115 182); /* #48c9b6 */
+  --aqua-film-04: color-mix(in oklab, var(--aqua) 6%, transparent);
+  --aqua-film-08: color-mix(in oklab, var(--aqua) 16%, transparent);
+  --aqua-rim: color-mix(in oklab, var(--aqua) 44%, transparent);
+
+  --shadow-1: 0 0 #0000;
+  --shadow-2: 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-3: 0 16px 48px -16px rgb(0 0 0 / 0.7);
+  --edge-machined:
+    inset 0 0.5px 0 rgb(246 248 248 / 0.08), 0 0 0 0.5px rgb(0 0 0 / 0.5);
+
+  /* §5 Motion */
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --dur-1: 100ms;
+  --dur-2: 150ms;
+  --dur-3: 240ms;
+  --dur-4: 320ms;
+
+  /* §2.4 curated hues — demo chip data (user list colors in the app) */
+  --hue-red: oklch(0.64 0.15 25);
+  --hue-orange: oklch(0.64 0.15 55);
+  --hue-yellow: oklch(0.72 0.14 95);
+  --hue-green: oklch(0.64 0.15 135);
+  --hue-blue: oklch(0.64 0.145 235);
+  --hue-indigo: oklch(0.6 0.15 275);
+  --hue-violet: oklch(0.64 0.15 305);
+  --hue-magenta: oklch(0.64 0.15 335);
+
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-serif: 'Sentient', 'Sentient-fallback', Georgia, serif;
+  --font-mono:
+    'Spline Sans Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+/* Light theme values (src/index.css :root), scoped to the inversion section */
+.theme-light {
+  --background: oklch(0.988 0.002 200); /* #fafbfc app canvas */
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.971 0.003 200);
+  --surface-3: oklch(1 0 0);
+  --hairline: oklch(0.932 0.005 200);
+  --hairline-strong: oklch(0.893 0.008 200);
+  --ink: oklch(0.206 0.012 210); /* #11191a */
+  --ink-2: oklch(0.361 0.016 210);
+  --ink-muted: oklch(0.542 0.019 210);
+  --faint: oklch(0.699 0.015 210);
+  --aqua: oklch(0.53 0.088 182); /* #1a7c70 deep enamel */
+  --aqua-ink: #ffffff;
+  --aqua-hover: oklch(0.49 0.085 182);
+  --aqua-film-04: color-mix(in oklab, var(--aqua) 5%, transparent);
+  --aqua-film-08: color-mix(in oklab, var(--aqua) 8%, transparent);
+  --aqua-rim: color-mix(in oklab, var(--aqua) 40%, transparent);
+  --shadow-1: 0 1px 2px -1px rgb(17 25 26 / 0.1);
+  --shadow-2:
+    0 1px 2px -1px rgb(17 25 26 / 0.1), 0 4px 10px -4px rgb(17 25 26 / 0.08),
+    0 16px 32px -12px rgb(17 25 26 / 0.06);
+  --shadow-3:
+    0 2px 4px -2px rgb(17 25 26 / 0.12), 0 12px 24px -8px rgb(17 25 26 / 0.1),
+    0 32px 64px -16px rgb(17 25 26 / 0.08);
+  --edge-machined:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.9), 0 0 0 0.5px rgb(17 25 26 / 0.14);
+  color-scheme: light;
+}
+
+@media (max-resolution: 1.5dppx) {
+  :root {
+    --edge-machined:
+      inset 0 1px 0 rgb(246 248 248 / 0.04), 0 0 0 1px rgb(0 0 0 / 0.25);
+  }
+  .theme-light {
+    --edge-machined:
+      inset 0 0 0 1px rgb(255 255 255 / 0.45), 0 0 0 1px rgb(17 25 26 / 0.07);
+  }
+}
+
+/* ============ base ============ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 400;
+  font-feature-settings: 'cv05';
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--aqua-film-08);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--aqua);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.container {
+  max-width: 1080px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: clamp(72px, 10vw, 120px);
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding-inline: 16px;
+  }
+}
+
+/* type roles (§3) */
+.display-hero {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-size: clamp(44px, 6.5vw, 72px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.display-section {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 3.4vw, 38px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.body-copy {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.mono-line {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* buttons — CTAs are filled aqua carrying --aqua-ink (§6) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 12px 18px;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out),
+    color var(--dur-2) var(--ease-out);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--aqua);
+  color: var(--aqua-ink);
+  /* the switch-on: the CTA is lit over the night (§6) */
+  box-shadow: 0 0 28px color-mix(in oklab, var(--aqua) 22%, transparent);
+}
+
+.btn-primary:hover {
+  background: var(--aqua-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.btn-ghost:hover {
+  color: var(--ink);
+}
+
+/* §2.4 chip alpha-film formula — THE shared material.
+   Dark: film 24% + full-alpha 0.5px rim + lifted text. */
+.chip {
+  background: color-mix(in oklab, var(--chip-c) 24%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--chip-c);
+  color: oklch(from var(--chip-c) 0.82 min(c, 0.1) h);
+  border-radius: 6px;
+}
+
+/* Light formula: film 12% + 3px bar + sunk text */
+.theme-light .chip,
+.chip--light {
+  background: color-mix(in oklab, var(--chip-c) 12%, transparent);
+  box-shadow: none;
+  border-left: 3px solid var(--chip-c);
+  color: oklch(from var(--chip-c) 0.5 c h);
+}
+
+/* rim flash: "placed" (§5) — pre-rendered inset ring on a pseudo-element */
+.flashable {
+  position: relative;
+}
+
+.flashable::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.5px var(--aqua);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.is-flash::after {
+  animation: rim-flash 240ms var(--ease-out) forwards;
+}
+
+@keyframes rim-flash {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* scroll reveals — applied only when JS runs (html.js), so content is
+   always present without it */
+html.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+}
+
+html.js [data-reveal].in {
+  opacity: 1;
+  transform: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 100;
+  background: var(--surface-3);
+  color: var(--ink);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top var(--dur-2) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+/* §5 reduced motion wraps the whole grammar: everything renders settled,
+   loops freeze, reveals are instant. Content is never gated on motion. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html.js [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}
