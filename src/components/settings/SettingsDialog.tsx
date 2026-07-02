@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-// import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
 import { SettingsNav } from './SettingsNav';
 import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
@@ -37,13 +39,23 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(defaultSection);
+  // Below 768px settings is a list -> detail push (#48): the nav is the
+  // first screen, a section choice slides the detail pane in over it.
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   // Update active section when defaultSection changes and dialog opens
   useEffect(() => {
     if (open) {
       setActiveSection(defaultSection);
+      // Deep links (e.g. straight to Integrations) land on the detail pane
+      setMobileDetailOpen(defaultSection !== 'general');
     }
   }, [open, defaultSection]);
+
+  const handleSectionChange = (section: SettingsSection) => {
+    setActiveSection(section);
+    setMobileDetailOpen(true);
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -90,29 +102,58 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full max-w-[calc(100vw-2rem)] sm:max-w-[90vw] md:max-w-6xl h-[80vh] max-h-[800px] p-0 gap-0 grid-rows-[auto_1fr]"
+        className="w-full max-w-[calc(100vw-2rem)] sm:max-w-[90vw] md:max-w-5xl h-[80vh] max-h-[800px] p-0 gap-0 grid-rows-[auto_1fr] max-sm:max-w-full max-sm:h-[92vh] max-sm:pb-0 overflow-hidden"
         closeButtonClassName="top-2"
       >
-        <DialogHeader className="px-6 py-2 border-b">
-          <DialogTitle className="text-xl font-semibold">Settings</DialogTitle>
+        <DialogHeader className="px-5 py-3 border-b border-hairline max-sm:pt-5">
+          <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="flex min-h-0 overflow-hidden">
-          {/* Navigation Sidebar */}
-          <aside className="w-64 border-r bg-muted/30 p-4 overflow-auto">
-            <div className="space-y-1">
-              <SettingsNav
-                activeSection={activeSection}
-                onSectionChange={setActiveSection}
-              />
-            </div>
+        <div className="relative min-h-0 overflow-hidden md:flex">
+          {/* Navigation: static rail on md+, first screen of the push below */}
+          <aside
+            className={cn(
+              'absolute inset-0 w-full overflow-y-auto p-4 bg-surface-3',
+              'transition-transform duration-[240ms] ease-settle motion-reduce:transition-none',
+              'md:static md:w-64 md:shrink-0 md:translate-x-0 md:border-r md:border-hairline md:bg-surface-2/50',
+              mobileDetailOpen && '-translate-x-1/4 md:translate-x-0'
+            )}
+            aria-hidden={mobileDetailOpen ? true : undefined}
+          >
+            <SettingsNav
+              activeSection={activeSection}
+              onSectionChange={handleSectionChange}
+            />
           </aside>
 
-          {/* Content Area */}
-          <div className="flex-1 min-h-0 overflow-auto">
-            <div className="p-6">
-              <div className="mb-2 space-y-1">
-                <h2 className="text-lg font-semibold">{getSectionTitle()}</h2>
+          {/* Detail pane: slides in over the nav below md (#48) */}
+          <section
+            className={cn(
+              'absolute inset-0 w-full overflow-y-auto bg-surface-3',
+              'transition-transform duration-[240ms] ease-settle motion-reduce:transition-none',
+              'md:static md:flex-1 md:translate-x-0',
+              mobileDetailOpen
+                ? 'translate-x-0 shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.4)] md:shadow-none'
+                : 'translate-x-full md:translate-x-0'
+            )}
+          >
+            <div className="p-5">
+              <div className="mb-3 space-y-1">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="md:hidden -ml-2 px-2 text-muted-foreground"
+                    onClick={() => setMobileDetailOpen(false)}
+                    aria-label="Back to settings"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Settings
+                  </Button>
+                </div>
+                <h2 className="text-base font-semibold tracking-[-0.01em]">
+                  {getSectionTitle()}
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   {activeSection === 'general' &&
                     'Manage your account and application settings'}
@@ -128,10 +169,9 @@ export function SettingsDialog({
                     'Get help, documentation, and support'}
                 </p>
               </div>
-              {/* Keep content tight to the header; separator removed to avoid large visual gap */}
               {renderContent()}
             </div>
-          </div>
+          </section>
         </div>
       </DialogContent>
     </Dialog>

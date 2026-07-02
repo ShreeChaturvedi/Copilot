@@ -7,6 +7,7 @@ import {
   Sliders,
   Calendar as CalendarIcon,
   Link2,
+  ChevronRight,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -104,6 +105,10 @@ export function SettingsNav({
               {profileData.email}
             </div>
           </div>
+          <ChevronRight
+            className="h-4 w-4 shrink-0 text-muted-foreground md:hidden"
+            aria-hidden="true"
+          />
         </button>
 
         <Separator />
@@ -134,6 +139,10 @@ export function SettingsNav({
                   {item.description}
                 </div>
               </div>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground md:hidden"
+                aria-hidden="true"
+              />
             </button>
           );
         })}
