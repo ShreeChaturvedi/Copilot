@@ -26,10 +26,14 @@ jobs:
         run: npm install --legacy-peer-deps
       - name: Lint
         run: npm run lint
+      - name: Typecheck
+        run: npx tsc -p tsconfig.app.json --noEmit && npx tsc -p tsconfig.node.json --noEmit
       - name: Frontend tests
         run: npm run test:frontend:run
       - name: Backend tests (mocked, no DB)
         run: npm run test:backend:run
+      - name: Shared tests
+        run: npm run test:run --workspace=packages/shared
       - name: Build
         run: npm run build
 
