@@ -276,7 +276,7 @@ describe('EventService', () => {
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('SELECT * FROM events WHERE id = $1'),
-        [mockEvent.id],
+        [mockEvent.id, mockUserId],
         expect.anything()
       );
       expect(result).toEqual(mockEvent);
@@ -293,14 +293,18 @@ describe('EventService', () => {
       expect(result).toBeNull();
     });
 
-    it('should query by id regardless of context', async () => {
+    it("owner-scopes the read so it cannot fetch another user's event (#62)", async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await eventService.findById('other-user-event-id', mockContext);
+      const result = await eventService.findById(
+        'other-user-event-id',
+        mockContext
+      );
 
+      expect(result).toBeNull();
       expect(mockedQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM events WHERE id = $1'),
-        ['other-user-event-id'],
+        expect.stringContaining('"userId" = $2'),
+        ['other-user-event-id', mockUserId],
         expect.anything()
       );
     });
@@ -660,44 +664,57 @@ describe('EventService', () => {
   });
 
   describe('delete', () => {
-    it('should delete an event', async () => {
+    it('should delete an event owned by the caller', async () => {
       const eventId = eventFixtures.allDay.id;
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
+      // 1) checkOwnership → owned by caller, 2) getOutboundTarget → unsynced,
+      // 3) owner-scoped DELETE removes 1 row.
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ userId: mockUserId }]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([], 1));
 
       const result = await eventService.delete(eventId, mockContext);
 
       expect(result).toBe(true);
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM events WHERE id = $1'),
-        [eventId],
+        [eventId, mockUserId],
         expect.anything()
       );
     });
 
-    it('should delete recurring event and all instances', async () => {
+    it('should delete a recurring event owned by the caller', async () => {
       const recurringEventId = eventFixtures.recurring.id;
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
+      mockedQuery
+        .mockResolvedValueOnce(createQueryResult([{ userId: mockUserId }]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([], 1));
 
       const result = await eventService.delete(recurringEventId, mockContext);
 
       expect(result).toBe(true);
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM events WHERE id = $1'),
-        [recurringEventId],
+        [recurringEventId, mockUserId],
         expect.anything()
       );
     });
 
-    it('should delete by id regardless of user context', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
+    it("does not delete another user's event — owner-scoped (#62)", async () => {
+      // checkOwnership finds the row owned by a different user → returns false,
+      // and no DELETE (or Google outbound delete) is ever issued.
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ userId: 'other-user' }])
+      );
 
-      await eventService.delete('other-user-event', mockContext);
+      const result = await eventService.delete('other-user-event', mockContext);
 
-      expect(mockedQuery).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM events WHERE id = $1'),
-        ['other-user-event'],
+      expect(result).toBe(false);
+      expect(mockedQuery).not.toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM events'),
+        expect.anything(),
         expect.anything()
       );
     });

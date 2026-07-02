@@ -227,10 +227,13 @@ export default createCrudHandler({
         );
       }
 
-      // TaskService.delete overrides BaseService.delete with a single-argument
-      // signature (it derives the request context internally), so passing a
-      // context object here is a type error and is ignored at runtime.
-      const success = await taskService.delete(taskId);
+      // Owner-scope the delete: TaskService.delete uses context.userId so one
+      // user cannot delete another user's task by id (#62). A cross-user id
+      // matches nothing → returns false → 404 below.
+      const success = await taskService.delete(taskId, {
+        userId,
+        requestId: req.headers['x-request-id'] as string,
+      });
 
       if (!success) {
         return sendError(res, new NotFoundError('Task'));

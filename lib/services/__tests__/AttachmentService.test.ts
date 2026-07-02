@@ -9,7 +9,11 @@ import {
   SUPPORTED_FILE_TYPES,
 } from '../AttachmentService';
 import { query as mockQuery } from '../../config/database.js';
-import { testUsers, testAttachments, testTasks } from '../../__tests__/helpers/fixtures';
+import {
+  testUsers,
+  testAttachments,
+  testTasks,
+} from '../../__tests__/helpers/fixtures';
 import { createQueryResult } from './helpers/mockDatabase';
 
 // Mock the database module
@@ -41,14 +45,28 @@ const mapAttachment = (
 });
 
 const attachmentFixtures = {
-  document: mapAttachment(testAttachments.document, { taskId: testTasks.incomplete.id }),
-  image: mapAttachment(testAttachments.image, { taskId: testTasks.completed.id }),
-  spreadsheet: mapAttachment(testAttachments.spreadsheet, { taskId: testTasks.completed.id }),
+  document: mapAttachment(testAttachments.document, {
+    taskId: testTasks.incomplete.id,
+  }),
+  image: mapAttachment(testAttachments.image, {
+    taskId: testTasks.completed.id,
+  }),
+  spreadsheet: mapAttachment(testAttachments.spreadsheet, {
+    taskId: testTasks.completed.id,
+  }),
 };
 
 const taskRows = [
-  { id: testTasks.incomplete.id, title: testTasks.incomplete.title, userId: testUsers.standard.id },
-  { id: testTasks.completed.id, title: testTasks.completed.title, userId: testUsers.standard.id },
+  {
+    id: testTasks.incomplete.id,
+    title: testTasks.incomplete.title,
+    userId: testUsers.standard.id,
+  },
+  {
+    id: testTasks.completed.id,
+    title: testTasks.completed.title,
+    userId: testUsers.standard.id,
+  },
 ];
 
 describe('AttachmentService', () => {
@@ -71,7 +89,10 @@ describe('AttachmentService', () => {
 
   describe('findAll', () => {
     it('should fetch all attachments for the authenticated user', async () => {
-      const attachments = [attachmentFixtures.document, attachmentFixtures.image];
+      const attachments = [
+        attachmentFixtures.document,
+        attachmentFixtures.image,
+      ];
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
@@ -169,15 +190,18 @@ describe('AttachmentService', () => {
   });
 
   describe('findById', () => {
-    it('should fetch a specific attachment by ID', async () => {
+    it('should fetch a specific attachment by ID (owner-scoped via task)', async () => {
       const mockAttachment = attachmentFixtures.document;
       mockedQuery.mockResolvedValueOnce(createQueryResult([mockAttachment]));
 
-      const result = await attachmentService.findById(mockAttachment.id, mockContext);
+      const result = await attachmentService.findById(
+        mockAttachment.id,
+        mockContext
+      );
 
       expect(mockedQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM attachments WHERE id = $1'),
-        [mockAttachment.id],
+        expect.stringContaining('JOIN tasks t ON t.id = a."taskId"'),
+        [mockAttachment.id, mockUserId],
         expect.anything()
       );
       expect(result).toEqual(mockAttachment);
@@ -186,19 +210,26 @@ describe('AttachmentService', () => {
     it('should return null when attachment not found', async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await attachmentService.findById('non-existent-id', mockContext);
+      const result = await attachmentService.findById(
+        'non-existent-id',
+        mockContext
+      );
 
       expect(result).toBeNull();
     });
 
-    it('should query by id regardless of context', async () => {
+    it("owner-scopes the read via the parent task's owner (#62)", async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await attachmentService.findById('other-user-attachment-id', mockContext);
+      const result = await attachmentService.findById(
+        'other-user-attachment-id',
+        mockContext
+      );
 
+      expect(result).toBeNull();
       expect(mockedQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM attachments WHERE id = $1'),
-        ['other-user-attachment-id'],
+        expect.stringContaining('t."userId" = $2'),
+        ['other-user-attachment-id', mockUserId],
         expect.anything()
       );
     });
@@ -247,7 +278,11 @@ describe('AttachmentService', () => {
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO attachments'),
-        expect.arrayContaining([createDTO.fileName, createDTO.fileUrl, createDTO.fileType]),
+        expect.arrayContaining([
+          createDTO.fileName,
+          createDTO.fileUrl,
+          createDTO.fileType,
+        ]),
         expect.anything()
       );
       expect(result).toEqual(createdAttachment);
@@ -309,9 +344,9 @@ describe('AttachmentService', () => {
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(attachmentService.create(createDTO as any, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR'
-      );
+      await expect(
+        attachmentService.create(createDTO as any, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
 
     it('should validate required fields', async () => {
@@ -320,7 +355,9 @@ describe('AttachmentService', () => {
         fileUrl: '',
       };
 
-      await expect(attachmentService.create(invalidDTO as any, mockContext)).rejects.toThrow();
+      await expect(
+        attachmentService.create(invalidDTO as any, mockContext)
+      ).rejects.toThrow();
     });
 
     it('should validate file size is positive', async () => {
@@ -332,7 +369,9 @@ describe('AttachmentService', () => {
         fileType: 'application/pdf',
       };
 
-      await expect(attachmentService.create(invalidDTO as any, mockContext)).rejects.toThrow();
+      await expect(
+        attachmentService.create(invalidDTO as any, mockContext)
+      ).rejects.toThrow();
     });
 
     it('should reject unsupported file types', async () => {
@@ -344,7 +383,9 @@ describe('AttachmentService', () => {
         fileType: 'invalid/type',
       };
 
-      await expect(attachmentService.create(invalidDTO as any, mockContext)).rejects.toThrow();
+      await expect(
+        attachmentService.create(invalidDTO as any, mockContext)
+      ).rejects.toThrow();
     });
   });
 
@@ -374,7 +415,11 @@ describe('AttachmentService', () => {
         return createQueryResult([]);
       });
 
-      const result = await attachmentService.update(attachmentId, updateDTO, mockContext);
+      const result = await attachmentService.update(
+        attachmentId,
+        updateDTO,
+        mockContext
+      );
 
       expect(result?.fileName).toBe(updateDTO.fileName);
     });
@@ -405,7 +450,11 @@ describe('AttachmentService', () => {
         return createQueryResult([]);
       });
 
-      const result = await attachmentService.update(attachmentId, updateDTO, mockContext);
+      const result = await attachmentService.update(
+        attachmentId,
+        updateDTO,
+        mockContext
+      );
 
       expect(result?.fileType).toBe(updateDTO.fileType);
       expect(result?.fileSize).toBe(updateDTO.fileSize);
@@ -415,7 +464,11 @@ describe('AttachmentService', () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(
-        attachmentService.update('other-user-attachment', { fileName: 'hacked.pdf' }, mockContext)
+        attachmentService.update(
+          'other-user-attachment',
+          { fileName: 'hacked.pdf' },
+          mockContext
+        )
       ).rejects.toThrow('AUTHORIZATION_ERROR');
     });
   });
@@ -425,7 +478,9 @@ describe('AttachmentService', () => {
       const attachmentId = attachmentFixtures.spreadsheet.id;
 
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([attachmentFixtures.spreadsheet]))
+        .mockResolvedValueOnce(
+          createQueryResult([attachmentFixtures.spreadsheet])
+        )
         .mockResolvedValueOnce(createQueryResult([], 1));
 
       const result = await attachmentService.delete(attachmentId, mockContext);
@@ -441,9 +496,9 @@ describe('AttachmentService', () => {
     it('should not delete attachments belonging to other users', async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(attachmentService.delete('other-user-attachment', mockContext)).rejects.toThrow(
-        'AUTHORIZATION_ERROR'
-      );
+      await expect(
+        attachmentService.delete('other-user-attachment', mockContext)
+      ).rejects.toThrow('AUTHORIZATION_ERROR');
     });
   });
 
@@ -474,7 +529,9 @@ describe('AttachmentService', () => {
           attachmentFixtures.image.fileSize +
           attachmentFixtures.spreadsheet.fileSize
       );
-      expect(result.filesByType[attachmentFixtures.document.fileType].count).toBe(1);
+      expect(
+        result.filesByType[attachmentFixtures.document.fileType].count
+      ).toBe(1);
     });
 
     it('should return zero stats when user has no attachments', async () => {
@@ -493,7 +550,9 @@ describe('AttachmentService', () => {
       const ids = [attachmentFixtures.document.id, attachmentFixtures.image.id];
 
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: ids[0] }, { id: ids[1] }], 2))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: ids[0] }, { id: ids[1] }], 2)
+        )
         .mockResolvedValueOnce(createQueryResult([], 2));
 
       const result = await attachmentService.bulkDelete(ids, mockContext);
@@ -507,7 +566,12 @@ describe('AttachmentService', () => {
       const orphanedIds = ['att-orphan-1', 'att-orphan-2'];
 
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult(orphanedIds.map((id) => ({ id, fileUrl: 'x' })), 2))
+        .mockResolvedValueOnce(
+          createQueryResult(
+            orphanedIds.map((id) => ({ id, fileUrl: 'x' })),
+            2
+          )
+        )
         .mockResolvedValueOnce(createQueryResult([], 2));
 
       const result = await attachmentService.cleanupOrphanedAttachments();
@@ -528,9 +592,14 @@ describe('AttachmentService', () => {
     it('should return file URL when attachment is accessible', async () => {
       const attachmentId = attachmentFixtures.document.id;
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([attachmentFixtures.document]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([attachmentFixtures.document])
+      );
 
-      const result = await attachmentService.getDownloadUrl(attachmentId, mockContext);
+      const result = await attachmentService.getDownloadUrl(
+        attachmentId,
+        mockContext
+      );
 
       expect(result).toBe(attachmentFixtures.document.fileUrl);
     });
@@ -540,7 +609,9 @@ describe('AttachmentService', () => {
     it('should handle database connection errors gracefully', async () => {
       mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      await expect(attachmentService.findAll({}, mockContext)).rejects.toThrow('Connection timeout');
+      await expect(attachmentService.findAll({}, mockContext)).rejects.toThrow(
+        'Connection timeout'
+      );
     });
 
     it('should reject very large file sizes', async () => {
@@ -552,9 +623,9 @@ describe('AttachmentService', () => {
         fileType: 'video/mp4',
       };
 
-      await expect(attachmentService.create(largeFile as any, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR'
-      );
+      await expect(
+        attachmentService.create(largeFile as any, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
 
     it('should handle special characters in file names', async () => {
@@ -613,7 +684,10 @@ describe('AttachmentService', () => {
         }
         if (lower.includes('from attachments a')) {
           deleteCount += 1;
-          const attachment = deleteCount === 1 ? attachmentFixtures.document : attachmentFixtures.image;
+          const attachment =
+            deleteCount === 1
+              ? attachmentFixtures.document
+              : attachmentFixtures.image;
           return createQueryResult([attachment], 1);
         }
         if (lower.startsWith('delete from attachments')) {

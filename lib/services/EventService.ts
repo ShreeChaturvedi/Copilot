@@ -682,6 +682,17 @@ export class EventService extends BaseService<
    * keep the plain BaseService.delete path.
    */
   async delete(id: string, context?: ServiceContext): Promise<boolean> {
+    // Owner-scope the delete so one authenticated user cannot delete another
+    // user's event by id (#62 IDOR). getOutboundTarget/super.delete key off the
+    // id alone, so without this guard a non-owner could destroy (and enqueue a
+    // Google delete for) another user's synced event. Return false (→ 404)
+    // rather than throwing, to avoid leaking the row's existence. Engine/system
+    // callers pass no userId and are unaffected.
+    if (context?.userId) {
+      const owned = await this.checkOwnership(id, context.userId);
+      if (!owned) return false;
+    }
+
     if (context?.skipGoogleSync) return super.delete(id, context);
 
     const target = await getOutboundTarget(id, this.db);

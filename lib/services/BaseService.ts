@@ -150,6 +150,41 @@ export abstract class BaseService<
   }
 
   /**
+   * Name of the column that scopes a row to its owning user, or null for
+   * entities that are not directly user-owned. Owner-scoped reads and deletes
+   * (findById/delete) additionally filter on this column when a userId is
+   * present in the context, so one authenticated user cannot read or delete
+   * another user's row just by knowing its id (#62 IDOR).
+   *
+   * Overridden to null by entities that are not user-owned by a local column:
+   * global tags (no userId), and attachments (owned via their parent task —
+   * AttachmentService enforces ownership with a task join instead).
+   */
+  protected getOwnerColumn(): string | null {
+    return 'userId';
+  }
+
+  /**
+   * Build a `WHERE id = $1` clause that also scopes to the owning user when the
+   * entity is user-owned (getOwnerColumn) and a userId is present. Shared by the
+   * owner-scoped findById/delete so a cross-user read or delete matches zero
+   * rows (→ 404) instead of leaking or destroying the row.
+   */
+  protected ownerScopedWhere(
+    id: string,
+    context?: ServiceContext
+  ): { sql: string; params: unknown[] } {
+    const params: unknown[] = [id];
+    let sql = 'WHERE id = $1';
+    const ownerColumn = this.getOwnerColumn();
+    if (ownerColumn && context?.userId) {
+      params.push(context.userId);
+      sql += ` AND "${ownerColumn}" = $${params.length}`;
+    }
+    return { sql, params };
+  }
+
+  /**
    * Check if user owns the entity (for user-owned entities)
    */
   protected async checkOwnership(id: string, userId: string): Promise<boolean> {
@@ -259,9 +294,10 @@ export abstract class BaseService<
     try {
       this.log('findById', { id }, context);
       const table = this.getTableName();
+      const { sql, params } = this.ownerScopedWhere(id, context);
       const res = await query(
-        `SELECT * FROM ${table} WHERE id = $1 LIMIT 1`,
-        [id],
+        `SELECT * FROM ${table} ${sql} LIMIT 1`,
+        params,
         this.db
       );
       const row = res.rows[0];
@@ -302,9 +338,11 @@ export abstract class BaseService<
     try {
       this.log('delete', { id }, context);
       const table = this.getTableName();
-      await query(`DELETE FROM ${table} WHERE id = $1`, [id], this.db);
-      this.log('delete:success', { id }, context);
-      return true;
+      const { sql, params } = this.ownerScopedWhere(id, context);
+      const res = await query(`DELETE FROM ${table} ${sql}`, params, this.db);
+      const deleted = (res.rowCount ?? 0) > 0;
+      this.log('delete:success', { id, deleted }, context);
+      return deleted;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.log('delete:error', { error: message, id }, context);

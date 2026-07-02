@@ -193,24 +193,19 @@ describe('TaskService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return task even if owned by different user (no ownership check in findById)', async () => {
-      // findById does not check ownership - it returns any task by ID
-      // Ownership checks should be done at the route/API level
-      const otherUserTask = { ...mockTask, userId: 'other-user' };
-
-      // SELECT query
-      mockedQuery.mockResolvedValueOnce(createQueryResult([otherUserTask]));
-      // enrichEntities: task lists (uses cache key with context userId)
-      mockedQuery.mockResolvedValueOnce(createQueryResult([mockTaskList]));
-      // enrichEntities: attachments
-      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
-      // enrichEntities: tags
+    it("owner-scopes the read so it cannot fetch another user's task (#62)", async () => {
+      // findById issues a userId-scoped SELECT, so a cross-user id matches zero
+      // rows and returns null instead of leaking the row.
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await taskService.findById('task-123', mockContext);
+      const result = await taskService.findById('other-user-task', mockContext);
 
-      expect(result).not.toBeNull();
-      expect(result?.userId).toBe('other-user');
+      expect(result).toBeNull();
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('"userId" = $2'),
+        ['other-user-task', 'user-123'],
+        expect.anything()
+      );
     });
   });
 
@@ -382,22 +377,29 @@ describe('TaskService', () => {
   });
 
   describe('delete', () => {
-    it('should delete task', async () => {
-      // Mock DELETE query
-      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1));
+    it('owner-scopes the delete and returns true when a row is removed', async () => {
+      // 1) collectAttachmentBlobUrls SELECT, 2) owner-scoped DELETE (1 row).
+      mockedQuery.mockResolvedValueOnce(createQueryResult([])); // blob URLs
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 1)); // DELETE
 
       const result = await taskService.delete('task-123', mockContext);
 
       expect(result).toBe(true);
+      expect(mockedQuery).toHaveBeenCalledWith(
+        expect.stringContaining('"userId" = $2'),
+        ['task-123', 'user-123'],
+        expect.anything()
+      );
     });
 
-    it('should return true even for non-existent task (no ownership check in delete)', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([], 0));
+    it("returns false for another user's (or missing) task — owner-scoped (#62)", async () => {
+      mockedQuery.mockResolvedValueOnce(createQueryResult([])); // blob URLs
+      mockedQuery.mockResolvedValueOnce(createQueryResult([], 0)); // DELETE, 0 rows
 
-      const result = await taskService.delete('non-existent', mockContext);
+      const result = await taskService.delete('other-user-task', mockContext);
 
-      // delete() always returns true in current implementation
-      expect(result).toBe(true);
+      // No owned row matched → false so the handler responds 404, not success.
+      expect(result).toBe(false);
     });
   });
 
