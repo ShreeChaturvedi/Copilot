@@ -60,6 +60,11 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/react_calendar_test
       # packages/backend/src/test/setup.ts prefers TEST_DATABASE_URL when set.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/react_calendar_test
+      # The L2 real-DB service suites (lib/services/*.db.test.ts and
+      # packages/backend AuthService.db.test.ts) gate on L2_TEST_DATABASE_URL
+      # and run against their OWN database, kept separate from react_calendar_test
+      # so the comprehensive-requirements suite's global cleanup can't race them.
+      L2_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/taskflow_l2_test
       # Non-production, so jwt.ts uses its dev fallback; set explicitly anyway.
       JWT_SECRET: ci-test-secret-not-for-production
     steps:
@@ -70,7 +75,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+      - name: Create L2 test database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE taskflow_l2_test'
       - name: Run migrations
         run: npm run db:migrate
-      - name: Backend workspace suite (real DB)
+      - name: Run migrations (L2 database)
+        run: DATABASE_URL="$L2_TEST_DATABASE_URL" npm run db:migrate
+      - name: Backend workspace suite (real DB, incl. AuthService L2)
         run: npm run test:run --workspace=packages/backend
+      - name: L2 service suites (real DB)
+        run: npm run test:l2
