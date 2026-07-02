@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml"><img src="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1812-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1814-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/TypeScript-5.8-blue" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-19.1-61dafb" alt="React">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
@@ -32,7 +32,7 @@
 Taskflow Calendar ships as one Vercel project: an Astro landing page at `/` and a Vite + React 19 SPA at `/app`, backed by exactly two serverless functions and a Postgres database (Neon in production, Docker locally). Type "Email vendor about invoice friday 4pm urgent" and the smart input extracts the date, time, and priority as you type.
 
 - **Two-way Google Calendar sync.** Push notifications via watch channels, incremental pull with full resync on HTTP 410, an outbox for local edits, a 15-minute reconcile workflow, and daily channel renewal.
-- **1,812 tests across eight suites**, from pure parser units to handler contract tests that exercise the real router against a real Postgres. Counts and commands in [Testing](#testing).
+- **1,814 tests across eight suites**, from pure parser units to handler contract tests that exercise the real router against a real Postgres. Counts and commands in [Testing](#testing).
 - **Two serverless functions total** (fits the Vercel Hobby limit): a catch-all router dispatching 38 routes, plus a second function for Google sync.
 - **Keyboard-first.** Cmd+K command bar, single-key navigation (T today, D/W/M/L views, N new task).
 
@@ -82,15 +82,15 @@ The suite is layered: pure units at the bottom, real infrastructure toward the t
 | L1 frontend          | components, hooks, stores, the smart-input parsers (chrono, compromise, priority)                                                          | `npm run test:frontend:run`                     | 826   |
 | L1 backend           | services and middleware with the DB mocked, router dispatch tables                                                                         | `npm run test:backend:run`                      | 636   |
 | Shared               | Zod schemas and utilities used by both sides                                                                                               | `npm run test:run --workspace=packages/shared`  | 22    |
-| L2 services          | TaskService, EventService, TaskListService, and cross-user IDOR checks against a real Postgres                                             | `npm run test:l2`                               | 78    |
+| L2 services          | TaskService, EventService, TaskListService, and cross-user IDOR checks against a real Postgres                                             | `npm run test:l2`                               | 80    |
 | L3 handler contracts | the actual `api/[...route].ts` and `api/google/[...route].ts` dispatchers mounted on an Express adapter: real routing, middleware, and SQL | `npm run test:l3:run`                           | 107   |
 | Google sync          | the sync engine (channels, outbound writes, merge) against a real Postgres with a fake Google client                                       | gated on `GOOGLE_SYNC_TEST_DB_URL`              | 33    |
 | Backend workspace    | auth SQL round-trips, refresh-token rotation, schema and access-control checks                                                             | `npm run test:run --workspace=packages/backend` | 89    |
 | L5 browser E2E       | signup, login, reset-password round trip, task and event CRUD, recurrence, kanban drag, settings, all driven through a real Chromium       | `npm run test:e2e`                              | 21    |
 
-Total: 1,812 cases. The frontend layer includes the L4 optimistic-update suites: mutation hooks run against an MSW server, the request fails, and the test asserts the cache rolls back. The L5 layer drives the built app in a real browser against a real backend and database.
+Total: 1,814 cases. The frontend layer includes the L4 optimistic-update suites: mutation hooks run against an MSW server, the request fails, and the test asserts the cache rolls back. The L5 layer drives the built app in a real browser against a real backend and database.
 
-The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` reports 636 passed and 113 skipped without a database. CI's `backend-db` job provides the database and runs the L2, L3, sync, and workspace layers on every push. A separate `e2e` job boots the stack and runs the Playwright suite in parallel, so it never slows the fast checks.
+The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` reports 636 passed and 115 skipped without a database. CI's `backend-db` job provides the database and runs the L2, L3, sync, and workspace layers on every push. A separate `e2e` job boots the stack and runs the Playwright suite in parallel, so it never slows the fast checks.
 
 ## Performance
 
