@@ -6,6 +6,7 @@ import { Task, TaskTag } from '@shared/types';
 import { UseMutationResult } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 
 interface CreateTaskData {
   title: string;
@@ -332,7 +333,7 @@ export function useTaskManagement(
         );
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
-        toast.error((err as Error).message || 'Failed to create task list');
+        toast.error(toUserMessage(err, 'Failed to create task list'));
         // Rollback optimistic add
         setTaskGroups((prev) =>
           prev.filter(
@@ -387,7 +388,7 @@ export function useTaskManagement(
             );
         }
       } catch (err) {
-        toast.error((err as Error).message || 'Failed to update task list');
+        toast.error(toUserMessage(err, 'Failed to update task list'));
         // No rollback snapshot in this simplified path; refetch list
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
         return;
@@ -426,7 +427,7 @@ export function useTaskManagement(
         }
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
-        toast.error((err as Error).message || 'Failed to delete task list');
+        toast.error(toUserMessage(err, 'Failed to delete task list'));
         // Rollback
         setTaskGroups(previous);
       }
@@ -461,7 +462,7 @@ export function useTaskManagement(
         }
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
-        toast.error((err as Error).message || 'Failed to archive task list');
+        toast.error(toUserMessage(err, 'Failed to archive task list'));
         // Rollback
         setTaskGroups(previous);
       }
@@ -518,9 +519,7 @@ export function useTaskManagement(
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
         setTaskGroups(previous);
-        toast.error(
-          (err as Error).message || 'Failed to update task list icon'
-        );
+        toast.error(toUserMessage(err, 'Failed to update task list icon'));
       }
     })();
   };
@@ -553,9 +552,7 @@ export function useTaskManagement(
         void queryClient.invalidateQueries({ queryKey: ['task-lists'] });
       } catch (err) {
         setTaskGroups(previous);
-        toast.error(
-          (err as Error).message || 'Failed to update task list color'
-        );
+        toast.error(toUserMessage(err, 'Failed to update task list color'));
       }
     })();
   };
