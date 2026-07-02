@@ -7,8 +7,7 @@
     "node": "20.x"
   },
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "packages/*"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
@@ -120,8 +119,10 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/cors": "^2.8.17",
     "@types/date-fns": "^2.6.3",
     "@types/dom-speech-recognition": "^0.0.6",
+    "@types/express": "^5.0.0",
     "@types/node": "^24.1.0",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.1.8",
@@ -130,10 +131,12 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.0",
+    "cors": "^2.8.5",
     "eslint": "^9.32.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "express": "^4.21.2",
     "globals": "^16.3.0",
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
