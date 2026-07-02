@@ -13,12 +13,14 @@ import { PreferencesSettings } from './PreferencesSettings';
 import { SecuritySettings } from './SecuritySettings';
 import { HelpSettings } from './HelpSettings';
 import { CalendarSettings } from './CalendarSettings';
+import { IntegrationsSettings } from './IntegrationsSettings';
 
 export type SettingsSection =
   | 'general'
   | 'profile'
   | 'preferences'
   | 'security'
+  | 'integrations'
   | 'help'
   | 'calendar';
 
@@ -55,6 +57,8 @@ export function SettingsDialog({
         return <PreferencesSettings />;
       case 'security':
         return <SecuritySettings />;
+      case 'integrations':
+        return <IntegrationsSettings />;
       case 'help':
         return <HelpSettings />;
       default:
@@ -74,6 +78,8 @@ export function SettingsDialog({
         return 'Preferences';
       case 'security':
         return 'Security';
+      case 'integrations':
+        return 'Integrations';
       case 'help':
         return 'Help & Support';
       default:
@@ -116,6 +122,8 @@ export function SettingsDialog({
                     'Customize your workspace and default preferences'}
                   {activeSection === 'security' &&
                     'Manage your password and security settings'}
+                  {activeSection === 'integrations' &&
+                    'Connect external services like Google Calendar'}
                   {activeSection === 'help' &&
                     'Get help, documentation, and support'}
                 </p>
