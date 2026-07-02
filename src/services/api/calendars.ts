@@ -3,7 +3,7 @@
  * Real implementation calling Vercel API routes with graceful fallback to local storage in dev/test.
  */
 
-import type { Calendar } from "@shared/types";
+import type { Calendar } from '@shared/types';
 import { calendarStorage } from '../../utils/storage';
 import { validateCalendar } from '../../utils/validation';
 import { useAuthStore } from '@/stores/authStore';
@@ -48,8 +48,13 @@ export const DEFAULT_CALENDAR_COLORS = [
 
 const apiBase = '/api';
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   try {
+    // Ensure a fresh JWT before every request. The access token lives ~15
+    // minutes and nothing refreshes it mid-session, so without this the client
+    // silently drops the Authorization header once it expires and the server
+    // rejects the call with "Missing or invalid authorization header".
+    await useAuthStore.getState().refreshTokenIfNeeded();
     const token = useAuthStore.getState().getValidAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
@@ -72,7 +77,7 @@ export const calendarApi = {
   fetchCalendars: async (): Promise<Calendar[]> => {
     const res = await fetch(`${apiBase}/calendars?withEventCounts=true`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     });
     if (!isJson(res)) {
       const calendars = calendarStorage.getCalendars();
@@ -90,19 +95,23 @@ export const calendarApi = {
       return calendars;
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to fetch calendars');
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to fetch calendars');
     const raw = body.data as Array<Record<string, unknown>>;
-    return raw.map((c) => ({
-      id: c.id,
-      name: c.name,
-      color: c.color,
-      description: (c.description as string) || undefined,
-      visible: c.isVisible as boolean,
-      isDefault: c.isDefault as boolean,
-      userId: c.userId,
-      createdAt: c.createdAt ? new Date(c.createdAt as string) : undefined,
-      updatedAt: c.updatedAt ? new Date(c.updatedAt as string) : undefined,
-    } as Calendar));
+    return raw.map(
+      (c) =>
+        ({
+          id: c.id,
+          name: c.name,
+          color: c.color,
+          description: (c.description as string) || undefined,
+          visible: c.isVisible as boolean,
+          isDefault: c.isDefault as boolean,
+          userId: c.userId,
+          createdAt: c.createdAt ? new Date(c.createdAt as string) : undefined,
+          updatedAt: c.updatedAt ? new Date(c.updatedAt as string) : undefined,
+        }) as Calendar
+    );
   },
 
   /**
@@ -110,11 +119,12 @@ export const calendarApi = {
    */
   createCalendar: async (data: CreateCalendarData): Promise<Calendar> => {
     const validationResult = validateCalendar(data);
-    if (!validationResult.isValid) throw new Error(validationResult.errors[0].message);
+    if (!validationResult.isValid)
+      throw new Error(validationResult.errors[0].message);
 
     const res = await fetch(`${apiBase}/calendars`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({
         name: data.name.trim(),
         color: data.color,
@@ -125,7 +135,11 @@ export const calendarApi = {
     if (!isJson(res)) {
       // Fallback to local storage
       const existing = calendarStorage.getCalendars();
-      if (existing.some(cal => cal.name.toLowerCase() === data.name.toLowerCase())) {
+      if (
+        existing.some(
+          (cal) => cal.name.toLowerCase() === data.name.toLowerCase()
+        )
+      ) {
         throw new Error('A calendar with this name already exists');
       }
       const newCalendar: Calendar = {
@@ -140,7 +154,8 @@ export const calendarApi = {
       return newCalendar;
     }
     const body = await res.json();
-    if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to create calendar');
+    if (!res.ok || !body.success)
+      throw new Error(body.error?.message || 'Failed to create calendar');
     const c = body.data as Record<string, unknown>;
     return {
       id: c.id,
@@ -158,25 +173,37 @@ export const calendarApi = {
   /**
    * Update an existing calendar
    */
-  updateCalendar: async (name: string, data: UpdateCalendarData): Promise<Calendar> => {
+  updateCalendar: async (
+    name: string,
+    data: UpdateCalendarData
+  ): Promise<Calendar> => {
     // Try backend first: resolve id by name
-    const list = await calendarApi.fetchCalendars().catch(() => [] as Calendar[]);
+    const list = await calendarApi
+      .fetchCalendars()
+      .catch(() => [] as Calendar[]);
     const target = list.find((c) => c.name === name);
     if (target?.id) {
-      const res = await fetch(`${apiBase}/calendars/${encodeURIComponent(target.id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          name: data.name,
-          color: data.color,
-          description: data.description,
-          isVisible: data.visible,
-          isDefault: data.isDefault,
-        }),
-      });
+      const res = await fetch(
+        `${apiBase}/calendars/${encodeURIComponent(target.id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await authHeaders()),
+          },
+          body: JSON.stringify({
+            name: data.name,
+            color: data.color,
+            description: data.description,
+            isVisible: data.visible,
+            isDefault: data.isDefault,
+          }),
+        }
+      );
       if (isJson(res)) {
         const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to update calendar');
+        if (!res.ok || !body.success)
+          throw new Error(body.error?.message || 'Failed to update calendar');
         const c = body.data as Record<string, unknown>;
         return {
           id: c.id,
@@ -194,16 +221,27 @@ export const calendarApi = {
 
     // Fallback to local storage
     if (data.name !== undefined) {
-      const validationResult = validateCalendar({ ...data, name: data.name!, color: data.color || '#3B82F6' });
-      if (!validationResult.isValid) throw new Error(validationResult.errors[0].message);
+      const validationResult = validateCalendar({
+        ...data,
+        name: data.name!,
+        color: data.color || '#3B82F6',
+      });
+      if (!validationResult.isValid)
+        throw new Error(validationResult.errors[0].message);
       const existingCalendars = calendarStorage.getCalendars();
-      if (data.name && data.name !== name && existingCalendars.some(cal => cal.name.toLowerCase() === data.name!.toLowerCase())) {
+      if (
+        data.name &&
+        data.name !== name &&
+        existingCalendars.some(
+          (cal) => cal.name.toLowerCase() === data.name!.toLowerCase()
+        )
+      ) {
         throw new Error('A calendar with this name already exists');
       }
     }
     if (data.isDefault) {
       const existingCalendars = calendarStorage.getCalendars();
-      existingCalendars.forEach(cal => {
+      existingCalendars.forEach((cal) => {
         if (cal.name !== name && cal.isDefault) {
           calendarStorage.updateCalendar(cal.name, { isDefault: false });
         }
@@ -212,7 +250,9 @@ export const calendarApi = {
     const success = calendarStorage.updateCalendar(name, data);
     if (!success) throw new Error('Failed to update calendar');
     const calendars = calendarStorage.getCalendars();
-    const updatedCalendar = calendars.find(calendar => calendar.name === (data.name || name));
+    const updatedCalendar = calendars.find(
+      (calendar) => calendar.name === (data.name || name)
+    );
     if (!updatedCalendar) throw new Error('Calendar not found after update');
     return updatedCalendar;
   },
@@ -222,13 +262,18 @@ export const calendarApi = {
    */
   deleteCalendar: async (name: string): Promise<void> => {
     // Try backend first
-    const list = await calendarApi.fetchCalendars().catch(() => [] as Calendar[]);
+    const list = await calendarApi
+      .fetchCalendars()
+      .catch(() => [] as Calendar[]);
     const target = list.find((c) => c.name === name);
     if (target?.id) {
-      const res = await fetch(`${apiBase}/calendars/${encodeURIComponent(target.id)}`, {
-        method: 'DELETE',
-        headers: { ...authHeaders() },
-      });
+      const res = await fetch(
+        `${apiBase}/calendars/${encodeURIComponent(target.id)}`,
+        {
+          method: 'DELETE',
+          headers: { ...(await authHeaders()) },
+        }
+      );
       if (isJson(res)) {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -240,11 +285,13 @@ export const calendarApi = {
 
     // Fallback to local storage
     const calendars = calendarStorage.getCalendars();
-    if (calendars.length <= 1) throw new Error('Cannot delete the only calendar');
-    const calendarToDelete = calendars.find(cal => cal.name === name);
+    if (calendars.length <= 1)
+      throw new Error('Cannot delete the only calendar');
+    const calendarToDelete = calendars.find((cal) => cal.name === name);
     if (calendarToDelete?.isDefault) {
-      const otherCalendar = calendars.find(cal => cal.name !== name);
-      if (otherCalendar) calendarStorage.updateCalendar(otherCalendar.name, { isDefault: true });
+      const otherCalendar = calendars.find((cal) => cal.name !== name);
+      if (otherCalendar)
+        calendarStorage.updateCalendar(otherCalendar.name, { isDefault: true });
     }
     const success = calendarStorage.deleteCalendar(name);
     if (!success) throw new Error('Failed to delete calendar');
@@ -255,16 +302,22 @@ export const calendarApi = {
    */
   toggleCalendarVisibility: async (name: string): Promise<Calendar> => {
     // Try backend first
-    const list = await calendarApi.fetchCalendars().catch(() => [] as Calendar[]);
+    const list = await calendarApi
+      .fetchCalendars()
+      .catch(() => [] as Calendar[]);
     const target = list.find((c) => c.name === name);
     if (target?.id) {
-      const res = await fetch(`${apiBase}/calendars/${encodeURIComponent(target.id)}?action=toggle-visibility`, {
-        method: 'PATCH',
-        headers: { ...authHeaders() },
-      });
+      const res = await fetch(
+        `${apiBase}/calendars/${encodeURIComponent(target.id)}?action=toggle-visibility`,
+        {
+          method: 'PATCH',
+          headers: { ...(await authHeaders()) },
+        }
+      );
       if (isJson(res)) {
         const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to toggle visibility');
+        if (!res.ok || !body.success)
+          throw new Error(body.error?.message || 'Failed to toggle visibility');
         const c = body.data as Record<string, unknown>;
         return {
           id: c.id,
@@ -281,7 +334,7 @@ export const calendarApi = {
     }
     // Fallback
     const calendars = calendarStorage.getCalendars();
-    const calendar = calendars.find(cal => cal.name === name);
+    const calendar = calendars.find((cal) => cal.name === name);
     if (!calendar) throw new Error('Calendar not found');
     return calendarApi.updateCalendar(name, { visible: !calendar.visible });
   },
@@ -291,16 +344,24 @@ export const calendarApi = {
    */
   setDefaultCalendar: async (name: string): Promise<Calendar> => {
     // Try backend first
-    const list = await calendarApi.fetchCalendars().catch(() => [] as Calendar[]);
+    const list = await calendarApi
+      .fetchCalendars()
+      .catch(() => [] as Calendar[]);
     const target = list.find((c) => c.name === name);
     if (target?.id) {
-      const res = await fetch(`${apiBase}/calendars/${encodeURIComponent(target.id)}?action=set-default`, {
-        method: 'PATCH',
-        headers: { ...authHeaders() },
-      });
+      const res = await fetch(
+        `${apiBase}/calendars/${encodeURIComponent(target.id)}?action=set-default`,
+        {
+          method: 'PATCH',
+          headers: { ...(await authHeaders()) },
+        }
+      );
       if (isJson(res)) {
         const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error?.message || 'Failed to set default calendar');
+        if (!res.ok || !body.success)
+          throw new Error(
+            body.error?.message || 'Failed to set default calendar'
+          );
         const c = body.data as Record<string, unknown>;
         return {
           id: c.id,

@@ -56,6 +56,10 @@ function useTaskListOptions(): TaskListOption[] {
     // Same key as useTaskManagement's list query so React Query dedupes
     queryKey: ['task-lists', { withTaskCount: false }],
     queryFn: async () => {
+      // Refresh a stale JWT first so an expired access token is exchanged
+      // (via the refresh token) instead of dropped, which the server would
+      // reject with "Missing or invalid authorization header".
+      await useAuthStore.getState().refreshTokenIfNeeded();
       const token = useAuthStore.getState().getValidAccessToken();
       const res = await fetch('/api/task-lists', {
         method: 'GET',

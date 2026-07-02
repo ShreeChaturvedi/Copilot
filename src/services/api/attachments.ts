@@ -3,8 +3,13 @@ import type { FileAttachment } from '@shared/types';
 
 const apiBase = '/api';
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   try {
+    // Ensure a fresh JWT before every request. The access token lives ~15
+    // minutes and nothing refreshes it mid-session, so without this the client
+    // silently drops the Authorization header once it expires and the server
+    // rejects the call with "Missing or invalid authorization header".
+    await useAuthStore.getState().refreshTokenIfNeeded?.();
     const token = useAuthStore.getState().getValidAccessToken?.();
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
@@ -23,7 +28,10 @@ export const attachmentsApi = {
       `${apiBase}/attachments?taskId=${encodeURIComponent(taskId)}`,
       {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeaders()),
+        },
       }
     );
     if (!isJson(res)) return [];
@@ -51,7 +59,7 @@ export const attachmentsApi = {
       `${apiBase}/attachments/${encodeURIComponent(id)}`,
       {
         method: 'DELETE',
-        headers: { ...authHeaders() },
+        headers: { ...(await authHeaders()) },
       }
     );
     if (!isJson(res)) return; // assume success in legacy mode

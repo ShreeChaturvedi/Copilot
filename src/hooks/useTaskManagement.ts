@@ -143,8 +143,13 @@ export function useTaskManagement(
 
   const queryClient = useQueryClient();
 
-  const authHeaders = (): Record<string, string> => {
+  const authHeaders = async (): Promise<Record<string, string>> => {
     try {
+      // Refresh a stale JWT before the request so an expired access token is
+      // exchanged (via the 7-day refresh token) instead of silently sending no
+      // Authorization header, which the server rejects with "Missing or invalid
+      // authorization header".
+      await useAuthStore.getState().refreshTokenIfNeeded();
       const token = useAuthStore.getState().getValidAccessToken();
       return token ? { Authorization: `Bearer ${token}` } : {};
     } catch {
@@ -158,7 +163,10 @@ export function useTaskManagement(
     queryFn: async () => {
       const res = await fetch('/api/task-lists', {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeaders()),
+        },
       });
       const isJson = (r: Response) =>
         (r.headers.get('content-type') || '').includes('application/json');
@@ -298,7 +306,10 @@ export function useTaskManagement(
       try {
         const res = await fetch('/api/task-lists', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await authHeaders()),
+          },
           body: JSON.stringify({
             name: data.name,
             color: data.color,
@@ -374,7 +385,10 @@ export function useTaskManagement(
           `/api/task-lists/${encodeURIComponent(groupId)}`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(await authHeaders()),
+            },
             body: JSON.stringify(payload),
           }
         );
@@ -417,7 +431,7 @@ export function useTaskManagement(
           `/api/task-lists/${encodeURIComponent(groupId)}`,
           {
             method: 'DELETE',
-            headers: { ...authHeaders() },
+            headers: { ...(await authHeaders()) },
           }
         );
         const isJson = (r: Response) =>
@@ -449,7 +463,10 @@ export function useTaskManagement(
           `/api/task-lists/${encodeURIComponent(groupId)}?action=archive`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(await authHeaders()),
+            },
           }
         );
         const isJson = (r: Response) =>
@@ -504,7 +521,10 @@ export function useTaskManagement(
           `/api/task-lists/${encodeURIComponent(groupId)}`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(await authHeaders()),
+            },
             body: JSON.stringify({ icon: emoji }),
           }
         );
@@ -537,7 +557,10 @@ export function useTaskManagement(
           `/api/task-lists/${encodeURIComponent(groupId)}`,
           {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(await authHeaders()),
+            },
             body: JSON.stringify({ color }),
           }
         );

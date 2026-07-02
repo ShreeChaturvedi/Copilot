@@ -57,8 +57,13 @@ export interface UpdateTaskData {
 
 const apiBase = '/api';
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   try {
+    // Ensure a fresh JWT before every request. The access token lives ~15
+    // minutes and nothing refreshes it mid-session, so without this the client
+    // silently drops the Authorization header once it expires and the server
+    // rejects the call with "Missing or invalid authorization header".
+    await useAuthStore.getState().refreshTokenIfNeeded();
     // Access store lazily at call time
     const token = useAuthStore.getState().getValidAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -183,7 +188,7 @@ export const taskApi = {
   fetchTasks: async (): Promise<Task[]> => {
     const res = await fetch(`${apiBase}/tasks`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     });
     if (!isJson(res)) {
       // Fallback to local storage (dev) if SSR route not available
@@ -209,7 +214,7 @@ export const taskApi = {
     // Create task
     const res = await fetch(`${apiBase}/tasks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({
         title: data.title,
         description: data.description,
@@ -286,7 +291,7 @@ export const taskApi = {
               `${apiBase}/upload?filename=${encodeURIComponent(f.name)}`,
               {
                 method: 'PUT',
-                headers: { 'Content-Type': mime, ...authHeaders() },
+                headers: { 'Content-Type': mime, ...(await authHeaders()) },
                 body: bytes,
               }
             );
@@ -312,7 +317,10 @@ export const taskApi = {
 
         const attRes = await fetch(`${apiBase}/attachments`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await authHeaders()),
+          },
           body: JSON.stringify({
             fileName: f.name,
             fileType: f.type,
@@ -351,7 +359,7 @@ export const taskApi = {
 
     const res = await fetch(`${apiBase}/tasks/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({
         ...data,
         // Map status to backend and normalize completed if not explicitly provided
@@ -399,7 +407,7 @@ export const taskApi = {
   deleteTask: async (id: string): Promise<void> => {
     const res = await fetch(`${apiBase}/tasks/${id}`, {
       method: 'DELETE',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     if (!isJson(res)) {
       const ok = taskStorage.deleteTask(id);
@@ -425,7 +433,7 @@ export const taskApi = {
   toggleTask: async (id: string): Promise<Task> => {
     const res = await fetch(`${apiBase}/tasks/${id}?action=toggle`, {
       method: 'PATCH',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     if (!isJson(res)) {
       const tasks = taskStorage.getTasks();

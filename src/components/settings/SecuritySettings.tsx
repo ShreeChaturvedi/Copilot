@@ -16,8 +16,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
 
 export function SecuritySettings() {
-  const { authMethod, user, getValidAccessToken, logoutEverywhere } =
-    useAuthStore();
+  const {
+    authMethod,
+    user,
+    getValidAccessToken,
+    refreshTokenIfNeeded,
+    logoutEverywhere,
+  } = useAuthStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -43,6 +48,10 @@ export function SecuritySettings() {
       return;
     }
 
+    // Refresh a stale-but-renewable JWT first so an idle session changes its
+    // password transparently instead of being forced to log in again (matches
+    // the api service authHeaders() behavior).
+    await refreshTokenIfNeeded();
     const accessToken = getValidAccessToken();
     if (!accessToken) {
       setPwError('Your session has expired. Please log in again.');

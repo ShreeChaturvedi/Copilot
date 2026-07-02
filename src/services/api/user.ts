@@ -36,8 +36,13 @@ export interface UserPreferences {
 
 const apiBase = '/api';
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   try {
+    // Ensure a fresh JWT before every request. The access token lives ~15
+    // minutes and nothing refreshes it mid-session, so without this the client
+    // silently drops the Authorization header once it expires and the server
+    // rejects the call with "Missing or invalid authorization header".
+    await useAuthStore.getState().refreshTokenIfNeeded();
     const token = useAuthStore.getState().getValidAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
@@ -54,7 +59,7 @@ class UserAPI {
   async updateProfile(update: UpdateProfileData): Promise<UserProfileData> {
     const response = await fetch(`${apiBase}/user/profile`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(update),
     });
     const data = await response.json();
@@ -67,7 +72,7 @@ class UserAPI {
   async getPreferences(): Promise<UserPreferences> {
     const response = await fetch(`${apiBase}/user/preferences`, {
       method: 'GET',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     const data = await response.json();
     if (!response.ok || !data.success) {
@@ -81,7 +86,7 @@ class UserAPI {
   ): Promise<UserPreferences> {
     const response = await fetch(`${apiBase}/user/preferences`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(update),
     });
     const data = await response.json();
@@ -97,7 +102,7 @@ class UserAPI {
   async exportData(): Promise<void> {
     const response = await fetch(`${apiBase}/user/export`, {
       method: 'GET',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     const data = await response.json();
     if (!response.ok || !data.success) {
@@ -120,7 +125,7 @@ class UserAPI {
   async deleteAccount(): Promise<void> {
     const response = await fetch(`${apiBase}/user`, {
       method: 'DELETE',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     const data = await response.json();
     if (!response.ok || !data.success) {

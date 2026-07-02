@@ -13,8 +13,13 @@ import { calendarApi } from './calendars';
 
 const apiBase = '/api';
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   try {
+    // Ensure a fresh JWT before every request. The access token lives ~15
+    // minutes and nothing refreshes it mid-session, so without this the client
+    // silently drops the Authorization header once it expires and the server
+    // rejects the call with "Missing or invalid authorization header".
+    await useAuthStore.getState().refreshTokenIfNeeded();
     const token = useAuthStore.getState().getValidAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
@@ -87,7 +92,7 @@ export const eventApi = {
   fetchEvents: async (): Promise<CalendarEvent[]> => {
     const res = await fetch(`${apiBase}/events`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     });
     if (!isJson(res)) {
       return eventStorage.getEvents();
@@ -158,7 +163,7 @@ export const eventApi = {
     // (dev with no serverless route), matching taskApi and deleteEvent.
     const res = await fetch(`${apiBase}/events`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({
         ...payload,
         ...(calendarId ? { calendarId } : { calendarName: data.calendarName }),
@@ -238,7 +243,7 @@ export const eventApi = {
     }
     const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(payload),
     });
     if (isJson(res)) {
@@ -295,7 +300,7 @@ export const eventApi = {
   deleteEvent: async (id: string): Promise<void> => {
     const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: { ...authHeaders() },
+      headers: { ...(await authHeaders()) },
     });
     if (isJson(res)) {
       if (!res.ok) {
@@ -330,7 +335,10 @@ export const eventApi = {
       `${apiBase}/events?start=${encodeURIComponent(toUTC(start).toISOString())}&end=${encodeURIComponent(toUTC(end).toISOString())}`,
       {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeaders()),
+        },
       }
     );
     if (!isJson(res)) {
@@ -393,7 +401,10 @@ export const eventApi = {
       `${apiBase}/events/conflicts?${search.toString()}`,
       {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeaders()),
+        },
       }
     );
     if (!isJson(res)) return [];
