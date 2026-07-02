@@ -24,6 +24,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     taskPanes,
     maxTaskPanes,
     addTaskPane,
+    selectedKanbanTaskListId,
   } = useUIStore();
   const [searchValue, setSearchValue] = useState('');
 
@@ -125,6 +126,17 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
   const handleHideAddTaskInput = () => setShowEnhancedInput(false);
 
+  // Follow external toggles too (e.g. the kanban board's "+ New task" ghost
+  // row sets enhancedInputVisible in the settings store)
+  useEffect(() => {
+    setShowEnhancedInput(enhancedInputVisible);
+  }, [enhancedInputVisible]);
+
+  // Board scope for the back chevron label (#56)
+  const kanbanListId = selectedKanbanTaskListId ?? activeTaskGroupId;
+  const kanbanListName =
+    taskGroups.find((g) => g.id === kanbanListId)?.name ?? 'Tasks';
+
   // Autofocus inner input when panel becomes visible
   useEffect(() => {
     if (!showEnhancedInput) return;
@@ -190,6 +202,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
           onToggleAddTaskInput={handleToggleAddTaskInput}
           isAddTaskInputVisible={showEnhancedInput}
           paneCount={taskPanes.length}
+          boardListName={kanbanListName}
         />
       </div>
 
