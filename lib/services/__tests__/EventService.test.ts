@@ -5,7 +5,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventService } from '../EventService';
 import { query as mockQuery } from '../../config/database.js';
-import { testUsers, testEvents, testCalendars, dateRanges } from '../../__tests__/helpers/fixtures';
+import {
+  testUsers,
+  testEvents,
+  testCalendars,
+  dateRanges,
+} from '../../__tests__/helpers/fixtures';
 import { createQueryResult } from './helpers/mockDatabase';
 
 // Mock the database module
@@ -24,7 +29,10 @@ const normalizeRecurrence = (rrule?: string | null) => {
   return rrule.startsWith('RRULE:') ? rrule : `RRULE:${rrule}`;
 };
 
-const mapEvent = (event: typeof testEvents.meeting, overrides: Record<string, unknown> = {}) => ({
+const mapEvent = (
+  event: typeof testEvents.meeting,
+  overrides: Record<string, unknown> = {}
+) => ({
   id: event.id,
   calendarId: event.calendarId,
   userId: event.userId,
@@ -69,7 +77,9 @@ const calendarRows = [
 ];
 
 const calendarsForEvents = (events: Array<{ calendarId: string }>) =>
-  calendarRows.filter((calendar) => events.some((event) => event.calendarId === calendar.id));
+  calendarRows.filter((calendar) =>
+    events.some((event) => event.calendarId === calendar.id)
+  );
 
 describe('EventService', () => {
   let eventService: EventService;
@@ -166,7 +176,12 @@ describe('EventService', () => {
       expect(eventCall).toBeTruthy();
       expect(eventCall?.[0]).toContain('"end" >= $2');
       expect(eventCall?.[0]).toContain('start <= $3');
-      expect(eventCall?.[1]).toEqual([mockUserId, start, end]);
+      // Timestamps are bound as ISO UTC strings, not Date objects (#59).
+      expect(eventCall?.[1]).toEqual([
+        mockUserId,
+        start.toISOString(),
+        end.toISOString(),
+      ]);
       expect(result).toHaveLength(1);
     });
 
@@ -204,6 +219,52 @@ describe('EventService', () => {
       );
       expect(result).toHaveLength(1);
     });
+
+    it('expands recurring series so upcoming occurrences appear (#40)', async () => {
+      const now = new Date();
+      // Master start 30 days in the past: the base row is never "upcoming",
+      // but the weekly series recurs forward and must surface occurrences.
+      const pastStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const pastEnd = new Date(pastStart.getTime() + 60 * 60 * 1000);
+      const weekly = {
+        id: 'event-weekly-upcoming',
+        userId: mockUserId,
+        calendarId: testCalendars.primary.id,
+        title: 'Weekly sync',
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
+        recurrence: 'RRULE:FREQ=WEEKLY',
+        color: null,
+        exceptions: [],
+        start: pastStart,
+        end: pastEnd,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const calendars = calendarsForEvents([weekly]);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([weekly]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
+      });
+
+      const result = await eventService.findUpcoming(10, mockContext);
+
+      expect(result.length).toBeGreaterThan(0);
+      // Every surfaced item is a future occurrence, not the past master row.
+      expect(result.every((e) => e.start.getTime() >= now.getTime())).toBe(
+        true
+      );
+      expect(result.some((e) => e.isRecurringInstance === true)).toBe(true);
+    });
   });
 
   describe('findById', () => {
@@ -224,7 +285,10 @@ describe('EventService', () => {
     it('should return null when event not found', async () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await eventService.findById('non-existent-id', mockContext);
+      const result = await eventService.findById(
+        'non-existent-id',
+        mockContext
+      );
 
       expect(result).toBeNull();
     });
@@ -282,7 +346,11 @@ describe('EventService', () => {
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO events'),
-        expect.arrayContaining([createDTO.title, mockUserId, createDTO.calendarId]),
+        expect.arrayContaining([
+          createDTO.title,
+          mockUserId,
+          createDTO.calendarId,
+        ]),
         expect.anything()
       );
       expect(result).toEqual(createdEvent);
@@ -385,9 +453,9 @@ describe('EventService', () => {
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(eventService.create(createDTO as any, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR'
-      );
+      await expect(
+        eventService.create(createDTO as any, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
 
     it('should validate start time is before end time', async () => {
@@ -398,7 +466,9 @@ describe('EventService', () => {
         end: new Date('2024-01-20T14:00:00Z'),
       };
 
-      await expect(eventService.create(createDTO as any, mockContext)).rejects.toThrow();
+      await expect(
+        eventService.create(createDTO as any, mockContext)
+      ).rejects.toThrow();
     });
 
     it('should validate required fields', async () => {
@@ -407,7 +477,9 @@ describe('EventService', () => {
         start: null,
       };
 
-      await expect(eventService.create(invalidDTO as any, mockContext)).rejects.toThrow();
+      await expect(
+        eventService.create(invalidDTO as any, mockContext)
+      ).rejects.toThrow();
     });
   });
 
@@ -430,7 +502,11 @@ describe('EventService', () => {
         if (lower.includes('select "userid" from events')) {
           return createQueryResult([{ userId: mockUserId }]);
         }
-        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+        if (
+          lower.includes('select start') &&
+          lower.includes('"end"') &&
+          lower.includes('"allday"')
+        ) {
           return createQueryResult([
             {
               start: eventFixtures.meeting.start,
@@ -472,7 +548,11 @@ describe('EventService', () => {
         if (lower.includes('select "userid" from events')) {
           return createQueryResult([{ userId: mockUserId }]);
         }
-        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+        if (
+          lower.includes('select start') &&
+          lower.includes('"end"') &&
+          lower.includes('"allday"')
+        ) {
           return createQueryResult([
             {
               start: eventFixtures.meeting.start,
@@ -513,7 +593,11 @@ describe('EventService', () => {
         if (lower.includes('select "userid" from events')) {
           return createQueryResult([{ userId: mockUserId }]);
         }
-        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+        if (
+          lower.includes('select start') &&
+          lower.includes('"end"') &&
+          lower.includes('"allday"')
+        ) {
           return createQueryResult([
             {
               start: eventFixtures.recurring.start,
@@ -537,10 +621,16 @@ describe('EventService', () => {
     });
 
     it('should not update events belonging to other users', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ userId: 'other-user' }]));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ userId: 'other-user' }])
+      );
 
       await expect(
-        eventService.update('other-user-event', { title: 'Hacked' }, mockContext)
+        eventService.update(
+          'other-user-event',
+          { title: 'Hacked' },
+          mockContext
+        )
       ).rejects.toThrow('AUTHORIZATION_ERROR');
     });
 
@@ -563,7 +653,9 @@ describe('EventService', () => {
           ])
         );
 
-      await expect(eventService.update(eventId, invalidUpdate as any, mockContext)).rejects.toThrow();
+      await expect(
+        eventService.update(eventId, invalidUpdate as any, mockContext)
+      ).rejects.toThrow();
     });
   });
 
@@ -619,9 +711,22 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting]));
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([eventFixtures.meeting]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([eventFixtures.meeting]));
+        }
+        return createQueryResult([]);
+      });
 
-      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
 
       expect(conflicts).toHaveLength(1);
       expect(conflicts[0].conflictingEvent).toMatchObject({
@@ -639,7 +744,11 @@ describe('EventService', () => {
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
 
       expect(conflicts).toHaveLength(0);
     });
@@ -650,9 +759,27 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:00:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting, eventFixtures.allDay]));
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([
+            eventFixtures.meeting,
+            eventFixtures.allDay,
+          ]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(
+            calendarsForEvents([eventFixtures.meeting, eventFixtures.allDay])
+          );
+        }
+        return createQueryResult([]);
+      });
 
-      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
 
       expect(conflicts).toHaveLength(2);
     });
@@ -666,7 +793,11 @@ describe('EventService', () => {
 
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
-      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
 
       expect(conflicts).toHaveLength(0);
     });
@@ -678,9 +809,22 @@ describe('EventService', () => {
         end: new Date('2024-01-15T11:30:00Z'),
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([eventFixtures.meeting]));
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([eventFixtures.meeting]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents([eventFixtures.meeting]));
+        }
+        return createQueryResult([]);
+      });
 
-      const conflicts = await eventService.getConflicts(newEvent, undefined, mockContext);
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
 
       expect(conflicts).toHaveLength(1);
     });
@@ -703,6 +847,51 @@ describe('EventService', () => {
       expect(eventCall).toBeTruthy();
       expect(eventCall?.[0]).toContain('e.id <> $');
       expect(eventCall?.[1]).toContain(eventId);
+    });
+
+    it('flags cross-calendar overlaps and names each conflict calendar (#41)', async () => {
+      // No calendarId passed: conflicts should span calendars.
+      const newEvent = {
+        start: new Date('2024-01-15T10:00:00Z'),
+        end: new Date('2024-01-15T11:00:00Z'),
+      };
+      // meeting lives on the primary calendar, allDay on the personal one.
+      const conflictingEvents = [eventFixtures.meeting, eventFixtures.allDay];
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult(conflictingEvents);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendarsForEvents(conflictingEvents));
+        }
+        return createQueryResult([]);
+      });
+
+      const conflicts = await eventService.getConflicts(
+        newEvent,
+        undefined,
+        mockContext
+      );
+
+      // The events query must not be scoped to a single calendar.
+      const eventCall = mockedQuery.mock.calls.find((call) =>
+        String(call[0]).includes('FROM events e')
+      );
+      expect(eventCall?.[0]).not.toContain('e."calendarId" =');
+
+      // Both cross-calendar overlaps surface, each carrying its calendar name.
+      expect(conflicts).toHaveLength(2);
+      const byId = new Map(
+        conflicts.map((c) => [c.conflictingEvent.id, c.conflictingEvent])
+      );
+      expect(byId.get(eventFixtures.meeting.id)?.calendar?.name).toBe(
+        testCalendars.primary.name
+      );
+      expect(byId.get(eventFixtures.allDay.id)?.calendar?.name).toBe(
+        testCalendars.personal.name
+      );
     });
   });
 
@@ -805,7 +994,11 @@ describe('EventService', () => {
         if (lower.includes('select "userid" from events')) {
           return createQueryResult([{ userId: mockUserId }]);
         }
-        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+        if (
+          lower.includes('select start') &&
+          lower.includes('"end"') &&
+          lower.includes('"allday"')
+        ) {
           return createQueryResult([
             {
               start: eventFixtures.recurring.start,
@@ -846,7 +1039,11 @@ describe('EventService', () => {
         if (lower.includes('select "userid" from events')) {
           return createQueryResult([{ userId: mockUserId }]);
         }
-        if (lower.includes('select start') && lower.includes('"end"') && lower.includes('"allday"')) {
+        if (
+          lower.includes('select start') &&
+          lower.includes('"end"') &&
+          lower.includes('"allday"')
+        ) {
           return createQueryResult([
             {
               start: eventFixtures.recurring.start,
@@ -870,11 +1067,84 @@ describe('EventService', () => {
     });
   });
 
+  describe('RRULE validation (#42: BYSETPOS)', () => {
+    // Exactly what src/utils/recurrence.ts generateRRule emits for
+    // "last Friday of the month" (monthlyBySetPos=-1, monthlyWeekday=5).
+    const lastFridayRRule =
+      'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1';
+
+    it('accepts the editor BYSETPOS rule and round-trips it through create', async () => {
+      const createDTO = {
+        calendarId: testCalendars.primary.id,
+        title: 'Last Friday sync',
+        start: new Date('2026-07-31T09:00:00Z'),
+        end: new Date('2026-07-31T10:00:00Z'),
+        recurrence: lastFridayRRule,
+      };
+
+      const createdEvent = {
+        id: 'event-bysetpos',
+        userId: mockUserId,
+        ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
+        color: null,
+        exceptions: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
+      });
+
+      const result = await eventService.create(createDTO, mockContext);
+
+      expect(result.recurrence).toBe(lastFridayRRule);
+    });
+
+    it('rejects a BYSETPOS of 0 as an invalid recurrence rule', async () => {
+      const createDTO = {
+        calendarId: testCalendars.primary.id,
+        title: 'Bad rule',
+        start: new Date('2026-07-31T09:00:00Z'),
+        end: new Date('2026-07-31T10:00:00Z'),
+        recurrence: 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYSETPOS=0',
+      };
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        return createQueryResult([]);
+      });
+
+      await expect(eventService.create(createDTO, mockContext)).rejects.toThrow(
+        'VALIDATION_ERROR'
+      );
+    });
+  });
+
   describe('Edge Cases and Error Handling', () => {
     it('should handle database connection errors gracefully', async () => {
       mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      await expect(eventService.findAll({}, mockContext)).rejects.toThrow('Connection timeout');
+      await expect(eventService.findAll({}, mockContext)).rejects.toThrow(
+        'Connection timeout'
+      );
     });
 
     it('should handle events with very long descriptions', async () => {
@@ -940,7 +1210,11 @@ describe('EventService', () => {
       const eventCall = mockedQuery.mock.calls.find((call) =>
         String(call[0]).includes('FROM events')
       );
-      expect(eventCall?.[1]).toEqual([mockUserId, start, end]);
+      expect(eventCall?.[1]).toEqual([
+        mockUserId,
+        start.toISOString(),
+        end.toISOString(),
+      ]);
     });
 
     it('should handle concurrent event creation', async () => {
@@ -969,19 +1243,25 @@ describe('EventService', () => {
         }
         if (lower.includes('insert into events')) {
           insertCount += 1;
-          const payload = insertCount === 1
-            ? { id: 'event-1', userId: mockUserId, ...event1 }
-            : { id: 'event-2', userId: mockUserId, ...event2 };
-          return createQueryResult([{
-            ...payload,
-            description: null,
-            location: null,
-            notes: null,
-            recurrence: null,
-            allDay: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }], 1);
+          const payload =
+            insertCount === 1
+              ? { id: 'event-1', userId: mockUserId, ...event1 }
+              : { id: 'event-2', userId: mockUserId, ...event2 };
+          return createQueryResult(
+            [
+              {
+                ...payload,
+                description: null,
+                location: null,
+                notes: null,
+                recurrence: null,
+                allDay: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+            1
+          );
         }
         return createQueryResult([]);
       });

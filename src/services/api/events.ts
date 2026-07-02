@@ -218,6 +218,23 @@ export const eventApi = {
         payload.start = toUTC(payload.start).toISOString();
       if (payload.end instanceof Date)
         payload.end = toUTC(payload.end).toISOString();
+      // The backend's UpdateEventDTO understands calendarId, not calendarName,
+      // and the PUT handler has no calendarName bridge. Mirror the create path:
+      // resolve the selected calendar name to its id so moving an event to a
+      // different calendar actually persists (#38). Only fall back to sending
+      // calendarName if resolution fails.
+      if (data.calendarName !== undefined) {
+        delete payload.calendarName;
+        let calendarId: string | undefined;
+        try {
+          const calendars = await calendarApi.fetchCalendars();
+          calendarId = calendars.find((c) => c.name === data.calendarName)?.id;
+        } catch {
+          // ignore; fall back to calendarName below
+        }
+        if (calendarId) payload.calendarId = calendarId;
+        else payload.calendarName = data.calendarName;
+      }
       const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },

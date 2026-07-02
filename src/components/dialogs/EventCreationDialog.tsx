@@ -2,13 +2,7 @@ import * as React from 'react';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { addHours, format } from 'date-fns';
 import { parseLocalDate } from '@/utils/date';
-import {
-  MapPin,
-  ArrowRight,
-  Calendar,
-  AtSign,
-  AlertTriangle,
-} from 'lucide-react';
+import { MapPin, ArrowRight, Calendar, AtSign } from 'lucide-react';
 
 import {
   Dialog,
@@ -56,6 +50,7 @@ import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useUIStore } from '@/stores/uiStore';
 import { ConditionalDialogHeader } from './ConditionalDialogHeader';
+import { ConflictWarning } from './ConflictWarning';
 import type { RecurrenceEditorOptions } from '@/utils/recurrence';
 import { parseRRule, generateRRule, clampRRuleUntil } from '@/utils/recurrence';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
@@ -473,14 +468,10 @@ function EventCreationDialogContent({
     }
   }, [formData.startDate, formData.endDate, formData.endTime, formData.allDay]);
 
-  // Resolve the selected calendar id so conflicts are scoped to that calendar
-  const selectedCalendarId = useMemo(
-    () => calendars.find((c) => c.name === formData.calendarName)?.id,
-    [calendars, formData.calendarName]
-  );
-
   // Real-time conflict detection: when the event time range is valid, ask the
   // backend for overlapping events and surface them as a non-blocking warning.
+  // No calendarId is passed so conflicts are detected across ALL of the user's
+  // calendars, catching cross-calendar double-bookings (#41).
   useEffect(() => {
     if (activeTab !== 'event') {
       setConflicts([]);
@@ -499,7 +490,6 @@ function EventCreationDialogContent({
         .getConflicts({
           start,
           end,
-          calendarId: selectedCalendarId,
           excludeEventId: initialEventData?.id,
         })
         .then((result) => {
@@ -514,13 +504,7 @@ function EventCreationDialogContent({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [
-    activeTab,
-    getStartDateTime,
-    getEndDateTime,
-    selectedCalendarId,
-    initialEventData?.id,
-  ]);
+  }, [activeTab, getStartDateTime, getEndDateTime, initialEventData?.id]);
 
   // Get current frequency from recurrence string
   const currentFrequency = useMemo(():
@@ -967,42 +951,7 @@ function EventCreationDialogContent({
         </TabsContent>
       </Tabs>
 
-      {activeTab === 'event' && conflicts.length > 0 && (
-        <div
-          role="alert"
-          className="mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm dark:border-yellow-900/60 dark:bg-yellow-950/40"
-        >
-          <div className="flex items-center gap-2 font-medium text-yellow-800 dark:text-yellow-200">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            {conflicts.length === 1
-              ? 'This time overlaps 1 existing event'
-              : `This time overlaps ${conflicts.length} existing events`}
-          </div>
-          <ul className="mt-2 space-y-1 text-yellow-800 dark:text-yellow-200">
-            {conflicts.map((conflict) => {
-              const ev = conflict.conflictingEvent;
-              return (
-                <li key={ev.id} className="flex flex-col">
-                  <span className="font-medium">
-                    {ev.title || 'Untitled event'}
-                  </span>
-                  <span className="text-xs opacity-80">
-                    {ev.allDay
-                      ? 'All day'
-                      : `${format(new Date(ev.start), 'MMM d, h:mm a')} - ${format(
-                          new Date(ev.end),
-                          'h:mm a'
-                        )}`}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-xs text-yellow-700 dark:text-yellow-300/80">
-            You can still save, or adjust the time to avoid the overlap.
-          </p>
-        </div>
-      )}
+      {activeTab === 'event' && <ConflictWarning conflicts={conflicts} />}
 
       {activeTab === 'event' && (
         <div className="flex justify-end gap-2 mt-6">

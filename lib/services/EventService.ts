@@ -17,6 +17,10 @@ import type { RRule, RRuleSet } from 'rrule';
 
 const { rrulestr } = rrulePkg as unknown as typeof import('rrule');
 
+// How far ahead findUpcoming expands recurring series when surfacing the next
+// occurrences of a list, in days.
+const UPCOMING_EXPANSION_DAYS = 90;
+
 /**
  * Event entity interface extending base
  */
@@ -128,6 +132,20 @@ export class EventService extends BaseService<
   }
 
   /**
+   * Serialize a timestamp for binding as a query parameter.
+   *
+   * events.start/end (and createdAt/updatedAt) are `timestamp without time
+   * zone` columns holding UTC wall-clock values. node-pg serializes a JS Date
+   * param using the server process's local UTC offset, which shifts the value
+   * on any non-UTC server and silently breaks range/overlap comparisons (#59).
+   * Binding an ISO-8601 UTC string pins the value to UTC regardless of the
+   * server timezone.
+   */
+  private toTimestampParam(value: Date | string): string {
+    return (value instanceof Date ? value : new Date(value)).toISOString();
+  }
+
+  /**
    * Override create to satisfy required relations (user, calendar)
    */
   async create(
@@ -146,8 +164,8 @@ export class EventService extends BaseService<
         [
           data.title.trim(),
           data.description?.trim() || null,
-          data.start,
-          data.end,
+          this.toTimestampParam(data.start),
+          this.toTimestampParam(data.end),
           data.allDay ?? false,
           data.location?.trim() || null,
           data.notes?.trim() || null,
@@ -200,11 +218,11 @@ export class EventService extends BaseService<
     // entirely outside the range).
     const dateClauses: string[] = [];
     if (filters.start) {
-      params.push(filters.start);
+      params.push(this.toTimestampParam(filters.start));
       dateClauses.push('"end" >= $' + params.length);
     }
     if (filters.end) {
-      params.push(filters.end);
+      params.push(this.toTimestampParam(filters.end));
       dateClauses.push('start <= $' + params.length);
     }
     if (dateClauses.length) {
@@ -282,11 +300,7 @@ export class EventService extends BaseService<
         out.push(event);
         continue;
       }
-      const occurrences = this.generateOccurrences(
-        event,
-        rangeStart,
-        rangeEnd
-      );
+      const occurrences = this.generateOccurrences(event, rangeStart, rangeEnd);
       out.push(...occurrences);
     }
     return out;
@@ -317,7 +331,11 @@ export class EventService extends BaseService<
 
     let occStarts: Date[];
     try {
-      occStarts = rule.between(new Date(windowStart), new Date(windowEnd), true);
+      occStarts = rule.between(
+        new Date(windowStart),
+        new Date(windowEnd),
+        true
+      );
     } catch {
       return [master];
     }
@@ -493,14 +511,11 @@ export class EventService extends BaseService<
       sets.push(`description = $${params.length}`);
     }
     if (data.start !== undefined) {
-      const d =
-        typeof data.start === 'string' ? new Date(data.start) : data.start;
-      params.push(d);
+      params.push(this.toTimestampParam(data.start));
       sets.push(`start = $${params.length}`);
     }
     if (data.end !== undefined) {
-      const d = typeof data.end === 'string' ? new Date(data.end) : data.end;
-      params.push(d);
+      params.push(this.toTimestampParam(data.end));
       sets.push(`"end" = $${params.length}`);
     }
     if (data.allDay !== undefined) {
@@ -532,7 +547,7 @@ export class EventService extends BaseService<
       sets.push(`"calendarId" = $${params.length}`);
     }
 
-    params.push(new Date());
+    params.push(this.toTimestampParam(new Date()));
     sets.push(`"updatedAt" = $${params.length}`);
     params.push(id);
 
@@ -582,20 +597,44 @@ export class EventService extends BaseService<
       this.log('findUpcoming', { limit }, context);
 
       const now = new Date();
+      const windowEnd = new Date(
+        now.getTime() + UPCOMING_EXPANSION_DAYS * 24 * 60 * 60 * 1000
+      );
+      // Include recurring masters regardless of their stored start so their
+      // future occurrences can be expanded below: a series whose master start
+      // is in the past still recurs forward. Non-recurring events keep the
+      // start >= now filter. The LIMIT is applied after expansion in JS since
+      // one master can yield several upcoming occurrences.
       const res = await query<EventEntity>(
         `SELECT e.*
          FROM events e
          JOIN calendars c ON c.id = e."calendarId"
-         WHERE e."userId" = $1 AND e.start >= $2 AND c."isVisible" = true
-         ORDER BY e.start ASC
-         LIMIT $3`,
-        [context.userId!, now, limit],
+         WHERE e."userId" = $1 AND (e.recurrence IS NOT NULL OR e.start >= $2) AND c."isVisible" = true
+         ORDER BY e.start ASC`,
+        [context.userId!, this.toTimestampParam(now)],
         this.db
       );
       const base = res.rows.map((row) => this.transformEntity(row));
       const enriched = await this.enrichEntities(base, context);
-      this.log('findUpcoming:success', { count: enriched.length }, context);
-      return enriched;
+      // Expand recurring masters into their upcoming occurrences within the
+      // window; non-recurring events pass through (SQL already bounded them).
+      const upcoming: EventEntity[] = [];
+      for (const event of enriched) {
+        if (event.recurrence) {
+          const occurrences = this.generateOccurrences(
+            event,
+            now,
+            windowEnd
+          ).filter((occ) => occ.start.getTime() >= now.getTime());
+          upcoming.push(...occurrences);
+        } else {
+          upcoming.push(event);
+        }
+      }
+      upcoming.sort((a, b) => a.start.getTime() - b.start.getTime());
+      const limited = upcoming.slice(0, limit);
+      this.log('findUpcoming:success', { count: limited.length }, context);
+      return limited;
     } catch (error) {
       this.log('findUpcoming:error', { error: error.message, limit }, context);
       throw error;
@@ -637,10 +676,14 @@ export class EventService extends BaseService<
 
       // Pull non-recurring events that overlap the window, plus every recurring
       // master (expanded below) so occurrences inside the window are considered.
-      const params: Array<string | Date> = [
+      // Bind the window bounds as ISO strings, not Date objects: the columns are
+      // `timestamp without time zone` and node-pg would otherwise serialize the
+      // Dates with the server's local offset, shifting the window on a non-UTC
+      // server and dropping real overlaps (#59).
+      const params: string[] = [
         context.userId!,
-        rangeEnd,
-        rangeStart,
+        this.toTimestampParam(rangeEnd),
+        this.toTimestampParam(rangeStart),
       ];
       const and: string[] = [
         'e."userId" = $1',
@@ -688,7 +731,13 @@ export class EventService extends BaseService<
         }
       }
 
-      const conflicts: EventConflict[] = candidates.map(
+      // Enrich with each conflicting event's calendar so callers can name the
+      // calendar it belongs to. Conflicts span all of the user's calendars
+      // (unless a calendarId was explicitly passed), so this disambiguates
+      // cross-calendar double-bookings in the warning UI (#41).
+      const enrichedCandidates = await this.enrichEntities(candidates, context);
+
+      const conflicts: EventConflict[] = enrichedCandidates.map(
         (conflictEvent) => {
           const overlapStart = new Date(
             Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
@@ -706,7 +755,8 @@ export class EventService extends BaseService<
             overlapEnd,
             overlapDuration,
           };
-        });
+        }
+      );
 
       this.log(
         'getConflicts:success',
@@ -851,18 +901,39 @@ export class EventService extends BaseService<
       'BYDAY',
       'BYMONTH',
       'BYMONTHDAY',
+      // The recurrence editor emits BYSETPOS for "nth weekday" monthly and
+      // yearly rules, e.g. "last Friday of the month" (src/utils/recurrence.ts
+      // buildRRule). Reject these rules and the UI can't save them (#42).
+      'BYSETPOS',
     ];
     const ruleBody = rrule.substring(6); // Remove 'RRULE:'
 
     // Split by semicolon and validate each part
     const parts = ruleBody.split(';');
     for (const part of parts) {
-      const [key] = part.split('=');
+      const [key, value] = part.split('=');
       if (!validKeywords.includes(key)) {
+        return false;
+      }
+      // BYSETPOS is a comma-separated list of non-zero positions in the range
+      // [-366, 366] per RFC 5545; reject anything outside that.
+      if (key === 'BYSETPOS' && !this.isValidBySetPos(value)) {
         return false;
       }
     }
 
     return true;
+  }
+
+  /**
+   * Validate a BYSETPOS value: a comma-separated list of non-zero integers in
+   * the RFC 5545 range [-366, 366].
+   */
+  private isValidBySetPos(value: string | undefined): boolean {
+    if (!value) return false;
+    return value.split(',').every((token) => {
+      const n = Number(token);
+      return Number.isInteger(n) && n !== 0 && n >= -366 && n <= 366;
+    });
   }
 }
