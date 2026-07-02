@@ -125,6 +125,13 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
   const handleHideAddTaskInput = () => setShowEnhancedInput(false);
 
+  // Cmd+K "New task" / global N open the enhanced input (design-brief §4.6)
+  useEffect(() => {
+    const onNewTask = () => setShowEnhancedInput(true);
+    window.addEventListener('app:new-task', onNewTask);
+    return () => window.removeEventListener('app:new-task', onNewTask);
+  }, []);
+
   // Autofocus inner input when panel becomes visible
   useEffect(() => {
     if (!showEnhancedInput) return;

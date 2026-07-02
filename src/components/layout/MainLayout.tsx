@@ -26,6 +26,8 @@ const SettingsDialog = lazy(async () => ({
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsDialog } from '@/hooks/useSettingsDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { CommandBar } from '@/components/command/CommandBar';
 import { usePreferencesSync } from '@/hooks/usePreferencesSync';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
@@ -83,6 +85,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     onLogout: () => logout(),
   });
 
+  // Cmd+K palette + single-key map (T, D/W/M/L, N) — design-brief §4.6
+  useGlobalShortcuts();
+
   // Global event bridge so dropdown can open settings without prop drilling
   useEffect(() => {
     const handler = (e: Event) => {
@@ -131,6 +136,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         ) : (
           <MainContent children={children} />
         )}
+
+        {/* Cmd+K command bar */}
+        <CommandBar />
 
         {/* Settings Dialog */}
         <Suspense fallback={null}>
