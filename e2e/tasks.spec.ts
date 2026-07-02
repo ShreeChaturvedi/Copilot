@@ -81,13 +81,8 @@ test.describe('task CRUD', () => {
       .toBe(0);
   });
 
-  // Expected-failure: documents #71. When the wiring is fixed this test will
-  // pass and Playwright will flag the stale test.fail() for removal.
+  // Regression for #71: the inline description must survive task create.
   test('description typed in the inline input persists', async ({ page }) => {
-    test.fail(
-      true,
-      'issue #71: TaskFocusPane.handleAddTaskWithFiles drops the description'
-    );
     await signupAndEnter(page);
     await gotoTaskView(page);
     const marker = `${Date.now()}`;
