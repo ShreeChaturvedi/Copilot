@@ -248,8 +248,14 @@ class GoogleOAuthService {
       throw new Error('GOOGLE_OAUTH_FAILED');
     }
 
-    // Generate JWT tokens
-    const tokens = await generateTokenPair(user.id, user.email);
+    // Generate JWT tokens, carrying the role claim so requireRole can avoid a
+    // per-request DB lookup. The role row is not selected above, so read it here.
+    const roleRes = await query<{ role: string | null }>(
+      `SELECT "role" FROM users WHERE id = $1 LIMIT 1`,
+      [user.id]
+    );
+    const role = roleRes.rows[0]?.role ?? undefined;
+    const tokens = await generateTokenPair(user.id, user.email, role);
 
     // Store refresh token
     await refreshTokenService.storeRefreshToken(

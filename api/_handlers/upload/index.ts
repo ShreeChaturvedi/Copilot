@@ -44,92 +44,25 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
       return;
     }
 
-    // Helper: make data URI
-    const toDataUri = (mime: string, buf: Buffer) =>
-      `data:${mime};base64,${buf.toString('base64')}`;
-    const isImage = contentType.startsWith('image/');
-    const isProd = process.env.NODE_ENV === 'production';
     const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
-    // DEV/No-token fallback: return data URLs (no external storage)
-    // Use remote Blob in dev if a token is present
-    if (!isProd && !hasBlob) {
-      if (isImage) {
-        try {
-          const sharpMod = await import('sharp');
-          const sharp = (sharpMod.default ??
-            sharpMod) as typeof import('sharp');
-
-          const optimized = await sharp(body)
-            .rotate()
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: 'inside',
-              withoutEnlargement: true,
-            })
-            .jpeg({ quality: 82, mozjpeg: true })
-            .toBuffer();
-
-          const thumb = await sharp(body)
-            .rotate()
-            .resize({
-              width: 512,
-              height: 512,
-              fit: 'inside',
-              withoutEnlargement: true,
-            })
-            .webp({ quality: 80 })
-            .toBuffer();
-
-          sendSuccess(
-            res,
-            {
-              url: toDataUri('image/jpeg', optimized),
-              thumbnailUrl: toDataUri('image/webp', thumb),
-              size: optimized.length,
-              contentType: 'image/jpeg',
-              dev: true,
-            },
-            201
-          );
-          return;
-        } catch {
-          // sharp failed: fall back to tiny placeholder thumb + original as data URI
-          const tinyPng = Buffer.from(
-            'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAACENnwnAAAAK0lEQVR42mP8//8/AyWYgQESKAYMDKwGRgYhEASDEGQhQAcxIhAGQwMAAF0gBBf3n0vTAAAAAElFTkSuQmCC',
-            'base64'
-          ); // 10x10 gray PNG
-          sendSuccess(
-            res,
-            {
-              url: toDataUri(contentType || 'application/octet-stream', body),
-              thumbnailUrl: toDataUri('image/png', tinyPng),
-              size: body.length,
-              contentType,
-              dev: true,
-            },
-            201
-          );
-          return;
-        }
-      }
-
-      // Non-images: return single data URI
-      sendSuccess(
-        res,
-        {
-          url: toDataUri(contentType, body),
-          size: body.length,
-          contentType,
-          dev: true,
+    // Without a blob token uploads cannot be persisted. Return an explicit 503
+    // (identical to scripts/dev-server.ts) rather than silently falling back to
+    // an in-memory data: URL, which masks a misconfiguration in local dev and a
+    // misconfigured production deploy alike.
+    if (!hasBlob) {
+      res.status(503).json({
+        success: false,
+        error: {
+          code: 'BLOB_NOT_CONFIGURED',
+          message:
+            'BLOB_READ_WRITE_TOKEN is not set; file uploads cannot be persisted.',
         },
-        201
-      );
+      });
       return;
     }
 
-    // Production path: store in Vercel Blob
+    // Store in Vercel Blob
     const { put } = await import('@vercel/blob');
 
     // If image, generate optimized original + thumbnail

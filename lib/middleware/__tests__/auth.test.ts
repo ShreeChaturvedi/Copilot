@@ -23,11 +23,19 @@ vi.mock('../../../packages/backend/src/utils/jwt.js', () => ({
   extractTokenFromHeader: vi.fn(),
 }));
 
+// Spy on the DB query used by requireRole's legacy-token fallback so we can
+// assert that a role-bearing token skips the database entirely.
+const mockDbQuery = vi.hoisted(() => vi.fn());
+vi.mock('../../config/database.js', () => ({
+  query: mockDbQuery,
+}));
+
 describe('Authentication Middleware', () => {
   let mockNext: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockNext = vi.fn();
+    mockDbQuery.mockReset();
     vi.mocked(extractTokenFromHeader).mockImplementation(
       (authHeader?: string) => {
         if (!authHeader) return null;
@@ -345,6 +353,46 @@ describe('Authentication Middleware', () => {
       const middleware = requireRole('USER');
       await middleware(req, res, mockNext);
 
+      expect(mockNext).toHaveBeenCalledOnce();
+    });
+
+    it('does not query the database when the token carries a role claim', async () => {
+      const req = createMockRequest() as AuthenticatedRequest;
+      req.user = {
+        id: 'user-123',
+        email: 'user@example.com',
+        name: 'Test User',
+        role: 'ADMIN',
+      };
+      const res = createMockResponse();
+
+      const middleware = requireRole('USER');
+      await middleware(req, res, mockNext);
+
+      expect(mockNext).toHaveBeenCalledOnce();
+      expect(mockDbQuery).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a DB lookup when the token has no role claim (legacy token)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ role: 'ADMIN' }] });
+      const req = createMockRequest() as AuthenticatedRequest;
+      req.user = {
+        id: 'user-123',
+        email: 'user@example.com',
+        name: 'Test User',
+        // no role claim (token minted before roles existed)
+      };
+      const res = createMockResponse();
+
+      const middleware = requireRole('USER');
+      await middleware(req, res, mockNext);
+
+      expect(mockDbQuery).toHaveBeenCalledTimes(1);
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT'),
+        ['user-123']
+      );
+      expect(req.user?.role).toBe('ADMIN');
       expect(mockNext).toHaveBeenCalledOnce();
     });
   });

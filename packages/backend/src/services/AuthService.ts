@@ -66,10 +66,11 @@ class AuthService {
         email: string;
         name: string | null;
         createdAt: Date;
+        role: string;
       }>(
         `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
-         RETURNING id, email, name, "createdAt"`,
+         RETURNING id, email, name, "createdAt", "role"`,
         [email.toLowerCase(), name || null, hashedPassword],
         tx
       );
@@ -82,8 +83,8 @@ class AuthService {
       return u;
     });
 
-    // Generate tokens
-    const tokens = await generateTokenPair(user.id, user.email);
+    // Generate tokens (carry the role claim so requireRole avoids a DB lookup)
+    const tokens = await generateTokenPair(user.id, user.email, user.role);
 
     // Store refresh token
     await refreshTokenService.storeRefreshToken(
@@ -116,8 +117,9 @@ class AuthService {
       name: string | null;
       password: string | null;
       createdAt: Date;
+      role: string;
     }>(
-      `SELECT id, email, name, password, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      `SELECT id, email, name, password, "createdAt", "role" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email.toLowerCase()]
     );
     const user = res.rows[0];
@@ -137,8 +139,8 @@ class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // Generate tokens
-    const tokens = await generateTokenPair(user.id, user.email);
+    // Generate tokens (carry the role claim so requireRole avoids a DB lookup)
+    const tokens = await generateTokenPair(user.id, user.email, user.role);
 
     // Store refresh token
     await refreshTokenService.storeRefreshToken(
@@ -346,9 +348,16 @@ class AuthService {
     email: string,
     token: string
   ): Promise<void> {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.FRONTEND_URL || 'http://localhost:3000';
+    // Prefer an explicit FRONTEND_URL so links point at the canonical host,
+    // then the stable Vercel production domain, then the deployment-specific
+    // VERCEL_URL, and finally the real local Vite dev port (5173, not 3000).
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'http://localhost:5173');
     const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(
       token
     )}`;

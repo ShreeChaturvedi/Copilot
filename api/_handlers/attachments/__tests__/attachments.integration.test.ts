@@ -224,6 +224,43 @@ describe('Attachments API', () => {
     }
   });
 
+  it('returns a 503 BLOB_NOT_CONFIGURED when no blob token is set (issue #31)', async () => {
+    const { default: uploadHandler } = await import('../../upload/index');
+    const previousToken = process.env.BLOB_READ_WRITE_TOKEN;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    const r = req({
+      method: 'PUT',
+      url: '/api/upload?filename=test.txt',
+      headers: { 'content-type': 'text/plain', 'x-request-id': 'req-3' },
+    });
+    const s = res();
+    type UploadEventHandler = (chunk?: Buffer) => void;
+    const events: Record<string, UploadEventHandler[]> = {};
+    (r as any).on = (ev: string, fn: UploadEventHandler) => {
+      (events[ev] ||= []).push(fn);
+    };
+    try {
+      const p = uploadHandler(r as any, s as any);
+      events['data']?.forEach((fn) => fn(Buffer.from('hello')));
+      events['end']?.forEach((fn) => fn());
+      await p;
+      expect(s.status).toHaveBeenCalledWith(503);
+      const body = vi.mocked(s.json).mock.calls[0]?.[0];
+      // Byte-identical to the dev-server upload route's 503 payload.
+      expect(body).toEqual({
+        success: false,
+        error: {
+          code: 'BLOB_NOT_CONFIGURED',
+          message:
+            'BLOB_READ_WRITE_TOKEN is not set; file uploads cannot be persisted.',
+        },
+      });
+    } finally {
+      if (previousToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+      else process.env.BLOB_READ_WRITE_TOKEN = previousToken;
+    }
+  });
+
   it('returns storage stats via stats route', async () => {
     const r = req({ method: 'GET', url: '/api/attachments/stats' });
     const s = res();
