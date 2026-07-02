@@ -45,6 +45,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     title: string,
     _groupId?: string,
     smartData?: {
+      description?: string;
       priority?: 'low' | 'medium' | 'high';
       scheduledDate?: Date;
       tags?: Array<{
@@ -66,6 +67,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
         : undefined;
     addTask.mutate({
       title,
+      description: smartData?.description,
       taskListId,
       priority: smartData?.priority,
       scheduledDate: smartData?.scheduledDate,
@@ -284,6 +286,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                 ) => {
                   const normalizedSmart = smart
                     ? {
+                        description: smart.description,
                         priority: smart.priority,
                         scheduledDate: smart.scheduledDate,
                         tags: smart.tags?.map((t) => ({
