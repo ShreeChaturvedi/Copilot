@@ -71,6 +71,9 @@ lib/**/*.map
 
 # Other
 screenshots/
+# README assets are the one tracked screenshots directory
+!docs/screenshots/
+!docs/screenshots/**
 test-scroll.html
 .vercel
 .env*.local

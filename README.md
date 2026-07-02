@@ -1,21 +1,21 @@
 <p align="center">
-  <img src="docs/assets/banner-light.svg#gh-light-mode-only" width="800" alt="Taskflow Calendar">
-  <img src="docs/assets/banner-dark.svg#gh-dark-mode-only" width="800" alt="Taskflow Calendar">
+  <img src="docs/branding/readme-light.svg#gh-light-mode-only" width="860" alt="Taskflow Calendar">
+  <img src="docs/branding/readme-dark.svg#gh-dark-mode-only" width="860" alt="Taskflow Calendar">
 </p>
-
-<h1 align="center">Taskflow Calendar</h1>
 
 <p align="center">
   <strong>A full-stack calendar and task manager: natural-language input, four calendar views, a kanban board, and two-way Google Calendar sync.</strong>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#testing">Testing</a> •
-  <a href="#getting-started">Getting Started</a> •
-  <a href="#screenshots">Screenshots</a>
+  <a href="https://taskflow-calendar.vercel.app">Live</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#testing">Testing</a> ·
+  <a href="#getting-started">Getting Started</a>
 </p>
+
+---
 
 <p align="center">
   <a href="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml"><img src="https://github.com/ShreeChaturvedi/taskflow-calendar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -25,57 +25,127 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
 
----
+<p align="center">
+  <a href="https://taskflow-calendar.vercel.app">
+    <img src="docs/screenshots/landing-hero.png" alt="Taskflow Calendar landing page" width="100%">
+  </a>
+</p>
+<p align="center"><sub>The landing page, live at taskflow-calendar.vercel.app.</sub></p>
 
 ## Overview
 
-Taskflow Calendar ships as one Vercel project: an Astro landing page at `/` and a Vite + React 19 SPA at `/app`, backed by exactly two serverless functions and a Postgres database (Neon in production, Docker locally). Type "Email vendor about invoice friday 4pm urgent" and the smart input extracts the date, time, and priority as you type.
-
-- **Two-way Google Calendar sync.** Push notifications via watch channels, incremental pull with full resync on HTTP 410, an outbox for local edits, a 15-minute reconcile workflow, and daily channel renewal.
-- **1,814 tests across eight suites**, from pure parser units to handler contract tests that exercise the real router against a real Postgres. Counts and commands in [Testing](#testing).
-- **Two serverless functions total** (fits the Vercel Hobby limit): a catch-all router dispatching 38 routes, plus a second function for Google sync.
-- **Keyboard-first.** Cmd+K command bar, single-key navigation (T today, D/W/M/L views, N new task).
+Taskflow Calendar is a task manager and a calendar that are the same object: type a task in plain words and it lands on the calendar. Type "Email vendor about invoice friday 4pm urgent" and the smart input pulls out the date, time, and priority as you go, no date picker required. The app ships as one Vercel project: an Astro landing page, a React SPA, exactly two serverless functions, and Postgres. It syncs both ways with Google Calendar, so an edit made in either place shows up in both.
 
 ## Features
 
-- **Calendar**: month, week, day, and list views (FullCalendar), drag and resize events, drag tasks from the list onto the grid to schedule them
-- **Smart input**: a chrono-node + compromise parsing pipeline pulls dates ("next friday 4pm"), priorities ("urgent"), and people out of plain text as you type
-- **Recurring events**: RRULE patterns with per-occurrence exceptions and per-event colors
-- **Kanban board**: drag cards between status columns, per-list board/list/folder views
-- **Conflict detection**: overlap checks across calendars when scheduling
-- **Attachments**: upload files to tasks (Vercel Blob), preview images and PDFs in place
-- **Settings**: profile, preferences, data export, account deletion
-- **Auth**: email/password with refresh-token rotation, Google sign-in, password reset by email (Resend)
-- **Themes**: light and dark, responsive down to phone widths
+<table>
+<tr>
+<td>
+  <img src="docs/screenshots/calendar-week-light.png#gh-light-mode-only" width="480" alt="Calendar week view with events across three calendars and the now-line on today">
+  <img src="docs/screenshots/calendar-week-dark.png#gh-dark-mode-only" width="480" alt="Calendar week view with events across three calendars and the now-line on today">
+</td>
+<td>
+  <strong>Calendar</strong><br>
+  Month, week, day, and list views. Drag to move an event, drag to resize it, or drag a task from the list onto the grid to schedule it.
+</td>
+</tr>
+<tr>
+<td>
+  <strong>Smart input</strong><br>
+  Chrono-node and compromise parse dates ("next friday 4pm"), priorities ("urgent"), and people out of plain text as you type. Matched spans underline live.
+</td>
+<td>
+  <img src="docs/screenshots/smart-input-light.png#gh-light-mode-only" width="480" alt="Smart input parsing a task typed in plain text, with matched spans underlined">
+  <img src="docs/screenshots/smart-input-dark.png#gh-dark-mode-only" width="480" alt="Smart input parsing a task typed in plain text, with matched spans underlined">
+</td>
+</tr>
+<tr>
+<td>
+  <img src="docs/screenshots/kanban-light.png#gh-light-mode-only" width="480" alt="Kanban board with tasks across three status columns">
+  <img src="docs/screenshots/kanban-dark.png#gh-dark-mode-only" width="480" alt="Kanban board with tasks across three status columns">
+</td>
+<td>
+  <strong>Kanban</strong><br>
+  A per-list board with drag-and-drop between status columns (dnd-kit). Each task list switches between folder, list, and board views.
+</td>
+</tr>
+<tr>
+<td>
+  <strong>Command bar</strong><br>
+  Cmd+K opens a command palette from anywhere in the app. Single-key shortcuts jump straight to a view or action:<br><br>
+  <code>Cmd+K</code> command palette<br>
+  <code>T</code> today<br>
+  <code>D</code> <code>W</code> <code>M</code> <code>L</code> switch view<br>
+  <code>N</code> new task<br>
+  <code>Cmd+P</code> profile<br>
+  <code>Cmd+,</code> settings
+</td>
+<td>
+  <img src="docs/screenshots/cmdk-light.png#gh-light-mode-only" width="480" alt="Command palette open over the calendar, showing quick actions">
+  <img src="docs/screenshots/cmdk-dark.png#gh-dark-mode-only" width="480" alt="Command palette open over the calendar, showing quick actions">
+</td>
+</tr>
+<tr>
+<td>
+  <img src="docs/screenshots/google-sync-light.png#gh-light-mode-only" width="480" alt="Google Calendar sync settings showing a connected account">
+  <img src="docs/screenshots/google-sync-dark.png#gh-dark-mode-only" width="480" alt="Google Calendar sync settings showing a connected account">
+</td>
+<td>
+  <strong>Google Calendar sync</strong><br>
+  Two-way sync, connected from Settings → Integrations. Push webhooks and a reconcile job keep both sides converged.
+</td>
+</tr>
+<tr>
+<td>
+  <strong>Folders and tags</strong><br>
+  Every task list has a color. That chip repeats across list rows, board cards, and calendar events, so a list stays recognizable everywhere it appears.
+</td>
+<td>
+  <img src="docs/screenshots/folders-light.png#gh-light-mode-only" width="480" alt="Folder grid of color-coded task lists with open counts">
+  <img src="docs/screenshots/folders-dark.png#gh-dark-mode-only" width="480" alt="Folder grid of color-coded task lists with open counts">
+</td>
+</tr>
+</table>
+
+### Also in the box
+
+- Recurring events with RRULE, per-occurrence exceptions, and per-event colors
+- Conflict detection across calendars when scheduling
+- Attachments on tasks: upload, with image and PDF preview in place
+- Settings: profile, preferences, data export (JSON download), account deletion
+- Refresh-token rotation, Google sign-in, and password reset by email
+- Light and dark themes, responsive down to phone widths
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Vercel["One Vercel project"]
-        Landing["Astro landing (/)"]
-        SPA["React 19 SPA (/app)"]
-        F1["api/[...route].ts<br>catch-all router, 38 routes"]
-        F2["api/google/[...route].ts<br>sync, webhook, cron"]
-    end
-    SPA --> F1
-    SPA --> F2
-    F1 --> PG[("Postgres<br>(Neon)")]
-    F2 --> PG
-    F1 --> Blob["Vercel Blob"]
-    F1 --> Resend["Resend"]
-    F2 --> GCal["Google Calendar API"]
-```
+<p align="center">
+  <img src="docs/diagrams/architecture-light.svg#gh-light-mode-only" width="860" alt="Taskflow Calendar architecture diagram">
+  <img src="docs/diagrams/architecture-dark.svg#gh-dark-mode-only" width="860" alt="Taskflow Calendar architecture diagram">
+</p>
 
-- **Frontend**: Vite 5, React 19, TypeScript 5.8, Tailwind CSS v4 with Radix UI / shadcn primitives. Zustand holds client state, TanStack Query holds server state with optimistic updates and rollback.
-- **API**: two Vercel functions. `api/[...route].ts` matches 38 routes and dispatches to one handler file per endpoint in `api/_handlers/`, each wrapped in the same middleware chain (CORS, request ID, rate limiting, JWT auth, Zod validation). `api/google/[...route].ts` is a separate function for Calendar sync: 8 routes including the webhook receiver and a daily `cron/renew` Vercel cron.
-- **Database**: plain SQL over the `pg` driver, no ORM. 10 migrations in `lib/config/migrations/`, applied transactionally by `npm run db:migrate` and recorded in `schema_migrations`.
-- **Files and email**: Vercel Blob stores attachments, Resend sends password-reset mail.
-- **CI**: GitHub Actions with three jobs. `checks` runs lint, typecheck, the no-DB test suites, and both builds. `backend-db` boots a Postgres 16 service, runs the migrations, then runs the real-database suites (backend workspace, L2, L3, Google sync). `e2e` boots the full stack and runs the Playwright browser suite in parallel. A separate scheduled workflow triggers the production sync reconcile every 15 minutes.
+- **Frontend**: Vite 5, React 19, TypeScript 5.8, Tailwind CSS v4, Radix/shadcn primitives. Zustand for client state, TanStack Query for server state with optimistic updates and rollback.
+- **API**: Two Vercel functions. `api/[...route].ts` dispatches 38 routes to one handler per endpoint in `api/_handlers/`, each behind the same middleware chain (CORS, request ID, rate limiting, JWT auth, Zod validation). `api/google/[...route].ts` handles Calendar sync: 8 routes, including the webhook receiver and a daily `cron/renew` cron.
+- **Database**: Plain SQL over `pg`, no ORM. 10 migrations in `lib/config/migrations/`, applied transactionally by `npm run db:migrate`, recorded in `schema_migrations`.
+- **Files and email**: Vercel Blob for attachments, Resend for password-reset mail.
+- **CI**: GitHub Actions, three jobs. `checks` runs lint, typecheck, the no-DB suites, and both builds. `backend-db` boots Postgres 16, runs migrations, then the real-database suites (backend workspace, L2, L3, Google sync). `e2e` boots the full stack and runs Playwright in parallel. A separate scheduled workflow reconciles production sync every 15 minutes.
+
+<details>
+<summary><strong>How Google sync works</strong></summary>
+
+<p align="center">
+  <img src="docs/diagrams/google-sync-light.svg#gh-light-mode-only" width="860" alt="Google Calendar sync flow">
+  <img src="docs/diagrams/google-sync-dark.svg#gh-dark-mode-only" width="860" alt="Google Calendar sync flow">
+</p>
+
+A watch channel pushes a webhook notification on every remote change, which triggers an incremental pull. If Google returns HTTP 410, sync falls back to a full resync. Local edits queue in an outbox and drain to Google, and both sides converge through a per-field three-way merge, so a local edit and a remote edit to different fields on the same event both survive. The watch channel renews daily, and a GitHub Actions workflow reconciles every connected account every 15 minutes as a backstop.
+
+</details>
+
+### Performance
+
+The entry chunk is 72 KB gzip. FullCalendar, the NLP parser, the emoji picker, and the PDF viewer are code-split and lazy-loaded, so each loads only when a user reaches that feature. Fonts are self-hosted, 133 KB across four woff2 files.
 
 ## Testing
-
-The suite is layered: pure units at the bottom, real infrastructure toward the top. Every number below is from a full run of this tree.
 
 | Layer                | What it exercises                                                                                                                          | Command                                         | Tests |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ----- |
@@ -88,24 +158,7 @@ The suite is layered: pure units at the bottom, real infrastructure toward the t
 | Backend workspace    | auth SQL round-trips, refresh-token rotation, schema and access-control checks                                                             | `npm run test:run --workspace=packages/backend` | 89    |
 | L5 browser E2E       | signup, login, reset-password round trip, task and event CRUD, recurrence, kanban drag, settings, all driven through a real Chromium       | `npm run test:e2e`                              | 21    |
 
-Total: 1,814 cases. The frontend layer includes the L4 optimistic-update suites: mutation hooks run against an MSW server, the request fails, and the test asserts the cache rolls back. The L5 layer drives the built app in a real browser against a real backend and database.
-
-The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` reports 636 passed and 115 skipped without a database. CI's `backend-db` job provides the database and runs the L2, L3, sync, and workspace layers on every push. A separate `e2e` job boots the stack and runs the Playwright suite in parallel, so it never slows the fast checks.
-
-## Performance
-
-Measured on a fresh `npm run build:frontend` (gzip sizes):
-
-| Asset                                | Size (gzip) | When it loads                |
-| ------------------------------------ | ----------- | ---------------------------- |
-| Entry chunk                          | 72 KB       | initial                      |
-| App CSS                              | 24 KB       | initial                      |
-| FullCalendar chunk                   | 77 KB       | with the calendar view       |
-| NLP chunk (chrono-node + compromise) | 149 KB      | when smart parsing is needed |
-| Emoji picker                         | 109 KB      | on first open                |
-| PDF viewer (pdfjs)                   | 112 KB      | on first PDF preview         |
-
-The heavy chunks are code-split through `manualChunks` and `React.lazy`, so none of them sit in the initial load. Fonts are self-hosted woff2 (Sentient, Inter, Spline Sans Mono, latin subsets), 133 KB across four files.
+Total: 1,814 cases. The frontend layer includes the L4 optimistic-update suites, which assert the TanStack Query cache rolls back when a mutation fails, and L5 drives the built app through a real Chromium browser against a real backend and database. The real-database layers gate on env vars (`L2_TEST_DATABASE_URL`, `L3_DATABASE_URL`, `GOOGLE_SYNC_TEST_DB_URL`) and skip cleanly when unset, so `npm run test:backend:run` passes without a database. CI provides the databases: `backend-db` runs L2, L3, sync, and the backend workspace suite, and a separate `e2e` job runs Playwright in parallel so it never slows the fast checks.
 
 ## Getting Started
 
@@ -134,22 +187,22 @@ Copy `.env.example` to `.env.local` and fill in what you need:
 
 ### Scripts
 
-| Command                                                     | Description                                           |
-| ----------------------------------------------------------- | ----------------------------------------------------- |
-| `npm run dev`                                               | Vite (5180) plus the local API (3001)                 |
-| `npm run build`                                             | shared package, landing, SPA, and backend, in order   |
-| `npm run build:frontend` / `build:landing` / `build:shared` | individual builds                                     |
-| `npm run db:migrate` / `db:migrate:status`                  | apply or list SQL migrations                          |
-| `npm run test:frontend:run` / `test:backend:run`            | the no-DB suites                                      |
-| `npm run test:l2` / `test:l3:run`                           | the real-database suites                              |
-| `npm run lint`                                              | ESLint across the repo                                |
-| `npm run docker:up`                                         | the docker-compose services (only Postgres is needed) |
+| Command                                          | Description                                         |
+| ------------------------------------------------ | --------------------------------------------------- |
+| `npm run dev`                                    | Vite (5180) plus the local API (3001)               |
+| `npm run build`                                  | shared package, landing, SPA, and backend, in order |
+| `npm run db:migrate`                             | apply pending SQL migrations, transactionally       |
+| `npm run test:frontend:run` / `test:backend:run` | the no-DB suites                                    |
+| `npm run lint`                                   | ESLint across the repo                              |
+
+The rest of the scripts, including the real-database suites, individual builds, and Docker helpers, are in `package.json`.
 
 ### Deploying
 
 One Vercel project. `vercel.json` chains the build (shared, then landing into `dist/`, then the SPA into `dist/app`), declares the two functions, the daily channel-renewal cron, and the `/app` rewrites. Set `DATABASE_URL` (Neon), `JWT_SECRET`, and whichever optional keys above you use.
 
-## Project Structure
+<details>
+<summary><strong>Project structure</strong></summary>
 
 ```
 taskflow-calendar/
@@ -172,20 +225,10 @@ taskflow-calendar/
 └── .github/workflows/        # CI and the sync reconcile cron
 ```
 
-## Screenshots
+</details>
 
-The landing page:
+## Contributing & License
 
-![Landing page hero, dark](docs/design-research/landing/hero-desktop-1440.png)
+MIT, see [LICENSE](LICENSE). Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
 
-The app:
-
-![Calendar week view, light theme](docs/design-research/surfaces/calendar/calendar-week-light-1440.png)
-
-![Kanban board, dark theme](docs/design-research/surfaces/kanban/board-dark-1440.png)
-
-![Task list, light theme](docs/design-research/surfaces/taskitem/taskitem-mainlist-light-1440.png)
-
-## License
-
-MIT, see [LICENSE](LICENSE). Contributions welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+Built by [Shree Chaturvedi](https://github.com/ShreeChaturvedi).
