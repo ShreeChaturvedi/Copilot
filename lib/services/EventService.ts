@@ -132,6 +132,20 @@ export class EventService extends BaseService<
   }
 
   /**
+   * Serialize a timestamp for binding as a query parameter.
+   *
+   * events.start/end (and createdAt/updatedAt) are `timestamp without time
+   * zone` columns holding UTC wall-clock values. node-pg serializes a JS Date
+   * param using the server process's local UTC offset, which shifts the value
+   * on any non-UTC server and silently breaks range/overlap comparisons (#59).
+   * Binding an ISO-8601 UTC string pins the value to UTC regardless of the
+   * server timezone.
+   */
+  private toTimestampParam(value: Date | string): string {
+    return (value instanceof Date ? value : new Date(value)).toISOString();
+  }
+
+  /**
    * Override create to satisfy required relations (user, calendar)
    */
   async create(
@@ -150,8 +164,8 @@ export class EventService extends BaseService<
         [
           data.title.trim(),
           data.description?.trim() || null,
-          data.start,
-          data.end,
+          this.toTimestampParam(data.start),
+          this.toTimestampParam(data.end),
           data.allDay ?? false,
           data.location?.trim() || null,
           data.notes?.trim() || null,
@@ -204,11 +218,11 @@ export class EventService extends BaseService<
     // entirely outside the range).
     const dateClauses: string[] = [];
     if (filters.start) {
-      params.push(filters.start);
+      params.push(this.toTimestampParam(filters.start));
       dateClauses.push('"end" >= $' + params.length);
     }
     if (filters.end) {
-      params.push(filters.end);
+      params.push(this.toTimestampParam(filters.end));
       dateClauses.push('start <= $' + params.length);
     }
     if (dateClauses.length) {
@@ -286,11 +300,7 @@ export class EventService extends BaseService<
         out.push(event);
         continue;
       }
-      const occurrences = this.generateOccurrences(
-        event,
-        rangeStart,
-        rangeEnd
-      );
+      const occurrences = this.generateOccurrences(event, rangeStart, rangeEnd);
       out.push(...occurrences);
     }
     return out;
@@ -321,7 +331,11 @@ export class EventService extends BaseService<
 
     let occStarts: Date[];
     try {
-      occStarts = rule.between(new Date(windowStart), new Date(windowEnd), true);
+      occStarts = rule.between(
+        new Date(windowStart),
+        new Date(windowEnd),
+        true
+      );
     } catch {
       return [master];
     }
@@ -497,14 +511,11 @@ export class EventService extends BaseService<
       sets.push(`description = $${params.length}`);
     }
     if (data.start !== undefined) {
-      const d =
-        typeof data.start === 'string' ? new Date(data.start) : data.start;
-      params.push(d);
+      params.push(this.toTimestampParam(data.start));
       sets.push(`start = $${params.length}`);
     }
     if (data.end !== undefined) {
-      const d = typeof data.end === 'string' ? new Date(data.end) : data.end;
-      params.push(d);
+      params.push(this.toTimestampParam(data.end));
       sets.push(`"end" = $${params.length}`);
     }
     if (data.allDay !== undefined) {
@@ -536,7 +547,7 @@ export class EventService extends BaseService<
       sets.push(`"calendarId" = $${params.length}`);
     }
 
-    params.push(new Date());
+    params.push(this.toTimestampParam(new Date()));
     sets.push(`"updatedAt" = $${params.length}`);
     params.push(id);
 
@@ -600,7 +611,7 @@ export class EventService extends BaseService<
          JOIN calendars c ON c.id = e."calendarId"
          WHERE e."userId" = $1 AND (e.recurrence IS NOT NULL OR e.start >= $2) AND c."isVisible" = true
          ORDER BY e.start ASC`,
-        [context.userId!, now],
+        [context.userId!, this.toTimestampParam(now)],
         this.db
       );
       const base = res.rows.map((row) => this.transformEntity(row));
@@ -665,10 +676,14 @@ export class EventService extends BaseService<
 
       // Pull non-recurring events that overlap the window, plus every recurring
       // master (expanded below) so occurrences inside the window are considered.
-      const params: Array<string | Date> = [
+      // Bind the window bounds as ISO strings, not Date objects: the columns are
+      // `timestamp without time zone` and node-pg would otherwise serialize the
+      // Dates with the server's local offset, shifting the window on a non-UTC
+      // server and dropping real overlaps (#59).
+      const params: string[] = [
         context.userId!,
-        rangeEnd,
-        rangeStart,
+        this.toTimestampParam(rangeEnd),
+        this.toTimestampParam(rangeStart),
       ];
       const and: string[] = [
         'e."userId" = $1',
@@ -716,25 +731,24 @@ export class EventService extends BaseService<
         }
       }
 
-      const conflicts: EventConflict[] = candidates.map(
-        (conflictEvent) => {
-          const overlapStart = new Date(
-            Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
-          );
-          const overlapEnd = new Date(
-            Math.min(rangeEnd.getTime(), conflictEvent.end.getTime())
-          );
-          const overlapDuration = Math.round(
-            (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
-          );
+      const conflicts: EventConflict[] = candidates.map((conflictEvent) => {
+        const overlapStart = new Date(
+          Math.max(rangeStart.getTime(), conflictEvent.start.getTime())
+        );
+        const overlapEnd = new Date(
+          Math.min(rangeEnd.getTime(), conflictEvent.end.getTime())
+        );
+        const overlapDuration = Math.round(
+          (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60)
+        );
 
-          return {
-            conflictingEvent: conflictEvent,
-            overlapStart,
-            overlapEnd,
-            overlapDuration,
-          };
-        });
+        return {
+          conflictingEvent: conflictEvent,
+          overlapStart,
+          overlapEnd,
+          overlapDuration,
+        };
+      });
 
       this.log(
         'getConflicts:success',
