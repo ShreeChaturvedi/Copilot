@@ -65,8 +65,6 @@ export function authenticateJWT(): Middleware {
         name: decoded.email.split('@')[0], // Extract name from email as fallback
         role: decoded.role,
       };
-
-      next();
     } catch (error) {
       if (error instanceof Error) {
         if (error.message === 'TOKEN_EXPIRED') {
@@ -77,6 +75,12 @@ export function authenticateJWT(): Middleware {
       }
       throw new UnauthorizedError('Authentication failed');
     }
+
+    // next() is returned OUTSIDE the try so a downstream handler error is not
+    // caught and mis-reported as 'Authentication failed', and so the thrown
+    // UnauthorizedError above propagates up the chain to the error handler as a
+    // 401 instead of a dropped rejection (issue #63).
+    return next();
   };
 }
 
@@ -120,7 +124,7 @@ export function optionalAuth(): Middleware {
       // Ignore auth errors for optional auth
     }
 
-    next();
+    return next();
   };
 }
 
@@ -142,7 +146,7 @@ export function devAuth(): Middleware {
         role: ADMIN_ROLE,
       };
     }
-    next();
+    return next();
   };
 }
 
@@ -173,7 +177,7 @@ export function requireRole(role: string): Middleware {
       throw new ForbiddenError(`Requires '${role}' role`);
     }
 
-    next();
+    return next();
   };
 }
 
@@ -199,6 +203,6 @@ export function requireOwnership(
       throw new UnauthorizedError('Access denied');
     }
 
-    next();
+    return next();
   };
 }

@@ -45,7 +45,10 @@ export function corsMiddleware(config: Partial<CorsConfig> = {}) {
 
     // Set CORS headers for all requests
     setCorsHeaders(res, corsConfig, req);
-    next();
+    // Return the promise so a downstream throw (e.g. authenticateJWT's
+    // UnauthorizedError) propagates back up the chain instead of floating
+    // as an unhandled rejection (issue #63).
+    return next();
   };
 }
 

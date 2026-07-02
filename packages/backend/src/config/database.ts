@@ -49,8 +49,19 @@ export async function connectDatabase(): Promise<void> {
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await pool.end();
-  console.log('✅ Backend (SQL) disconnected');
+  // Idempotent: the SIGINT/SIGTERM/beforeExit handlers below all fire-and-forget
+  // this, and tests (L3 adapter) also end the pool explicitly, so pool.end() can
+  // be reached twice. pg rejects the second call ('Called end on pool more than
+  // once'); swallow it so it never becomes an unhandled rejection (mirrors the
+  // API pool's cleanupDatabase).
+  try {
+    await pool.end();
+    console.log('✅ Backend (SQL) disconnected');
+  } catch (error) {
+    if (!(error instanceof Error) || !/more than once/i.test(error.message)) {
+      console.error('❌ Backend (SQL) disconnection failed:', error);
+    }
+  }
 }
 
 export async function checkDatabaseHealth(): Promise<boolean> {

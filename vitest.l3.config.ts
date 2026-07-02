@@ -38,11 +38,6 @@ export default defineConfig({
     // A few flows do real bcrypt (register/login) which is CPU-heavy.
     testTimeout: 30000,
     hookTimeout: 30000,
-    // The middleware-bug pin (routing.l3.test.ts) DELIBERATELY provokes the
-    // dropped-UnauthorizedError unhandled rejection that is the bug itself, so
-    // the run must not fail on it. Remove together with that pinned test once
-    // the middleware chain propagates errors.
-    dangerouslyIgnoreUnhandledErrors: true,
     env: {
       NODE_ENV: 'production',
       DATABASE_URL: DB_URL,

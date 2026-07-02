@@ -37,10 +37,13 @@ class MemoryStore {
     this.store.set(key, value);
   }
 
-  increment(key: string, windowMs: number): { count: number; resetTime: number } {
+  increment(
+    key: string,
+    windowMs: number
+  ): { count: number; resetTime: number } {
     const now = Date.now();
     const entry = this.get(key);
-    
+
     if (!entry) {
       const newEntry = { count: 1, resetTime: now + windowMs };
       this.set(key, newEntry);
@@ -100,19 +103,32 @@ const defaultConfig: RateLimitConfig = {
 export function rateLimit(config: Partial<RateLimitConfig> = {}) {
   const options = { ...defaultConfig, ...config };
 
-  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => {
+  return async (
+    req: AuthenticatedRequest,
+    res: VercelResponse,
+    next: () => void
+  ) => {
     const key = options.keyGenerator!(req);
     const entry = store.increment(key, options.windowMs);
 
     // Set rate limit headers
     res.setHeader('X-RateLimit-Limit', options.max.toString());
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, options.max - entry.count).toString());
-    res.setHeader('X-RateLimit-Reset', Math.ceil(entry.resetTime / 1000).toString());
+    res.setHeader(
+      'X-RateLimit-Remaining',
+      Math.max(0, options.max - entry.count).toString()
+    );
+    res.setHeader(
+      'X-RateLimit-Reset',
+      Math.ceil(entry.resetTime / 1000).toString()
+    );
 
     // Check if rate limit exceeded
     if (entry.count > options.max) {
-      res.setHeader('Retry-After', Math.ceil((entry.resetTime - Date.now()) / 1000).toString());
-      
+      res.setHeader(
+        'Retry-After',
+        Math.ceil((entry.resetTime - Date.now()) / 1000).toString()
+      );
+
       const error = new RateLimitError(options.message);
       res.status(error.statusCode).json({
         success: false,
@@ -125,7 +141,9 @@ export function rateLimit(config: Partial<RateLimitConfig> = {}) {
       return;
     }
 
-    next();
+    // Await/return the downstream chain so a thrown auth error surfaces as a
+    // response instead of a dropped rejection (issue #63).
+    return next();
   };
 }
 
@@ -137,19 +155,19 @@ function getClientIP(req: AuthenticatedRequest): string | undefined {
   const forwarded = req.headers['x-forwarded-for'];
   const realIP = req.headers['x-real-ip'];
   const cfConnectingIP = req.headers['cf-connecting-ip'];
-  
+
   if (typeof forwarded === 'string') {
     return forwarded.split(',')[0].trim();
   }
-  
+
   if (typeof realIP === 'string') {
     return realIP;
   }
-  
+
   if (typeof cfConnectingIP === 'string') {
     return cfConnectingIP;
   }
-  
+
   return req.connection?.remoteAddress || req.socket?.remoteAddress;
 }
 
