@@ -6,7 +6,7 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "functions": {
-    "api/**/*.ts": {
+    "api/*.ts": {
       "runtime": "@vercel/node@5.3.11"
     }
   },
