@@ -21,6 +21,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/google/:path*",
+      "destination": "/api/google/[...route]"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/[...route]"
+    },
+    {
       "source": "/app",
       "destination": "/app/index.html"
     },
