@@ -7,6 +7,11 @@ import { type CalendarEvent } from "@shared/types";
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { groupItemsByDate, filterUpcomingItems } from '@/utils/dateGrouping';
+import { expandOccurrences } from '@/utils/recurrence';
+
+// How far ahead the sidebar expands recurring series to surface their next
+// occurrences, in days.
+const UPCOMING_EXPANSION_DAYS = 90;
 
 interface EventOverviewProps {
   maxEvents?: number;
@@ -36,7 +41,29 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
     const visible = allEvents.filter((event) =>
       visibleCalendarNames.includes(event.calendarName || '')
     );
-    return filterUpcomingItems(visible, (e: CalendarEvent) => new Date(e.start));
+    // Expand recurring series into their occurrences within the window so a
+    // series whose master start is in the past still shows upcoming instances
+    // (#40). Non-recurring events pass through unchanged.
+    const now = new Date();
+    const windowEnd = new Date(
+      now.getTime() + UPCOMING_EXPANSION_DAYS * 24 * 60 * 60 * 1000
+    );
+    const expanded: CalendarEvent[] = [];
+    for (const event of visible) {
+      if (event.recurrence) {
+        for (const occ of expandOccurrences(event, now, windowEnd)) {
+          expanded.push({
+            ...event,
+            id: `${event.id}::${occ.start.toISOString()}`,
+            start: occ.start,
+            end: occ.end,
+          });
+        }
+      } else {
+        expanded.push(event);
+      }
+    }
+    return filterUpcomingItems(expanded, (e: CalendarEvent) => new Date(e.start));
   }, [allEvents, visibleCalendarNames]);
 
   // Apply display limit for the overview list

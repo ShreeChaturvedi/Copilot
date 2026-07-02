@@ -204,6 +204,50 @@ describe('EventService', () => {
       );
       expect(result).toHaveLength(1);
     });
+
+    it('expands recurring series so upcoming occurrences appear (#40)', async () => {
+      const now = new Date();
+      // Master start 30 days in the past: the base row is never "upcoming",
+      // but the weekly series recurs forward and must surface occurrences.
+      const pastStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const pastEnd = new Date(pastStart.getTime() + 60 * 60 * 1000);
+      const weekly = {
+        id: 'event-weekly-upcoming',
+        userId: mockUserId,
+        calendarId: testCalendars.primary.id,
+        title: 'Weekly sync',
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
+        recurrence: 'RRULE:FREQ=WEEKLY',
+        color: null,
+        exceptions: [],
+        start: pastStart,
+        end: pastEnd,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const calendars = calendarsForEvents([weekly]);
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('from events e')) {
+          return createQueryResult([weekly]);
+        }
+        if (lower.includes('from calendars')) {
+          return createQueryResult(calendars);
+        }
+        return createQueryResult([]);
+      });
+
+      const result = await eventService.findUpcoming(10, mockContext);
+
+      expect(result.length).toBeGreaterThan(0);
+      // Every surfaced item is a future occurrence, not the past master row.
+      expect(result.every((e) => e.start.getTime() >= now.getTime())).toBe(true);
+      expect(result.some((e) => e.isRecurringInstance === true)).toBe(true);
+    });
   });
 
   describe('findById', () => {

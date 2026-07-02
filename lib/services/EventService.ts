@@ -17,6 +17,10 @@ import type { RRule, RRuleSet } from 'rrule';
 
 const { rrulestr } = rrulePkg as unknown as typeof import('rrule');
 
+// How far ahead findUpcoming expands recurring series when surfacing the next
+// occurrences of a list, in days.
+const UPCOMING_EXPANSION_DAYS = 90;
+
 /**
  * Event entity interface extending base
  */
@@ -582,20 +586,44 @@ export class EventService extends BaseService<
       this.log('findUpcoming', { limit }, context);
 
       const now = new Date();
+      const windowEnd = new Date(
+        now.getTime() + UPCOMING_EXPANSION_DAYS * 24 * 60 * 60 * 1000
+      );
+      // Include recurring masters regardless of their stored start so their
+      // future occurrences can be expanded below: a series whose master start
+      // is in the past still recurs forward. Non-recurring events keep the
+      // start >= now filter. The LIMIT is applied after expansion in JS since
+      // one master can yield several upcoming occurrences.
       const res = await query<EventEntity>(
         `SELECT e.*
          FROM events e
          JOIN calendars c ON c.id = e."calendarId"
-         WHERE e."userId" = $1 AND e.start >= $2 AND c."isVisible" = true
-         ORDER BY e.start ASC
-         LIMIT $3`,
-        [context.userId!, now, limit],
+         WHERE e."userId" = $1 AND (e.recurrence IS NOT NULL OR e.start >= $2) AND c."isVisible" = true
+         ORDER BY e.start ASC`,
+        [context.userId!, now],
         this.db
       );
       const base = res.rows.map((row) => this.transformEntity(row));
       const enriched = await this.enrichEntities(base, context);
-      this.log('findUpcoming:success', { count: enriched.length }, context);
-      return enriched;
+      // Expand recurring masters into their upcoming occurrences within the
+      // window; non-recurring events pass through (SQL already bounded them).
+      const upcoming: EventEntity[] = [];
+      for (const event of enriched) {
+        if (event.recurrence) {
+          const occurrences = this.generateOccurrences(
+            event,
+            now,
+            windowEnd
+          ).filter((occ) => occ.start.getTime() >= now.getTime());
+          upcoming.push(...occurrences);
+        } else {
+          upcoming.push(event);
+        }
+      }
+      upcoming.sort((a, b) => a.start.getTime() - b.start.getTime());
+      const limited = upcoming.slice(0, limit);
+      this.log('findUpcoming:success', { count: limited.length }, context);
+      return limited;
     } catch (error) {
       this.log('findUpcoming:error', { error: error.message, limit }, context);
       throw error;
