@@ -1,0 +1,132 @@
+---
+// §6.4 — "Plan without leaving the keys." Every keycap here is a real
+// shipped shortcut (src/hooks/useGlobalShortcuts.ts): Cmd/Ctrl+K command
+// bar, T today, D/W/M/L views, N new task. Keycaps press themselves once,
+// IO-gated.
+const keys = [
+  { cap: '⌘K', label: 'Command bar', wide: true },
+  { cap: 'T', label: 'Today' },
+  { cap: 'D', label: 'Day' },
+  { cap: 'W', label: 'Week' },
+  { cap: 'M', label: 'Month' },
+  { cap: 'L', label: 'List' },
+  { cap: 'N', label: 'New task' },
+];
+---
+
+<section class="section" id="keys">
+  <div class="container">
+    <div class="copy" data-reveal>
+      <h2 class="display-section">Plan without leaving the keys.</h2>
+      <p class="body-copy">
+        The whole calendar answers the keyboard. Jump to today, switch views,
+        start a task, or open the command bar and type where it should go.
+      </p>
+    </div>
+    <ul class="cluster" id="keycluster" data-reveal>
+      {
+        keys.map((k) => (
+          <li class="keyunit">
+            <kbd class:list={['keycap', 'mono', { wide: k.wide }]}>{k.cap}</kbd>
+            <span class="keylabel">{k.label}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<script is:inline>
+  // One pass of self-presses, IO-gated, 160ms down per key.
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var cluster = document.getElementById('keycluster');
+    if (!cluster || !('IntersectionObserver' in window)) return;
+    var caps = cluster.querySelectorAll('.keycap');
+    var io = new IntersectionObserver(
+      function (entries) {
+        if (!entries.some(function (e) { return e.isIntersecting; })) return;
+        io.disconnect();
+        caps.forEach(function (cap, i) {
+          setTimeout(function () {
+            cap.classList.add('pressed');
+            setTimeout(function () {
+              cap.classList.remove('pressed');
+            }, 160);
+          }, 300 + i * 190);
+        });
+      },
+      { threshold: 0.6 }
+    );
+    io.observe(cluster);
+  })();
+</script>
+
+<style>
+  .copy .body-copy {
+    margin-top: 16px;
+    max-width: 52ch;
+  }
+
+  .cluster {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    margin: 48px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .keyunit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* machined keycap (§2.6): one implied light source, real key travel */
+  .keycap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    height: 52px;
+    padding: 0 14px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow:
+      var(--edge-machined),
+      inset 0 -2px 0 rgb(0 0 0 / 0.35),
+      var(--shadow-2);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    transition:
+      transform var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-1) var(--ease-out);
+  }
+
+  .keycap.pressed {
+    transform: translateY(2px);
+    box-shadow:
+      var(--edge-machined),
+      inset 0 -1px 0 rgb(0 0 0 / 0.35);
+  }
+
+  .keylabel {
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+
+  @media (max-width: 640px) {
+    .cluster {
+      gap: 18px;
+    }
+
+    .keycap {
+      min-width: 46px;
+      height: 46px;
+      font-size: 14px;
+    }
+  }
+</style>

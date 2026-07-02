@@ -7,15 +7,18 @@
     "node": "22.x"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "landing"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
     "dev:vite": "vite",
     "dev:api": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/react_calendar_dev npx tsx scripts/dev-server.ts",
     "dev:vercel": "vercel dev",
-    "build": "npm run build:shared && npm run build:frontend && npm run build:backend",
+    "build": "npm run build:shared && npm run build:landing && npm run build:frontend && npm run build:backend",
     "build:shared": "npm run build --workspace=packages/shared",
+    "build:landing": "npm run build --workspace=landing",
+    "dev:landing": "npm run dev --workspace=landing",
     "build:frontend": "vite build",
     "build:backend": "npm run build --workspace=packages/backend",
     "lint": "eslint . --ext .ts,.tsx",

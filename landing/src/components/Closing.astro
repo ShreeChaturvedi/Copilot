@@ -1,0 +1,163 @@
+---
+// §6.7 — back to the void. The waiting chip from the hero margin finally
+// settles into a Saturday slot above the CTA, then the page asks once.
+---
+
+<section class="section closing" id="closing">
+  <div class="container closing-inner">
+    <div
+      class="slot-frame"
+      role="img"
+      aria-label="A Saturday column with the task Plan the trip settled at 10:00."
+    >
+      <div class="s-head"><span class="s-dow">SAT</span></div>
+      <div class="s-body">
+        <span class="s-hour mono" style="top:25%">10 AM</span>
+        <span class="s-hour mono" style="top:75%">11 AM</span>
+        <div
+          class="chip s-chip flashable"
+          id="closing-chip"
+          style="--chip-c: var(--hue-violet); top:25%; height:37.5%"
+        >
+          <span class="c-t mono">10:00</span>
+          <span class="c-ti">Plan the trip</span>
+        </div>
+      </div>
+    </div>
+    <h2 class="display-section" data-reveal>
+      One task is still waiting. Give it a time.
+    </h2>
+    <div class="cta-stack" data-reveal>
+      <a class="btn btn-primary" href="/app/signup">Start free</a>
+      <p class="mono-line">NO CARD REQUIRED</p>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // The last settle: the idler comes in from the margin and lands, once.
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var chip = document.getElementById('closing-chip');
+    if (!chip || !('IntersectionObserver' in window)) return;
+    chip.classList.add('offstage');
+    var io = new IntersectionObserver(
+      function (entries) {
+        if (!entries.some(function (e) { return e.isIntersecting; })) return;
+        io.disconnect();
+        chip.style.transition = 'transform 700ms cubic-bezier(0.16,1,0.3,1) 200ms';
+        chip.classList.remove('offstage');
+        chip.addEventListener('transitionend', function done(e) {
+          if (e.propertyName !== 'transform') return;
+          chip.removeEventListener('transitionend', done);
+          chip.style.transition = '';
+          chip.classList.add('is-flash');
+        });
+      },
+      { threshold: 0.6 }
+    );
+    io.observe(chip.closest('.slot-frame'));
+  })();
+</script>
+
+<style>
+  .closing {
+    /* the offstage chip travels in from outside the frame; never let it
+       widen the document */
+    overflow: hidden;
+  }
+
+  .closing-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 36px;
+  }
+
+  .closing .display-section {
+    max-width: 430px;
+  }
+
+  .slot-frame {
+    width: 230px;
+    background: var(--surface-1);
+    border-radius: 10px;
+    box-shadow: var(--edge-machined), var(--shadow-2);
+    overflow: visible;
+  }
+
+  .s-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .s-dow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+
+  .s-body {
+    position: relative;
+    height: 128px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(25% - 1px),
+      var(--hairline) calc(25% - 1px),
+      var(--hairline) 25%
+    );
+  }
+
+  .s-hour {
+    position: absolute;
+    left: 8px;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--ink-muted);
+  }
+
+  .s-chip {
+    position: absolute;
+    left: 48px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+    padding: 3px 7px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .s-chip.offstage {
+    transform: translate(150px, -90px) rotate(9deg);
+  }
+
+  .c-t {
+    font-size: 11px;
+    padding-top: 1.5px;
+  }
+
+  .c-ti {
+    font-size: 12px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  .cta-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .cta-stack .mono-line {
+    margin: 0;
+  }
+</style>

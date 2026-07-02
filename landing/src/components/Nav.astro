@@ -1,0 +1,135 @@
+---
+// §6.0 — 64px nav: wordmark Inter 600 14, muted 13px links, ghost Sign in,
+// aqua Start free. Progressive blur ladder hangs under the sticky bar.
+---
+
+<header class="nav">
+  <nav class="container nav-row" aria-label="Main">
+    <a class="wordmark" href="/">
+      <svg
+        class="mark"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect x="0.5" y="0.5" width="15" height="15" rx="4" fill="var(--surface-2)" stroke="var(--hairline-strong)"></rect>
+        <rect x="3" y="7" width="10" height="4" rx="1.5" fill="var(--aqua)"></rect>
+        <rect x="3" y="3.5" width="6" height="2" rx="1" fill="var(--ink-muted)"></rect>
+      </svg>
+      Taskflow
+    </a>
+    <div class="nav-links">
+      <a href="#type-it">How it works</a>
+      <a href="#keys">Shortcuts</a>
+    </div>
+    <div class="nav-actions">
+      <a class="btn btn-ghost" href="/app/login">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="/app/signup">Start free</a>
+    </div>
+  </nav>
+  <div class="blur-ladder" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in oklab, var(--void) 78%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .nav-row {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  /* the ladder: content melts under the bar instead of hitting a hard edge */
+  .blur-ladder {
+    position: absolute;
+    inset: 64px 0 auto 0;
+    height: 36px;
+    pointer-events: none;
+  }
+
+  .blur-ladder span {
+    position: absolute;
+    left: 0;
+    right: 0;
+  }
+
+  .blur-ladder span:nth-child(1) {
+    top: 0;
+    height: 12px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    mask-image: linear-gradient(to bottom, black, transparent);
+  }
+
+  .blur-ladder span:nth-child(2) {
+    top: 12px;
+    height: 12px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    mask-image: linear-gradient(to bottom, black, transparent);
+  }
+
+  .blur-ladder span:nth-child(3) {
+    top: 24px;
+    height: 12px;
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+    mask-image: linear-gradient(to bottom, black, transparent);
+  }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+    margin-right: auto;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 20px;
+  }
+
+  .nav-links a {
+    font-size: 13px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    transition: color var(--dur-2) var(--ease-out);
+  }
+
+  .nav-links a:hover {
+    color: var(--ink);
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .btn-sm {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+
+  @media (max-width: 720px) {
+    .nav-links {
+      display: none;
+    }
+  }
+</style>

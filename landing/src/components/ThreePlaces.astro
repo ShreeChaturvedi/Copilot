@@ -1,0 +1,348 @@
+---
+// §6.3 — "One task, three places": the list row, the board card, and the
+// calendar chip are visibly the same object. On entry, one chip FLIPs
+// list -> board -> grid in 320ms hops with the |-- 90 MIN --| dimension
+// annotation riding along.
+---
+
+<section class="section" id="places">
+  <div class="container">
+    <div class="copy" data-reveal>
+      <h2 class="display-section">One task, three places.</h2>
+      <p class="body-copy">
+        Schedule a task once. The list row, the board card, and the calendar
+        chip stay one object: same color, same radius, same mono time.
+      </p>
+    </div>
+    <div
+      class="stage"
+      id="places-stage"
+      role="img"
+      aria-label="The task Interview loop, Thursday 10:30, 90 minutes, shown three ways: as a list row, as a board card, and as a chip on the week grid. All three share the same magenta color and the same time."
+      data-reveal
+    >
+      <div class="panel">
+        <span class="panel-label">LIST</span>
+        <div class="obj-list" id="tp-list">
+          <span class="ring" style="--chip-c: var(--hue-magenta)"></span>
+          <span class="row-title">Interview loop</span>
+          <span class="due chip mono" style="--chip-c: var(--hue-magenta)"
+            >THU 10:30 &middot; 90 MIN</span
+          >
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">BOARD</span>
+        <div class="obj-card" id="tp-board" style="--chip-c: var(--hue-magenta)">
+          <span class="card-title">Interview loop</span>
+          <span class="card-meta mono">THU 10:30 &middot; 90 MIN</span>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">WEEK</span>
+        <div class="obj-grid">
+          <div class="g-head"><span class="panel-label today">THU</span></div>
+          <div class="g-body">
+            <span class="g-hour mono" style="top:16.6%">10 AM</span>
+            <span class="g-hour mono" style="top:50%">11 AM</span>
+            <span class="g-hour mono" style="top:83.3%">12 PM</span>
+            <div
+              class="chip g-chip"
+              id="tp-grid"
+              style="--chip-c: var(--hue-magenta); top:25%; height:50%"
+            >
+              <span class="c-t mono">10:30</span>
+              <span class="c-ti">Interview loop</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="traveler chip flashable" id="tp-traveler" aria-hidden="true" style="--chip-c: var(--hue-magenta)">
+        <span class="c-t mono">10:30</span>
+        <span class="c-ti">Interview loop</span>
+        <span class="dim mono" id="tp-dim">
+          <span class="dim-line"></span>90 MIN<span class="dim-line"></span>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // The hop: one traveling chip FLIPs across the three anchors, 320ms per
+  // hop on the brand curve, dimension annotation visible mid-flight,
+  // rim flash on the final land. Runs once, IO-gated, transform-only.
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var stage = document.getElementById('places-stage');
+    var traveler = document.getElementById('tp-traveler');
+    var dim = document.getElementById('tp-dim');
+    if (!stage || !traveler || !('IntersectionObserver' in window)) return;
+
+    function centerOn(el) {
+      var s = stage.getBoundingClientRect();
+      var r = el.getBoundingClientRect();
+      var t = traveler.getBoundingClientRect();
+      var x = r.left - s.left + r.width / 2 - t.width / 2;
+      var y = r.top - s.top + r.height / 2 - t.height / 2;
+      return 'translate(' + x + 'px,' + y + 'px)';
+    }
+
+    function run() {
+      var list = document.getElementById('tp-list');
+      var board = document.getElementById('tp-board');
+      var grid = document.getElementById('tp-grid');
+      traveler.style.transform = centerOn(list);
+      traveler.classList.add('is-live');
+      setTimeout(function () {
+        traveler.style.transition =
+          'transform 320ms cubic-bezier(0.16,1,0.3,1)';
+        dim.classList.add('on');
+        traveler.style.transform = centerOn(board);
+      }, 450);
+      setTimeout(function () {
+        traveler.style.transform = centerOn(grid);
+      }, 1220);
+      setTimeout(function () {
+        dim.classList.remove('on');
+        traveler.classList.add('is-flash');
+      }, 1560);
+      setTimeout(function () {
+        traveler.classList.remove('is-live');
+      }, 2100);
+    }
+
+    var io = new IntersectionObserver(
+      function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) {
+          io.disconnect();
+          run();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    io.observe(stage);
+  })();
+</script>
+
+<style>
+  .copy .body-copy {
+    margin-top: 16px;
+    max-width: 52ch;
+  }
+
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+    align-items: end;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .panel-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+
+  .panel-label.today {
+    color: var(--aqua);
+  }
+
+  /* list row (§4.1 anatomy, at rest) */
+  .obj-list {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface-1);
+    box-shadow: var(--edge-machined);
+  }
+
+  .ring {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    border-radius: 999px;
+    border: 1.5px solid var(--chip-c);
+  }
+
+  .row-title {
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .due {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  /* board card (§4.3): same object, 3px bar */
+  .obj-card {
+    background: var(--surface-1);
+    border-radius: 8px;
+    box-shadow: var(--edge-machined);
+    border-left: 3px solid var(--chip-c);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .card-meta {
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  /* week fragment: same object, placed */
+  .obj-grid {
+    background: var(--surface-1);
+    border-radius: 10px;
+    box-shadow: var(--edge-machined), var(--shadow-1);
+  }
+
+  .g-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .g-body {
+    position: relative;
+    height: 150px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(33.333% - 1px),
+      var(--hairline) calc(33.333% - 1px),
+      var(--hairline) 33.333%
+    );
+  }
+
+  .g-hour {
+    position: absolute;
+    left: 8px;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--ink-muted);
+  }
+
+  .g-chip {
+    position: absolute;
+    left: 48px;
+    right: 8px;
+    display: flex;
+    gap: 5px;
+    padding: 3px 7px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .c-t {
+    font-size: 11px;
+    padding-top: 1.5px;
+  }
+
+  .c-ti {
+    font-size: 12px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  /* the traveler: hidden until the IO timeline arms it */
+  .traveler {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    padding: 4px 9px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .traveler.is-live {
+    opacity: 1;
+    transition: opacity 200ms var(--ease-out);
+  }
+
+  /* dimension annotation (§4.4): the data model drawn under the chip */
+  .dim {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--aqua);
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out);
+  }
+
+  .dim.on {
+    opacity: 1;
+  }
+
+  .dim-line {
+    flex: 1;
+    height: 1px;
+    background: var(--aqua);
+    position: relative;
+  }
+
+  /* end ticks: |-- on the left line, --| on the right line */
+  .dim-line::before {
+    content: '';
+    position: absolute;
+    top: -2.5px;
+    width: 1px;
+    height: 6px;
+    background: var(--aqua);
+  }
+
+  .dim-line:first-of-type::before {
+    left: 0;
+  }
+
+  .dim-line:last-of-type::before {
+    right: 0;
+  }
+
+  @media (max-width: 860px) {
+    .stage {
+      grid-template-columns: 1fr;
+      max-width: 380px;
+      align-items: stretch;
+    }
+  }
+</style>
