@@ -1,0 +1,197 @@
+/* Cmd+K command bar — the switch-on (design-brief §4.6, KEYLIGHT vector).
+   The room goes dark (void scrim + the app's ONE sanctioned heavy blur) and
+   the brightest surface appears, carrying the only always-on aqua rim. */
+
+.tf-cmdk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: color-mix(in oklab, var(--void) 60%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.tf-cmdk-scrim[data-state='open'] {
+  animation: tf-cmdk-fade-in 200ms var(--ease-out);
+}
+.tf-cmdk-scrim[data-state='closed'] {
+  animation: tf-cmdk-fade-out 100ms var(--ease-out);
+}
+
+.tf-cmdk-panel {
+  position: fixed;
+  z-index: 50;
+  top: 20vh;
+  left: 50%;
+  translate: -50% 0; /* centering lives on `translate` so keyframes own `transform` */
+  width: min(560px, calc(100vw - 32px));
+  border-radius: 12px;
+  background: var(--surface-3);
+  /* machined edge + the only always-on aqua rim in the app + depth */
+  box-shadow:
+    var(--edge-machined),
+    0 0 0 1px var(--aqua-rim),
+    var(--shadow-3);
+  overflow: hidden;
+  outline: none;
+}
+.tf-cmdk-panel[data-state='open'] {
+  animation: tf-cmdk-panel-in 200ms var(--ease-settle);
+}
+.tf-cmdk-panel[data-state='closed'] {
+  animation: tf-cmdk-fade-out 100ms var(--ease-out);
+}
+
+/* Input row: 15px Inter over a hairline */
+.tf-cmdk [cmdk-input-wrapper] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.tf-cmdk [cmdk-input-wrapper] > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+}
+.tf-cmdk [cmdk-input] {
+  height: 52px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 15px;
+  color: var(--ink);
+}
+.tf-cmdk [cmdk-input]::placeholder {
+  color: var(--faint);
+}
+
+.tf-cmdk [cmdk-list] {
+  /* Tall enough to show the whole command set at rest (no half-clipped row) */
+  max-height: min(524px, 64vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px 8px;
+  scroll-padding-block: 8px;
+}
+
+/* Group labels: 11px caps */
+.tf-cmdk [cmdk-group-heading] {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Rows: 36px / 13px, 16px icons. Result navigation is NOT animated:
+   no transitions here, selection snaps. */
+.tf-cmdk [cmdk-item] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: default;
+}
+.tf-cmdk [cmdk-item] > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+}
+.tf-cmdk [cmdk-item][data-selected='true'] {
+  background: var(--aqua-film-08);
+  box-shadow: inset 2px 0 0 var(--aqua); /* the selected left bar (§4.1) */
+  color: var(--ink);
+}
+.tf-cmdk [cmdk-item][data-selected='true'] > svg {
+  color: var(--ink-2);
+}
+
+.tf-cmdk-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right-aligned keycap cluster */
+.tf-cmdk-keys {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex: none;
+}
+
+/* Place offer: the resolved date is a time-numeral, so mono, and it is about
+   to be placed, so aqua (§2.3: aqua means live/placed) */
+.tf-cmdk-place .tf-cmdk-label {
+  flex: 0 1 auto;
+}
+.tf-cmdk-place-date {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--aqua);
+  white-space: nowrap;
+}
+
+.tf-cmdk [cmdk-empty] {
+  padding: 24px 16px 28px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.tf-cmdk-empty-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+@keyframes tf-cmdk-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tf-cmdk-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes tf-cmdk-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Motion grammar §5: reduced motion collapses travel to 120ms crossfades */
+@media (prefers-reduced-motion: reduce) {
+  .tf-cmdk-scrim[data-state='open'],
+  .tf-cmdk-panel[data-state='open'] {
+    animation: tf-cmdk-fade-in 120ms ease-out;
+  }
+  .tf-cmdk-scrim[data-state='closed'],
+  .tf-cmdk-panel[data-state='closed'] {
+    animation: tf-cmdk-fade-out 120ms ease-out;
+  }
+}
