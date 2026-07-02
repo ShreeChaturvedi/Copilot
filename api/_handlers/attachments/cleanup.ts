@@ -32,10 +32,12 @@ export default createMethodHandler({
         );
       }
 
-      const deletedCount = await attachmentService.cleanupOrphanedAttachments({
-        userId,
-        requestId: req.headers['x-request-id'] as string,
-      });
+      const { deletedCount } = await attachmentService.cleanupOrphanedAttachments(
+        {
+          userId,
+          requestId: req.headers['x-request-id'] as string,
+        }
+      );
 
       sendSuccess(res, {
         cleaned: true,
