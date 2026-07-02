@@ -1,0 +1,583 @@
+---
+// §6.1 — Hero: Sentient H1, one-sentence sub, Start planning CTA, mono
+// honesty line with the REAL local time, then the week-grid slab where
+// ~20 chips perform THE settle (§5 landing FLIP spec).
+
+const DAY_START = 8 * 60; // grid runs 08:00-18:00
+const DAY_SPAN = 10 * 60;
+
+type ChipDef = {
+  day: number; // 0 = MON
+  start: string;
+  dur: number; // minutes
+  hue: string; // curated palette token
+  title: string;
+  scatter: [number, number, number]; // dx, dy, rot
+};
+
+// Demo week. Colors are per-list user data in the app (§2.4 curated hues);
+// scatter constants are precomputed so the FLIP is one style pass.
+const chips: ChipDef[] = [
+  { day: 0, start: '09:00', dur: 30, hue: 'blue', title: 'Standup', scatter: [150, -300, -9] },
+  { day: 0, start: '10:00', dur: 90, hue: 'indigo', title: 'Deep work: Q3 plan', scatter: [320, -350, 7] },
+  { day: 0, start: '13:00', dur: 60, hue: 'violet', title: 'Lunch with Sam', scatter: [80, -260, 12] },
+  { day: 0, start: '15:30', dur: 45, hue: 'blue', title: 'Code review', scatter: [240, -390, -6] },
+  { day: 1, start: '08:30', dur: 60, hue: 'green', title: 'Gym', scatter: [-90, -330, 5] },
+  { day: 1, start: '11:00', dur: 30, hue: 'blue', title: '1:1 with Ana', scatter: [210, -290, -11] },
+  { day: 1, start: '14:00', dur: 90, hue: 'indigo', title: 'Write launch notes', scatter: [-140, -220, 8] },
+  { day: 1, start: '16:30', dur: 45, hue: 'orange', title: 'Groceries', scatter: [90, -370, -4] },
+  { day: 2, start: '09:30', dur: 60, hue: 'blue', title: 'Design crit', scatter: [-30, -400, 10] },
+  { day: 2, start: '12:00', dur: 45, hue: 'green', title: 'Dentist', scatter: [170, -240, -8] },
+  { day: 2, start: '15:00', dur: 90, hue: 'indigo', title: 'Ship v2.1', scatter: [-200, -340, 6] },
+  { day: 2, start: '17:00', dur: 30, hue: 'violet', title: 'Call mom', scatter: [60, -280, -12] },
+  { day: 3, start: '09:00', dur: 30, hue: 'blue', title: 'Standup', scatter: [-150, -380, 4] },
+  { day: 3, start: '10:30', dur: 90, hue: 'magenta', title: 'Interview loop', scatter: [110, -320, -7] },
+  { day: 3, start: '13:30', dur: 45, hue: 'orange', title: 'Renew passport', scatter: [-90, -250, 11] },
+  { day: 3, start: '16:00', dur: 60, hue: 'yellow', title: 'Budget pass', scatter: [130, -360, -5] },
+  { day: 4, start: '09:00', dur: 30, hue: 'blue', title: 'Standup', scatter: [-260, -300, 9] },
+  { day: 4, start: '11:00', dur: 45, hue: 'green', title: 'Physio', scatter: [-80, -230, -10] },
+  { day: 4, start: '13:00', dur: 90, hue: 'magenta', title: 'Team lunch', scatter: [-180, -340, 6] },
+];
+
+// The live one. Aqua because it was just placed; it lands last, flashes,
+// and reappears in "Type it. It lands." below.
+const liveChip: ChipDef = {
+  day: 4,
+  start: '16:00',
+  dur: 60,
+  hue: 'aqua',
+  title: 'Email vendor',
+  scatter: [-420, -200, -14],
+};
+
+function pos(c: ChipDef) {
+  const [h, m] = c.start.split(':').map(Number);
+  const startMin = h * 60 + m - DAY_START;
+  const top = (startMin / DAY_SPAN) * 100;
+  const height = (c.dur / DAY_SPAN) * 100;
+  return `--d:${c.day};top:${top.toFixed(3)}%;height:${height.toFixed(3)}%;`;
+}
+
+function hueVar(hue: string) {
+  return hue === 'aqua' ? 'var(--aqua)' : `var(--hue-${hue})`;
+}
+
+const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+const hourLabels = [
+  { label: '9 AM', top: 10 },
+  { label: '12 PM', top: 40 },
+  { label: '3 PM', top: 70 },
+];
+---
+
+<section class="hero" id="hero">
+  <div class="container">
+    <h1 class="display-hero">Everything has a&nbsp;time.</h1>
+    <p class="sub body-copy">
+      Taskflow is a task list and a calendar on one grid. Type a task, give it
+      a time, and your week fills in.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/app/signup">Start planning</a>
+      <p class="mono-line honesty">
+        FREE - SYNCS WITH GOOGLE CALENDAR<span id="hero-clock"></span>
+      </p>
+    </div>
+
+    <div class="before-strip" aria-hidden="true">
+      <span class="mini-chip" style="--chip-c: var(--hue-violet); transform: rotate(-8deg)">Call mom</span>
+      <span class="mini-chip" style="--chip-c: var(--hue-green); transform: rotate(5deg)">Gym</span>
+      <span class="mini-chip" style="--chip-c: var(--hue-orange); transform: rotate(-4deg)">Groceries</span>
+      <span class="mono-line strip-label">BEFORE THE SETTLE</span>
+    </div>
+
+    <div
+      class="slab"
+      id="hero-slab"
+      role="img"
+      aria-label="A week on the Taskflow grid: twenty task chips settled into their time slots, Monday through Friday."
+    >
+      <div class="slab-head">
+        <div class="gutter-spacer"></div>
+        {
+          days.map((d, i) => (
+            <div class:list={['head-day', { 'is-today': i === 3 }]} data-hd={i}>
+              <span class="dow">{d}</span>
+              <span class="date mono" data-date={i}></span>
+            </div>
+          ))
+        }
+      </div>
+      <div class="slab-body">
+        <div class="gutter" aria-hidden="true">
+          {hourLabels.map((h) => (
+            <span class="hour mono" style={`top:${h.top}%`}>{h.label}</span>
+          ))}
+        </div>
+        <div class="cols">
+          {days.map((_, i) => (
+            <div class:list={['col', { 'is-today': i === 3 }]} data-col={i}></div>
+          ))}
+          <div class="chips">
+            {
+              chips.map((c) => (
+                <div
+                  class="chip gchip"
+                  data-day={c.day}
+                  data-dx={c.scatter[0]}
+                  data-dy={c.scatter[1]}
+                  data-r={c.scatter[2]}
+                  style={`--chip-c:${hueVar(c.hue)};${pos(c)}`}
+                >
+                  <span class="c-t mono">{c.start}</span>
+                  <span class="c-ti">{c.title}</span>
+                </div>
+              ))
+            }
+            <div
+              class="chip gchip chip-live flashable"
+              data-day={liveChip.day}
+              data-dx={liveChip.scatter[0]}
+              data-dy={liveChip.scatter[1]}
+              data-r={liveChip.scatter[2]}
+              style={`--chip-c:${hueVar(liveChip.hue)};${pos(liveChip)}`}
+            >
+              <span class="c-t mono">{liveChip.start}</span>
+              <span class="c-ti">{liveChip.title}</span>
+            </div>
+          </div>
+          <div class="nowline" id="nowline" hidden aria-hidden="true">
+            <span class="nl-dot"></span>
+            <span class="nl-time mono" id="nl-time"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="floor" aria-hidden="true"></div>
+
+    <div class="idler chip" aria-hidden="true" style="--chip-c: var(--hue-violet)">
+      <span class="c-ti">Plan the trip</span>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // THE settle (§5): chips are in their final slots; one pass scatters
+  // them, a double-rAF flip releases them back to transform: none on the
+  // brand curve. Slots fire 40ms apart, everything lands by 1.3s, the
+  // aqua chip lands last and rim-flashes.
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var slab = document.getElementById('hero-slab');
+    if (!slab) return;
+    var all = Array.prototype.slice.call(slab.querySelectorAll('.gchip'));
+    // Mobile hides MON/TUE columns: 12 chips settle, not 20 (§9.3).
+    var chips = all.filter(function (c) {
+      return c.offsetParent !== null;
+    });
+    var k = Math.min(1, window.innerWidth / 1200); // shrink travel on small screens
+    chips.forEach(function (c) {
+      c.style.transform =
+        'translate(' +
+        c.dataset.dx * k +
+        'px,' +
+        c.dataset.dy * k +
+        'px) rotate(' +
+        c.dataset.r +
+        'deg)';
+      c.style.willChange = 'transform';
+    });
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var slot = 0;
+        chips.forEach(function (c) {
+          var live = c.classList.contains('chip-live');
+          var delay = live ? 400 : Math.floor(slot++ / 2) * 40;
+          c.style.transition =
+            'transform 880ms cubic-bezier(0.16,1,0.3,1) ' + delay + 'ms';
+          c.style.transform = 'none';
+          c.addEventListener('transitionend', function done(e) {
+            if (e.propertyName !== 'transform') return;
+            c.removeEventListener('transitionend', done);
+            c.style.willChange = '';
+            c.style.transition = '';
+            if (live) c.classList.add('is-flash');
+          });
+        });
+      });
+    });
+  })();
+</script>
+
+<script is:inline>
+  // Honesty instruments: the mono clock states the visitor's real local
+  // time, header dates are this week's real dates, and the now-line sits
+  // at the real time of day (only when today is on the grid and within
+  // its hours). Mono lines never invent facts (§7).
+  (function () {
+    var DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    var pad = function (n) {
+      return (n < 10 ? '0' : '') + n;
+    };
+    var now = new Date();
+    var dow = now.getDay();
+    var monday = new Date(now);
+    monday.setDate(now.getDate() - ((dow + 6) % 7));
+
+    for (var i = 0; i < 5; i++) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      var el = document.querySelector('[data-date="' + i + '"]');
+      if (el) el.textContent = d.getDate();
+    }
+
+    var todayCol = dow >= 1 && dow <= 5 ? dow - 1 : -1;
+    if (todayCol !== -1) {
+      document
+        .querySelectorAll('#hero-slab .is-today')
+        .forEach(function (el) {
+          el.classList.remove('is-today');
+        });
+      var col = document.querySelector('[data-col="' + todayCol + '"]');
+      var hd = document.querySelector('[data-hd="' + todayCol + '"]');
+      if (col) col.classList.add('is-today');
+      if (hd) hd.classList.add('is-today');
+    }
+
+    var line = document.getElementById('nowline');
+    var lineTime = document.getElementById('nl-time');
+    function tick() {
+      var t = new Date();
+      var clock = document.getElementById('hero-clock');
+      if (clock)
+        clock.textContent =
+          ' - ' + DAYS[t.getDay()] + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
+      if (!line) return;
+      var mins = t.getHours() * 60 + t.getMinutes();
+      var visible = todayCol !== -1 && mins >= 480 && mins <= 1080;
+      line.hidden = !visible;
+      if (!visible) return;
+      line.style.left = 'calc(' + todayCol + ' * var(--cw))';
+      line.style.width = 'var(--cw)';
+      line.style.top = ((mins - 480) / 600) * 100 + '%';
+      if (lineTime)
+        lineTime.textContent = pad(t.getHours()) + ':' + pad(t.getMinutes());
+    }
+    tick();
+    setInterval(tick, 60000);
+  })();
+</script>
+
+<style>
+  .hero {
+    overflow: hidden;
+    padding-top: 72px;
+  }
+
+  .hero .container {
+    position: relative;
+  }
+
+  .display-hero {
+    max-width: 640px;
+  }
+
+  .sub {
+    max-width: 52ch;
+    margin-top: 20px;
+    font-size: 17px;
+  }
+
+  .cta-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+
+  .honesty {
+    margin: 0;
+  }
+
+  /* --- the slab: machined surface holding the week (§2.6) --- */
+  .slab {
+    --cw: 20%;
+    position: relative;
+    margin-top: 64px;
+    background: var(--surface-1);
+    border-radius: 10px;
+    box-shadow: var(--edge-machined), var(--shadow-2);
+  }
+
+  .slab-head {
+    display: flex;
+    height: 44px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .gutter-spacer,
+  .gutter {
+    width: 52px;
+    flex: none;
+  }
+
+  .head-day {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .dow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+
+  .date {
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .date:empty {
+    display: none;
+  }
+
+  /* fixed 24px disc: today carries the light (§4.4) */
+  .head-day.is-today .date {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--aqua);
+    color: var(--aqua-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .slab-body {
+    position: relative;
+    display: flex;
+    height: 396px;
+  }
+
+  .gutter {
+    position: relative;
+  }
+
+  .hour {
+    position: absolute;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .cols {
+    position: relative;
+    flex: 1;
+    display: flex;
+    /* hour ruling; :30 lines at half presence (§4.4) */
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(10% - 1px),
+        var(--hairline) calc(10% - 1px),
+        var(--hairline) 10%
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(5% - 1px),
+        color-mix(in oklab, var(--hairline) 45%, transparent) calc(5% - 1px),
+        color-mix(in oklab, var(--hairline) 45%, transparent) 5%
+      );
+  }
+
+  .col {
+    flex: 1;
+    border-left: 1px solid var(--hairline);
+  }
+
+  .col[data-col='0'] {
+    border-left-color: transparent;
+  }
+
+  /* today: the brightest surface is now (§4.4) */
+  .col.is-today {
+    background: var(--aqua-film-04);
+    border-left-color: var(--aqua-rim);
+    box-shadow: inset -1px 0 0 var(--aqua-rim);
+  }
+
+  .chips {
+    position: absolute;
+    inset: 0;
+  }
+
+  .gchip {
+    position: absolute;
+    left: calc((var(--d) - var(--dshift, 0)) * var(--cw) + 3px);
+    width: calc(var(--cw) - 6px);
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 3px 7px;
+    min-height: 18px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .c-t {
+    font-size: 11px;
+    padding-top: 1.5px;
+    flex: none;
+  }
+
+  .c-ti {
+    font-size: 12px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  /* now-line: 2px aqua + dot + live mono time (§4.4); dark theme glow */
+  .nowline {
+    position: absolute;
+    height: 2px;
+    background: var(--aqua);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--aqua) 25%, transparent);
+    z-index: 3;
+  }
+
+  .nl-dot {
+    position: absolute;
+    left: -3px;
+    top: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--aqua);
+  }
+
+  .nl-time {
+    position: absolute;
+    left: -46px;
+    top: -6px;
+    font-size: 11px;
+    color: var(--aqua);
+    background: var(--void);
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+
+  .floor {
+    height: 1px;
+    width: 72%;
+    margin: 36px auto 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--aqua) 30%, transparent) 50%,
+      transparent
+    );
+  }
+
+  /* one unplaced chip idles in the margin, waiting (§6.1) */
+  .idler {
+    position: absolute;
+    right: -128px;
+    top: 46%;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    animation: idle-drift 7s ease-in-out infinite alternate;
+  }
+
+  @keyframes idle-drift {
+    from {
+      transform: translateY(-5px) rotate(-2deg);
+    }
+    to {
+      transform: translateY(5px) rotate(1deg);
+    }
+  }
+
+  @media (max-width: 1339px) {
+    .idler {
+      display: none;
+    }
+  }
+
+  /* reduced motion: pre-settled grid + the static "before" strip (§5) */
+  .before-strip {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    margin-top: 40px;
+  }
+
+  .mini-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    background: color-mix(in oklab, var(--chip-c) 24%, transparent);
+    box-shadow: inset 0 0 0 0.5px var(--chip-c);
+    color: oklch(from var(--chip-c) 0.82 min(c, 0.1) h);
+    border-radius: 6px;
+  }
+
+  .strip-label {
+    margin-left: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .before-strip {
+      display: flex;
+    }
+    .idler {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero {
+      padding-top: 48px;
+    }
+
+    .slab {
+      --cw: 33.333%;
+      --dshift: 2;
+      margin-top: 48px;
+    }
+
+    .slab-body {
+      height: 340px;
+    }
+
+    .gutter-spacer,
+    .gutter {
+      width: 44px;
+    }
+
+    /* WED-FRI carry the mobile fold: 12 chips settle, not 20 */
+    [data-col='0'],
+    [data-col='1'],
+    [data-hd='0'],
+    [data-hd='1'],
+    .gchip[data-day='0'],
+    .gchip[data-day='1'] {
+      display: none;
+    }
+
+    .col[data-col='2'] {
+      border-left-color: transparent;
+    }
+  }
+</style>
