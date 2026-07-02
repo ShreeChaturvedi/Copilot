@@ -7,7 +7,7 @@ import {
 import { QueryProvider, ThemeProvider } from './components/providers';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
 import { useAuthStore } from './stores/authStore';
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 
 const MainLayout = lazy(async () => ({
@@ -33,13 +33,18 @@ const ResetPasswordPage = lazy(async () => ({
 const DevAuthToggle = () => {
   const { setJWTAuth, logout, isAuthenticated, authMethod } = useAuthStore();
 
-  // Position and drag state
+  // Position and drag state. Default to bottom-right so the panel never covers
+  // the calendar header nav. Key is versioned so stale top-right positions from
+  // older dev profiles reset instead of resurrecting the overlap.
   const [position, setPosition] = useState(() => {
-    const saved = localStorage.getItem('dev-toggle-position');
-    return saved ? JSON.parse(saved) : { x: window.innerWidth - 220, y: 16 };
+    const saved = localStorage.getItem('dev-toggle-position-v2');
+    return saved
+      ? JSON.parse(saved)
+      : { x: window.innerWidth - 220, y: window.innerHeight - 130 };
   });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const handleMockLogin = () => {
     // Create mock user data for testing
@@ -84,7 +89,7 @@ const DevAuthToggle = () => {
     if (e.button !== 0) return; // Only left click
     e.preventDefault();
 
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = (panelRef.current ?? e.currentTarget).getBoundingClientRect();
     setDragOffset({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -96,7 +101,7 @@ const DevAuthToggle = () => {
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
 
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = (panelRef.current ?? e.currentTarget).getBoundingClientRect();
     const touch = e.touches[0];
     setDragOffset({
       x: touch.clientX - rect.left,
@@ -130,7 +135,7 @@ const DevAuthToggle = () => {
     const handleEnd = () => {
       setIsDragging(false);
       // Save position to localStorage
-      localStorage.setItem('dev-toggle-position', JSON.stringify(position));
+      localStorage.setItem('dev-toggle-position-v2', JSON.stringify(position));
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -148,20 +153,25 @@ const DevAuthToggle = () => {
 
   return (
     <div
+      ref={panelRef}
       className={`fixed z-50 bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg border border-yellow-300 dark:border-yellow-700 shadow-lg select-none transition-opacity ${
-        isDragging
-          ? 'opacity-75 cursor-grabbing'
-          : 'cursor-grab hover:shadow-xl'
+        isDragging ? 'opacity-75' : 'hover:shadow-xl'
       }`}
       style={{
         left: position.x,
         top: position.y,
         touchAction: 'none',
       }}
-      onMouseDown={handleMouseDown}
-      onTouchStart={handleTouchStart}
     >
-      <div className="text-xs font-semibold text-yellow-800 dark:text-yellow-200 mb-2 pointer-events-none">
+      {/* Only the title bar is a drag handle, so the panel body no longer
+          swallows clicks aimed at anything it happens to overlap. */}
+      <div
+        className={`text-xs font-semibold text-yellow-800 dark:text-yellow-200 mb-2 ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+      >
         🚧 DEV MODE {isDragging && '(dragging)'}
       </div>
       <div className="flex flex-col gap-2 text-xs">
