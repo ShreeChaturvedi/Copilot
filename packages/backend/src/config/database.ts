@@ -4,7 +4,12 @@ import { Pool, type PoolClient, type QueryResult } from 'pg';
 export const databaseConfig = {
   url:
     process.env.DATABASE_URL ||
-    'postgresql://localhost:5432/react_calendar_dev',
+    // Local default matches the docker-compose credentials (postgres/postgres)
+    // so the comprehensive-requirements DB suite and any local run connect
+    // without extra config. Production and CI always set DATABASE_URL (and
+    // TEST_DATABASE_URL, which test/setup.ts copies into DATABASE_URL)
+    // explicitly, so this fallback never affects them.
+    'postgresql://postgres:postgres@localhost:5432/react_calendar_dev',
   max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10'),
   idleTimeoutMillis: parseInt(process.env.DATABASE_TIMEOUT || '10000'),
 };
