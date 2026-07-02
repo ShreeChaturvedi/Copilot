@@ -10,6 +10,7 @@ import { toUserMessage } from '@/utils/errorMessages';
 
 interface CreateTaskData {
   title: string;
+  description?: string;
   taskListId?: string;
   priority?: 'low' | 'medium' | 'high';
   scheduledDate?: Date;
