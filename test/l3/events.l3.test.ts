@@ -274,22 +274,22 @@ describe.skipIf(!dbAvailable)('L3 events contracts', () => {
       expect(gone.body.error?.message).toBe('Event not found');
     });
 
-    it("GET reads another user's event (200) — pinned IDOR, issue #67", async () => {
+    it("GET does not leak another user's event (404) — IDOR fixed, #62/#67", async () => {
       const intruder = await registerUser(req);
       const created = await createEvent({
         title: 'Victim event',
         start: '2026-11-03T10:00:00.000Z',
         end: '2026-11-03T11:00:00.000Z',
       });
-      // CURRENT behavior: unscoped findById (lib/services/BaseService.ts:248)
-      // returns the row cross-user. Issue #67; flip to 404 when fixed.
+      // Owner-scoped findById (the #62 fix): a cross-user GET reports
+      // not-found rather than returning the row.
       const read = await req<Envelope<EventEntity>>(
         'GET',
         `/api/events/${created.body.data!.id}`,
         { token: intruder.accessToken }
       );
-      expect(read.status).toBe(200);
-      expect(read.body.data!.userId).toBe(user.userId);
+      expect(read.status).toBe(404);
+      expect(read.body.data).toBeUndefined();
     });
   });
 

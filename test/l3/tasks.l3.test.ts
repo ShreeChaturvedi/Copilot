@@ -367,19 +367,18 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
   });
 
   describe("cross-user access (another user's task)", () => {
-    it("GET leaks the other user's task (200) — pinned IDOR, issue #67; PUT/PATCH correctly 403", async () => {
+    it("GET does not leak the other user's task (404); PUT/PATCH 403/404 — IDOR fixed, #62/#67", async () => {
       const intruder = await registerUser(req);
       const created = await createTask({ title: 'Victim task' });
       const id = created.body.data!.id;
 
-      // CURRENT behavior: unscoped findById (lib/services/BaseService.ts:248,
-      // TaskService.ts:843) returns the row to ANY authenticated user. Issue
-      // #67; flip to 404 when the fix lands.
+      // Owner-scoped findById (the #62 fix) hides another user's row: a
+      // cross-user GET reports not-found rather than leaking it.
       const read = await req<Envelope<Task>>('GET', `/api/tasks/${id}`, {
         token: intruder.accessToken,
       });
-      expect(read.status).toBe(200);
-      expect(read.body.data!.userId).toBe(user.userId);
+      expect(read.status).toBe(404);
+      expect(read.body.data).toBeUndefined();
 
       const put = await req<Envelope>('PUT', `/api/tasks/${id}`, {
         token: intruder.accessToken,
@@ -396,26 +395,25 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
       expect(patch.status).toBe(403);
     });
 
-    it("DELETE destroys the other user's task (200) — pinned IDOR, issue #67", async () => {
+    it("DELETE does not destroy the other user's task (404) — IDOR fixed, #62/#67", async () => {
       const intruder = await registerUser(req);
       const created = await createTask({ title: 'Deletable victim' });
       const id = created.body.data!.id;
 
-      // CURRENT behavior: TaskService.delete never checks ownership
-      // (api/_handlers/tasks/[id].ts:230-233). Issue #67; flip to 404 when
-      // fixed.
+      // Owner-scoped delete (the #62 fix): a cross-user DELETE reports
+      // not-found and the row survives for its real owner.
       const del = await req<Envelope<{ deleted: boolean }>>(
         'DELETE',
         `/api/tasks/${id}`,
         { token: intruder.accessToken }
       );
-      expect(del.status).toBe(200);
-      expect(del.body.data).toEqual({ deleted: true });
+      expect(del.status).toBe(404);
 
-      const gone = await req<Envelope>('GET', `/api/tasks/${id}`, {
+      // The real owner's task survives the intruder's failed delete.
+      const survives = await req<Envelope>('GET', `/api/tasks/${id}`, {
         token: user.accessToken,
       });
-      expect(gone.status).toBe(404);
+      expect(survives.status).toBe(200);
     });
   });
 
