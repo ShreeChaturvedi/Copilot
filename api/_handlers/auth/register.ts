@@ -7,15 +7,13 @@ import type { AuthenticatedRequest } from '../../../lib/types/api.js';
 import type { VercelResponse } from '@vercel/node';
 import { authService } from '../../../packages/backend/src/services/AuthService.js';
 import { z } from 'zod';
+import { passwordSchema } from './passwordPolicy.js';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+  // Shared strong policy so register never accepts a password that
+  // change-password would later reject as WEAK_PASSWORD (issue #66).
+  password: passwordSchema,
   name: z.string().min(1, 'Name is required').optional(),
 });
 

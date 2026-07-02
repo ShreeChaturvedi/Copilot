@@ -28,7 +28,7 @@ export function requestIdMiddleware() {
     // Add request ID to response headers
     res.setHeader('X-Request-ID', requestId);
 
-    next();
+    return next();
   };
 }
 
@@ -41,19 +41,24 @@ export function requestLogger() {
     const requestId = req.requestId || 'unknown';
 
     // Log incoming request
-    console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.url}`, {
-      userAgent: req.headers['user-agent'],
-      userId: req.user?.id,
-      ip: getClientIP(req),
-    });
+    console.log(
+      `[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.url}`,
+      {
+        userAgent: req.headers['user-agent'],
+        userId: req.user?.id,
+        ip: getClientIP(req),
+      }
+    );
 
     // Log on finish to avoid messing with res.end signature
     res.once('finish', () => {
       const duration = Date.now() - startTime;
-      console.log(`[${new Date().toISOString()}] [${requestId}] Response ${res.statusCode} - ${duration}ms`);
+      console.log(
+        `[${new Date().toISOString()}] [${requestId}] Response ${res.statusCode} - ${duration}ms`
+      );
     });
 
-    next();
+    return next();
   };
 }
 
@@ -64,18 +69,18 @@ function getClientIP(req: AuthenticatedRequest): string | undefined {
   const forwarded = req.headers['x-forwarded-for'];
   const realIP = req.headers['x-real-ip'];
   const cfConnectingIP = req.headers['cf-connecting-ip'];
-  
+
   if (typeof forwarded === 'string') {
     return forwarded.split(',')[0].trim();
   }
-  
+
   if (typeof realIP === 'string') {
     return realIP;
   }
-  
+
   if (typeof cfConnectingIP === 'string') {
     return cfConnectingIP;
   }
-  
+
   return req.connection?.remoteAddress || req.socket?.remoteAddress;
 }

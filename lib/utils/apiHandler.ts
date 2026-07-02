@@ -27,6 +27,15 @@ export function createApiHandler(
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
       const method = req.method as HttpMethod;
+
+      // CORS preflight must be answered before method dispatch: OPTIONS is never
+      // registered in the route table, so dispatching first returned 405 and
+      // corsMiddleware's OPTIONS branch was dead code (issue #65). Let cors set
+      // the preflight headers and end the response.
+      if (method === HttpMethod.OPTIONS) {
+        return corsMiddleware()(req, res, () => {});
+      }
+
       const route = routes[method];
 
       if (!route) {
@@ -79,14 +88,27 @@ export function createApiHandler(
 }
 
 /**
- * Simple method-based route handler
+ * Simple method-based route handler.
+ *
+ * Pass `{ requireAuth: true }` to authenticate the request. Without it this
+ * factory ran no auth middleware at all — unlike createApiHandler it did not
+ * even inject devAuth — so any handler that gated on `req.user` returned 401 for
+ * every caller, including ones with a valid Bearer token (issue #64).
  */
 export function createMethodHandler(
-  handlers: Partial<Record<HttpMethod, RouteHandler>>
+  handlers: Partial<Record<HttpMethod, RouteHandler>>,
+  options: { requireAuth?: boolean } = {}
 ) {
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
       const method = req.method as HttpMethod;
+
+      // Answer the CORS preflight before method dispatch (issue #65); OPTIONS is
+      // not a registered handler so it would otherwise 405.
+      if (method === HttpMethod.OPTIONS) {
+        return corsMiddleware()(req, res, () => {});
+      }
+
       const handler = handlers[method];
 
       if (!handler) {
@@ -96,13 +118,23 @@ export function createMethodHandler(
         );
       }
 
-      // Apply basic middleware
-      await composeMiddleware(
-        corsMiddleware(),
-        requestIdMiddleware(),
-        requestLogger(),
-        rateLimitPresets.api
-      )(req, res, async () => {
+      // Build the pipeline. Auth middleware is added only for requireAuth routes
+      // so public endpoints (health, register, login, ...) are unchanged. devAuth
+      // (dev only) mirrors createApiHandler and is placed before the logger so
+      // logs carry the userId in development.
+      const middlewares = [corsMiddleware(), requestIdMiddleware()];
+
+      if (options.requireAuth && process.env.NODE_ENV !== 'production') {
+        middlewares.push(devAuth());
+      }
+
+      middlewares.push(requestLogger(), rateLimitPresets.api);
+
+      if (options.requireAuth) {
+        middlewares.push(authenticateJWT());
+      }
+
+      await composeMiddleware(...middlewares)(req, res, async () => {
         await handler(req, res);
       });
     }

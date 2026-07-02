@@ -345,7 +345,7 @@ describe.skipIf(!dbAvailable)('L3 auth contracts', () => {
         [u.userId, tokenHash]
       );
 
-      const newPassword = 'Brand2NewPass';
+      const newPassword = 'Brand2NewPass!';
       const reset = await req<Envelope<{ message: string }>>(
         'POST',
         '/api/auth/reset-password',
@@ -360,7 +360,7 @@ describe.skipIf(!dbAvailable)('L3 auth contracts', () => {
       expect(login.status).toBe(200);
 
       const replay = await req<Envelope>('POST', '/api/auth/reset-password', {
-        body: { token: rawToken, newPassword: 'Another2Pass' },
+        body: { token: rawToken, newPassword: 'Another2Pass!' },
       });
       expect(replay.status).toBe(400);
       expect(replay.body.error?.code).toBe('RESET_TOKEN_USED');
@@ -368,7 +368,7 @@ describe.skipIf(!dbAvailable)('L3 auth contracts', () => {
 
     it('400 INVALID_RESET_TOKEN for an unknown token, RESET_TOKEN_EXPIRED for an expired one', async () => {
       const bad = await req<Envelope>('POST', '/api/auth/reset-password', {
-        body: { token: 'deadbeef', newPassword: 'Valid1Password' },
+        body: { token: 'deadbeef', newPassword: 'Valid1Password!' },
       });
       expect(bad.status).toBe(400);
       expect(bad.body.error?.code).toBe('INVALID_RESET_TOKEN');
@@ -381,7 +381,7 @@ describe.skipIf(!dbAvailable)('L3 auth contracts', () => {
         [u.userId, createHash('sha256').update(rawToken).digest('hex')]
       );
       const expired = await req<Envelope>('POST', '/api/auth/reset-password', {
-        body: { token: rawToken, newPassword: 'Valid1Password' },
+        body: { token: rawToken, newPassword: 'Valid1Password!' },
       });
       expect(expired.status).toBe(400);
       expect(expired.body.error?.code).toBe('RESET_TOKEN_EXPIRED');
@@ -423,20 +423,47 @@ describe.skipIf(!dbAvailable)('L3 auth contracts', () => {
       expect(r.body.error?.code).toBe('INVALID_CURRENT_PASSWORD');
     });
 
-    it('400 WEAK_PASSWORD: change-password demands a special character that register does NOT (pins issue #66)', async () => {
-      // register accepts TEST_PASSWORD ('Password123', no special char), but
-      // AuthService.validatePassword (used only by change-password) also
-      // requires a special character, so a user can never "change" to a
-      // password of the same strength they registered with. Issue #66 tracks
-      // unifying the policy; update this pin when it lands.
-      const u = await registerUser(req);
+    it('a user can change to a password of the same strength they registered with (regression for issue #66)', async () => {
+      // register now enforces the same strong policy as change-password, so a
+      // password of the strength a user registered with is accepted on change.
+      const u = await registerUser(req); // registered with a strong password
+      const newPassword = 'NewPassword123!'; // same strength (has a special char)
       const r = await req<Envelope>('POST', '/api/auth/change-password', {
         token: u.accessToken,
-        body: { currentPassword: u.password, newPassword: 'NewPassword123' },
+        body: { currentPassword: u.password, newPassword },
       });
-      expect(r.status).toBe(400);
-      expect(r.body.error?.code).toBe('WEAK_PASSWORD');
-      expect(Array.isArray(r.body.error?.details)).toBe(true);
+      expect(r.status).toBe(200);
+
+      const login = await req<Envelope>('POST', '/api/auth/login', {
+        body: { email: u.email, password: newPassword },
+      });
+      expect(login.status).toBe(200);
+    });
+
+    it('a no-special-char password is rejected by BOTH register and change-password (regression for issue #66)', async () => {
+      // The asymmetry is gone: register used to accept 'NewPassword123' (no
+      // special char) while change-password rejected it as WEAK_PASSWORD.
+      const weak = 'NewPassword123';
+      const u = await registerUser(req);
+
+      const change = await req<Envelope>('POST', '/api/auth/change-password', {
+        token: u.accessToken,
+        body: { currentPassword: u.password, newPassword: weak },
+      });
+      expect(change.status).toBe(400);
+      expect(change.body.error?.code).toBe('WEAK_PASSWORD');
+      expect(Array.isArray(change.body.error?.details)).toBe(true);
+
+      const reg = await req<Envelope>('POST', '/api/auth/register', {
+        body: { email: uniqueEmail(), password: weak, name: 'Weak Pw' },
+      });
+      expect(reg.status).toBe(400);
+      expect(reg.body.error?.code).toBe('VALIDATION_ERROR');
+      expect(
+        (reg.body.error?.details as Array<{ message: string }>).some((d) =>
+          /special character/i.test(d.message)
+        )
+      ).toBe(true);
     });
   });
 

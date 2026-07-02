@@ -215,10 +215,19 @@ describe.skipIf(!dbAvailable)('L3 task-lists contracts', () => {
     expect(r.body.error?.message).toBe('Task list not found');
   });
 
-  it('GET /api/task-lists/stats -> 401 even with a valid token (pins issue #64)', async () => {
-    const r = await req<Envelope>('GET', '/api/task-lists/stats', {
-      token: user.accessToken,
-    });
+  it('GET /api/task-lists/stats -> 200 with a valid token (regression for issue #64)', async () => {
+    const r = await req<Envelope<Record<string, unknown>>>(
+      'GET',
+      '/api/task-lists/stats',
+      { token: user.accessToken }
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(true);
+    expect(r.body.data).toBeTypeOf('object');
+  });
+
+  it('GET /api/task-lists/stats without a token -> 401 (real auth is enforced)', async () => {
+    const r = await req<Envelope>('GET', '/api/task-lists/stats');
     expect(r.status).toBe(401);
     expect(r.body.error?.code).toBe('UNAUTHORIZED');
   });

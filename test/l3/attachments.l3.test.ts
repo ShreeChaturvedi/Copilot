@@ -202,21 +202,33 @@ describe.skipIf(!dbAvailable)('L3 attachments + upload contracts', () => {
     });
   });
 
-  describe('stats/cleanup (pins issue #64: never authenticated)', () => {
-    it('GET /api/attachments/stats -> 401 even with a valid token', async () => {
-      const r = await req<Envelope>('GET', '/api/attachments/stats', {
-        token: user.accessToken,
-      });
+  describe('stats/cleanup (regression for issue #64: now authenticated)', () => {
+    it('GET /api/attachments/stats -> 200 with a valid token', async () => {
+      const r = await req<Envelope<Record<string, unknown>>>(
+        'GET',
+        '/api/attachments/stats',
+        { token: user.accessToken }
+      );
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(r.body.data).toBeTypeOf('object');
+    });
+
+    it('GET /api/attachments/stats without a token -> 401 (real auth is enforced)', async () => {
+      const r = await req<Envelope>('GET', '/api/attachments/stats');
       expect(r.status).toBe(401);
       expect(r.body.error?.code).toBe('UNAUTHORIZED');
     });
 
-    it('DELETE /api/attachments/cleanup -> 401 even with a valid token', async () => {
-      const r = await req<Envelope>('DELETE', '/api/attachments/cleanup', {
-        token: user.accessToken,
-      });
-      expect(r.status).toBe(401);
-      expect(r.body.error?.code).toBe('UNAUTHORIZED');
+    it('DELETE /api/attachments/cleanup -> 200 with a valid token', async () => {
+      const r = await req<Envelope<{ deletedCount: number }>>(
+        'DELETE',
+        '/api/attachments/cleanup',
+        { token: user.accessToken }
+      );
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(typeof r.body.data?.deletedCount).toBe('number');
     });
   });
 });

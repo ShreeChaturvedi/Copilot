@@ -2,10 +2,11 @@
  * L3 — routing, 401/404/405, OPTIONS/CORS and middleware-pipeline contracts of
  * the REAL catch-all dispatcher (api/[...route].ts) and handler factories.
  *
- * Two pinned bugs live here:
- *   #63 requireAuth routes never answer 401 (request hangs, error dropped)
- *   #65 OPTIONS preflight returns 405 (CORS middleware unreachable)
- * Flip those pins when the fixes land.
+ * Regression coverage for fixed routing/middleware bugs:
+ *   #63 requireAuth routes now answer a clean 401 (the thrown UnauthorizedError
+ *       used to be dropped by a floating next() and the request hung)
+ *   #65 OPTIONS preflight now returns 200 with CORS headers (corsMiddleware runs
+ *       before method dispatch instead of the request 405-ing)
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
@@ -86,12 +87,12 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
       const r = await req<Envelope>('GET', '/api/tasks/stats', {
         token: u.accessToken,
       });
-      // Discriminator: the stats handler (createMethodHandler, never
-      // authenticated, issue #64) answers 401 UNAUTHORIZED. tasks/[id] would
-      // have answered 404 NOT_FOUND ("Task not found") for id="stats". So a
-      // 401 here proves the static route won.
-      expect(r.status).toBe(401);
-      expect(r.body.error?.code).toBe('UNAUTHORIZED');
+      // Discriminator: the stats handler now authenticates (issue #64 fixed) and
+      // answers 200 with stats. tasks/[id] would have answered 404 NOT_FOUND
+      // ("Task not found") for id="stats", so a 200 here proves the static route
+      // won.
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
     });
 
     it('dynamic [id] segment is injected into req.query (unknown id -> 404 Task not found)', async () => {
@@ -105,8 +106,8 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
     });
   });
 
-  describe('OPTIONS / CORS (pins issue #65)', () => {
-    it('OPTIONS on a routed path returns 405, NOT the CORS preflight 200 (method dispatch precedes corsMiddleware)', async () => {
+  describe('OPTIONS / CORS (regression for issue #65)', () => {
+    it('OPTIONS on a routed path returns the CORS preflight 200 with headers (corsMiddleware runs before method dispatch)', async () => {
       const r = await req<Envelope>('OPTIONS', '/api/tasks', {
         headers: {
           Origin: 'https://l3.example.test',
@@ -114,13 +115,14 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
           'Access-Control-Request-Headers': 'authorization,content-type',
         },
       });
-      // corsMiddleware's OPTIONS branch (lib/middleware/cors.ts:40-44) would
-      // send 200 + CORS headers, but createCrudHandler looks up routes[method]
-      // first and OPTIONS is never registered. Issue #65; flip to 200 when
-      // preflight handling lands.
-      expect(r.status).toBe(405);
-      expect(r.body.error?.code).toBe('METHOD_NOT_ALLOWED');
-      expect(r.headers.get('access-control-allow-origin')).toBeNull();
+      // corsMiddleware's OPTIONS branch (lib/middleware/cors.ts:40-44) now
+      // answers the preflight: the factories short-circuit OPTIONS before
+      // dispatching on the route table (issue #65).
+      expect(r.status).toBe(200);
+      expect(r.headers.get('access-control-allow-origin')).toBe(
+        'https://l3.example.test'
+      );
+      expect(r.headers.get('access-control-allow-methods')).toContain('POST');
     });
 
     it('normal responses DO carry CORS + security headers for an allow-listed Origin (FRONTEND_URL)', async () => {
@@ -148,45 +150,47 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
     });
   });
 
-  describe('requireAuth token failures (pins issue #63: request hangs, no 401)', () => {
-    // The real contract the frontend needs is a 401 (its refresh flow keys off
-    // failed requests). Today authenticateJWT's UnauthorizedError is dropped by
-    // the middleware chain (middlewares call next() without awaiting), the
-    // response is never written, and the request hangs until client timeout.
-    // These pins assert the hang so the suite notices when #63 is fixed:
-    // replace them with status-401 assertions then.
-    const expectHang = async (path: string, token?: string) => {
-      await expect(
-        fetch(server.baseUrl + path, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          signal: AbortSignal.timeout(1500),
-        })
-      ).rejects.toThrow(/timeout|abort/i);
+  describe('requireAuth token failures (regression for issue #63: clean 401, no hang)', () => {
+    // The frontend refresh flow keys off a 401. authenticateJWT throws an
+    // UnauthorizedError, and the middleware chain now propagates it to the error
+    // handler which writes a 401 JSON envelope (previously the throw was dropped
+    // by a floating next() and the socket hung until timeout). The 1500ms abort
+    // signal is the regression guard: if the hang returns these fail on timeout.
+    const expect401 = async (path: string, token?: string) => {
+      const res = await fetch(server.baseUrl + path, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: AbortSignal.timeout(1500),
+      });
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as Envelope;
+      expect(body.success).toBe(false);
+      expect(body.error?.code).toBe('UNAUTHORIZED');
+      return body;
     };
 
-    it('GET /api/tasks without a token: NO response at all (issue #63)', async () => {
-      await expectHang('/api/tasks');
+    it('GET /api/tasks without a token -> 401 (issue #63)', async () => {
+      await expect401('/api/tasks');
     });
 
-    it('GET /api/auth/me with an EXPIRED access token: NO response at all (issue #63)', async () => {
+    it('GET /api/auth/me with an EXPIRED access token -> 401 (issue #63, root of #57)', async () => {
       const u = await registerUser(req);
       const expired = signAccessToken(
         { userId: u.userId, email: u.email },
         '-10s'
       );
-      await expectHang('/api/auth/me', expired);
+      await expect401('/api/auth/me', expired);
     });
 
-    it('GET /api/events with a garbage token: NO response at all (issue #63)', async () => {
-      await expectHang('/api/events', 'not-a-jwt');
+    it('GET /api/events with a garbage token -> 401 (issue #63)', async () => {
+      await expect401('/api/events', 'not-a-jwt');
     });
 
-    it('a refresh token is REJECTED as an access token (type check works when the signature is valid)', async () => {
-      // Wrong-type tokens still go through verifyToken successfully and then
-      // throw UnauthorizedError('Invalid token type') — which is ALSO dropped
-      // (#63). Pin the hang.
+    it('a refresh token is REJECTED as an access token -> 401 (type check works when the signature is valid)', async () => {
+      // Wrong-type tokens verify successfully then throw
+      // UnauthorizedError('Invalid token type'); that error now propagates as a
+      // 401 instead of being dropped (#63).
       const u = await registerUser(req);
-      await expectHang('/api/auth/me', u.refreshToken);
+      await expect401('/api/auth/me', u.refreshToken);
     });
   });
 

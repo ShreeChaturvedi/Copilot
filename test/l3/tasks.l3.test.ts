@@ -419,26 +419,44 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
     });
   });
 
-  describe('stats/bulk (pins issue #64: never authenticated)', () => {
-    it('GET /api/tasks/stats -> 401 even with a valid token', async () => {
-      // createMethodHandler has no auth middleware (issue #64), so the
-      // manual req.user check always fails. The frontend would consume
-      // data.{total,completed,pending,overdue,...} (TaskStats) if this worked.
-      const r = await req<Envelope>('GET', '/api/tasks/stats', {
-        token: user.accessToken,
-      });
-      expect(r.status).toBe(401);
-      expect(r.body.error?.code).toBe('UNAUTHORIZED');
-      expect(r.body.error?.message).toBe('User authentication required');
+  describe('stats/bulk (regression for issue #64: now authenticated)', () => {
+    it('GET /api/tasks/stats -> 200 with the TaskStats the frontend consumes', async () => {
+      // createMethodHandler now runs authenticateJWT (issue #64 fixed), so a
+      // valid token reaches the handler. The frontend reads
+      // data.{total,completed,pending,overdue,...} (TaskStats).
+      const r = await req<
+        Envelope<{
+          total: number;
+          completed: number;
+          pending: number;
+          overdue: number;
+        }>
+      >('GET', '/api/tasks/stats', { token: user.accessToken });
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(typeof r.body.data?.total).toBe('number');
+      expect(typeof r.body.data?.completed).toBe('number');
     });
 
-    it('PATCH /api/tasks/bulk -> 401 even with a valid token (and POST is 405: only PATCH/DELETE are routed)', async () => {
-      const patch = await req<Envelope>('PATCH', '/api/tasks/bulk', {
+    it('GET /api/tasks/stats without a token -> 401 (real auth is now enforced, not skipped)', async () => {
+      const r = await req<Envelope>('GET', '/api/tasks/stats');
+      expect(r.status).toBe(401);
+      expect(r.body.error?.code).toBe('UNAUTHORIZED');
+    });
+
+    it('PATCH /api/tasks/bulk -> 200 with a valid token (and POST is 405: only PATCH/DELETE are routed)', async () => {
+      const created = await createTask({ title: 'Bulk target' });
+      const id = created.body.data!.id;
+
+      const patch = await req<
+        Envelope<{ updatedTasks: Task[]; count: number }>
+      >('PATCH', '/api/tasks/bulk', {
         token: user.accessToken,
-        body: { action: 'complete', taskIds: ['x'] },
+        body: { taskIds: [id], updates: { completed: true } },
       });
-      expect(patch.status).toBe(401);
-      expect(patch.body.error?.code).toBe('UNAUTHORIZED');
+      expect(patch.status).toBe(200);
+      expect(patch.body.success).toBe(true);
+      expect(patch.body.data?.count).toBe(1);
 
       const post = await req<Envelope>('POST', '/api/tasks/bulk', {
         token: user.accessToken,

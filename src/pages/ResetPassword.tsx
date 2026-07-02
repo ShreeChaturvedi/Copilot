@@ -32,11 +32,15 @@ function ResetPasswordForm({
       setError('Passwords do not match.');
       return;
     }
-    // Mirror the backend rules (min 8, upper, lower, number) for a fast,
-    // local error before hitting the network.
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password)) {
+    // Mirror the backend rules (min 8, upper, lower, number, special char) for a
+    // fast, local error before hitting the network.
+    if (
+      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(
+        password
+      )
+    ) {
       setError(
-        'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.'
+        'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.'
       );
       return;
     }

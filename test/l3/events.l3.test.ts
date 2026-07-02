@@ -293,28 +293,41 @@ describe.skipIf(!dbAvailable)('L3 events contracts', () => {
     });
   });
 
-  describe('GET /api/events/conflicts (pins issue #64: never authenticated)', () => {
-    it('401 even with a valid token; the frontend then silently sees no conflicts', async () => {
-      // conflicts uses createMethodHandler (no auth middleware, issue #64), so
-      // the manual req.user check always 401s. src/services/api/events.ts:394-404
-      // reads body.data.conflicts and falls back to [], so the UI shows none.
-      const r = await req<Envelope>(
+  describe('GET /api/events/conflicts (regression for issue #64: now authenticated)', () => {
+    it('200 with a valid token; conflict data reaches the frontend', async () => {
+      // conflicts now runs authenticateJWT (issue #64 fixed).
+      // src/services/api/events.ts:394-404 reads body.data.conflicts, so a real
+      // array now flows to the UI instead of the swallowed 401.
+      const r = await req<
+        Envelope<{ conflicts: unknown[]; hasConflicts: boolean; count: number }>
+      >(
         'GET',
         `/api/events/conflicts?start=2026-09-07T10:15:00.000Z&end=2026-09-07T10:45:00.000Z&calendarId=${calendarId}`,
         { token: user.accessToken }
       );
-      expect(r.status).toBe(401);
-      expect(r.body.error?.code).toBe('UNAUTHORIZED');
-      expect(r.body.error?.message).toBe('User authentication required');
+      expect(r.status).toBe(200);
+      expect(r.body.success).toBe(true);
+      expect(Array.isArray(r.body.data?.conflicts)).toBe(true);
+      expect(typeof r.body.data?.hasConflicts).toBe('boolean');
     });
 
-    it('400-path validation is unreachable behind the 401: missing start/end also yields 401 today', async () => {
+    it('400 VALIDATION_ERROR for missing start/end (validation now reachable past auth)', async () => {
       const r = await req<Envelope>('GET', '/api/events/conflicts', {
         token: user.accessToken,
       });
-      // The req.user check runs before the start/end validation, so even a
-      // malformed request is 401 (issue #64). Documents ordering.
+      // The req.user check now passes, so the start/end validation runs instead
+      // of the request short-circuiting on a spurious 401.
+      expect(r.status).toBe(400);
+      expect(r.body.error?.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('GET /api/events/conflicts without a token -> 401 (real auth is enforced)', async () => {
+      const r = await req<Envelope>(
+        'GET',
+        `/api/events/conflicts?start=2026-09-07T10:15:00.000Z&end=2026-09-07T10:45:00.000Z&calendarId=${calendarId}`
+      );
       expect(r.status).toBe(401);
+      expect(r.body.error?.code).toBe('UNAUTHORIZED');
     });
   });
 });

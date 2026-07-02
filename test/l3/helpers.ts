@@ -47,7 +47,9 @@ export const cleanupPool: Pool | null = dbAvailable
   ? new Pool({ connectionString: TEST_DB_URL, max: 4 })
   : null;
 
-export const TEST_PASSWORD = 'Password123';
+// Satisfies the shared strong policy (upper, lower, digit, special char) so
+// registerUser succeeds now that register enforces it too (issue #66).
+export const TEST_PASSWORD = 'Password123!';
 /** Email prefix used to scope cleanup so parallel suites don't clobber. */
 export const EMAIL_PREFIX = 'l3-';
 /** Tag name prefix (tags table is GLOBAL / not user-scoped, cascade won't reach it). */

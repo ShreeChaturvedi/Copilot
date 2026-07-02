@@ -16,38 +16,44 @@ import {
   InternalServerError,
 } from '../../../lib/types/api.js';
 
-export default createMethodHandler({
-  [HttpMethod.GET]: async (req: AuthenticatedRequest, res: VercelResponse) => {
-    try {
-      const { task: taskService } = getAllServices();
-      const userId = req.user?.id;
+export default createMethodHandler(
+  {
+    [HttpMethod.GET]: async (
+      req: AuthenticatedRequest,
+      res: VercelResponse
+    ) => {
+      try {
+        const { task: taskService } = getAllServices();
+        const userId = req.user?.id;
 
-      if (!userId) {
-        return sendError(
+        if (!userId) {
+          return sendError(
+            res,
+            new UnauthorizedError('User authentication required')
+          );
+        }
+
+        const stats = await taskService.getStats({
+          userId,
+          requestId: req.headers['x-request-id'] as string,
+        });
+
+        sendSuccess(res, stats);
+      } catch (error) {
+        console.error('GET /api/tasks/stats error:', error);
+
+        if (error.message?.includes('AUTHORIZATION_ERROR')) {
+          return sendError(res, new ForbiddenError('Access denied'));
+        }
+
+        sendError(
           res,
-          new UnauthorizedError('User authentication required')
+          new InternalServerError(
+            error.message || 'Failed to fetch task statistics'
+          )
         );
       }
-
-      const stats = await taskService.getStats({
-        userId,
-        requestId: req.headers['x-request-id'] as string,
-      });
-
-      sendSuccess(res, stats);
-    } catch (error) {
-      console.error('GET /api/tasks/stats error:', error);
-
-      if (error.message?.includes('AUTHORIZATION_ERROR')) {
-        return sendError(res, new ForbiddenError('Access denied'));
-      }
-
-      sendError(
-        res,
-        new InternalServerError(
-          error.message || 'Failed to fetch task statistics'
-        )
-      );
-    }
+    },
   },
-});
+  { requireAuth: true }
+);
