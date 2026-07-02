@@ -9,6 +9,7 @@ const SettingsDialog = lazy(async () => ({ default: (await import('@/components/
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsDialog } from '@/hooks/useSettingsDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { usePreferencesSync } from '@/hooks/usePreferencesSync';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import type FullCalendar from '@fullcalendar/react';
@@ -42,6 +43,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const { currentView, dragState, setCurrentView } = useUIStore();
   const { logout } = useAuthStore();
   const { sidebarExpanded, appViewMode } = useSettingsStore();
+
+  // Apply the user's saved preferences (theme, default view, week start) on load
+  usePreferencesSync();
   
   // Settings dialog management
   const { 

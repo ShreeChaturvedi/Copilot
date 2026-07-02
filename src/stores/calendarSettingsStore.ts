@@ -7,9 +7,11 @@ interface CalendarSettingsState {
   timeRangeMode: TimeRangeMode;
   customStartHour: number; // 0-24
   customEndHour: number;   // 0-24
+  weekStartsOn: number;    // 0 (Sun) - 6 (Sat), fed from saved user preferences
 
   setTimeRangeMode: (mode: TimeRangeMode) => void;
   setCustomRange: (startHour: number, endHour: number) => void;
+  setWeekStartsOn: (day: number) => void;
 
   getEffectiveRange: () => { startHour: number; endHour: number };
   getSlotTimes: () => { slotMinTime: string; slotMaxTime: string };
@@ -30,8 +32,16 @@ export const useCalendarSettingsStore = create<CalendarSettingsState>()(
         timeRangeMode: 'default',
         customStartHour: 6,
         customEndHour: 22,
+        weekStartsOn: 0,
 
         setTimeRangeMode: (mode) => set({ timeRangeMode: mode }, false, 'setTimeRangeMode'),
+
+        setWeekStartsOn: (day) =>
+          set(
+            { weekStartsOn: Math.max(0, Math.min(6, Math.floor(day))) },
+            false,
+            'setWeekStartsOn'
+          ),
 
         setCustomRange: (start, end) => {
           const startHour = clampHour(start);
@@ -70,6 +80,7 @@ export const useCalendarSettingsStore = create<CalendarSettingsState>()(
           timeRangeMode: state.timeRangeMode,
           customStartHour: state.customStartHour,
           customEndHour: state.customEndHour,
+          weekStartsOn: state.weekStartsOn,
         }),
       }
     ),
