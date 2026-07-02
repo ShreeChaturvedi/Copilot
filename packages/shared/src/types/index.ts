@@ -147,6 +147,12 @@ export interface ParsedTag extends TaskTag {
   originalText: string;
   confidence: number; // 0..1
   source: string; // parser id/name
+  /**
+   * Links sibling tags that describe one entity spanning a single span (e.g. the
+   * start and end of a parsed date range). Siblings are not competing
+   * interpretations, so conflict resolution must not drop one for the other.
+   */
+  rangeId?: string;
 }
 
 export interface Conflict {

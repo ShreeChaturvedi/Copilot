@@ -74,7 +74,9 @@ describe('SmartParser', () => {
       const result = await parser.parse('Call John #urgent p1');
       const priorities = result.tags.filter((t) => t.type === 'priority');
       expect(priorities).toHaveLength(2); // "urgent" and "p1"
-      expect(result.tags.some((t) => t.type === 'person' && t.value === 'John')).toBe(true);
+      expect(
+        result.tags.some((t) => t.type === 'person' && t.value === 'John')
+      ).toBe(true);
       expect(result.cleanText).toBe('Call #');
       expect(result.confidence).toBeCloseTo(0.87, 2);
     });
@@ -85,30 +87,41 @@ describe('SmartParser', () => {
       const result = await parser.parse('Meeting friday at Google');
       expect(result.conflicts).toHaveLength(1);
       // The higher-confidence project (org) tag survives; the "at Google" location is dropped.
-      expect(result.tags.some((t) => t.type === 'project' && t.value === 'Google')).toBe(true);
-      expect(result.tags.some((t) => t.originalText === 'at Google')).toBe(false);
+      expect(
+        result.tags.some((t) => t.type === 'project' && t.value === 'Google')
+      ).toBe(true);
+      expect(result.tags.some((t) => t.originalText === 'at Google')).toBe(
+        false
+      );
       expect(result.tags.some((t) => t.type === 'date')).toBe(true);
       expect(result.cleanText).toBe('at');
     });
 
-    // BUG #60: a date RANGE loses its end date in the pipeline. ChronoDateParser
-    // emits the start and "Until ..." end tags with IDENTICAL span indices, so
-    // SmartParser.detectConflicts treats them as an overlap and drops the end tag.
-    // Marked it.fails: it passes today (documenting the loss) and will start
-    // failing loudly once #60 is fixed and both range tags survive.
-    it.fails('DESIRED (fails until #60): a date range keeps BOTH start and end tags', async () => {
+    // #60: a date RANGE must keep BOTH endpoints through the pipeline.
+    // ChronoDateParser emits the start and "Until ..." end tags over one
+    // identical span; they now share a rangeId, so detectConflicts recognizes
+    // them as siblings and no longer drops the end tag. (Was it.fails until #60.)
+    it('a date range keeps BOTH start and end tags, without a conflict', async () => {
       const result = await parser.parse('from monday to friday');
       const dateTags = result.tags.filter((t) => t.type === 'date');
       expect(dateTags).toHaveLength(2);
-      expect(dateTags.some((t) => t.displayText.startsWith('Until'))).toBe(true);
+      expect(dateTags.some((t) => t.displayText === 'Monday')).toBe(true);
+      expect(dateTags.some((t) => t.displayText.startsWith('Until'))).toBe(
+        true
+      );
+      // sibling range tags are no longer counted as a conflict
+      expect(result.conflicts).toHaveLength(0);
     });
 
-    it('CHARACTERIZATION (#60): the range end tag is currently dropped, leaving only the start', async () => {
-      const result = await parser.parse('from monday to friday');
+    it.each<[string, string, string]>([
+      ['from monday to friday', 'Monday', 'Until Jan 23'],
+      ['aug 3 to aug 7', 'Aug 3', 'Until Aug 7'],
+      ['next week through friday', 'Wednesday', 'Until Jan 23'],
+    ])('keeps both endpoints of the range %j', async (input, start, end) => {
+      const result = await parser.parse(input);
       const dateTags = result.tags.filter((t) => t.type === 'date');
-      expect(dateTags).toHaveLength(1);
-      expect(dateTags[0].displayText).toBe('Monday');
-      expect(result.conflicts).toHaveLength(1);
+      expect(dateTags.map((t) => t.displayText)).toEqual([start, end]);
+      expect(result.conflicts).toHaveLength(0);
     });
   });
 
@@ -150,11 +163,15 @@ describe('SmartParser', () => {
 
   describe('testParse (debug helper)', () => {
     it('reports per-parser results for each applicable parser', async () => {
-      const { parserResults } = await parser.testParse('tomorrow high priority');
+      const { parserResults } = await parser.testParse(
+        'tomorrow high priority'
+      );
       const names = parserResults.map((r) => r.parser);
       expect(names).toContain('Date/Time Parser');
       expect(names).toContain('Priority Parser');
-      const dateResult = parserResults.find((r) => r.parser === 'Date/Time Parser');
+      const dateResult = parserResults.find(
+        (r) => r.parser === 'Date/Time Parser'
+      );
       expect(dateResult!.tags.length).toBeGreaterThan(0);
     });
   });
