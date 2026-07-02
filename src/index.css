@@ -70,9 +70,21 @@
   --scrollbar-size: 8px;
   --scrollbar-size-lg: 12px;
   --scrollbar-track: color-mix(in oklab, var(--muted) 30%, transparent);
-  --scrollbar-thumb: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
-  --scrollbar-thumb-hover: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
-  --scrollbar-thumb-active: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  --scrollbar-thumb: color-mix(
+    in oklab,
+    var(--muted-foreground) 30%,
+    transparent
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--muted-foreground) 50%,
+    transparent
+  );
+  --scrollbar-thumb-active: color-mix(
+    in oklab,
+    var(--muted-foreground) 70%,
+    transparent
+  );
 }
 
 body {
@@ -195,9 +207,21 @@ h1 {
   --scrollbar-size: 8px;
   --scrollbar-size-lg: 12px;
   --scrollbar-track: color-mix(in oklab, var(--muted) 20%, transparent);
-  --scrollbar-thumb: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
-  --scrollbar-thumb-hover: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
-  --scrollbar-thumb-active: color-mix(in oklab, var(--muted-foreground) 75%, transparent);
+  --scrollbar-thumb: color-mix(
+    in oklab,
+    var(--muted-foreground) 35%,
+    transparent
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--muted-foreground) 55%,
+    transparent
+  );
+  --scrollbar-thumb-active: color-mix(
+    in oklab,
+    var(--muted-foreground) 75%,
+    transparent
+  );
 }
 
 @layer base {
@@ -350,29 +374,6 @@ h1 {
     color: var(--muted-foreground);
   }
 
-  /* Force checkbox to maintain proper dimensions */
-  button[role='checkbox'] {
-    width: 1rem !important;
-    height: 1rem !important;
-    min-width: 1rem !important;
-    min-height: 1rem !important;
-    max-width: 1rem !important;
-    max-height: 1rem !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    line-height: 1 !important;
-    font-size: inherit !important;
-  }
-
-  /* Only set transparent background for unchecked state */
-  button[role='checkbox']:not([data-state='checked']) {
-    background: transparent !important;
-  }
-
   /* Time picker scrolling - completely override all conflicting styles */
   .time-picker-scroll {
     overflow-y: scroll !important;
@@ -380,7 +381,12 @@ h1 {
     overscroll-behavior: contain !important;
     -webkit-overflow-scrolling: touch !important;
     scrollbar-width: thin !important;
-    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent) transparent !important;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 30%,
+        transparent
+      )
+      transparent !important;
     max-height: 128px !important;
     height: 128px !important;
     padding: 0 !important;
@@ -405,12 +411,20 @@ h1 {
   }
 
   .time-picker-scroll::-webkit-scrollbar-thumb {
-    background: color-mix(in oklab, var(--muted-foreground) 30%, transparent) !important;
+    background: color-mix(
+      in oklab,
+      var(--muted-foreground) 30%,
+      transparent
+    ) !important;
     border-radius: 3px !important;
   }
 
   .time-picker-scroll::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklab, var(--muted-foreground) 50%, transparent) !important;
+    background: color-mix(
+      in oklab,
+      var(--muted-foreground) 50%,
+      transparent
+    ) !important;
   }
 
   /* Global scrollbar styling for all elements - external monitor compatible */
@@ -465,7 +479,12 @@ h1 {
   /* Specific styling for containers that should have more prominent scrollbars */
   .scrollbar-styled {
     scrollbar-width: auto;
-    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent) color-mix(in oklab, var(--muted) 50%, transparent);
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 50%,
+        transparent
+      )
+      color-mix(in oklab, var(--muted) 50%, transparent);
   }
 
   .scrollbar-styled::-webkit-scrollbar {
@@ -500,11 +519,7 @@ h1 {
 
   /* Gradient text utilities using chart colors */
   .gradient-text-blue-red {
-    background: linear-gradient(
-      135deg,
-      var(--chart-3) 0%,
-      var(--chart-1) 100%
-    );
+    background: linear-gradient(135deg, var(--chart-3) 0%, var(--chart-1) 100%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -513,11 +528,7 @@ h1 {
   }
 
   .gradient-bg-blue-red {
-    background: linear-gradient(
-      135deg,
-      var(--chart-3) 0%,
-      var(--chart-1) 100%
-    );
+    background: linear-gradient(135deg, var(--chart-3) 0%, var(--chart-1) 100%);
     background-size: 200% 200%;
     /* animation: gradient-shift 3s ease infinite; */ /* Disabled to prevent drag interference */
   }
@@ -755,5 +766,4 @@ h1 {
     /* On hover, stronger and wider glow all around the button */
     --glow-radius: 340px;
   }
-
 }
