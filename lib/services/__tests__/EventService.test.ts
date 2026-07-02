@@ -870,6 +870,76 @@ describe('EventService', () => {
     });
   });
 
+  describe('RRULE validation (#42: BYSETPOS)', () => {
+    // Exactly what src/utils/recurrence.ts generateRRule emits for
+    // "last Friday of the month" (monthlyBySetPos=-1, monthlyWeekday=5).
+    const lastFridayRRule = 'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1';
+
+    it('accepts the editor BYSETPOS rule and round-trips it through create', async () => {
+      const createDTO = {
+        calendarId: testCalendars.primary.id,
+        title: 'Last Friday sync',
+        start: new Date('2026-07-31T09:00:00Z'),
+        end: new Date('2026-07-31T10:00:00Z'),
+        recurrence: lastFridayRRule,
+      };
+
+      const createdEvent = {
+        id: 'event-bysetpos',
+        userId: mockUserId,
+        ...createDTO,
+        description: null,
+        location: null,
+        notes: null,
+        allDay: false,
+        color: null,
+        exceptions: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        if (lower.includes('insert into users')) {
+          return createQueryResult([], 1);
+        }
+        if (lower.includes('insert into events')) {
+          return createQueryResult([createdEvent], 1);
+        }
+        return createQueryResult([]);
+      });
+
+      const result = await eventService.create(createDTO, mockContext);
+
+      expect(result.recurrence).toBe(lastFridayRRule);
+    });
+
+    it('rejects a BYSETPOS of 0 as an invalid recurrence rule', async () => {
+      const createDTO = {
+        calendarId: testCalendars.primary.id,
+        title: 'Bad rule',
+        start: new Date('2026-07-31T09:00:00Z'),
+        end: new Date('2026-07-31T10:00:00Z'),
+        recurrence: 'RRULE:FREQ=MONTHLY;BYDAY=FR;BYSETPOS=0',
+      };
+
+      mockedQuery.mockImplementation(async (sql: string) => {
+        const lower = sql.toLowerCase();
+        if (lower.includes('select id from calendars')) {
+          return createQueryResult([{ id: createDTO.calendarId }], 1);
+        }
+        return createQueryResult([]);
+      });
+
+      await expect(
+        eventService.create(createDTO, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
+    });
+  });
+
   describe('Edge Cases and Error Handling', () => {
     it('should handle database connection errors gracefully', async () => {
       mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));

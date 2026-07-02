@@ -851,18 +851,39 @@ export class EventService extends BaseService<
       'BYDAY',
       'BYMONTH',
       'BYMONTHDAY',
+      // The recurrence editor emits BYSETPOS for "nth weekday" monthly and
+      // yearly rules, e.g. "last Friday of the month" (src/utils/recurrence.ts
+      // buildRRule). Reject these rules and the UI can't save them (#42).
+      'BYSETPOS',
     ];
     const ruleBody = rrule.substring(6); // Remove 'RRULE:'
 
     // Split by semicolon and validate each part
     const parts = ruleBody.split(';');
     for (const part of parts) {
-      const [key] = part.split('=');
+      const [key, value] = part.split('=');
       if (!validKeywords.includes(key)) {
+        return false;
+      }
+      // BYSETPOS is a comma-separated list of non-zero positions in the range
+      // [-366, 366] per RFC 5545; reject anything outside that.
+      if (key === 'BYSETPOS' && !this.isValidBySetPos(value)) {
         return false;
       }
     }
 
     return true;
+  }
+
+  /**
+   * Validate a BYSETPOS value: a comma-separated list of non-zero integers in
+   * the RFC 5545 range [-366, 366].
+   */
+  private isValidBySetPos(value: string | undefined): boolean {
+    if (!value) return false;
+    return value.split(',').every((token) => {
+      const n = Number(token);
+      return Number.isInteger(n) && n !== 0 && n >= -366 && n <= 366;
+    });
   }
 }
