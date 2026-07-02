@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
 import {
   Card,
@@ -168,13 +168,9 @@ function ResetPasswordForm({
                 </Button>
               </div>
               <div className="mt-4 text-center text-sm">
-                <a
-                  href="/login"
-                  onClick={handleBackToLogin}
-                  className="underline underline-offset-4"
-                >
+                <Link to="/login" className="underline underline-offset-4">
                   Back to login
-                </a>
+                </Link>
               </div>
             </form>
           )}

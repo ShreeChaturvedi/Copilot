@@ -3,6 +3,11 @@
  * Talks to the /api/google/* serverless function (or its dev-server mirror).
  */
 import { useAuthStore } from '@/stores/authStore';
+import { googleRedirectUri } from '@/lib/urls';
+
+// Re-exported so existing importers (useGoogleSync, IntegrationsSettings)
+// keep a single source of truth for the /app-aware redirect URI.
+export { googleRedirectUri };
 
 export interface GoogleLinkStatus {
   id: string;
@@ -95,11 +100,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw error;
   }
   return body.data as T;
-}
-
-/** The redirect URI this origin uses for the Google consent round trip. */
-export function googleRedirectUri(): string {
-  return `${window.location.origin}/auth/google/callback`;
 }
 
 export const googleSyncApi = {

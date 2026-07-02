@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { googleRedirectUri } from '@/lib/urls';
 import { Button } from '@/components/ui/Button';
 import {
   Card,
@@ -78,7 +79,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
   };
 
   const handleGoogleSignup = () => {
-    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = googleRedirectUri();
     const url = authAPI.getGoogleAuthUrl(redirectUri);
     window.location.href = url;
   };

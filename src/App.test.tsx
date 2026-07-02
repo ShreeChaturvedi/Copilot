@@ -51,6 +51,9 @@ const setAuthenticatedState = () => {
 describe('App', () => {
   beforeEach(() => {
     resetAuthState();
+    // The SPA is mounted under basename="/app"; the router renders nothing
+    // for a location outside that base, so pin jsdom's URL under /app.
+    window.history.replaceState(null, '', '/app');
   });
 
   it('renders the login screen for unauthenticated users', async () => {

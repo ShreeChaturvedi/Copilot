@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { googleRedirectUri } from '@/lib/urls';
 import { authAPI } from '@/services/api/auth';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -50,13 +51,8 @@ export function LoginForm({
     navigate('/signup');
   };
 
-  const handleForgotPasswordLink = (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate('/forgot-password');
-  };
-
   const handleGoogleLogin = () => {
-    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = googleRedirectUri();
     const url = authAPI.getGoogleAuthUrl(redirectUri);
     window.location.href = url;
   };
@@ -88,13 +84,12 @@ export function LoginForm({
               <div className="grid gap-3">
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
-                  <a
-                    href="/forgot-password"
-                    onClick={handleForgotPasswordLink}
+                  <Link
+                    to="/forgot-password"
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                   >
                     Forgot your password?
-                  </a>
+                  </Link>
                 </div>
                 <Input
                   id="password"

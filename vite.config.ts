@@ -5,6 +5,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+  // SPA is served under /app (landing owns /). Vite prefixes root-absolute
+  // asset URLs and import.meta.env.BASE_URL with this in dev and build.
+  base: '/app/',
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
     include: [
@@ -23,6 +26,9 @@ export default defineConfig({
     },
   },
   build: {
+    // Emit into dist/app so the SPA and the landing (dist/) coexist in one
+    // Vercel output dir. emptyOutDir defaults true and clears only dist/app.
+    outDir: 'dist/app',
     // Enable minification and tree-shaking
     minify: 'terser',
     terserOptions: {
@@ -114,7 +120,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5180,
     strictPort: true,
     proxy: {
       '/api': {

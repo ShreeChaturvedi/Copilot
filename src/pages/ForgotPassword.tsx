@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
 import {
   Card,
@@ -104,13 +104,9 @@ function ForgotPasswordForm({
               </div>
               <div className="mt-4 text-center text-sm">
                 Remembered your password?{' '}
-                <a
-                  href="/login"
-                  onClick={handleBackToLogin}
-                  className="underline underline-offset-4"
-                >
+                <Link to="/login" className="underline underline-offset-4">
                   Back to login
-                </a>
+                </Link>
               </div>
             </form>
           )}
