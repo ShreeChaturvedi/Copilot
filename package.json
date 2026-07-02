@@ -36,6 +36,7 @@
     "test:frontend:run": "vitest run --config vitest.config.ts",
     "test:l3": "vitest --config vitest.l3.config.ts",
     "test:l3:run": "vitest run --config vitest.l3.config.ts",
+    "test:sync": "vitest run --config vitest.backend.config.ts dbintegration",
     "test:all": "npm run test:run --workspaces --if-present && npm run test:frontend:run && npm run test:backend:run",
     "preview": "vite preview",
     "prepare": "husky",

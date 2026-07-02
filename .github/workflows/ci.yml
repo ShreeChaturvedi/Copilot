@@ -70,6 +70,11 @@ jobs:
       # L3 (real-handler integration) runs against its own database so it never
       # shares rows with the workspace suite above.
       L3_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/taskflow_l3_test
+      # Google-sync DB integration suites run against the Fake client + a real
+      # Postgres, gated on GOOGLE_SYNC_TEST_DB_URL. No real Google creds are
+      # needed; the encryption key just has to be a valid 32-byte hex string.
+      GOOGLE_SYNC_TEST_DB_URL: postgresql://postgres:postgres@localhost:5432/taskflow_sync_test
+      GOOGLE_TOKEN_ENC_KEY: 0000000000000000000000000000000000000000000000000000000000000000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,3 +99,9 @@ jobs:
           DATABASE_URL=$L3_DATABASE_URL npm run db:migrate
       - name: L3 real-handler integration suite (real DB)
         run: npm run test:l3:run
+      - name: Create + migrate the Google-sync database
+        run: |
+          node -e "const {Client}=require('pg');const c=new Client('postgresql://postgres:postgres@localhost:5432/postgres');c.connect().then(()=>c.query('CREATE DATABASE taskflow_sync_test')).catch(e=>{if(!String(e).includes('already exists'))throw e}).finally(()=>c.end())"
+          DATABASE_URL=$GOOGLE_SYNC_TEST_DB_URL npm run db:migrate
+      - name: Google-sync DB integration suites (Fake client, real DB)
+        run: npm run test:sync
