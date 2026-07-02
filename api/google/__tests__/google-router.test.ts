@@ -9,7 +9,8 @@ import {
   createMockRequest,
   createMockResponse,
 } from '../../../lib/__tests__/helpers/mockRequest.js';
-import handler, { isCronRequest } from '../[...route].js';
+import handler from '../[...route].js';
+import { isCronRequest } from '../../../lib/google/googleApi.js';
 
 const CRON_SECRET = 'a'.repeat(64);
 

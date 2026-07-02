@@ -7,6 +7,7 @@
  * mirror (scripts/dev-server.ts) call these, so behavior stays identical.
  * Failures throw ApiError so the shared error middleware shapes responses.
  */
+import { timingSafeEqual } from 'node:crypto';
 import { ApiError } from '../types/api.js';
 import {
   decryptToken,
@@ -136,6 +137,20 @@ async function handleGoogleFailure(
     );
   }
   throw error;
+}
+
+/**
+ * Constant-time bearer comparison against GOOGLE_SYNC_CRON_SECRET (the
+ * GitHub Actions reconciliation cron's credential).
+ */
+export function isCronRequest(authorization: string | undefined): boolean {
+  const secret = process.env.GOOGLE_SYNC_CRON_SECRET;
+  if (!secret || !authorization?.startsWith('Bearer ')) return false;
+  const presented = Buffer.from(authorization.slice(7));
+  const expected = Buffer.from(secret);
+  return (
+    presented.length === expected.length && timingSafeEqual(presented, expected)
+  );
 }
 
 // --- endpoint implementations -------------------------------------------------

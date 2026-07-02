@@ -20,7 +20,6 @@
  * M3 will add here: POST /api/google/webhook (public, channel-token
  * validated) and GET /api/google/cron/renew (Vercel cron, CRON_SECRET).
  */
-import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ApiError, HttpMethod } from '../../lib/types/api.js';
 import type { AuthenticatedRequest } from '../../lib/types/api.js';
@@ -128,17 +127,6 @@ const disconnectHandler = createApiHandler({
   },
 });
 
-/** Constant-time bearer comparison against GOOGLE_SYNC_CRON_SECRET. */
-export function isCronRequest(authorization: string | undefined): boolean {
-  const secret = process.env.GOOGLE_SYNC_CRON_SECRET;
-  if (!secret || !authorization?.startsWith('Bearer ')) return false;
-  const presented = Buffer.from(authorization.slice(7));
-  const expected = Buffer.from(secret);
-  return (
-    presented.length === expected.length && timingSafeEqual(presented, expected)
-  );
-}
-
 const jwtSyncHandler = createApiHandler({
   [HttpMethod.POST]: {
     method: HttpMethod.POST,
@@ -161,7 +149,7 @@ const syncHandler = asyncHandler(
         new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
       );
     }
-    if (isCronRequest(req.headers.authorization)) {
+    if (googleApi.isCronRequest(req.headers.authorization)) {
       sendSuccess(res, await googleApi.syncAllUsers());
       return;
     }
