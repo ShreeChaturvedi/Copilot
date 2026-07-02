@@ -41,6 +41,13 @@ tests.md
 *.db
 *.sqlite
 
+# Playwright (L5 E2E) — reports, traces, and captured server logs
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+/e2e/.artifacts/
+
 # Monorepo
 packages/*/dist
 packages/*/node_modules

@@ -108,6 +108,21 @@ export default tseslint.config([
       ],
     },
   },
+  // L5 Playwright E2E (Node context, its own runner) + the root config.
+  {
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
   // Relax strict any usage in tests/mocks
   {
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],

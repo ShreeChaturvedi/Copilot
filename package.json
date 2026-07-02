@@ -33,6 +33,8 @@
     "test:frontend:run": "vitest run --config vitest.config.ts",
     "test:l3": "vitest --config vitest.l3.config.ts",
     "test:l3:run": "vitest run --config vitest.l3.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report",
     "test:all": "npm run test:run --workspaces --if-present && npm run test:frontend:run && npm run test:backend:run",
     "preview": "vite preview",
     "prepare": "husky",
@@ -117,6 +119,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.1.11",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
