@@ -27,6 +27,15 @@ export function createApiHandler(
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
       const method = req.method as HttpMethod;
+
+      // CORS preflight must be answered before method dispatch: OPTIONS is never
+      // registered in the route table, so dispatching first returned 405 and
+      // corsMiddleware's OPTIONS branch was dead code (issue #65). Let cors set
+      // the preflight headers and end the response.
+      if (method === HttpMethod.OPTIONS) {
+        return corsMiddleware()(req, res, () => {});
+      }
+
       const route = routes[method];
 
       if (!route) {
@@ -87,6 +96,13 @@ export function createMethodHandler(
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
       const method = req.method as HttpMethod;
+
+      // Answer the CORS preflight before method dispatch (issue #65); OPTIONS is
+      // not a registered handler so it would otherwise 405.
+      if (method === HttpMethod.OPTIONS) {
+        return corsMiddleware()(req, res, () => {});
+      }
+
       const handler = handlers[method];
 
       if (!handler) {

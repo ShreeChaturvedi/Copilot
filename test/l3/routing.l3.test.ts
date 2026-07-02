@@ -5,7 +5,8 @@
  * Regression coverage for fixed routing/middleware bugs:
  *   #63 requireAuth routes now answer a clean 401 (the thrown UnauthorizedError
  *       used to be dropped by a floating next() and the request hung)
- *   #65 OPTIONS preflight (CORS) — pinned below until the preflight fix lands.
+ *   #65 OPTIONS preflight now returns 200 with CORS headers (corsMiddleware runs
+ *       before method dispatch instead of the request 405-ing)
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
@@ -105,8 +106,8 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
     });
   });
 
-  describe('OPTIONS / CORS (pins issue #65)', () => {
-    it('OPTIONS on a routed path returns 405, NOT the CORS preflight 200 (method dispatch precedes corsMiddleware)', async () => {
+  describe('OPTIONS / CORS (regression for issue #65)', () => {
+    it('OPTIONS on a routed path returns the CORS preflight 200 with headers (corsMiddleware runs before method dispatch)', async () => {
       const r = await req<Envelope>('OPTIONS', '/api/tasks', {
         headers: {
           Origin: 'https://l3.example.test',
@@ -114,13 +115,14 @@ describe.skipIf(!dbAvailable)('L3 routing / auth-pipeline contracts', () => {
           'Access-Control-Request-Headers': 'authorization,content-type',
         },
       });
-      // corsMiddleware's OPTIONS branch (lib/middleware/cors.ts:40-44) would
-      // send 200 + CORS headers, but createCrudHandler looks up routes[method]
-      // first and OPTIONS is never registered. Issue #65; flip to 200 when
-      // preflight handling lands.
-      expect(r.status).toBe(405);
-      expect(r.body.error?.code).toBe('METHOD_NOT_ALLOWED');
-      expect(r.headers.get('access-control-allow-origin')).toBeNull();
+      // corsMiddleware's OPTIONS branch (lib/middleware/cors.ts:40-44) now
+      // answers the preflight: the factories short-circuit OPTIONS before
+      // dispatching on the route table (issue #65).
+      expect(r.status).toBe(200);
+      expect(r.headers.get('access-control-allow-origin')).toBe(
+        'https://l3.example.test'
+      );
+      expect(r.headers.get('access-control-allow-methods')).toContain('POST');
     });
 
     it('normal responses DO carry CORS + security headers for an allow-listed Origin (FRONTEND_URL)', async () => {
