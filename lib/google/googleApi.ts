@@ -1,13 +1,19 @@
 /**
- * Transport-agnostic implementations of the /api/google/* endpoints (M1
- * subset of plan §3/§6): status, connect (auth URL + code exchange),
- * calendars list, link/import, pull sync, disconnect.
+ * Transport-agnostic implementations of the /api/google/* endpoints (plan
+ * §3/§6): status, connect (auth URL + code exchange), calendars list,
+ * link/import, pull sync, disconnect, plus the M3 push surface — webhook
+ * notification handling and the daily channel-renewal cron.
  *
  * Both the serverless function (api/google/[...route].ts) and the dev-server
  * mirror (scripts/dev-server.ts) call these, so behavior stays identical.
  * Failures throw ApiError so the shared error middleware shapes responses.
+ *
+ * Google-touching functions accept an injectable client factory (defaulting
+ * to the real fetch client) so the integration suite can drive the full
+ * endpoint logic with FakeGoogleCalendarClient.
  */
 import { timingSafeEqual } from 'node:crypto';
+import type { IncomingHttpHeaders } from 'node:http';
 import { ApiError } from '../types/api.js';
 import {
   decryptToken,
@@ -32,8 +38,25 @@ import {
 import { GoogleApiError, ReauthRequiredError } from './types.js';
 import { googleSyncService, type SyncStats } from './GoogleSyncService.js';
 import { combineDrainStats, drainUserOps, type DrainStats } from './outbox.js';
+import {
+  channelNeedsRenewal,
+  ensureChannel,
+  parseWebhookHeaders,
+  validateChannelToken,
+  webhookAddress,
+  RENEWAL_WINDOW_MS,
+  type EnsureChannelResult,
+} from './channels.js';
 import * as repo from './syncRepo.js';
 import { query } from '../config/database.js';
+
+/**
+ * Builds the authenticated Calendar client for an account. The default is
+ * the real fetch client; integration tests inject a Fake-backed factory.
+ */
+export type GoogleClientFactory = (
+  account: repo.GoogleAccountRow
+) => Promise<GoogleCalendarClient>;
 
 export interface GoogleLinkStatus {
   id: string;
@@ -140,17 +163,36 @@ async function handleGoogleFailure(
   throw error;
 }
 
-/**
- * Constant-time bearer comparison against GOOGLE_SYNC_CRON_SECRET (the
- * GitHub Actions reconciliation cron's credential).
- */
-export function isCronRequest(authorization: string | undefined): boolean {
-  const secret = process.env.GOOGLE_SYNC_CRON_SECRET;
+/** Constant-time bearer comparison. False when the secret is unset. */
+function bearerMatches(
+  authorization: string | undefined,
+  secret: string | undefined
+): boolean {
   if (!secret || !authorization?.startsWith('Bearer ')) return false;
   const presented = Buffer.from(authorization.slice(7));
   const expected = Buffer.from(secret);
   return (
     presented.length === expected.length && timingSafeEqual(presented, expected)
+  );
+}
+
+/**
+ * POST /api/google/sync cron mode: bearer must match GOOGLE_SYNC_CRON_SECRET
+ * (the GitHub Actions reconciliation cron's credential).
+ */
+export function isCronRequest(authorization: string | undefined): boolean {
+  return bearerMatches(authorization, process.env.GOOGLE_SYNC_CRON_SECRET);
+}
+
+/**
+ * GET /api/google/cron/renew credential: Vercel attaches `Bearer $CRON_SECRET`
+ * to cron invocations automatically. The GH-Actions reconciliation secret is
+ * accepted too so the owner can trigger a renewal sweep manually.
+ */
+export function isRenewCronRequest(authorization: string | undefined): boolean {
+  return (
+    bearerMatches(authorization, process.env.CRON_SECRET) ||
+    isCronRequest(authorization)
   );
 }
 
@@ -354,11 +396,12 @@ async function resolvePrimaryCalendarId(
  */
 export async function linkCalendar(
   userId: string,
-  googleCalendarId = 'primary'
+  googleCalendarId = 'primary',
+  clientFor: GoogleClientFactory = clientForAccount
 ): Promise<{ status: GoogleStatus; stats: SyncStats }> {
   requireConfigured();
   const account = await requireAccount(userId);
-  const client = await clientForAccount(account);
+  const client = await clientFor(account);
 
   // Never store the 'primary' alias (plan §1).
   const realId =
@@ -382,12 +425,29 @@ export async function linkCalendar(
     });
   }
 
+  let stats: SyncStats;
   try {
-    const stats = await googleSyncService.syncCalendar(client, link);
-    return { status: await getStatus(userId), stats };
+    stats = await googleSyncService.syncCalendar(client, link);
   } catch (error) {
     return handleGoogleFailure(userId, error);
   }
+
+  // M3: register the push channel. Best-effort — a watch failure must never
+  // fail the link/import; the 15-min pull reconciliation still converges and
+  // the renewal cron retries the watch daily.
+  const address = webhookAddress();
+  if (address) {
+    try {
+      await ensureChannel(client, link, address);
+    } catch (error) {
+      console.warn(
+        `events.watch failed for link ${link.id} (non-fatal):`,
+        error
+      );
+    }
+  }
+
+  return { status: await getStatus(userId), stats };
 }
 
 export interface UserSyncResult {
@@ -408,7 +468,10 @@ export interface UserSyncResult {
  * drain the outbox (oldest-first), pull every enabled link, then drain once
  * more so ops enqueued by the pull's merges propagate in the same cycle.
  */
-export async function syncUser(userId: string): Promise<UserSyncResult> {
+export async function syncUser(
+  userId: string,
+  clientFor: GoogleClientFactory = clientForAccount
+): Promise<UserSyncResult> {
   requireConfigured();
   const account = await requireAccount(userId);
   if (account.needsReauth) {
@@ -418,7 +481,7 @@ export async function syncUser(userId: string): Promise<UserSyncResult> {
       'Google connection needs to be re-authorized'
     );
   }
-  const client = await clientForAccount(account);
+  const client = await clientFor(account);
   const links = await repo.getLinksForUser(userId);
   const result: UserSyncResult = { userId, links: [] };
 
@@ -471,11 +534,19 @@ export async function syncUser(userId: string): Promise<UserSyncResult> {
 /**
  * POST /api/google/sync (cron mode) — reconciliation across all users
  * (GitHub Actions 15-min pull). Self-budgets so a serverless timeout never
- * kills a run mid-user; the next tick continues (plan §8).
+ * kills a run mid-user; the next tick continues (plan §8). Ends with the
+ * channel-renewal sweep (plan §3 safety net for the daily Vercel cron), so
+ * even a dead/expired channel is re-established within one 15-min tick.
  */
 export async function syncAllUsers(
-  budgetMs = 45_000
-): Promise<{ usersSynced: number; usersFailed: number; skipped: number }> {
+  budgetMs = 45_000,
+  clientFor: GoogleClientFactory = clientForAccount
+): Promise<{
+  usersSynced: number;
+  usersFailed: number;
+  skipped: number;
+  channels?: ChannelRenewStats;
+}> {
   requireConfigured();
   const startedAt = Date.now();
   const links = await repo.listSyncableLinks();
@@ -490,7 +561,7 @@ export async function syncAllUsers(
       continue;
     }
     try {
-      const result = await syncUser(userId);
+      const result = await syncUser(userId, clientFor);
       if (result.links.some((l) => l.error)) usersFailed++;
       else usersSynced++;
     } catch (error) {
@@ -498,7 +569,21 @@ export async function syncAllUsers(
       console.error(`Cron sync failed for user ${userId}:`, error);
     }
   }
-  return { usersSynced, usersFailed, skipped };
+
+  // Renewal sweep (no drain: syncUser already drained per user above).
+  let channels: ChannelRenewStats | undefined;
+  try {
+    channels = await renewChannels(
+      {
+        drainOps: false,
+        budgetMs: Math.max(budgetMs - (Date.now() - startedAt), 5_000),
+      },
+      clientFor
+    );
+  } catch (error) {
+    console.error('Channel renewal sweep failed (non-fatal):', error);
+  }
+  return { usersSynced, usersFailed, skipped, channels };
 }
 
 /**
@@ -509,7 +594,8 @@ export async function syncAllUsers(
  */
 export async function disconnect(
   userId: string,
-  removeImportedEvents = false
+  removeImportedEvents = false,
+  clientFor: GoogleClientFactory = clientForAccount
 ): Promise<{ removedEvents: number; unmappedEvents: number }> {
   const account = await requireAccount(userId);
 
@@ -520,16 +606,23 @@ export async function disconnect(
     // token unreadable; nothing to revoke
   }
 
-  // M3 channels: stop any live ones so Google stops pinging.
+  // M3 channels: stop any live ones so Google stops pinging. Channel columns
+  // die with the link rows below. Best-effort — an unstoppable channel
+  // expires within 7 days and its pings no longer match any stored channel.
   const links = await repo.getLinksForUser(userId);
-  for (const link of links) {
-    if (link.channelId && link.channelResourceId) {
-      try {
-        const client = await clientForAccount(account);
-        await client.stopChannel(link.channelId, link.channelResourceId);
-      } catch {
-        // channel will expire on its own
+  const watched = links.filter((l) => l.channelId && l.channelResourceId);
+  if (watched.length > 0) {
+    try {
+      const client = await clientFor(account);
+      for (const link of watched) {
+        try {
+          await client.stopChannel(link.channelId!, link.channelResourceId!);
+        } catch {
+          // channel will expire on its own
+        }
       }
+    } catch {
+      // no usable client (e.g. token undecryptable); channels will expire
     }
   }
 
@@ -543,3 +636,193 @@ export async function disconnect(
   await repo.deleteAccount(userId);
   return { removedEvents, unmappedEvents };
 }
+
+export interface WebhookResult {
+  outcome: 'ignored' | 'acknowledged' | 'synced' | 'sync_failed';
+  /** Why an 'ignored' notification was dropped (ops visibility only). */
+  reason?: string;
+  linkId?: string;
+  stats?: SyncStats;
+}
+
+/**
+ * POST /api/google/webhook (public — Google sends no auth; plan §3).
+ *
+ * Notifications have an empty body; everything is in X-Goog-* headers. The
+ * channel id resolves the link, the per-channel token (minted at watch time)
+ * authenticates the sender, and the ping itself carries no event data — any
+ * non-'sync' state just triggers an incremental pull of that link.
+ *
+ * Error contract: only a malformed request (missing channel/resource id, so
+ * demonstrably not from Google) throws (400). Everything else — unknown or
+ * expired channels, token mismatches, sync failures — resolves to a 200-able
+ * result: a non-2xx would make Google retry, which cannot help, and the
+ * 15-min reconciliation cron is the durable convergence path. The sync runs
+ * inline (an incremental pull is typically one events.list call) so a slow
+ * serverless freeze-after-response cannot kill it mid-write.
+ */
+export async function handleWebhook(
+  headers: IncomingHttpHeaders,
+  clientFor: GoogleClientFactory = clientForAccount
+): Promise<WebhookResult> {
+  const parsed = parseWebhookHeaders(headers);
+  if (!parsed) {
+    throw new ApiError(
+      400,
+      'INVALID_WEBHOOK',
+      'Missing X-Goog-Channel-ID / X-Goog-Resource-ID headers'
+    );
+  }
+  if (!isGoogleSyncConfigured()) {
+    return { outcome: 'ignored', reason: 'not_configured' };
+  }
+
+  const link = await repo.getLinkByChannelId(parsed.channelId);
+  if (!link) return { outcome: 'ignored', reason: 'unknown_channel' };
+  if (!validateChannelToken(parsed.token, link.channelToken)) {
+    console.warn(
+      `Webhook token mismatch for channel ${parsed.channelId} (link ${link.id})`
+    );
+    return { outcome: 'ignored', reason: 'token_mismatch' };
+  }
+  if (link.channelResourceId && parsed.resourceId !== link.channelResourceId) {
+    return { outcome: 'ignored', reason: 'resource_mismatch' };
+  }
+  if (link.channelExpiration && link.channelExpiration.getTime() < Date.now()) {
+    return { outcome: 'ignored', reason: 'channel_expired' };
+  }
+
+  // First ping after watch ('sync' state, message number 1): ack only.
+  if (parsed.state === 'sync') {
+    return { outcome: 'acknowledged', linkId: link.id };
+  }
+  if (!link.syncEnabled) {
+    return { outcome: 'ignored', reason: 'link_disabled', linkId: link.id };
+  }
+  const account = await repo.getAccount(link.userId);
+  if (!account || !account.syncEnabled || account.needsReauth) {
+    return {
+      outcome: 'ignored',
+      reason: 'account_unavailable',
+      linkId: link.id,
+    };
+  }
+
+  try {
+    const client = await clientFor(account);
+    const stats = await googleSyncService.syncCalendar(client, link);
+    return { outcome: 'synced', linkId: link.id, stats };
+  } catch (error) {
+    // syncCalendar already recorded lastError on the link; flag dead grants
+    // so the Settings panel shows the reauth banner.
+    try {
+      await handleGoogleFailure(link.userId, error);
+    } catch {
+      // mapped/rethrown — the transport still answers 200 to Google
+    }
+    console.error(`Webhook sync failed for link ${link.id}:`, error);
+    return { outcome: 'sync_failed', linkId: link.id };
+  }
+}
+
+export interface ChannelRenewStats {
+  /** Resolved webhook address; null disables watch entirely. */
+  address: string | null;
+  /** Links whose channel was missing or expiring within 48h. */
+  due: number;
+  created: number;
+  renewed: number;
+  failed: number;
+  skipped: number;
+  /** Opportunistic outbox drain totals (GET /api/google/cron/renew only). */
+  outbound?: DrainStats;
+}
+
+/**
+ * GET /api/google/cron/renew (daily Vercel cron; plan §3) — re-watch every
+ * channel expiring within 48h (watch new, then stop old) and, by default,
+ * opportunistically drain overdue outbox ops. Also invoked (drain off) as
+ * the renewal sweep at the end of every reconciliation run.
+ */
+export async function renewChannels(
+  opts: { drainOps?: boolean; budgetMs?: number } = {},
+  clientFor: GoogleClientFactory = clientForAccount
+): Promise<ChannelRenewStats> {
+  requireConfigured();
+  const budgetMs = opts.budgetMs ?? 45_000;
+  const startedAt = Date.now();
+  const address = webhookAddress();
+  const stats: ChannelRenewStats = {
+    address,
+    due: 0,
+    created: 0,
+    renewed: 0,
+    failed: 0,
+    skipped: 0,
+  };
+  if (!address) return stats; // no public URL -> pull-only mode
+
+  const due = await repo.listLinksDueForChannelRenewal(
+    new Date(Date.now() + RENEWAL_WINDOW_MS)
+  );
+  stats.due = due.length;
+
+  const clients = new Map<string, GoogleCalendarClient>();
+  const deadUsers = new Set<string>();
+  for (const link of due) {
+    if (deadUsers.has(link.userId) || Date.now() - startedAt > budgetMs) {
+      stats.skipped++;
+      continue;
+    }
+    try {
+      let client = clients.get(link.userId);
+      if (!client) {
+        const account = await repo.getAccount(link.userId);
+        if (!account || !account.syncEnabled || account.needsReauth) {
+          stats.skipped++;
+          continue;
+        }
+        client = await clientFor(account);
+        clients.set(link.userId, client);
+      }
+      const result: EnsureChannelResult = await ensureChannel(
+        client,
+        link,
+        address
+      );
+      if (result === 'created') stats.created++;
+      else if (result === 'renewed') stats.renewed++;
+    } catch (error) {
+      stats.failed++;
+      console.error(`Channel renewal failed for link ${link.id}:`, error);
+      if (error instanceof ReauthRequiredError || isInvalidGrantError(error)) {
+        await repo.markAccountNeedsReauth(
+          link.userId,
+          error instanceof Error ? error.message : String(error)
+        );
+        deadUsers.add(link.userId);
+      }
+    }
+  }
+
+  if (opts.drainOps !== false) {
+    for (const userId of await repo.listUserIdsWithDueOps()) {
+      if (Date.now() - startedAt > budgetMs) break;
+      try {
+        const account = await repo.getAccount(userId);
+        if (!account || !account.syncEnabled || account.needsReauth) continue;
+        const client = clients.get(userId) ?? (await clientFor(account));
+        stats.outbound = combineDrainStats(
+          stats.outbound,
+          await drainUserOps(client, userId)
+        );
+      } catch (error) {
+        console.error(`Renewal-cron drain failed for user ${userId}:`, error);
+      }
+    }
+  }
+  return stats;
+}
+
+// Re-exported so the router/tests reason about the renewal window in one place.
+export { channelNeedsRenewal, webhookAddress };
