@@ -69,7 +69,7 @@ flowchart LR
 
 - **Frontend**: Vite 5, React 19, TypeScript 5.8, Tailwind CSS v4 with Radix UI / shadcn primitives. Zustand holds client state, TanStack Query holds server state with optimistic updates and rollback.
 - **API**: two Vercel functions. `api/[...route].ts` matches 38 routes and dispatches to one handler file per endpoint in `api/_handlers/`, each wrapped in the same middleware chain (CORS, request ID, rate limiting, JWT auth, Zod validation). `api/google/[...route].ts` is a separate function for Calendar sync: 8 routes including the webhook receiver and a daily `cron/renew` Vercel cron.
-- **Database**: plain SQL over the `pg` driver, no ORM. 9 migrations in `lib/config/migrations/`, applied transactionally by `npm run db:migrate` and recorded in `schema_migrations`.
+- **Database**: plain SQL over the `pg` driver, no ORM. 10 migrations in `lib/config/migrations/`, applied transactionally by `npm run db:migrate` and recorded in `schema_migrations`.
 - **Files and email**: Vercel Blob stores attachments, Resend sends password-reset mail.
 - **CI**: GitHub Actions with three jobs. `checks` runs lint, typecheck, the no-DB test suites, and both builds. `backend-db` boots a Postgres 16 service, runs the migrations, then runs the real-database suites (backend workspace, L2, L3, Google sync). `e2e` boots the full stack and runs the Playwright browser suite in parallel. A separate scheduled workflow triggers the production sync reconcile every 15 minutes.
 
@@ -163,7 +163,7 @@ taskflow-calendar/
 │   ├── google/[...route].ts  # second function: Calendar sync, webhook, cron
 │   └── _handlers/            # one handler file per endpoint
 ├── lib/                      # services, middleware, Google sync engine
-│   └── config/migrations/    # 9 plain-SQL migrations
+│   └── config/migrations/    # 10 plain-SQL migrations
 ├── packages/
 │   ├── shared/               # types and Zod schemas shared by both sides
 │   └── backend/              # auth services (JWT, refresh rotation, OAuth)
