@@ -31,6 +31,7 @@ import {
 } from './GoogleCalendarClient.js';
 import { GoogleApiError, ReauthRequiredError } from './types.js';
 import { googleSyncService, type SyncStats } from './GoogleSyncService.js';
+import { combineDrainStats, drainUserOps, type DrainStats } from './outbox.js';
 import * as repo from './syncRepo.js';
 import { query } from '../config/database.js';
 
@@ -397,11 +398,15 @@ export interface UserSyncResult {
     stats?: SyncStats;
     error?: string;
   }>;
+  /** Outbox drain totals for the cycle (M2). */
+  outbound?: DrainStats;
+  outboundError?: string;
 }
 
 /**
- * POST /api/google/sync (JWT mode) — pull-sync every enabled link of one
- * user. M2 will drain the google_sync_ops outbox here before pulling.
+ * POST /api/google/sync (JWT mode) — one full sync cycle for a user (M2):
+ * drain the outbox (oldest-first), pull every enabled link, then drain once
+ * more so ops enqueued by the pull's merges propagate in the same cycle.
  */
 export async function syncUser(userId: string): Promise<UserSyncResult> {
   requireConfigured();
@@ -416,6 +421,25 @@ export async function syncUser(userId: string): Promise<UserSyncResult> {
   const client = await clientForAccount(account);
   const links = await repo.getLinksForUser(userId);
   const result: UserSyncResult = { userId, links: [] };
+
+  const drain = async (): Promise<void> => {
+    try {
+      result.outbound = combineDrainStats(
+        result.outbound,
+        await drainUserOps(client, userId)
+      );
+    } catch (error) {
+      // drainUserOps only throws on a dead grant (account already flagged)
+      // or an unexpected internal error; both end the cycle.
+      if (error instanceof ReauthRequiredError || isInvalidGrantError(error)) {
+        return handleGoogleFailure(userId, error);
+      }
+      result.outboundError =
+        error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  await drain();
 
   for (const link of links) {
     if (!link.syncEnabled) continue;
@@ -435,10 +459,12 @@ export async function syncUser(userId: string): Promise<UserSyncResult> {
       });
       if (error instanceof ReauthRequiredError || isInvalidGrantError(error)) {
         await repo.markAccountNeedsReauth(userId, message);
-        break; // remaining links share the dead grant
+        return result; // remaining links (and drain) share the dead grant
       }
     }
   }
+
+  await drain();
   return result;
 }
 

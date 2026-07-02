@@ -44,6 +44,8 @@ export interface CalendarLinkRow {
 export interface MappedEventRow {
   id: string;
   title: string;
+  description: string | null;
+  location: string | null;
   start: Date;
   end: Date;
   allDay: boolean;
@@ -52,7 +54,32 @@ export interface MappedEventRow {
   calendarId: string;
   googleEventId: string | null;
   googleEtag: string | null;
+  googleUpdatedAt: Date | null;
+  googleSyncSnapshot: Record<string, unknown> | null;
   updatedAt: Date;
+}
+
+export interface TombstoneRow {
+  id: string;
+  userId: string;
+  googleCalendarId: string;
+  googleEventId: string;
+  deletedAt: Date;
+}
+
+export interface SyncOpRow {
+  id: string;
+  userId: string;
+  op: 'insert' | 'patch' | 'delete';
+  eventId: string | null;
+  googleCalendarId: string;
+  googleEventId: string | null;
+  payload: Record<string, unknown> | null;
+  ifMatchEtag: string | null;
+  attempts: number;
+  nextAttemptAt: Date;
+  lastError: string | null;
+  createdAt: Date;
 }
 
 const LINK_COLUMNS = `id, "userId", "googleCalendarId", "appCalendarId", "syncToken",
@@ -246,7 +273,7 @@ export async function createImportCalendar(
 
 // --- events (mapping-aware writes) ----------------------------------------------
 
-function snapshotOf(fields: AppEventFields): string {
+export function snapshotOf(fields: AppEventFields): string {
   return JSON.stringify({
     title: fields.title,
     description: fields.description,
@@ -265,13 +292,23 @@ export async function getEventByGoogleId(
   client?: SqlClient
 ): Promise<MappedEventRow | null> {
   const res = await query<MappedEventRow>(
-    `SELECT id, title, start, "end", "allDay", recurrence, exceptions,
-            "calendarId", "googleEventId", "googleEtag", "updatedAt"
+    `SELECT id, title, description, location, start, "end", "allDay",
+            recurrence, exceptions, "calendarId", "googleEventId",
+            "googleEtag", "googleUpdatedAt", "googleSyncSnapshot", "updatedAt"
      FROM events WHERE "userId" = $1 AND "googleEventId" = $2`,
     [userId, googleEventId],
     client
   );
   return res.rows[0] ?? null;
+}
+
+/** User's IANA timezone for outbound payloads (user_profiles, default UTC). */
+export async function getUserTimezone(userId: string): Promise<string> {
+  const res = await query<{ timezone: string | null }>(
+    'SELECT timezone FROM user_profiles WHERE "userId" = $1',
+    [userId]
+  );
+  return res.rows[0]?.timezone || 'UTC';
 }
 
 /**
@@ -366,6 +403,11 @@ export async function deleteEventByGoogleId(
 /**
  * Add an occurrence-start ISO to a recurring master's exceptions (dedup) by
  * the master's Google event id. No-ops when the master is not mapped locally.
+ * The exclusion is also recorded under the snapshot's `instanceExceptions`
+ * key: it is INSTANCE-derived (Google models it as an override/cancelled
+ * instance, not an EXDATE), so the merge must not read it as an app-side
+ * addition and no outbound EXDATE may ever be written for it — an EXDATE on
+ * an overridden instance cancels the override on Google.
  * Returns true when the exception was added.
  */
 export async function addExceptionToMaster(
@@ -376,7 +418,15 @@ export async function addExceptionToMaster(
 ): Promise<boolean> {
   const res = await query(
     `UPDATE events
-     SET exceptions = array_append(exceptions, $3), "updatedAt" = NOW()
+     SET exceptions = array_append(exceptions, $3),
+         "googleSyncSnapshot" = CASE
+           WHEN "googleSyncSnapshot" IS NULL THEN NULL
+           ELSE jsonb_set(
+             "googleSyncSnapshot", '{instanceExceptions}',
+             COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb)
+               || to_jsonb($3::text))
+         END,
+         "updatedAt" = NOW()
      WHERE "userId" = $1 AND "googleEventId" = $2
        AND NOT ($3 = ANY(exceptions))`,
     [userId, masterGoogleEventId, occurrenceIso],
@@ -431,6 +481,428 @@ export async function deleteImportedEventsForUser(
     [userId]
   );
   return res.rowCount ?? 0;
+}
+
+/**
+ * Write the outcome of a three-way merge onto an existing row: content fields
+ * exactly as merged (exceptions are NOT unioned — the merge already decided),
+ * plus inbound bookkeeping (etag/updated/snapshot = the merged state).
+ */
+export async function applyMergedEvent(
+  tx: PoolClient,
+  input: {
+    eventId: string;
+    /** Merged synced fields; exceptions = the EXDATE-backed set only. */
+    fields: AppEventFields;
+    etag: string;
+    googleUpdatedAt: Date | null;
+    /** Instance-derived exclusions to preserve (see addExceptionToMaster). */
+    instanceExceptions?: string[];
+  }
+): Promise<void> {
+  const { fields } = input;
+  const instance = [...new Set(input.instanceExceptions ?? [])].sort();
+  const rowExceptions = [
+    ...new Set([...fields.exceptions, ...instance]),
+  ].sort();
+  const snapshot = JSON.parse(snapshotOf(fields)) as Record<string, unknown>;
+  snapshot.instanceExceptions = instance;
+  await query(
+    `UPDATE events SET
+       title = $2, description = $3, location = $4, start = $5, "end" = $6,
+       "allDay" = $7, recurrence = $8, exceptions = $9,
+       "googleEtag" = $10, "googleUpdatedAt" = $11, "lastSyncedAt" = NOW(),
+       "googleSyncSnapshot" = $12::jsonb, "updatedAt" = NOW()
+     WHERE id = $1`,
+    [
+      input.eventId,
+      fields.title,
+      fields.description,
+      fields.location,
+      fields.start.toISOString(),
+      fields.end.toISOString(),
+      fields.allDay,
+      fields.recurrence,
+      rowExceptions,
+      input.etag,
+      input.googleUpdatedAt?.toISOString() ?? null,
+      JSON.stringify(snapshot),
+    ],
+    tx
+  );
+}
+
+/**
+ * Strip a row's Google mapping so it can be re-inserted as a NEW Google event
+ * (edit-vs-delete: the app's edit outlived Google's cancellation; cancelled
+ * ids are not revivable).
+ */
+export async function clearEventMapping(
+  tx: PoolClient,
+  eventId: string
+): Promise<void> {
+  await query(
+    `UPDATE events SET "googleEventId" = NULL, "googleCalendarId" = NULL,
+       "googleEtag" = NULL, "googleUpdatedAt" = NULL, "lastSyncedAt" = NULL,
+       "googleSyncSnapshot" = NULL
+     WHERE id = $1`,
+    [eventId],
+    tx
+  );
+}
+
+/**
+ * Record a successful outbound insert on the app row. The snapshot is built
+ * from the row's OWN current columns (not the Google response): the base must
+ * equal what the app believes was synced, so Google-side canonicalization
+ * (e.g. RRULE reordering) later reads as an inbound change, never as a
+ * phantom app edit. Returns false when the row no longer exists (deleted
+ * locally mid-flight) — the caller must then enqueue a compensating delete.
+ */
+export async function markEventInserted(
+  db: SqlClient,
+  input: {
+    eventId: string;
+    googleEventId: string;
+    googleCalendarId: string;
+    etag: string;
+    googleUpdatedAt: Date | null;
+  }
+): Promise<boolean> {
+  const res = await query(
+    `UPDATE events SET
+       "googleEventId" = $2, "googleCalendarId" = $3, "googleEtag" = $4,
+       "googleUpdatedAt" = $5, "lastSyncedAt" = NOW(),
+       "googleSyncSnapshot" = ${ROW_SNAPSHOT_SQL}
+     WHERE id = $1`,
+    [
+      input.eventId,
+      input.googleEventId,
+      input.googleCalendarId,
+      input.etag,
+      input.googleUpdatedAt?.toISOString() ?? null,
+    ],
+    db
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Record a successful outbound patch (same snapshot-from-row semantics). */
+export async function markEventPatched(
+  db: SqlClient,
+  input: { eventId: string; etag: string; googleUpdatedAt: Date | null }
+): Promise<boolean> {
+  const res = await query(
+    `UPDATE events SET
+       "googleEtag" = $2, "googleUpdatedAt" = $3, "lastSyncedAt" = NOW(),
+       "googleSyncSnapshot" = ${ROW_SNAPSHOT_SQL}
+     WHERE id = $1`,
+    [input.eventId, input.etag, input.googleUpdatedAt?.toISOString() ?? null],
+    db
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+// `to_char` with the literal ISO shape Date.toISOString() emits, so snapshot
+// comparisons in the merge are exact string matches. The snapshot's
+// `exceptions` are the EXDATE-backed set (row exceptions MINUS the
+// instance-derived ones, which are preserved under `instanceExceptions`).
+const ROW_SNAPSHOT_SQL = `jsonb_build_object(
+  'title', title, 'description', description, 'location', location,
+  'start', to_char(start, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'end', to_char("end", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'allDay', "allDay", 'recurrence', recurrence,
+  'exceptions', (
+    SELECT COALESCE(jsonb_agg(e ORDER BY e), '[]'::jsonb)
+    FROM unnest(exceptions) AS e
+    WHERE NOT COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb) ? e
+  ),
+  'instanceExceptions',
+    COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb))`;
+
+/** Minimal existence/mapping probe used by the outbox drain. */
+export async function getEventCore(
+  eventId: string,
+  db?: SqlClient
+): Promise<{
+  id: string;
+  userId: string;
+  googleEventId: string | null;
+  googleEtag: string | null;
+} | null> {
+  const res = await query<{
+    id: string;
+    userId: string;
+    googleEventId: string | null;
+    googleEtag: string | null;
+  }>(
+    'SELECT id, "userId", "googleEventId", "googleEtag" FROM events WHERE id = $1',
+    [eventId],
+    db
+  );
+  return res.rows[0] ?? null;
+}
+
+// --- google_event_tombstones -----------------------------------------------------
+
+export async function upsertTombstone(
+  db: SqlClient,
+  input: { userId: string; googleCalendarId: string; googleEventId: string }
+): Promise<void> {
+  await query(
+    `INSERT INTO google_event_tombstones ("userId", "googleCalendarId", "googleEventId")
+     VALUES ($1, $2, $3)
+     ON CONFLICT ("userId", "googleEventId")
+     DO UPDATE SET "deletedAt" = NOW(), "googleCalendarId" = EXCLUDED."googleCalendarId"`,
+    [input.userId, input.googleCalendarId, input.googleEventId],
+    db
+  );
+}
+
+export async function getTombstone(
+  userId: string,
+  googleEventId: string,
+  db?: SqlClient
+): Promise<TombstoneRow | null> {
+  const res = await query<TombstoneRow>(
+    `SELECT id, "userId", "googleCalendarId", "googleEventId", "deletedAt"
+     FROM google_event_tombstones WHERE "userId" = $1 AND "googleEventId" = $2`,
+    [userId, googleEventId],
+    db
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deleteTombstone(
+  db: SqlClient,
+  userId: string,
+  googleEventId: string
+): Promise<void> {
+  await query(
+    'DELETE FROM google_event_tombstones WHERE "userId" = $1 AND "googleEventId" = $2',
+    [userId, googleEventId],
+    db
+  );
+}
+
+// --- google_sync_ops (outbox) ------------------------------------------------------
+//
+// Enqueues COALESCE per event: a still-pending op of the same kind is updated
+// in place (fresh payload/etag, made due immediately) instead of stacking a
+// second op. The drain claims ops by bumping nextAttemptAt, so a coalesce
+// that lands mid-flight resets nextAttemptAt and the drain's guarded delete
+// (WHERE nextAttemptAt = claimed value) leaves the refreshed op for the next
+// round — a concurrent edit can never be silently dropped.
+
+const OP_COLUMNS = `id, "userId", op, "eventId", "googleCalendarId", "googleEventId",
+  payload, "ifMatchEtag", attempts, "nextAttemptAt", "lastError", "createdAt"`;
+
+export async function enqueueInsertOp(
+  db: SqlClient,
+  input: {
+    userId: string;
+    eventId: string;
+    googleCalendarId: string;
+    payload: Record<string, unknown>;
+  }
+): Promise<void> {
+  const updated = await query(
+    `UPDATE google_sync_ops
+     SET payload = $3::jsonb, "nextAttemptAt" = NOW(), "lastError" = NULL
+     WHERE "userId" = $1 AND "eventId" = $2 AND op = 'insert'`,
+    [input.userId, input.eventId, JSON.stringify(input.payload)],
+    db
+  );
+  if ((updated.rowCount ?? 0) > 0) return;
+  await query(
+    `INSERT INTO google_sync_ops ("userId", op, "eventId", "googleCalendarId", payload)
+     VALUES ($1, 'insert', $2, $3, $4::jsonb)`,
+    [
+      input.userId,
+      input.eventId,
+      input.googleCalendarId,
+      JSON.stringify(input.payload),
+    ],
+    db
+  );
+}
+
+export async function enqueuePatchOp(
+  db: SqlClient,
+  input: {
+    userId: string;
+    eventId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    payload: Record<string, unknown>;
+    ifMatchEtag: string | null;
+  }
+): Promise<void> {
+  const updated = await query(
+    `UPDATE google_sync_ops
+     SET payload = $3::jsonb, "ifMatchEtag" = $4, "googleEventId" = $5,
+         "nextAttemptAt" = NOW(), "lastError" = NULL
+     WHERE "userId" = $1 AND "eventId" = $2 AND op = 'patch'`,
+    [
+      input.userId,
+      input.eventId,
+      JSON.stringify(input.payload),
+      input.ifMatchEtag,
+      input.googleEventId,
+    ],
+    db
+  );
+  if ((updated.rowCount ?? 0) > 0) return;
+  await query(
+    `INSERT INTO google_sync_ops
+       ("userId", op, "eventId", "googleCalendarId", "googleEventId", payload, "ifMatchEtag")
+     VALUES ($1, 'patch', $2, $3, $4, $5::jsonb, $6)`,
+    [
+      input.userId,
+      input.eventId,
+      input.googleCalendarId,
+      input.googleEventId,
+      JSON.stringify(input.payload),
+      input.ifMatchEtag,
+    ],
+    db
+  );
+}
+
+export async function enqueueDeleteOp(
+  db: SqlClient,
+  input: {
+    userId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    ifMatchEtag: string | null;
+  }
+): Promise<void> {
+  const updated = await query(
+    `UPDATE google_sync_ops
+     SET "ifMatchEtag" = $3, "nextAttemptAt" = NOW(), "lastError" = NULL
+     WHERE "userId" = $1 AND "googleEventId" = $2 AND op = 'delete'`,
+    [input.userId, input.googleEventId, input.ifMatchEtag],
+    db
+  );
+  if ((updated.rowCount ?? 0) > 0) return;
+  await query(
+    `INSERT INTO google_sync_ops
+       ("userId", op, "googleCalendarId", "googleEventId", "ifMatchEtag")
+     VALUES ($1, 'delete', $2, $3, $4)`,
+    [
+      input.userId,
+      input.googleCalendarId,
+      input.googleEventId,
+      input.ifMatchEtag,
+    ],
+    db
+  );
+}
+
+/** Drop pending insert/patch ops for an app event (row deleted or merged). */
+export async function deletePendingUpsertOps(
+  db: SqlClient,
+  userId: string,
+  eventId: string
+): Promise<number> {
+  const res = await query(
+    `DELETE FROM google_sync_ops
+     WHERE "userId" = $1 AND "eventId" = $2 AND op IN ('insert', 'patch')`,
+    [userId, eventId],
+    db
+  );
+  return res.rowCount ?? 0;
+}
+
+/** Drop pending delete ops for a Google event (Google's side won, or done). */
+export async function deletePendingDeleteOps(
+  db: SqlClient,
+  userId: string,
+  googleEventId: string
+): Promise<number> {
+  const res = await query(
+    `DELETE FROM google_sync_ops
+     WHERE "userId" = $1 AND "googleEventId" = $2 AND op = 'delete'`,
+    [userId, googleEventId],
+    db
+  );
+  return res.rowCount ?? 0;
+}
+
+/** Due op ids for one user, oldest-first per calendar (plan §2 drain order). */
+export async function listDueOpIds(userId: string): Promise<string[]> {
+  const res = await query<{ id: string }>(
+    `SELECT id FROM google_sync_ops
+     WHERE "userId" = $1 AND "nextAttemptAt" <= NOW()
+     ORDER BY "googleCalendarId" ASC, "createdAt" ASC, id ASC`,
+    [userId]
+  );
+  return res.rows.map((r) => r.id);
+}
+
+/**
+ * Claim a due op: bump attempts and push nextAttemptAt 2 minutes out so no
+ * concurrent drain grabs it while the Google call is in flight (no row lock
+ * held across the network call). Returns null when already claimed/undue.
+ */
+export async function claimOp(opId: string): Promise<SyncOpRow | null> {
+  // date_trunc to milliseconds: the claim value round-trips through a JS
+  // Date (ms precision), and deleteClaimedOp matches it exactly.
+  const res = await query<SyncOpRow>(
+    `UPDATE google_sync_ops
+     SET attempts = attempts + 1,
+         "nextAttemptAt" = date_trunc('milliseconds', NOW() + interval '120 seconds')
+     WHERE id = $1 AND "nextAttemptAt" <= NOW()
+     RETURNING ${OP_COLUMNS}`,
+    [opId]
+  );
+  return res.rows[0] ?? null;
+}
+
+/**
+ * Remove a completed/dropped op — guarded on the claim's nextAttemptAt so an
+ * op that was coalesce-refreshed mid-flight survives with its new payload.
+ * Returns false when the op was refreshed (kept).
+ */
+export async function deleteClaimedOp(
+  db: SqlClient,
+  op: SyncOpRow
+): Promise<boolean> {
+  const res = await query(
+    'DELETE FROM google_sync_ops WHERE id = $1 AND "nextAttemptAt" = $2',
+    [op.id, op.nextAttemptAt.toISOString()],
+    db
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/**
+ * Record a retryable failure: exponential backoff on the attempts counter,
+ * min(2^attempts minutes, 1 hour) per plan §8 (the in-request client backoff
+ * is latency smoothing; this is the durable layer).
+ */
+export async function recordOpFailure(
+  op: SyncOpRow,
+  error: string
+): Promise<void> {
+  await query(
+    `UPDATE google_sync_ops
+     SET "nextAttemptAt" = NOW() +
+           LEAST(interval '1 minute' * power(2, attempts), interval '1 hour'),
+         "lastError" = $2
+     WHERE id = $1`,
+    [op.id, error.slice(0, 500)]
+  );
+}
+
+/** Pending-op count for a user (tests + status surfacing). */
+export async function countPendingOps(userId: string): Promise<number> {
+  const res = await query<{ count: string }>(
+    'SELECT COUNT(*)::bigint AS count FROM google_sync_ops WHERE "userId" = $1',
+    [userId]
+  );
+  return Number(res.rows[0]?.count ?? 0);
 }
 
 export { withTransaction };

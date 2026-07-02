@@ -6,7 +6,23 @@ import {
   type ServiceContext,
   type UserOwnedEntity,
 } from './BaseService.js';
-import { query } from '../config/database.js';
+import {
+  pool,
+  query,
+  withTransaction,
+  type SqlClient,
+} from '../config/database.js';
+import {
+  captureEventDelete,
+  captureEventInsert,
+  captureEventUpdate,
+  getLinkTargetForCalendar,
+  getOutboundTarget,
+  scheduleOutboundDrain,
+  targetIsSynced,
+  type OutboundEventRow,
+  type OutboundTarget,
+} from '../google/outbound.js';
 // rrule ships an ESM type surface but a CJS (webpack) runtime build whose
 // named exports are not statically detectable by the Node/tsx ESM loader. A
 // default import resolves to module.exports (which carries rrulestr) and works
@@ -146,6 +162,22 @@ export class EventService extends BaseService<
   }
 
   /**
+   * Run a write plus its Google outbox capture. When this service uses the
+   * global pool (the normal case) both run in ONE transaction (plan §2:
+   * enqueue transactionally with the local write); when the service was
+   * constructed with a caller-supplied client (tests), they run sequentially
+   * on that client, which is typically already transaction-managed.
+   */
+  private async withOutboxTransaction<T>(
+    work: (db: SqlClient) => Promise<T>
+  ): Promise<T> {
+    if (this.db === pool) {
+      return withTransaction(async (tx) => work(tx));
+    }
+    return work(this.db);
+  }
+
+  /**
    * Override create to satisfy required relations (user, calendar)
    */
   async create(
@@ -157,28 +189,53 @@ export class EventService extends BaseService<
       await this.validateCreate(data, context);
       await this.ensureUserExists(context?.userId, 'dev@example.com');
 
-      const inserted = await query(
-        `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, color, exceptions, "userId", "calendarId", "createdAt", "updatedAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
-         RETURNING *`,
-        [
-          data.title.trim(),
-          data.description?.trim() || null,
-          this.toTimestampParam(data.start),
-          this.toTimestampParam(data.end),
-          data.allDay ?? false,
-          data.location?.trim() || null,
-          data.notes?.trim() || null,
-          data.recurrence || null,
-          data.color || null,
-          data.exceptions ?? [],
-          context!.userId!,
-          data.calendarId,
-        ],
-        this.db
-      );
+      // M2 (#27): a create on a Google-linked calendar enqueues an outbound
+      // insert op transactionally with the row; unlinked calendars keep the
+      // exact pre-M2 single-INSERT path.
+      const target =
+        context?.userId && !context.skipGoogleSync
+          ? await getLinkTargetForCalendar(
+              data.calendarId,
+              context.userId,
+              this.db
+            )
+          : null;
 
-      const row = inserted.rows[0];
+      const insertSql = `INSERT INTO events (id, title, description, start, "end", "allDay", location, notes, recurrence, color, exceptions, "userId", "calendarId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+         RETURNING *`;
+      const insertParams = [
+        data.title.trim(),
+        data.description?.trim() || null,
+        this.toTimestampParam(data.start),
+        this.toTimestampParam(data.end),
+        data.allDay ?? false,
+        data.location?.trim() || null,
+        data.notes?.trim() || null,
+        data.recurrence || null,
+        data.color || null,
+        data.exceptions ?? [],
+        context!.userId!,
+        data.calendarId,
+      ];
+
+      let row;
+      if (target) {
+        row = await this.withOutboxTransaction(async (db) => {
+          const inserted = await query(insertSql, insertParams, db);
+          await captureEventInsert(
+            db,
+            inserted.rows[0] as OutboundEventRow,
+            target
+          );
+          return inserted.rows[0];
+        });
+        scheduleOutboundDrain(context!.userId!);
+      } else {
+        const inserted = await query(insertSql, insertParams, this.db);
+        row = inserted.rows[0];
+      }
+
       this.log('create:success', { id: row.id }, context);
       return this.transformEntity(row);
     } catch (error) {
@@ -490,6 +547,42 @@ export class EventService extends BaseService<
   }
 
   /**
+   * Resolve the Google sync target for an update (M2 #27): the row's current
+   * mapping/link state, plus — when the update moves the event to another
+   * calendar — the destination calendar's link (moving an unmapped event
+   * onto a linked calendar must enqueue its first insert).
+   */
+  private async resolveUpdateTarget(
+    id: string,
+    data: UpdateEventDTO,
+    context?: ServiceContext
+  ): Promise<OutboundTarget | null> {
+    if (!context?.userId || context.skipGoogleSync) return null;
+    const target = await getOutboundTarget(id, this.db);
+    if (!target) return null;
+    if (
+      !target.googleEventId &&
+      !target.linkGoogleCalendarId &&
+      data.calendarId &&
+      data.calendarId !== target.calendarId
+    ) {
+      const moved = await getLinkTargetForCalendar(
+        data.calendarId,
+        target.userId,
+        this.db
+      );
+      if (moved) {
+        return {
+          ...target,
+          linkGoogleCalendarId: moved.googleCalendarId,
+          timezone: moved.timezone,
+        };
+      }
+    }
+    return targetIsSynced(target) ? target : null;
+  }
+
+  /**
    * Update event by ID
    */
   async update(
@@ -498,6 +591,10 @@ export class EventService extends BaseService<
     context?: ServiceContext
   ): Promise<EventEntity | null> {
     await this.validateUpdate(id, data, context);
+
+    // M2 (#27): updates of Google-synced rows enqueue an outbound patch (or
+    // the first insert) transactionally with the local write.
+    const target = await this.resolveUpdateTarget(id, data, context);
 
     const sets: string[] = [];
     const params: Array<string | boolean | null | Date | string[]> = [];
@@ -552,11 +649,57 @@ export class EventService extends BaseService<
     params.push(id);
 
     const sql = `UPDATE events SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`;
-    const res = await query(sql, params, this.db);
-    if (res.rowCount === 0) return null;
-    const base = this.transformEntity(res.rows[0]);
+
+    let row: unknown;
+    if (target) {
+      row = await this.withOutboxTransaction(async (db) => {
+        const res = await query(sql, params, db);
+        if (res.rowCount === 0) return null;
+        await captureEventUpdate(db, res.rows[0] as OutboundEventRow, target);
+        return res.rows[0];
+      });
+      if (!row) return null;
+      scheduleOutboundDrain(target.userId);
+    } else {
+      const res = await query(sql, params, this.db);
+      if (res.rowCount === 0) return null;
+      row = res.rows[0];
+    }
+
+    const base = this.transformEntity(row);
     const [enriched] = await this.enrichEntities([base], context);
     return enriched;
+  }
+
+  /**
+   * Delete event by ID.
+   *
+   * M2 (#27): deleting a Google-synced row also — in the same transaction —
+   * cancels its pending insert/patch ops, writes a google_event_tombstones
+   * row (so edit-vs-delete can be resolved by timestamp and the outbound
+   * delete can retry after the row is gone), and enqueues the outbound
+   * delete with the last-known etag as the If-Match guard. Unsynced rows
+   * keep the plain BaseService.delete path.
+   */
+  async delete(id: string, context?: ServiceContext): Promise<boolean> {
+    if (context?.skipGoogleSync) return super.delete(id, context);
+
+    const target = await getOutboundTarget(id, this.db);
+    if (!targetIsSynced(target)) return super.delete(id, context);
+
+    try {
+      this.log('delete', { id }, context);
+      await this.withOutboxTransaction((db) =>
+        captureEventDelete(db, id, target!)
+      );
+      scheduleOutboundDrain(target!.userId);
+      this.log('delete:success', { id }, context);
+      return true;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log('delete:error', { error: message, id }, context);
+      throw error;
+    }
   }
 
   /**
