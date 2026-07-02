@@ -10,6 +10,7 @@ import {
   ArrowUpZA,
   Calendar,
   CalendarClock,
+  ChevronLeft,
   Flag,
   AlertTriangle,
   Clock,
@@ -19,13 +20,17 @@ import {
   List,
   Search,
   Plus,
+  SquareKanban,
   X,
   Check,
   Columns2,
   Columns3,
   ArrowDownToDot,
 } from 'lucide-react';
-import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
+import {
+  SharedToggleButton,
+  type ToggleOption,
+} from '@/components/ui/SharedToggleButton';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +67,8 @@ export interface TaskControlsProps {
   onToggleAddTaskInput?: () => void;
   isAddTaskInputVisible?: boolean;
   paneCount?: number;
+  /** Name of the list the board is scoped to (back-chevron label, #56) */
+  boardListName?: string;
 }
 
 /**
@@ -133,7 +140,8 @@ const SORT_OPTIONS: Array<{
   },
 ];
 
-// Define view mode options for the SharedToggleButton
+// Define view mode options for the SharedToggleButton.
+// Board is a first-class mode with a real active state (fixes #56).
 const VIEW_MODE_OPTIONS: ToggleOption<TaskViewMode>[] = [
   {
     value: 'folder',
@@ -144,6 +152,11 @@ const VIEW_MODE_OPTIONS: ToggleOption<TaskViewMode>[] = [
     value: 'list',
     label: 'List',
     icon: List,
+  },
+  {
+    value: 'kanban',
+    label: 'Board',
+    icon: SquareKanban,
   },
 ];
 
@@ -299,6 +312,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
   onToggleAddTaskInput,
   isAddTaskInputVisible = false,
   paneCount = 1,
+  boardListName,
 }) => {
   // Suppress unused variable warning - taskCount kept for interface compatibility
   void taskCount;
@@ -358,27 +372,57 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [today]);
-  const todayTitle = useMemo(() => format(toLocal(today), 'MMMM d, yyyy'), [today]);
+  const todayTitle = useMemo(
+    () => format(toLocal(today), 'MMMM d, yyyy'),
+    [today]
+  );
 
   return (
-    <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center gap-4', className)}>
-      {/* Left Section - Sidebar Trigger + Today title */}
-      <div className="flex items-center gap-3 justify-self-start">
+    <div
+      className={cn(
+        'grid items-center gap-4 grid-cols-[1fr_auto_1fr]',
+        // Mobile: title + actions on row one, view switcher on row two
+        // (the three sections do not fit side by side under 768px)
+        "max-md:gap-2 max-md:grid-cols-[minmax(0,1fr)_auto] max-md:[grid-template-areas:'left_right'_'center_center']",
+        className
+      )}
+    >
+      {/* Left Section - Sidebar Trigger + Today title (board mode swaps in
+          a back chevron labeled with the list name, fixes #56) */}
+      <div className="flex items-center gap-3 justify-self-start min-w-0 max-md:[grid-area:left]">
         <SmoothSidebarTrigger position="rightPane" />
-        <h2 className="text-lg font-semibold text-foreground">
-          {todayTitle.includes(' ')
-            ? (
-                <>
-                  <span className="font-bold">{todayTitle.split(' ')[0]}</span>
-                  <span className="font-normal"> {todayTitle.split(' ').slice(1).join(' ')}</span>
-                </>
-              )
-            : todayTitle}
-        </h2>
+        {taskViewMode === 'kanban' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 px-1.5 -ml-1.5 min-w-0"
+            onClick={() => setTaskViewMode('folder')}
+            aria-label={`Back to lists from ${boardListName ?? 'board'}`}
+          >
+            <ChevronLeft className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-base font-semibold text-foreground truncate">
+              {boardListName ?? 'Tasks'}
+            </span>
+          </Button>
+        ) : (
+          <h2 className="text-lg font-semibold text-foreground">
+            {todayTitle.includes(' ') ? (
+              <>
+                <span className="font-bold">{todayTitle.split(' ')[0]}</span>
+                <span className="font-normal">
+                  {' '}
+                  {todayTitle.split(' ').slice(1).join(' ')}
+                </span>
+              </>
+            ) : (
+              todayTitle
+            )}
+          </h2>
+        )}
       </div>
 
       {/* Center Section - View Mode Toggle */}
-      <div className="justify-self-center">
+      <div className="justify-self-center max-md:[grid-area:center]">
         <SharedToggleButton
           currentValue={taskViewMode}
           options={VIEW_MODE_OPTIONS}
@@ -390,7 +434,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       </div>
 
       {/* Right Section - Icon-Only Controls */}
-      <div className="flex items-center gap-1 justify-self-end">
+      <div className="flex items-center gap-1 justify-self-end max-md:[grid-area:right]">
         {/* Grouped Action Buttons */}
         <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1">
           {/* Animated Search */}
@@ -517,7 +561,6 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             )}
           </div>
 
-
           {/* Add Pane Button (columns icon based on count) */}
           {onAddPane && taskViewMode === 'list' && (
             <Tooltip>
@@ -551,17 +594,17 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                   onClick={onToggleAddTaskInput}
                   size="sm"
                   className={cn(
-                    "h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out",
-                    "bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95",
-                    "text-secondary-foreground shadow-xs border border-border/20",
-                    "hover:scale-105 hover:shadow-lg hover:shadow-secondary/20",
-                    "hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90",
-                    "before:absolute before:inset-0 before:bg-gradient-to-r",
-                    "before:from-transparent before:via-black/15 before:to-transparent",
-                    "dark:before:via-white/15",
-                    "before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]",
-                    "hover:before:translate-x-[150%]",
-                    "active:scale-[1.02] active:shadow-md"
+                    'h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out',
+                    'bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95',
+                    'text-secondary-foreground shadow-xs border border-border/20',
+                    'hover:scale-105 hover:shadow-lg hover:shadow-secondary/20',
+                    'hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90',
+                    'before:absolute before:inset-0 before:bg-gradient-to-r',
+                    'before:from-transparent before:via-black/15 before:to-transparent',
+                    'dark:before:via-white/15',
+                    'before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]',
+                    'hover:before:translate-x-[150%]',
+                    'active:scale-[1.02] active:shadow-md'
                   )}
                   aria-label="Add task"
                 >

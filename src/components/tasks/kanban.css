@@ -1,0 +1,331 @@
+/* ============================================================
+   Kanban board (design-brief §4.3) — columns as gutters, cards
+   as settled chips, THE DROP SETTLE motion grammar.
+   Tokens come from src/index.css; nothing here invents a color.
+   ============================================================ */
+
+/* ---- Card: the same object as the calendar chip ---- */
+.kanban-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-1);
+  border-radius: 8px;
+  /* transparent 1px border keeps box metrics identical when the vacated
+     slot swaps to a dashed etch border */
+  border: 1px solid transparent;
+  box-shadow: var(--edge-machined), var(--shadow-1);
+  padding: 9px 11px;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kanban-card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* 3px left bar in the list color (chip formula, §2.4) */
+.kanban-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--chip-c, var(--hairline-strong));
+}
+
+/* Pre-rendered rim-flash ring (§5): a 1px aqua inset ring that always
+   exists at opacity 0; ONLY opacity ever animates, never box-shadow. */
+.kanban-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--aqua);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kanban-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.kanban-card--done .kanban-card-title {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+.kanban-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  min-height: 14px;
+}
+
+/* Due chip: every time-numeral is mono (§3) */
+.kanban-due {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+}
+.kanban-due--today {
+  color: var(--aqua);
+}
+.kanban-due--overdue {
+  color: var(--destructive);
+}
+
+/* Colorless priority glyph (bars carry the level, ink carries no hue) */
+.kanban-priority {
+  margin-left: auto;
+  color: var(--ink-muted);
+  display: inline-flex;
+  flex: none;
+}
+
+/* Hover-revealed card menu; touch devices keep it visible at 40% (§4.9) */
+.kanban-card-menu {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .kanban-card:hover .kanban-card-menu,
+  .kanban-card:focus-within .kanban-card-menu {
+    opacity: 1;
+    transition-duration: 0s; /* instant on, 150ms off (§5) */
+  }
+}
+.kanban-card-menu:focus-within,
+.kanban-card-menu[data-open='true'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .kanban-card-menu {
+    opacity: 0.4;
+  }
+}
+
+/* ---- Drag phases ---- */
+
+/* Vacated slot: the dashed etched drawing of the card that left (§2.5) */
+.kanban-card--vacated {
+  background: transparent;
+  border: 1px dashed var(--etch-strong);
+  box-shadow: none;
+  cursor: default;
+}
+.kanban-card--vacated::before,
+.kanban-card--vacated::after {
+  opacity: 0;
+}
+.kanban-card--vacated > * {
+  opacity: 0;
+}
+
+/* Landing: the real card stays invisible while the DragOverlay travels
+   onto it (320ms, --ease-settle), then reveals with the rim flash */
+.kanban-card--landing {
+  opacity: 0;
+}
+
+.kanban-card--flash::after {
+  animation: kanban-rim-flash 240ms var(--ease-out) forwards;
+}
+
+@keyframes kanban-rim-flash {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Pick-up (DragOverlay): 160ms to scale 1.03 / rotate 1.5deg, shadow-3
+   applied statically (transform+opacity only ever animate) */
+.kanban-card--lifted {
+  box-shadow: var(--edge-machined), var(--shadow-3);
+  cursor: grabbing;
+  animation: kanban-pickup 160ms var(--ease-out) forwards;
+}
+
+@keyframes kanban-pickup {
+  from {
+    transform: none;
+  }
+  to {
+    transform: scale(1.03) rotate(1.5deg);
+  }
+}
+
+/* ---- Gap in the target column: opens 200ms, grid-rows only (§5) ---- */
+.kanban-gap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms var(--ease-settle);
+}
+.kanban-gap--open {
+  grid-template-rows: 1fr;
+}
+.kanban-gap-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.kanban-gap-slot {
+  border: 1px dashed var(--etch-strong);
+  border-radius: 8px;
+}
+
+/* ---- Empty column ---- */
+
+/* At rest: ghost "+ New task" row */
+.kanban-ghost-new {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed var(--etch-strong);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--etch-text);
+  cursor: pointer;
+  transition:
+    color var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out);
+}
+.kanban-ghost-new:hover {
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  transition-duration: 0s;
+}
+.kanban-ghost-new:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* During drag: full-height dashed etch target + aqua film */
+.kanban-drop-target {
+  flex: 1;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--etch-strong);
+  border-radius: 8px;
+  background: var(--aqua-film-04);
+}
+.kanban-drop-target--over {
+  border-color: var(--aqua-rim);
+  background: var(--aqua-film-08);
+}
+.kanban-drop-target-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--etch-text);
+}
+
+/* ---- Column header (28px) ---- */
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 2px;
+  flex: none;
+}
+.kanban-col-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.kanban-col-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ink-muted);
+}
+.kanban-col-add {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .kanban-column:hover .kanban-col-add {
+    opacity: 1;
+    transition-duration: 0s;
+  }
+}
+.kanban-col-add:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .kanban-col-add {
+    opacity: 0.4;
+  }
+}
+
+/* ---- Mobile pager dots (display set via Tailwind flex/md:hidden) ---- */
+.kanban-pager {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0 10px;
+}
+.kanban-pager-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  border: none;
+  padding: 0;
+  background: var(--hairline-strong);
+  transition: background-color var(--dur-2) var(--ease-out);
+}
+.kanban-pager-dot--active {
+  background: var(--ink-2);
+}
+
+/* ---- Reduced motion (§5): travel becomes a crossfade, the flash
+   becomes a 240ms static ring at 20%, nothing else moves ---- */
+@media (prefers-reduced-motion: reduce) {
+  .kanban-card--lifted {
+    animation: none;
+  }
+  .kanban-gap {
+    transition: none;
+  }
+  .kanban-card--flash::after {
+    animation: kanban-rim-flash-static 240ms step-end forwards;
+  }
+}
+
+@keyframes kanban-rim-flash-static {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 0;
+  }
+}
