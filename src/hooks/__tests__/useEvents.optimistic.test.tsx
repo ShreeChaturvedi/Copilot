@@ -2,10 +2,9 @@
  * Optimistic-update + rollback coverage for the event mutations (issue #21,
  * test-audit §L4 / §6.5). Real api client (src/services/api/events) over MSW.
  *
- * Note on create-rollback: eventApi.createEvent swallows a backend 5xx and
- * falls back to localStorage, so a create resolves even when the server errors
- * — there is no rollback to assert on that path. Rollback is therefore covered
- * through update and delete, whose clients reject cleanly on a 5xx.
+ * Create-rollback: eventApi.createEvent now rejects on a JSON error response
+ * instead of swallowing the 5xx into a localStorage fallback (#72), so the
+ * optimistic temp event rolls back and onError toasts — asserted below.
  */
 import {
   describe,
@@ -140,6 +139,47 @@ describe('useEvents — create (optimistic)', () => {
       expect(c.some((e) => e.id === 'srv-new')).toBe(true);
       expect(c.some((e) => e.id.startsWith('temp-'))).toBe(false);
     });
+  });
+
+  it('rolls back the temp event and toasts when the create fails (5xx)', async () => {
+    seed([evt('a', 'Standup')]);
+    const gate = deferred();
+    server.use(
+      getEvents,
+      getCalendars,
+      http.post('/api/events', async () => {
+        await gate.promise;
+        return fail('create blew up');
+      })
+    );
+    const { result, queryClient } = await mountEvents();
+
+    act(() =>
+      result.current.create.mutate({
+        title: 'Review',
+        start: new Date(START),
+        end: new Date(END),
+        calendarName: 'Personal',
+      })
+    );
+
+    // Optimistic temp event is inserted while the request is in flight.
+    await waitFor(() => {
+      const c = cache(queryClient);
+      expect(c).toHaveLength(2);
+      expect(c.some((e) => e.id.startsWith('temp-'))).toBe(true);
+    });
+
+    gate.resolve();
+
+    // The 5xx propagates (no localStorage swallow), so onError rolls back to
+    // the pre-mutation snapshot and surfaces a toast.
+    await waitFor(() => {
+      const c = cache(queryClient);
+      expect(c).toHaveLength(1);
+      expect(c.some((e) => e.id.startsWith('temp-'))).toBe(false);
+    });
+    expect(toast.error).toHaveBeenCalled();
   });
 });
 

@@ -150,41 +150,41 @@ export const eventApi = {
       // ignore; we'll rely on backend legacy bridge via calendarName
     }
 
-    try {
-      const res = await fetch(`${apiBase}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          ...payload,
-          ...(calendarId
-            ? { calendarId }
-            : { calendarName: data.calendarName }),
-        }),
-      });
-      if (isJson(res)) {
-        const body = await res.json();
-        if (!res.ok || !body.success)
-          throw new Error(body.error?.message || 'Failed to create event');
-        const e = body.data as Record<string, unknown>;
-        const calendar = e.calendar as Record<string, unknown> | undefined;
-        const calendarName =
-          (e.calendarName as string | undefined) ??
-          (calendar?.name as string | undefined) ??
-          data.calendarName;
-        return {
-          ...(e as object),
-          calendarName,
-          start: new Date(e.start as string),
-          end: new Date(e.end as string),
-          createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
-          updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
-        } as CalendarEvent;
-      }
-    } catch {
-      // fall back to local storage below
+    // A JSON response from the backend is authoritative: an error one
+    // ({ success:false } / non-2xx) must REJECT so the mutation rolls back and
+    // toasts (#72). Do NOT swallow it into the localStorage fallback — that
+    // hid real 5xx/auth failures and lost the event on the next refetch. The
+    // localStorage path below is reached only for a genuine non-JSON response
+    // (dev with no serverless route), matching taskApi and deleteEvent.
+    const res = await fetch(`${apiBase}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        ...payload,
+        ...(calendarId ? { calendarId } : { calendarName: data.calendarName }),
+      }),
+    });
+    if (isJson(res)) {
+      const body = await res.json();
+      if (!res.ok || !body.success)
+        throw new Error(body.error?.message || 'Failed to create event');
+      const e = body.data as Record<string, unknown>;
+      const calendar = e.calendar as Record<string, unknown> | undefined;
+      const calendarName =
+        (e.calendarName as string | undefined) ??
+        (calendar?.name as string | undefined) ??
+        data.calendarName;
+      return {
+        ...(e as object),
+        calendarName,
+        start: new Date(e.start as string),
+        end: new Date(e.end as string),
+        createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
+        updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
+      } as CalendarEvent;
     }
 
-    // Fallback to local storage
+    // Fallback to local storage (non-JSON response only)
     const newEvent: CalendarEvent = {
       id: uuidv4(),
       title: data.title.trim(),
@@ -211,58 +211,56 @@ export const eventApi = {
     id: string,
     data: UpdateEventData
   ): Promise<CalendarEvent> => {
-    // Try backend first
-    try {
-      const payload: Record<string, unknown> = { ...data };
-      if (payload.start instanceof Date)
-        payload.start = toUTC(payload.start).toISOString();
-      if (payload.end instanceof Date)
-        payload.end = toUTC(payload.end).toISOString();
-      // The backend's UpdateEventDTO understands calendarId, not calendarName,
-      // and the PUT handler has no calendarName bridge. Mirror the create path:
-      // resolve the selected calendar name to its id so moving an event to a
-      // different calendar actually persists (#38). Only fall back to sending
-      // calendarName if resolution fails.
-      if (data.calendarName !== undefined) {
-        delete payload.calendarName;
-        let calendarId: string | undefined;
-        try {
-          const calendars = await calendarApi.fetchCalendars();
-          calendarId = calendars.find((c) => c.name === data.calendarName)?.id;
-        } catch {
-          // ignore; fall back to calendarName below
-        }
-        if (calendarId) payload.calendarId = calendarId;
-        else payload.calendarName = data.calendarName;
+    // Try backend first. A JSON error response must REJECT (roll back + toast,
+    // #72), never fall through to localStorage; only a genuine non-JSON
+    // response (dev with no serverless route) uses the local fallback below.
+    const payload: Record<string, unknown> = { ...data };
+    if (payload.start instanceof Date)
+      payload.start = toUTC(payload.start).toISOString();
+    if (payload.end instanceof Date)
+      payload.end = toUTC(payload.end).toISOString();
+    // The backend's UpdateEventDTO understands calendarId, not calendarName,
+    // and the PUT handler has no calendarName bridge. Mirror the create path:
+    // resolve the selected calendar name to its id so moving an event to a
+    // different calendar actually persists (#38). Only fall back to sending
+    // calendarName if resolution fails.
+    if (data.calendarName !== undefined) {
+      delete payload.calendarName;
+      let calendarId: string | undefined;
+      try {
+        const calendars = await calendarApi.fetchCalendars();
+        calendarId = calendars.find((c) => c.name === data.calendarName)?.id;
+      } catch {
+        // ignore; fall back to calendarName below
       }
-      const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify(payload),
-      });
-      if (isJson(res)) {
-        const body = await res.json();
-        if (!res.ok || !body.success)
-          throw new Error(body.error?.message || 'Failed to update event');
-        const e = body.data as Record<string, unknown>;
-        const calendar = e.calendar as Record<string, unknown> | undefined;
-        const calendarName =
-          (e.calendarName as string | undefined) ??
-          (calendar?.name as string | undefined);
-        return {
-          ...(e as object),
-          calendarName,
-          start: new Date(e.start as string),
-          end: new Date(e.end as string),
-          createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
-          updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
-        } as CalendarEvent;
-      }
-    } catch {
-      // fall back
+      if (calendarId) payload.calendarId = calendarId;
+      else payload.calendarName = data.calendarName;
+    }
+    const res = await fetch(`${apiBase}/events/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (isJson(res)) {
+      const body = await res.json();
+      if (!res.ok || !body.success)
+        throw new Error(body.error?.message || 'Failed to update event');
+      const e = body.data as Record<string, unknown>;
+      const calendar = e.calendar as Record<string, unknown> | undefined;
+      const calendarName =
+        (e.calendarName as string | undefined) ??
+        (calendar?.name as string | undefined);
+      return {
+        ...(e as object),
+        calendarName,
+        start: new Date(e.start as string),
+        end: new Date(e.end as string),
+        createdAt: e.createdAt ? new Date(e.createdAt as string) : undefined,
+        updatedAt: e.updatedAt ? new Date(e.updatedAt as string) : undefined,
+      } as CalendarEvent;
     }
 
-    // Fallback to local storage validation
+    // Fallback to local storage validation (non-JSON response only)
     if (
       data.title !== undefined ||
       data.start !== undefined ||
@@ -391,10 +389,13 @@ export const eventApi = {
     if (params.excludeEventId)
       search.set('excludeEventId', params.excludeEventId);
 
-    const res = await fetch(`${apiBase}/events/conflicts?${search.toString()}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    });
+    const res = await fetch(
+      `${apiBase}/events/conflicts?${search.toString()}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      }
+    );
     if (!isJson(res)) return [];
     const body = await res.json();
     if (!res.ok || !body.success)
