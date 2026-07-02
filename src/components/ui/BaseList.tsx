@@ -1,3 +1,4 @@
+import { COLOR_PRESETS, DEFAULT_PRESET_COLOR } from '@/constants/colors';
 import React, { useState, ReactNode } from 'react';
 import {
   Plus,
@@ -56,16 +57,8 @@ export interface SelectionModeItem extends BaseListItem {
   id: string; // Required for selection mode
 }
 
-const DEFAULT_COLORS = [
-  '#3b82f6', // Blue
-  '#ef4444', // Red
-  '#10b981', // Green
-  '#f59e0b', // Amber
-  '#8b5cf6', // Purple
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#84cc16', // Lime
-];
+// Curated swatch palette shared app-wide (design-brief §2.4)
+const DEFAULT_COLORS = [...COLOR_PRESETS];
 
 export interface BaseListProps<T extends BaseListItem> {
   items: T[];
@@ -161,7 +154,8 @@ export function BaseList<T extends BaseListItem>({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(DEFAULT_COLORS[0]);
+  const [selectedColor, setSelectedColor] =
+    useState<string>(DEFAULT_PRESET_COLOR);
   const [recentColors, setRecentColors] = useState<string[]>([]);
 
   const handleAddItem = () => {
@@ -169,14 +163,14 @@ export function BaseList<T extends BaseListItem>({
     if (trimmedName) {
       onAdd(trimmedName, selectedColor);
       setNewItemName('');
-      setSelectedColor(DEFAULT_COLORS[0]);
+      setSelectedColor(DEFAULT_PRESET_COLOR);
       setIsAddingItem(false);
     }
   };
 
   const handleCancelAdd = () => {
     setNewItemName('');
-    setSelectedColor(DEFAULT_COLORS[0]);
+    setSelectedColor(DEFAULT_PRESET_COLOR);
     setIsAddingItem(false);
   };
 
@@ -514,7 +508,12 @@ function BaseListItem<T extends BaseListItem>({
             aria-label={`Select ${item.name}`}
             aria-pressed={isActive}
           >
-            <span className={cn('text-[18px] leading-none', isActive ? '' : 'opacity-80')}>
+            <span
+              className={cn(
+                'text-[18px] leading-none',
+                isActive ? '' : 'opacity-80'
+              )}
+            >
               {item.emoji ?? '📁'}
             </span>
           </button>
@@ -546,7 +545,11 @@ function BaseListItem<T extends BaseListItem>({
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => (onStartEdit ? onStartEdit(item) : setIsEditing(true))}>
+              <DropdownMenuItem
+                onClick={() =>
+                  onStartEdit ? onStartEdit(item) : setIsEditing(true)
+                }
+              >
                 <Edit className="mr-2 h-4 w-4" />
                 <span>Edit</span>
               </DropdownMenuItem>

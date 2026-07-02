@@ -44,22 +44,25 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     title: string,
     _groupId?: string,
     smartData?: {
-      priority?: 'low' | 'medium' | 'high'
-      scheduledDate?: Date
+      priority?: 'low' | 'medium' | 'high';
+      scheduledDate?: Date;
       tags?: Array<{
-        id: string
-        type: string
-        value: string
-        displayText: string
-        iconName: string
-        color?: string
-      }>
-      originalInput?: string
-      title?: string
+        id: string;
+        type: string;
+        value: string;
+        displayText: string;
+        iconName: string;
+        color?: string;
+      }>;
+      originalInput?: string;
+      title?: string;
     },
-    files?: UploadedFile[],
+    files?: UploadedFile[]
   ) => {
-    const taskListId = _groupId && _groupId !== 'default' && _groupId !== 'all' ? _groupId : undefined;
+    const taskListId =
+      _groupId && _groupId !== 'default' && _groupId !== 'all'
+        ? _groupId
+        : undefined;
     addTask.mutate({
       title,
       taskListId,
@@ -68,7 +71,14 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       tags: smartData?.tags?.map((tag) => ({
         id: tag.id,
         // enforce union-compatible tag type
-        type: tag.type as 'date' | 'time' | 'priority' | 'location' | 'person' | 'label' | 'project',
+        type: tag.type as
+          | 'date'
+          | 'time'
+          | 'priority'
+          | 'location'
+          | 'person'
+          | 'label'
+          | 'project',
         value: typeof tag.value === 'string' ? tag.value : String(tag.value),
         displayText: tag.displayText,
         iconName: tag.iconName,
@@ -104,8 +114,14 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
   const canAddPane = taskPanes.length < maxTaskPanes && taskViewMode === 'list';
 
   // Show/Hide enhanced input on demand
-  const { enhancedInputVisible, setEnhancedInputVisible, enhancedInputTaskListId, setEnhancedInputTaskListId } = useSettingsStore();
-  const [showEnhancedInput, setShowEnhancedInput] = useState(enhancedInputVisible);
+  const {
+    enhancedInputVisible,
+    setEnhancedInputVisible,
+    enhancedInputTaskListId,
+    setEnhancedInputTaskListId,
+  } = useSettingsStore();
+  const [showEnhancedInput, setShowEnhancedInput] =
+    useState(enhancedInputVisible);
   const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
   const handleHideAddTaskInput = () => setShowEnhancedInput(false);
 
@@ -123,7 +139,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
 
     const tryFocus = () => {
       for (const id of focusTargets) {
-        const el = document.getElementById(id) as HTMLTextAreaElement | HTMLInputElement | null;
+        const el = document.getElementById(id) as
+          | HTMLTextAreaElement
+          | HTMLInputElement
+          | null;
         if (el) {
           el.focus();
           if ('select' in el && typeof el.select === 'function') {
@@ -177,27 +196,31 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       {/* Scheduling Drop Zones - Only visible when dragging */}
       {dragState.isDragging && (
         <div className="px-6 py-4 border-b border-border bg-muted/20 transition-all duration-200 ease-out">
+          {/* Token-based drop targets (theme-aware): Today is the live/aqua
+              target, the rest are neutral wells (design-brief §2.3) */}
           <div className="flex items-center gap-3 h-12">
-            <div className="flex-1 h-11 bg-green-50 border border-green-200 rounded-lg flex items-center justify-center hover:bg-green-100 transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-green-700">Today</span>
+            <div className="flex-1 h-11 bg-aqua-film-08 border border-aqua-rim rounded-lg flex items-center justify-center hover:bg-aqua-film-08 hover:border-primary transition-colors cursor-pointer">
+              <span className="text-sm font-medium text-primary">Today</span>
             </div>
-            <div className="flex-1 h-11 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-blue-700">
+            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
+              <span className="text-sm font-medium text-foreground">
                 Tomorrow
               </span>
             </div>
-            <div className="flex-1 h-11 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-center hover:bg-purple-100 transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-purple-700">
+            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
+              <span className="text-sm font-medium text-foreground">
                 This Week
               </span>
             </div>
-            <div className="flex-1 h-11 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-center hover:bg-orange-100 transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-orange-700">
+            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
+              <span className="text-sm font-medium text-foreground">
                 Next Week
               </span>
             </div>
-            <div className="flex-1 h-11 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-gray-700">Later</span>
+            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
+              <span className="text-sm font-medium text-muted-foreground">
+                Later
+              </span>
             </div>
           </div>
         </div>
@@ -233,7 +256,12 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                   handleAddTask(...args);
                   handleHideAddTaskInput();
                 }}
-                onAddTaskWithFiles={(title, groupId, smart: SmartTaskData | undefined, files) => {
+                onAddTaskWithFiles={(
+                  title,
+                  groupId,
+                  smart: SmartTaskData | undefined,
+                  files
+                ) => {
                   const normalizedSmart = smart
                     ? {
                         priority: smart.priority,
@@ -241,7 +269,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                         tags: smart.tags?.map((t) => ({
                           id: t.id,
                           type: t.type,
-                          value: typeof t.value === 'string' ? t.value : String(t.value),
+                          value:
+                            typeof t.value === 'string'
+                              ? t.value
+                              : String(t.value),
                           displayText: t.displayText,
                           iconName: t.iconName,
                           color: t.color,
@@ -250,7 +281,12 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
                         title: smart.title,
                       }
                     : undefined;
-                  handleAddTaskWithFiles(title, groupId, normalizedSmart, files);
+                  handleAddTaskWithFiles(
+                    title,
+                    groupId,
+                    normalizedSmart,
+                    files
+                  );
                   handleHideAddTaskInput();
                 }}
                 taskGroups={taskGroups}

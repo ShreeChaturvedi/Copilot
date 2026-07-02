@@ -72,7 +72,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#3b82f6',
+    color: '#0d97d5',
     description: 'Default task group',
   };
 
@@ -103,7 +103,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             className
           )}
         >
-           {isAllSelected ? (
+          {isAllSelected ? (
             <>
               <div style={{ color: 'hsl(var(--muted-foreground))' }}>
                 <List className="w-4 h-4" />
@@ -112,10 +112,10 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
             </>
           ) : (
             <>
-              <div className="text-base">
-                {activeTaskGroup?.emoji}
-              </div>
-              <span className="text-sm font-medium">{activeTaskGroup?.name}</span>
+              <div className="text-base">{activeTaskGroup?.emoji}</div>
+              <span className="text-sm font-medium">
+                {activeTaskGroup?.name}
+              </span>
             </>
           )}
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
@@ -143,7 +143,12 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   </div>
                   <span>All Tasks</span>
                 </div>
-                <Check className={cn('ml-auto h-4 w-4', isAllSelected ? 'opacity-100' : 'opacity-0')} />
+                <Check
+                  className={cn(
+                    'ml-auto h-4 w-4',
+                    isAllSelected ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -153,16 +158,17 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   key={group.id}
                   value={group.id}
                   onSelect={(currentValue) => {
-                    if (currentValue !== activeTaskGroupId && onSelectTaskGroup) {
+                    if (
+                      currentValue !== activeTaskGroupId &&
+                      onSelectTaskGroup
+                    ) {
                       onSelectTaskGroup(currentValue);
                     }
                     setOpen(false);
                   }}
                 >
                   <div className="flex items-center gap-2 flex-1">
-                    <div className="text-base">
-                      {group.emoji}
-                    </div>
+                    <div className="text-base">{group.emoji}</div>
                     <span>{group.name}</span>
                   </div>
                   <Check

@@ -4,19 +4,10 @@
 
 /* CSS Custom Properties for theme consistency */
 .fc {
+  /* Today wash = aqua film (design-brief §2.3/§4.4); the token itself is
+     theme-tiered (5% light / 6% dark), so no .dark override is needed */
   --fc-border-color: var(--border);
-  --fc-today-bg-color: oklch(
-    0.7 0.15 140 / 0.15
-  ) !important; /* Muted green for today */
-  --fc-page-bg-color: var(--background) !important;
-  --fc-neutral-bg-color: var(--background) !important;
-}
-
-.dark .fc {
-  --fc-border-color: var(--border);
-  --fc-today-bg-color: oklch(
-    0.7 0.15 140 / 0.1
-  ) !important; /* Muted green for dark mode */
+  --fc-today-bg-color: var(--aqua-film-04) !important;
   --fc-page-bg-color: var(--background) !important;
   --fc-neutral-bg-color: var(--background) !important;
 }
@@ -57,17 +48,10 @@
    CURRENT DAY STYLING
    ================================ */
 
-/* Today highlighting - Subtle muted green background for current day COLUMN (not headers) */
+/* Today highlighting - aqua film wash for the current day COLUMN (not
+   headers). Token is theme-tiered, no .dark override. */
 .fc-day-today {
-  background-color: oklch(
-    0.7 0.15 140 / 0.15
-  ) !important; /* Light mode muted green */
-}
-
-.dark .fc-day-today {
-  background-color: oklch(
-    0.7 0.15 140 / 0.1
-  ) !important; /* Dark mode muted green - different opacity for theme responsiveness */
+  background-color: var(--aqua-film-04) !important;
 }
 
 /* NO SPECIAL STYLING FOR TODAY'S COLUMN HEADER - BOTH LIGHT AND DARK MODE */
@@ -103,20 +87,19 @@
   color: var(--secondary-foreground);
 }
 
+/* Today pill: aqua carries --aqua-ink per theme (white on deep enamel in
+   light, ink on bright aqua in dark). Fixed-disc anatomy lands with the
+   calendar surface pass; colors re-base now. */
 .day-header-number.today {
-  background-color: oklch(0.7 0.15 140);
-  color: white;
+  background-color: var(--aqua);
+  color: var(--aqua-ink);
   font-weight: 600;
-}
-
-.dark .day-header-number.today {
-  background-color: oklch(0.6 0.25 140);
 }
 
 /* Today's date number - circular highlight */
 .fc-day-today .fc-daygrid-day-number {
-  background-color: oklch(0.7 0.3 140);
-  color: white;
+  background-color: var(--aqua);
+  color: var(--aqua-ink);
   border-radius: 50%;
   width: 24px;
   height: 24px;
@@ -124,10 +107,6 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-}
-
-.dark .fc-day-today .fc-daygrid-day-number {
-  background-color: oklch(0.6 0.25 140);
 }
 
 /* ================================
@@ -169,7 +148,8 @@
 }
 
 /* Do not suppress underline when element is a navlink */
-.fc-daygrid-day:not(.fc-day-today) .fc-daygrid-day-number:hover:not(.fc-navlink) {
+.fc-daygrid-day:not(.fc-day-today)
+  .fc-daygrid-day-number:hover:not(.fc-navlink) {
   background-color: var(--accent);
   color: var(--accent-foreground);
   border-radius: 4px;
@@ -231,15 +211,14 @@
   background-color: color-mix(in oklab, var(--accent) 10%, transparent);
 }
 
-/* Minor grid lines - consolidated */
+/* Minor (:30) grid lines - hairline at half opacity (design-brief §4.4) */
 .fc-timegrid-slot-minor,
 .fc-timegrid-slot-minor td {
-  border-color: oklch(0.5 0 0 / 0.1) !important;
-}
-
-.dark .fc-timegrid-slot-minor,
-.dark .fc-timegrid-slot-minor td {
-  border-color: oklch(1 0 0 / 0.05) !important;
+  border-color: color-mix(
+    in oklab,
+    var(--hairline) 50%,
+    transparent
+  ) !important;
 }
 
 /* ================================
@@ -304,8 +283,11 @@
    NOW INDICATOR
    ================================ */
 
+/* Now-line is aqua: aqua means live, red means only errors/overdue/delete
+   (design-brief §2.3). Full now-line anatomy (gutter chip, ghost line) lands
+   with the calendar surface pass. */
 .fc-timegrid-now-indicator-line {
-  background: var(--destructive) !important;
+  background: var(--aqua) !important;
   height: 2px;
 }
 
@@ -316,10 +298,10 @@
   border-color: transparent !important;
 }
 .fc:not(.fc-direction-rtl) .fc-now-indicator-arrow {
-  border-left-color: var(--destructive) !important;
+  border-left-color: var(--aqua) !important;
 }
 .fc.fc-direction-rtl .fc-now-indicator-arrow {
-  border-right-color: var(--destructive) !important;
+  border-right-color: var(--aqua) !important;
 }
 
 /* ================================
@@ -342,13 +324,21 @@
 
 /* Selection styling */
 .fc-highlight {
-  background-color: color-mix(in srgb, var(--default-calendar-color, var(--primary)) 20%, transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--default-calendar-color, var(--primary)) 20%,
+    transparent
+  ) !important;
   border-color: var(--default-calendar-color, var(--primary)) !important;
   border-radius: 4px;
 }
 
 .fc-timegrid-slot.fc-highlight {
-  background-color: color-mix(in srgb, var(--default-calendar-color, var(--primary)) 10%, transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--default-calendar-color, var(--primary)) 10%,
+    transparent
+  ) !important;
 }
 
 /* ================================
@@ -478,9 +468,10 @@
   background-color: color-mix(in oklab, var(--muted) 30%, transparent);
 }
 
+/* Weekend wash: neutral ink at 2% (design-brief §4.4) */
 .fc-day-sat,
 .fc-day-sun {
-  background-color: color-mix(in oklab, var(--muted) 10%, transparent);
+  background-color: color-mix(in oklab, var(--ink) 2%, transparent);
 }
 
 .fc-event-past {

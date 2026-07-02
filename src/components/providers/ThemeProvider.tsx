@@ -16,13 +16,13 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
       try {
         // Initialize theme
         initializeTheme();
-        
+
         if (isMounted) {
           setIsInitialized(true);
         }
       } catch (error) {
         console.error('Failed to initialize theme:', error);
-        
+
         if (isMounted) {
           setIsInitialized(true); // Still set to true to prevent infinite loading
         }
@@ -40,7 +40,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }

@@ -34,7 +34,7 @@ describe('ThemeStore', () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Setup default matchMedia mock
     mockMatchMedia.mockReturnValue({
       matches: false,
@@ -43,7 +43,7 @@ describe('ThemeStore', () => {
       addListener: vi.fn(),
       removeListener: vi.fn(),
     });
-    
+
     // Clear localStorage
     localStorage.clear();
   });
@@ -55,7 +55,7 @@ describe('ThemeStore', () => {
   describe('Initial State', () => {
     it('should have correct initial state', () => {
       const state = useThemeStore.getState();
-      
+
       expect(state.theme).toBe('system');
       expect(state.resolvedTheme).toBe('light');
     });
@@ -64,9 +64,9 @@ describe('ThemeStore', () => {
   describe('Theme Setting', () => {
     it('should set light theme', () => {
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('light');
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('light');
       expect(state.resolvedTheme).toBe('light');
@@ -75,9 +75,9 @@ describe('ThemeStore', () => {
 
     it('should set dark theme', () => {
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('dark');
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('dark');
       expect(state.resolvedTheme).toBe('dark');
@@ -94,9 +94,9 @@ describe('ThemeStore', () => {
       });
 
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('system');
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('system');
       expect(state.resolvedTheme).toBe('light');
@@ -113,9 +113,9 @@ describe('ThemeStore', () => {
       });
 
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('system');
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('system');
       expect(state.resolvedTheme).toBe('dark');
@@ -126,10 +126,10 @@ describe('ThemeStore', () => {
   describe('Theme Toggle', () => {
     it('should toggle from light to dark', () => {
       const { setTheme, toggleTheme } = useThemeStore.getState();
-      
+
       setTheme('light');
       toggleTheme();
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('dark');
       expect(state.resolvedTheme).toBe('dark');
@@ -137,10 +137,10 @@ describe('ThemeStore', () => {
 
     it('should toggle from dark to light', () => {
       const { setTheme, toggleTheme } = useThemeStore.getState();
-      
+
       setTheme('dark');
       toggleTheme();
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('light');
       expect(state.resolvedTheme).toBe('light');
@@ -157,12 +157,12 @@ describe('ThemeStore', () => {
       });
 
       const { setTheme, toggleTheme } = useThemeStore.getState();
-      
+
       setTheme('system'); // Should resolve to light
       expect(useThemeStore.getState().resolvedTheme).toBe('light');
-      
+
       toggleTheme(); // Should toggle to dark
-      
+
       const state = useThemeStore.getState();
       expect(state.theme).toBe('dark');
       expect(state.resolvedTheme).toBe('dark');
@@ -173,7 +173,7 @@ describe('ThemeStore', () => {
     it('should initialize theme and set up system theme listener', () => {
       const mockAddEventListener = vi.fn();
       const mockAddListener = vi.fn();
-      
+
       mockMatchMedia.mockReturnValue({
         matches: false,
         addEventListener: mockAddEventListener,
@@ -183,16 +183,19 @@ describe('ThemeStore', () => {
       });
 
       const { initializeTheme } = useThemeStore.getState();
-      
+
       initializeTheme();
-      
+
       // Should set up event listener (modern browsers)
-      expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+      expect(mockAddEventListener).toHaveBeenCalledWith(
+        'change',
+        expect.any(Function)
+      );
     });
 
     it('should use fallback listener for older browsers', () => {
       const mockAddListener = vi.fn();
-      
+
       mockMatchMedia.mockReturnValue({
         matches: false,
         addEventListener: undefined, // Simulate older browser
@@ -202,9 +205,9 @@ describe('ThemeStore', () => {
       });
 
       const { initializeTheme } = useThemeStore.getState();
-      
+
       initializeTheme();
-      
+
       // Should use fallback listener
       expect(mockAddListener).toHaveBeenCalledWith(expect.any(Function));
     });
@@ -213,31 +216,37 @@ describe('ThemeStore', () => {
   describe('Meta Theme Color', () => {
     it('should update meta theme-color for light theme', () => {
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('light');
-      
-      expect(mockMetaThemeColor.setAttribute).toHaveBeenCalledWith('content', '#ffffff');
+
+      expect(mockMetaThemeColor.setAttribute).toHaveBeenCalledWith(
+        'content',
+        '#fafbfc'
+      );
     });
 
     it('should update meta theme-color for dark theme', () => {
       const { setTheme } = useThemeStore.getState();
-      
+
       setTheme('dark');
-      
-      expect(mockMetaThemeColor.setAttribute).toHaveBeenCalledWith('content', '#1f2937');
+
+      expect(mockMetaThemeColor.setAttribute).toHaveBeenCalledWith(
+        'content',
+        '#0c1112'
+      );
     });
   });
 
   describe('System Theme Changes', () => {
     it('should respond to system theme changes when theme is system', () => {
       let systemChangeHandler: () => void;
-      
+
       const mockAddEventListener = vi.fn((event, handler) => {
         if (event === 'change') {
           systemChangeHandler = handler;
         }
       });
-      
+
       // Initially light system theme
       mockMatchMedia.mockReturnValue({
         matches: false,
@@ -248,12 +257,12 @@ describe('ThemeStore', () => {
       });
 
       const { setTheme, initializeTheme } = useThemeStore.getState();
-      
+
       setTheme('system');
       initializeTheme();
-      
+
       expect(useThemeStore.getState().resolvedTheme).toBe('light');
-      
+
       // Simulate system theme change to dark
       mockMatchMedia.mockReturnValue({
         matches: true, // Now dark
@@ -262,23 +271,23 @@ describe('ThemeStore', () => {
         addListener: vi.fn(),
         removeListener: vi.fn(),
       });
-      
+
       // Trigger the system change handler
       systemChangeHandler!();
-      
+
       expect(useThemeStore.getState().resolvedTheme).toBe('dark');
       expect(mockDocumentElement.classList.add).toHaveBeenCalledWith('dark');
     });
 
     it('should not respond to system theme changes when theme is not system', () => {
       let systemChangeHandler: () => void;
-      
+
       const mockAddEventListener = vi.fn((event, handler) => {
         if (event === 'change') {
           systemChangeHandler = handler;
         }
       });
-      
+
       mockMatchMedia.mockReturnValue({
         matches: false,
         addEventListener: mockAddEventListener,
@@ -288,12 +297,12 @@ describe('ThemeStore', () => {
       });
 
       const { setTheme, initializeTheme } = useThemeStore.getState();
-      
+
       setTheme('light'); // Manual theme, not system
       initializeTheme();
-      
+
       expect(useThemeStore.getState().resolvedTheme).toBe('light');
-      
+
       // Simulate system theme change
       mockMatchMedia.mockReturnValue({
         matches: true,
@@ -302,10 +311,10 @@ describe('ThemeStore', () => {
         addListener: vi.fn(),
         removeListener: vi.fn(),
       });
-      
+
       // Trigger the system change handler
       systemChangeHandler!();
-      
+
       // Should still be light since we're not using system theme
       expect(useThemeStore.getState().resolvedTheme).toBe('light');
     });

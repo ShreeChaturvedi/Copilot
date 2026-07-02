@@ -1,5 +1,14 @@
+import { COLOR_PRESETS, DEFAULT_PRESET_COLOR } from '@/constants/colors';
 import React, { useState } from 'react';
-import { Plus, ChevronUp, MoreVertical, FolderOpen, Settings, Edit, Trash2 } from 'lucide-react';
+import {
+  Plus,
+  ChevronUp,
+  MoreVertical,
+  FolderOpen,
+  Settings,
+  Edit,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -42,21 +51,18 @@ export interface TaskListSelectorProps {
   taskLists: TaskList[];
   onToggleVisibility: (taskListId: string) => void;
   onCreateTaskList: (name: string, color: string, icon: string) => void;
-  onEditTaskList: (taskListId: string, name: string, color: string, icon: string) => void;
+  onEditTaskList: (
+    taskListId: string,
+    name: string,
+    color: string,
+    icon: string
+  ) => void;
   onDeleteTaskList?: (taskListId: string) => void;
   className?: string;
 }
 
-const TASK_LIST_COLORS = [
-  '#3b82f6', // Blue
-  '#ef4444', // Red
-  '#10b981', // Green
-  '#f59e0b', // Amber
-  '#8b5cf6', // Purple
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#84cc16', // Lime
-];
+// Curated swatch palette shared app-wide (design-brief §2.4)
+const TASK_LIST_COLORS = [...COLOR_PRESETS];
 
 const TASK_LIST_ICONS = [
   'folder',
@@ -75,12 +81,13 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
   onCreateTaskList,
   onEditTaskList,
   onDeleteTaskList,
-  className
+  className,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAddingTaskList, setIsAddingTaskList] = useState(false);
   const [newTaskListName, setNewTaskListName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(TASK_LIST_COLORS[0]);
+  const [selectedColor, setSelectedColor] =
+    useState<string>(DEFAULT_PRESET_COLOR);
   const [selectedIcon, setSelectedIcon] = useState(TASK_LIST_ICONS[0]);
   const [recentColors, setRecentColors] = useState<string[]>([]);
 
@@ -89,7 +96,7 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
     if (trimmedName) {
       onCreateTaskList(trimmedName, selectedColor, selectedIcon);
       setNewTaskListName('');
-      setSelectedColor(TASK_LIST_COLORS[0]);
+      setSelectedColor(DEFAULT_PRESET_COLOR);
       setSelectedIcon(TASK_LIST_ICONS[0]);
       setIsAddingTaskList(false);
     }
@@ -97,20 +104,23 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
 
   const handleCancelAdd = () => {
     setNewTaskListName('');
-    setSelectedColor(TASK_LIST_COLORS[0]);
+    setSelectedColor(DEFAULT_PRESET_COLOR);
     setSelectedIcon(TASK_LIST_ICONS[0]);
     setIsAddingTaskList(false);
   };
 
   const handleRecentColorAdd = (color: string) => {
-    setRecentColors(prev => {
-      const filtered = prev.filter(c => c !== color);
+    setRecentColors((prev) => {
+      const filtered = prev.filter((c) => c !== color);
       return [color, ...filtered].slice(0, 5);
     });
   };
 
   return (
-    <Collapsible open={!isCollapsed} onOpenChange={(open) => setIsCollapsed(!open)}>
+    <Collapsible
+      open={!isCollapsed}
+      onOpenChange={(open) => setIsCollapsed(!open)}
+    >
       <div className={cn('space-y-3', className)}>
         {/* Task Lists Header */}
         <div className="flex items-center justify-between">
@@ -138,7 +148,9 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="h-5 w-5 p-0"
               >
-                <div className={`transition-transform duration-200 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}>
+                <div
+                  className={`transition-transform duration-200 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}
+                >
                   <ChevronUp className="w-3 h-3" />
                 </div>
               </Button>
@@ -152,13 +164,23 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
             <div
               key={taskList.id}
               className="task-list-item"
-              style={{ '--animation-delay': `${index * 50}ms` } as React.CSSProperties}
+              style={
+                {
+                  '--animation-delay': `${index * 50}ms`,
+                } as React.CSSProperties
+              }
             >
               <TaskListItem
                 taskList={taskList}
                 onToggleVisibility={() => onToggleVisibility(taskList.id)}
-                onEdit={(name, color, icon) => onEditTaskList(taskList.id, name, color, icon)}
-                onDelete={onDeleteTaskList ? () => onDeleteTaskList(taskList.id) : undefined}
+                onEdit={(name, color, icon) =>
+                  onEditTaskList(taskList.id, name, color, icon)
+                }
+                onDelete={
+                  onDeleteTaskList
+                    ? () => onDeleteTaskList(taskList.id)
+                    : undefined
+                }
                 recentColors={recentColors}
                 onRecentColorAdd={handleRecentColorAdd}
               />
@@ -167,7 +189,14 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
 
           {/* Add Task List Form */}
           {isAddingTaskList && (
-            <div className="p-3 border rounded-md space-y-3 task-list-item" style={{ '--animation-delay': `${taskLists.length * 50}ms` } as React.CSSProperties}>
+            <div
+              className="p-3 border rounded-md space-y-3 task-list-item"
+              style={
+                {
+                  '--animation-delay': `${taskLists.length * 50}ms`,
+                } as React.CSSProperties
+              }
+            >
               <Input
                 type="text"
                 placeholder="Task list name"
@@ -184,7 +213,7 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Color:</span>
                 <div className="flex gap-1">
-                  {TASK_LIST_COLORS.map(color => (
+                  {TASK_LIST_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setSelectedColor(color)}
@@ -210,11 +239,7 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
                 >
                   Add Task List
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCancelAdd}
-                >
+                <Button variant="outline" size="sm" onClick={handleCancelAdd}>
                   Cancel
                 </Button>
               </div>
@@ -222,7 +247,10 @@ export const TaskListSelector: React.FC<TaskListSelectorProps> = ({
           )}
 
           {taskLists.length === 0 && !isAddingTaskList && (
-            <div className="text-center py-3 text-muted-foreground task-list-item" style={{ '--animation-delay': '0ms' } as React.CSSProperties}>
+            <div
+              className="text-center py-3 text-muted-foreground task-list-item"
+              style={{ '--animation-delay': '0ms' } as React.CSSProperties}
+            >
               <p className="text-xs">No task lists yet</p>
               <Button
                 variant="ghost"
@@ -255,7 +283,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
   onEdit,
   onDelete,
   recentColors = [],
-  onRecentColorAdd
+  onRecentColorAdd,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(taskList.name);
@@ -265,7 +293,12 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
 
   const handleSaveEdit = () => {
     const trimmedName = editName.trim();
-    if (trimmedName && (trimmedName !== taskList.name || editColor !== taskList.color || editIcon !== taskList.icon)) {
+    if (
+      trimmedName &&
+      (trimmedName !== taskList.name ||
+        editColor !== taskList.color ||
+        editIcon !== taskList.icon)
+    ) {
       onEdit(trimmedName, editColor, editIcon);
     }
     setIsEditing(false);
@@ -301,7 +334,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Color:</span>
           <div className="flex gap-1">
-            {TASK_LIST_COLORS.map(color => (
+            {TASK_LIST_COLORS.map((color) => (
               <button
                 key={color}
                 onClick={() => setEditColor(color)}
@@ -339,11 +372,13 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
             'data-[state=checked]:bg-current data-[state=checked]:border-current',
             'border-2 rounded-sm flex-shrink-0'
           )}
-          style={{
-            borderColor: taskList.color,
-            '--tw-border-opacity': '1',
-            color: taskList.color
-          } as React.CSSProperties}
+          style={
+            {
+              borderColor: taskList.color,
+              '--tw-border-opacity': '1',
+              color: taskList.color,
+            } as React.CSSProperties
+          }
           aria-label={`Toggle ${taskList.name} visibility`}
         />
 
@@ -357,9 +392,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => setIsEditing(true)}
         >
-          <div className="text-sm font-medium truncate">
-            {taskList.name}
-          </div>
+          <div className="text-sm font-medium truncate">{taskList.name}</div>
         </div>
 
         {/* Task count */}
@@ -370,11 +403,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
         <div className="flex items-center opacity-0 group-hover/task-list:opacity-100 transition-opacity">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 ml-auto"
-              >
+              <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto">
                 <MoreVertical className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -394,7 +423,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
                 />
                 <span>Color</span>
                 <DropdownMenuShortcut className="flex gap-1 ml-auto">
-                  {TASK_LIST_COLORS.slice(0, 4).map(color => (
+                  {TASK_LIST_COLORS.slice(0, 4).map((color) => (
                     <button
                       key={color}
                       onClick={(e) => {
@@ -441,7 +470,9 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Task List</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{taskList.name}"? All tasks in this list will be permanently deleted. This action cannot be undone.
+              Are you sure you want to delete "{taskList.name}"? All tasks in
+              this list will be permanently deleted. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

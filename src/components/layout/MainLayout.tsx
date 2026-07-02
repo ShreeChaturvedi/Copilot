@@ -1,11 +1,28 @@
-import { ReactNode, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import {
+  ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+} from 'react';
 import { useIsFetching } from '@tanstack/react-query';
-const LeftPane = lazy(async () => ({ default: (await import('./LeftPane')).LeftPane }));
-const RightPane = lazy(async () => ({ default: (await import('./RightPane')).RightPane }));
-const TaskFocusPane = lazy(async () => ({ default: (await import('./TaskFocusPane')).TaskFocusPane }));
+const LeftPane = lazy(async () => ({
+  default: (await import('./LeftPane')).LeftPane,
+}));
+const RightPane = lazy(async () => ({
+  default: (await import('./RightPane')).RightPane,
+}));
+const TaskFocusPane = lazy(async () => ({
+  default: (await import('./TaskFocusPane')).TaskFocusPane,
+}));
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { useSettingsStore } from '@/stores/settingsStore';
-const SettingsDialog = lazy(async () => ({ default: (await import('@/components/settings/SettingsDialog')).SettingsDialog }));
+const SettingsDialog = lazy(async () => ({
+  default: (await import('@/components/settings/SettingsDialog'))
+    .SettingsDialog,
+}));
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsDialog } from '@/hooks/useSettingsDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -24,7 +41,10 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
   return (
     <>
       {/* MAIN CONTENT - Natural flex behavior */}
-      <div className="flex flex-col flex-1 min-w-0" style={{ overscrollBehavior: 'none' }}>
+      <div
+        className="flex flex-col flex-1 min-w-0"
+        style={{ overscrollBehavior: 'none' }}
+      >
         {/* RIGHT PANE CONTENT */}
         <div className="flex-1" style={{ overscrollBehavior: 'none' }}>
           <Suspense fallback={null}>
@@ -46,13 +66,13 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   // Apply the user's saved preferences (theme, default view, week start) on load
   usePreferencesSync();
-  
+
   // Settings dialog management
-  const { 
-    isOpen: isSettingsOpen, 
-    currentSection, 
-    openSettings, 
-    closeSettings 
+  const {
+    isOpen: isSettingsOpen,
+    currentSection,
+    openSettings,
+    closeSettings,
   } = useSettingsDialog();
 
   // Keyboard shortcuts
@@ -71,7 +91,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       openSettings(section);
     };
     window.addEventListener('app:open-settings', handler as EventListener);
-    return () => window.removeEventListener('app:open-settings', handler as EventListener);
+    return () =>
+      window.removeEventListener('app:open-settings', handler as EventListener);
   }, [openSettings]);
 
   // Initialize UI view from settings on mount
@@ -85,7 +106,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   return (
     <SidebarProvider defaultOpen={sidebarExpanded}>
       <TopProgressBar />
-      <div 
+      <div
         className={cn(
           'h-screen w-screen overflow-hidden bg-background flex',
           currentView === 'task' && 'transition-all duration-500 ease-out',
@@ -160,9 +181,9 @@ const TopProgressBar = () => {
       setVisible(true);
       setIsFinishing(false);
       setInitialStarted(true);
-      setStartInFlight(prev => (prev === 0 ? inFlight : prev));
+      setStartInFlight((prev) => (prev === 0 ? inFlight : prev));
       // Kick progress if it is at rest
-      setProgress(prev => (prev === 0 ? 0.04 : prev));
+      setProgress((prev) => (prev === 0 ? 0.04 : prev));
     } else if (visible && initialStarted) {
       // Initial work finished
       setIsFinishing(true);
@@ -185,12 +206,13 @@ const TopProgressBar = () => {
     if (!visible || !initialPhase || inFlight <= 0) return;
     let raf = 0;
     const tick = () => {
-      setProgress(prev => {
+      setProgress((prev) => {
         const base = prev;
         const alpha = 0.16; // EMA smoothing factor
         let next = base + (targetProgress - base) * alpha;
         // Minimal trickle to avoid stalling when target is flat
-        const minIncrement = base < 0.2 ? 0.008 : base < 0.5 ? 0.004 : base < 0.8 ? 0.002 : 0.001;
+        const minIncrement =
+          base < 0.2 ? 0.008 : base < 0.5 ? 0.004 : base < 0.8 ? 0.002 : 0.001;
         if (next - base < minIncrement) next = base + minIncrement;
         // Cap while work is active to leave room for finish
         next = Math.min(next, 0.985);
@@ -207,13 +229,14 @@ const TopProgressBar = () => {
   // Ensure we never regress on abrupt target changes
   useEffect(() => {
     if (!visible || !initialPhase) return;
-    setProgress(prev => (targetProgress > prev ? targetProgress : prev));
+    setProgress((prev) => (targetProgress > prev ? targetProgress : prev));
   }, [targetProgress, visible, initialPhase]);
 
   if (!visible && progress === 0) return null;
 
-  // OKLCH green gradient with two stops (left-to-right) for smooth interpolation and clear contrast
-  const gradient = 'linear-gradient(90deg in oklch, oklch(92% 0.26 145) 0%, oklch(60% 0.18 155) 100%)';
+  // Aqua gradient off the accent tokens (theme-aware; aqua = live, design-brief §2.3)
+  const gradient =
+    'linear-gradient(90deg in oklch, var(--aqua-hover) 0%, var(--aqua) 100%)';
 
   // Reveal by width (monotonic, layout is trivial at 3px height)
   const widthPercent = Math.max(0, Math.min(100, progress * 100));

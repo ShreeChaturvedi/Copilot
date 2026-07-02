@@ -18,7 +18,11 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { lazy } from 'react';
-import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
+import {
+  COLOR_PRESETS,
+  ColorPreset,
+  DEFAULT_PRESET_COLOR,
+} from '@/constants/colors';
 
 const EmojiPicker = lazy(async () => ({
   default: (await import('@/components/ui/emoji-picker')).EmojiPicker,
@@ -64,7 +68,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState(initialEmoji ?? '📁');
   const [selectedColor, setSelectedColor] = useState<ColorPreset>(
-    (initialColor as ColorPreset) ?? COLOR_PRESETS[0]
+    (initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR
   );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
@@ -74,7 +78,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       setName(initialName ?? '');
       setDescription(initialDescription ?? '');
       setEmoji(initialEmoji ?? '📁');
-      setSelectedColor((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
+      setSelectedColor((initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR);
     }
   }, [open, initialName, initialDescription, initialEmoji, initialColor]);
 

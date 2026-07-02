@@ -18,8 +18,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { lazy, Suspense } from 'react';
-const IconPicker = lazy(async () => ({ default: (await import('@/components/ui/icon-picker')).IconPicker }));
-import { COLOR_PRESETS, ColorPreset } from '@/constants/colors';
+const IconPicker = lazy(async () => ({
+  default: (await import('@/components/ui/icon-picker')).IconPicker,
+}));
+import {
+  COLOR_PRESETS,
+  ColorPreset,
+  DEFAULT_PRESET_COLOR,
+} from '@/constants/colors';
 
 export interface CreateCalendarDialogProps {
   open: boolean;
@@ -60,7 +66,9 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
   const [name, setName] = useState(initialName ?? '');
   const [description, setDescription] = useState(initialDescription ?? '');
   const [selectedIcon, setSelectedIcon] = useState(initialIconId ?? 'Calendar');
-  const [selectedColor, setSelectedColor] = useState<ColorPreset>((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
+  const [selectedColor, setSelectedColor] = useState<ColorPreset>(
+    (initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR
+  );
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Reset form when dialog opens
@@ -69,7 +77,7 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
       setName(initialName ?? '');
       setDescription(initialDescription ?? '');
       setSelectedIcon(initialIconId ?? 'Calendar');
-      setSelectedColor((initialColor as ColorPreset) ?? COLOR_PRESETS[0]);
+      setSelectedColor((initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR);
       setShowIconPicker(false);
     }
   }, [open, initialName, initialDescription, initialIconId, initialColor]);
@@ -89,7 +97,7 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
       name: trimmedName,
       description: description.trim(),
       emoji: selectedIcon,
-      color: selectedColor
+      color: selectedColor,
     };
 
     // Call whichever callback is provided
@@ -126,13 +134,19 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
               <div className="flex items-center gap-3">
                 {/* Icon Display - Clickable */}
                 <div className="flex-shrink-0">
-                  <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
+                  <Popover
+                    open={showIconPicker}
+                    onOpenChange={setShowIconPicker}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
                         className="w-10 h-10 p-0 hover:bg-accent"
-                        style={{ backgroundColor: selectedColor + '20', borderColor: selectedColor }}
+                        style={{
+                          backgroundColor: selectedColor + '20',
+                          borderColor: selectedColor,
+                        }}
                       >
                         {SelectedIconComponent && (
                           <div style={{ color: selectedColor }}>
@@ -166,21 +180,20 @@ export const CreateCalendarDialog: React.FC<CreateCalendarDialogProps> = ({
               </div>
             </div>
 
-
-
             {/* Color Picker */}
             <div className="grid gap-3">
               <Label>Color</Label>
               <div className="flex gap-2 flex-wrap">
-                {COLOR_PRESETS.map(color => (
+                {COLOR_PRESETS.map((color) => (
                   <button
                     key={color}
                     type="button"
                     onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === color
-                      ? 'border-foreground scale-110'
-                      : 'border-transparent hover:border-border'
-                      }`}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      selectedColor === color
+                        ? 'border-foreground scale-110'
+                        : 'border-transparent hover:border-border'
+                    }`}
                     style={{ backgroundColor: color }}
                     aria-label={`Select color ${color}`}
                   />

@@ -141,7 +141,7 @@ export const HighlightedTextareaField: React.FC<
         );
       }
       const tagText = value.substring(tag.startIndex, tag.endIndex);
-      const color = tag.color || '#3b82f6';
+      const color = tag.color || '#0d97d5';
       html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</mark>`;
       lastIndex = tag.endIndex;
     }
@@ -254,7 +254,7 @@ export const HighlightedTextareaField: React.FC<
         style={{
           // Blue cursor when recording, otherwise normal
           caretColor: isRecording
-            ? '#3b82f6'
+            ? 'var(--primary)'
             : isFocused
               ? 'var(--foreground)'
               : 'transparent',

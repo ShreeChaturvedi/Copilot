@@ -181,7 +181,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 <span className="sr-only">Close</span>
               </Button>
             </div>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
               {COLOR_PRESETS.map((color) => (
                 <button
                   key={color}

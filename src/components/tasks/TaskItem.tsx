@@ -419,7 +419,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                               id: 'default',
                               name: 'Tasks',
                               emoji: '📋',
-                              color: '#3b82f6',
+                              color: '#0d97d5',
                             }
                           : undefined);
                       return taskList ? (

@@ -4,8 +4,14 @@
  * Based on Stack Overflow research and industry best practices
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ParsedTag } from "@shared/types";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
+import { ParsedTag } from '@shared/types';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +43,9 @@ export interface OverlayHighlightedInputProps {
 /**
  * Overlay highlighted input using industry-standard technique
  */
-export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = ({
+export const OverlayHighlightedInput: React.FC<
+  OverlayHighlightedInputProps
+> = ({
   value,
   onChange,
   tags,
@@ -59,7 +67,7 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
   const syncScroll = useCallback(() => {
     const input = inputRef.current;
     const overlay = overlayRef.current;
-    
+
     if (input && overlay) {
       // Use requestAnimationFrame for smooth synchronization
       requestAnimationFrame(() => {
@@ -71,20 +79,20 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
   // Set up scroll synchronization
   useEffect(() => {
     const input = inputRef.current;
-    
+
     if (input) {
       // Sync on all relevant events
       const events = ['scroll', 'input', 'focus', 'keydown', 'keyup'];
-      
-      events.forEach(event => {
+
+      events.forEach((event) => {
         input.addEventListener(event, syncScroll);
       });
-      
+
       // Initial sync
       syncScroll();
-      
+
       return () => {
-        events.forEach(event => {
+        events.forEach((event) => {
           input.removeEventListener(event, syncScroll);
         });
       };
@@ -109,11 +117,11 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
 
       // Add highlighted tag with precise styling
       const tagText = value.substring(tag.startIndex, tag.endIndex);
-      const color = tag.color || '#3b82f6';
-      
+      const color = tag.color || '#0d97d5';
+
       // Use span with exact styling to match TaskItem badges
       html += `<span class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</span>`;
-      
+
       lastIndex = tag.endIndex;
     }
 
@@ -126,18 +134,24 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
   }, [value, tags]);
 
   // Handle input changes
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value);
-    // Trigger scroll sync after state update
-    requestAnimationFrame(syncScroll);
-  }, [onChange, syncScroll]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(e.target.value);
+      // Trigger scroll sync after state update
+      requestAnimationFrame(syncScroll);
+    },
+    [onChange, syncScroll]
+  );
 
   // Handle key press events
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    onKeyPress?.(e);
-    // Sync after key events
-    requestAnimationFrame(syncScroll);
-  }, [onKeyPress, syncScroll]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      onKeyPress?.(e);
+      // Sync after key events
+      requestAnimationFrame(syncScroll);
+    },
+    [onKeyPress, syncScroll]
+  );
 
   // Handle focus events
   const handleFocus = useCallback(() => {
@@ -231,11 +245,14 @@ export const OverlayHighlightedInput: React.FC<OverlayHighlightedInputProps> = (
       {/* Confidence indicator */}
       {showConfidence && confidence < 1 && tags.length > 0 && (
         <div className="absolute -bottom-1 right-1 flex items-center gap-1 z-20">
-          <div 
+          <div
             className={cn(
               'w-2 h-2 rounded-full',
-              confidence >= 0.8 ? 'bg-green-400' : 
-              confidence >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'
+              confidence >= 0.8
+                ? 'bg-green-400'
+                : confidence >= 0.6
+                  ? 'bg-yellow-400'
+                  : 'bg-red-400'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />
