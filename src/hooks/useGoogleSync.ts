@@ -3,6 +3,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 import {
   googleSyncApi,
   googleRedirectUri,
@@ -43,7 +44,7 @@ export function useStartGoogleConnect() {
       window.location.assign(authUrl);
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Could not start the Google connection');
+      toast.error(toUserMessage(error, 'Could not start the Google connection'));
     },
   });
 }
@@ -75,7 +76,7 @@ export function useLinkGoogleCalendar() {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Import from Google Calendar failed');
+      toast.error(toUserMessage(error, 'Import from Google Calendar failed'));
     },
   });
 }
@@ -87,7 +88,7 @@ export function useGoogleSyncNow() {
     onSuccess: (result) => {
       const failed = result.links.filter((l) => l.error);
       if (failed.length > 0) {
-        toast.error(`Sync finished with errors: ${failed[0].error}`);
+        toast.error(`Sync finished with errors: ${toUserMessage(failed[0].error, 'some events failed')}`);
       } else {
         const changed = result.links.reduce(
           (n, l) =>
@@ -108,7 +109,7 @@ export function useGoogleSyncNow() {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Google sync failed');
+      toast.error(toUserMessage(error, 'Google sync failed'));
       queryClient.invalidateQueries({ queryKey: googleSyncQueryKeys.all });
     },
   });
@@ -126,7 +127,7 @@ export function useGoogleDisconnect() {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Disconnect failed');
+      toast.error(toUserMessage(error, 'Disconnect failed'));
     },
   });
 }

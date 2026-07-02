@@ -5,6 +5,7 @@
 import React, { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 
 interface QueryProviderProps {
   children: ReactNode;
@@ -17,7 +18,7 @@ const handleQueryError = (error: Error) => {
   console.error('Query error:', error);
   if (typeof window !== 'undefined') {
     const isNetwork = /Failed to fetch|NetworkError|ERR_NETWORK/i.test(error.message);
-    toast.error(isNetwork ? 'Network error. Please check your connection.' : error.message || 'Something went wrong loading data');
+    toast.error(isNetwork ? 'Network error. Please check your connection.' : toUserMessage(error, 'Something went wrong loading data'));
   }
 };
 
@@ -27,7 +28,7 @@ const handleQueryError = (error: Error) => {
 const handleMutationError = (error: Error) => {
   console.error('Mutation error:', error);
   if (typeof window !== 'undefined') {
-    toast.error(error.message || 'Action failed. Changes were not saved.');
+    toast.error(toUserMessage(error, 'Action failed. Changes were not saved.'));
   }
 };
 
@@ -40,7 +41,16 @@ const createQueryClient = () => {
       onError: (error) => handleQueryError(error as Error),
     }),
     mutationCache: new MutationCache({
-      onError: (error) => handleMutationError(error as Error),
+      onError: (error, _variables, _context, mutation) => {
+        // Mutations that define their own onError already toast a
+        // context-specific message; toasting here too stacked two toasts
+        // for one failure (audit critique 3.7).
+        if (mutation.options.onError) {
+          console.error('Mutation error:', error);
+          return;
+        }
+        handleMutationError(error as Error);
+      },
     }),
     defaultOptions: {
       queries: {

@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ArrowUp, Plus } from 'lucide-react';
-// import { getIconByName } from '@/components/ui/icons';
+import { ArrowUp, Plus, Folder } from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -43,6 +43,20 @@ type TaskGroup = {
 import { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
 import './components/smart-tags.css';
+
+/**
+ * List glyph for group pickers: lucide icon in the list color, matching the
+ * folder grid (getIconByName with Folder fallback; emoji ids never render
+ * raw, the audit's clashing-emoji defect).
+ */
+function GroupGlyph({ iconId, color }: { iconId: string; color?: string }) {
+  const Icon = getIconByName(iconId, Folder);
+  return (
+    <span className="inline-flex" style={{ color }} aria-hidden="true">
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
 
 export interface SmartTaskData {
   /** Clean title without parsed elements */
@@ -305,9 +319,10 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           className="h-7 w-7 p-0"
           aria-label={`Current task group: ${activeTaskGroup.name}`}
         >
-          <span className="text-base" style={{ color: activeTaskGroup.color }}>
-            {activeTaskGroup.emoji}
-          </span>
+          <GroupGlyph
+            iconId={activeTaskGroup.emoji}
+            color={activeTaskGroup.color}
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
@@ -317,8 +332,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             onClick={() => onSelectTaskGroup?.(group.id)}
             className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
           >
-            <span className="mr-2 text-base" style={{ color: group.color }}>
-              {group.emoji}
+            <span className="mr-2">
+              <GroupGlyph iconId={group.emoji} color={group.color} />
             </span>
             <span>{group.name}</span>
           </DropdownMenuItem>
@@ -330,7 +345,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
           className="text-success hover:text-success hover:bg-success/10 focus:text-success focus:bg-success/10"
         >
           <Plus className="mr-2 h-4 w-4 text-success" />
-          <span>New List</span>
+          <span>New list</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -386,7 +401,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
             value={inputText}
             onChange={handleInputChange}
             tags={tags}
-            placeholder="Add Task"
+            placeholder="Add task"
             disabled={disabled}
             onKeyPress={handleKeyPress}
             confidence={confidence}
@@ -414,7 +429,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Add Task"
+                placeholder="Add task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -425,7 +440,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 type="text"
                 id="smart-task-input-fallback"
                 name="smart-task-input-fallback"
-                placeholder="Add Task"
+                placeholder="Add task"
                 value={inputText}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -455,12 +470,10 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
                 aria-label={`Current task group: ${activeTaskGroup.name}`}
               >
-                <span
-                  className="text-base"
-                  style={{ color: activeTaskGroup.color }}
-                >
-                  {activeTaskGroup.emoji}
-                </span>
+                <GroupGlyph
+                  iconId={activeTaskGroup.emoji}
+                  color={activeTaskGroup.color}
+                />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
@@ -470,11 +483,8 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                   onClick={() => onSelectTaskGroup?.(group.id)}
                   className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
                 >
-                  <span
-                    className="mr-2 text-base"
-                    style={{ color: group.color }}
-                  >
-                    {group.emoji}
+                  <span className="mr-2">
+                    <GroupGlyph iconId={group.emoji} color={group.color} />
                   </span>
                   <span>{group.name}</span>
                 </DropdownMenuItem>
@@ -486,7 +496,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 className="text-success hover:text-success hover:bg-success/10 focus:text-success focus:bg-success/10"
               >
                 <Plus className="mr-2 h-4 w-4 text-success" />
-                <span>New List</span>
+                <span>New list</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -498,7 +508,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Add Task"
+                placeholder="Add task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -510,7 +520,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Add Task"
+                placeholder="Add task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -522,7 +532,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
                 value={inputText}
                 onChange={handleInputChange}
                 tags={tags}
-                placeholder="Add Task"
+                placeholder="Add task"
                 disabled={disabled}
                 onKeyPress={handleKeyPress}
                 confidence={confidence}
@@ -535,7 +545,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
               type="text"
               id="legacy-task-input"
               name="legacy-task-input"
-              placeholder="Add Task"
+              placeholder="Add task"
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -637,14 +647,16 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
 
       {/* Error Display */}
       {error && enableSmartParsing && (
-        <div className="text-sm text-red-500 px-1">Parsing error: {error}</div>
+        <div className="text-sm text-destructive px-1">
+          Parsing error: {error}
+        </div>
       )}
 
       {/* Conflicts Warning */}
       {hasConflicts && enableSmartParsing && showConfidence && (
-        <div className="text-sm text-yellow-600 px-1 flex items-center gap-1">
+        <div className="text-sm text-warning px-1 flex items-center gap-1">
           {/* Simple marker without importing the full icon set dynamically */}
-          <span className="w-3 h-3 inline-block rounded-full bg-yellow-500" />
+          <span className="w-3 h-3 inline-block rounded-full bg-warning" />
           Some tags may overlap. Using highest confidence matches.
         </div>
       )}

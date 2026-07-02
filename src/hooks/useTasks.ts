@@ -10,6 +10,7 @@ import {
   type CreateTaskData,
 } from '../services/api';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 
 /**
  * Query keys for task-related queries
@@ -128,7 +129,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
-      toast.error(error.message || 'Failed to create task');
+      toast.error(toUserMessage(error, 'Failed to create task'));
     },
     onSuccess: (newTask, _variables, context) => {
       // Replace temp with real task if present
@@ -202,7 +203,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
-      toast.error(error.message || 'Failed to update task');
+      toast.error(toUserMessage(error, 'Failed to update task'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
@@ -227,7 +228,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
-      toast.error(error.message || 'Failed to delete task');
+      toast.error(toUserMessage(error, 'Failed to delete task'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
@@ -257,7 +258,7 @@ export const useTasks = (filters: TaskFilters = {}) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
-      toast.error(error.message || 'Failed to schedule task');
+      toast.error(toUserMessage(error, 'Failed to schedule task'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });

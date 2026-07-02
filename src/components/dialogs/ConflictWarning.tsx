@@ -19,15 +19,15 @@ export function ConflictWarning({ conflicts }: ConflictWarningProps) {
   return (
     <div
       role="alert"
-      className="mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm dark:border-yellow-900/60 dark:bg-yellow-950/40"
+      className="mt-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
     >
-      <div className="flex items-center gap-2 font-medium text-yellow-800 dark:text-yellow-200">
+      <div className="flex items-center gap-2 font-medium text-foreground">
         <AlertTriangle className="h-4 w-4 shrink-0" />
         {conflicts.length === 1
           ? 'This time overlaps 1 existing event'
           : `This time overlaps ${conflicts.length} existing events`}
       </div>
-      <ul className="mt-2 space-y-1 text-yellow-800 dark:text-yellow-200">
+      <ul className="mt-2 space-y-1 text-foreground/90">
         {conflicts.map((conflict) => {
           const ev = conflict.conflictingEvent;
           return (
@@ -48,7 +48,7 @@ export function ConflictWarning({ conflicts }: ConflictWarningProps) {
           );
         })}
       </ul>
-      <p className="mt-2 text-xs text-yellow-700 dark:text-yellow-300/80">
+      <p className="mt-2 text-xs text-muted-foreground">
         You can still save, or adjust the time to avoid the overlap.
       </p>
     </div>

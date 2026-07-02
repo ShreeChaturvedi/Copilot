@@ -1,6 +1,6 @@
 /**
  * TaskGroupCombobox Component Tests
- * 
+ *
  * Tests the TaskGroupCombobox component functionality including:
  * - Rendering with task groups
  * - Selection handling
@@ -28,15 +28,15 @@ const mockTaskGroups: TaskGroup[] = [
     name: 'Work',
     iconId: 'Briefcase',
     color: '#3b82f6',
-    description: 'Work tasks'
+    description: 'Work tasks',
   },
   {
     id: 'personal',
     name: 'Personal',
     iconId: 'Home',
     color: '#10b981',
-    description: 'Personal tasks'
-  }
+    description: 'Personal tasks',
+  },
 ];
 
 describe('TaskGroupCombobox', () => {
@@ -69,7 +69,7 @@ describe('TaskGroupCombobox', () => {
 
   it('calls onSelectTaskGroup when option is selected', () => {
     const handleSelect = vi.fn();
-    
+
     render(
       <TaskGroupCombobox
         taskGroups={mockTaskGroups}
@@ -89,7 +89,7 @@ describe('TaskGroupCombobox', () => {
 
   it('shows new list option when onCreateTaskGroup is provided', () => {
     const handleCreate = vi.fn();
-    
+
     render(
       <TaskGroupCombobox
         taskGroups={mockTaskGroups}
@@ -102,12 +102,12 @@ describe('TaskGroupCombobox', () => {
     const trigger = screen.getByRole('combobox');
     fireEvent.click(trigger);
 
-    expect(screen.getByText('New List')).toBeInTheDocument();
+    expect(screen.getByText('New list')).toBeInTheDocument();
   });
 
   it('calls onCreateTaskGroup when new list is clicked', () => {
     const handleCreate = vi.fn();
-    
+
     render(
       <TaskGroupCombobox
         taskGroups={mockTaskGroups}
@@ -120,7 +120,7 @@ describe('TaskGroupCombobox', () => {
     const trigger = screen.getByRole('combobox');
     fireEvent.click(trigger);
 
-    const newListOption = screen.getByText('New List');
+    const newListOption = screen.getByText('New list');
     fireEvent.click(newListOption);
 
     expect(handleCreate).toHaveBeenCalled();

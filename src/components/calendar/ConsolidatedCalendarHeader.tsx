@@ -305,13 +305,13 @@ const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
               // Active state
               'active:scale-[1.02] active:shadow-md'
             )}
-            aria-label="New Event"
+            aria-label="New event"
           >
             <Plus className="h-3.5 w-3.5 relative z-10" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>New Event</p>
+          <p>New event</p>
         </TooltipContent>
       </Tooltip>
     </div>

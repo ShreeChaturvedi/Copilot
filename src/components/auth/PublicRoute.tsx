@@ -18,10 +18,8 @@ export function PublicRoute({ children, redirectTo = '/' }: PublicRouteProps) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Loading...
-          </p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );

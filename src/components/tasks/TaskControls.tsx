@@ -528,12 +528,10 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                     // Default state
                     globalShowCompleted
                       ? [
-                          // On state - calendar green with visible border and transparency (same as Autotag)
-                          'bg-[oklch(0.7_0.15_140_/_0.15)] text-foreground border border-[oklch(0.7_0.15_140)]',
-                          // Dark mode adjustments
-                          'dark:bg-[oklch(0.7_0.15_140_/_0.1)] dark:border-[oklch(0.7_0.15_140)]',
-                          // Hover states for on state
-                          'hover:bg-[oklch(0.7_0.15_140_/_0.2)] dark:hover:bg-[oklch(0.7_0.15_140_/_0.15)]',
+                          // On state - aqua film + rim (same as Autotag,
+                          // design-brief 2.3; the today-green is retired)
+                          'bg-aqua-film-08 text-foreground border border-aqua-rim',
+                          'hover:bg-aqua-film-08 hover:border-aqua',
                         ]
                       : [
                           // Off state - default ghost button styling

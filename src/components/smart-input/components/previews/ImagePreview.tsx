@@ -1,6 +1,6 @@
 /**
  * ImagePreview - Component for displaying image file thumbnails
- * 
+ *
  * Handles image preview generation with proper loading states,
  * error handling, and accessibility features.
  */
@@ -68,10 +68,10 @@ const ImagePreviewComponent: React.FC<ImagePreviewProps> = ({
 
         // Create object URL for image
         const url = URL.createObjectURL(file);
-        
+
         // Validate image can be loaded
         const img = new Image();
-        
+
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
           img.onerror = () => reject(new Error('Failed to load image'));
@@ -85,10 +85,12 @@ const ImagePreviewComponent: React.FC<ImagePreviewProps> = ({
           // Clean up if component unmounted
           URL.revokeObjectURL(url);
         }
-        
       } catch (err) {
-        const error = err instanceof Error ? err : new Error('Unknown image processing error');
-        
+        const error =
+          err instanceof Error
+            ? err
+            : new Error('Unknown image processing error');
+
         if (isMounted) {
           setError(error.message);
           setPreviewState('error');
@@ -145,7 +147,7 @@ const ImagePreviewComponent: React.FC<ImagePreviewProps> = ({
         style={{ width, height }}
         title={error || 'Failed to generate image preview'}
       >
-        <ImageIcon className="w-4 h-4 text-red-500" />
+        <ImageIcon className="w-4 h-4 text-destructive" />
       </div>
     );
   }
@@ -155,10 +157,7 @@ const ImagePreviewComponent: React.FC<ImagePreviewProps> = ({
    */
   return (
     <div
-      className={cn(
-        'relative rounded-md overflow-hidden',
-        className
-      )}
+      className={cn('relative rounded-md overflow-hidden', className)}
       style={{ width, height }}
     >
       <img

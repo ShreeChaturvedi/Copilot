@@ -58,7 +58,7 @@ describe('SmartTaskInput Enhanced Layout Integration', () => {
     );
 
     const textarea = screen.getByRole('textbox');
-    expect(textarea).toHaveAttribute('placeholder', 'Add Task');
+    expect(textarea).toHaveAttribute('placeholder', 'Add task');
     expect(textarea).not.toBeDisabled();
   });
 

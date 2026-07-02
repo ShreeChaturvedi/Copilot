@@ -255,7 +255,7 @@ describe('TaskAnalyticsDialog', () => {
     );
 
     expect(screen.getByText('Completed')).toBeInTheDocument();
-    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
     expect(screen.getByText('Overdue')).toBeInTheDocument();
 
     // Weekly heatmap

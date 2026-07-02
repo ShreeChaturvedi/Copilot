@@ -6,7 +6,8 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, ChevronsUpDown, Check, List } from 'lucide-react';
+import { Plus, ChevronsUpDown, Check, List, Folder } from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 // Emoji-based task group display
 import { Button } from '@/components/ui/Button';
 import {
@@ -32,7 +33,22 @@ type TaskGroup = {
   description?: string;
 };
 
-export interface TaskGroupComboboxProps {
+export function GroupGlyph({
+  iconId,
+  color,
+}: {
+  iconId: string;
+  color?: string;
+}) {
+  const Icon = getIconByName(iconId, Folder);
+  return (
+    <span className="inline-flex" style={{ color }} aria-hidden="true">
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
+interface TaskGroupComboboxProps {
   /** Available task groups */
   taskGroups: TaskGroup[];
   /** Currently active task group ID */
@@ -87,7 +103,8 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     : taskGroups.find((group) => group.id === activeTaskGroupId) ||
       (taskGroups.length > 0 ? taskGroups[0] : defaultTaskGroup);
 
-  // We render emoji directly; no icon component needed
+  // Group glyphs render via the shared lucide registry (emoji ids fall back
+  // to Folder), matching the folder grid and smart input.
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -105,14 +122,17 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
         >
           {isAllSelected ? (
             <>
-              <div style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <div className="text-muted-foreground">
                 <List className="w-4 h-4" />
               </div>
               <span className="text-sm font-medium">All Tasks</span>
             </>
           ) : (
             <>
-              <div className="text-base">{activeTaskGroup?.emoji}</div>
+              <GroupGlyph
+                iconId={activeTaskGroup?.emoji ?? 'folder'}
+                color={activeTaskGroup?.color}
+              />
               <span className="text-sm font-medium">
                 {activeTaskGroup?.name}
               </span>
@@ -138,7 +158,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                 }}
               >
                 <div className="flex items-center gap-2 flex-1">
-                  <div style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  <div className="text-muted-foreground">
                     <List className="w-4 h-4" />
                   </div>
                   <span>All Tasks</span>
@@ -168,7 +188,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   }}
                 >
                   <div className="flex items-center gap-2 flex-1">
-                    <div className="text-base">{group.emoji}</div>
+                    <GroupGlyph iconId={group.emoji} color={group.color} />
                     <span>{group.name}</span>
                   </div>
                   <Check
@@ -195,7 +215,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
                   >
                     <div className="flex items-center gap-2 flex-1">
                       <Plus className="w-4 h-4 text-success" />
-                      <span>New List</span>
+                      <span>New list</span>
                     </div>
                   </CommandItem>
                 </CommandGroup>

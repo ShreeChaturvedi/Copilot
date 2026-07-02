@@ -185,7 +185,7 @@ describe('SmartTaskInput Enhanced Layout Functionality', () => {
       });
       await user.click(taskGroupButton);
 
-      const newListOption = await screen.findByText('New List');
+      const newListOption = await screen.findByText('New list');
       await user.click(newListOption);
 
       await waitFor(() => {

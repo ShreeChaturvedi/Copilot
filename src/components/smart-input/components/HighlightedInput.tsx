@@ -168,10 +168,10 @@ export const HighlightedInput: React.FC<HighlightedInputProps> = ({
             className={cn(
               'w-2 h-2 rounded-full',
               confidence >= 0.8
-                ? 'bg-green-400'
+                ? 'bg-success'
                 : confidence >= 0.6
-                  ? 'bg-yellow-400'
-                  : 'bg-red-400'
+                  ? 'bg-warning'
+                  : 'bg-destructive'
             )}
             title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
           />

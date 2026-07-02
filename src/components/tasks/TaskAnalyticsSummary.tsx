@@ -5,7 +5,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { Circle, PlayCircle, Flag } from 'lucide-react';
+import { Circle, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { useThemeStore } from '@/stores/themeStore';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useTaskStats } from '@/hooks/useTaskStats';
 import { useUIStore } from '@/stores/uiStore';
@@ -108,15 +109,26 @@ function TaskAnalyticsSummaryComponent() {
     return 'Selected List';
   }, [scopedListId, taskGroups]);
 
-  // Use actual hex colors - CSS variables don't work in Recharts SVG elements
+  // Use actual hex colors - CSS variables don't work in Recharts SVG elements.
+  // Values are the SETTLE tokens (design-brief 2.2/2.3): done = aqua
+  // (success), in progress = warning amber, not started = faint.
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const chartData: ChartData[] = useMemo(
     () =>
       [
-        { name: 'Done', value: stats.done, color: '#10b981' },
-        { name: 'In Progress', value: stats.inProgress, color: '#f59e0b' },
-        { name: 'Not Started', value: stats.notStarted, color: '#6b7280' },
+        {
+          name: 'Done',
+          value: stats.done,
+          color: resolvedTheme === 'dark' ? '#1bbeaa' : '#1a7c70',
+        },
+        { name: 'In progress', value: stats.inProgress, color: '#d6a62e' },
+        {
+          name: 'Not started',
+          value: stats.notStarted,
+          color: resolvedTheme === 'dark' ? '#5e6868' : '#94a1a3',
+        },
       ].filter((item) => item.value > 0),
-    [stats.done, stats.inProgress, stats.notStarted]
+    [stats.done, stats.inProgress, stats.notStarted, resolvedTheme]
   );
 
   const totalCount = stats.done + stats.inProgress + stats.notStarted;
@@ -208,7 +220,7 @@ function TaskAnalyticsSummaryComponent() {
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.color}
-                      fillOpacity={entry.name === 'Not Started' ? 0.7 : 1}
+                      fillOpacity={entry.name === 'Not started' ? 0.7 : 1}
                     />
                   ))}
                 </Pie>
@@ -232,13 +244,16 @@ function TaskAnalyticsSummaryComponent() {
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  {stats.completed} / {stats.total} completed
+                  <span className="font-mono">
+                    {stats.completed} / {stats.total}
+                  </span>{' '}
+                  completed
                 </span>
-                <span className="text-xs font-medium text-emerald-600">
+                <span className="text-xs font-medium font-mono text-success">
                   {stats.completionPct}%
                 </span>
               </div>
-              {/* Progress bar - thin with gradient matching TopProgressBar */}
+              {/* Progress bar - thin, aqua = done (design-brief 2.3) */}
               <div
                 className="relative h-[2px] w-full rounded-full bg-border/60 overflow-hidden"
                 aria-hidden="true"
@@ -247,8 +262,7 @@ function TaskAnalyticsSummaryComponent() {
                   className="absolute left-0 top-0 bottom-0 rounded-full"
                   style={{
                     width: `${stats.completionPct}%`,
-                    background:
-                      'linear-gradient(90deg in oklch, oklch(92% 0.26 145) 0%, oklch(60% 0.18 155) 100%)',
+                    background: 'var(--aqua)',
                   }}
                 />
               </div>
@@ -259,28 +273,28 @@ function TaskAnalyticsSummaryComponent() {
               {stats.notStarted > 0 && (
                 <div
                   className="flex items-center gap-1 text-muted-foreground"
-                  title={`Not Started: ${stats.notStarted} tasks`}
+                  title={`Not started: ${stats.notStarted} tasks`}
                 >
                   <Circle className="w-3 h-3" />
-                  <span>{stats.notStarted}</span>
+                  <span className="font-mono">{stats.notStarted}</span>
                 </div>
               )}
               {stats.inProgress > 0 && (
                 <div
-                  className="flex items-center gap-1 text-amber-500"
-                  title={`In Progress: ${stats.inProgress} tasks`}
+                  className="flex items-center gap-1 text-warning"
+                  title={`In progress: ${stats.inProgress} tasks`}
                 >
                   <PlayCircle className="w-3 h-3" />
-                  <span>{stats.inProgress}</span>
+                  <span className="font-mono">{stats.inProgress}</span>
                 </div>
               )}
               {stats.done > 0 && (
                 <div
-                  className="flex items-center gap-1 text-emerald-600"
+                  className="flex items-center gap-1 text-success"
                   title={`Done: ${stats.done} tasks`}
                 >
-                  <Flag className="w-3 h-3" />
-                  <span>{stats.done}</span>
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span className="font-mono">{stats.done}</span>
                 </div>
               )}
             </div>

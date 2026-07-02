@@ -55,13 +55,15 @@ import {
 } from 'recharts';
 import type { Task } from '@shared/types';
 
-// Chart colors - vibrant and visible in both themes
+// Chart colors - SETTLE tokens (design-brief 2.3/2.4): done = aqua
+// (success), amber = in progress, curated blue for created, red only for
+// overdue. CSS vars resolve in SVG fills, so both themes stay in sync.
 const COLORS = {
-  done: '#10b981', // Emerald green
-  inProgress: '#f59e0b', // Amber
-  notStarted: '#6b7280', // Gray
-  created: '#3b82f6', // Blue
-  overdue: '#ef4444', // Red
+  done: 'var(--aqua, #1a7c70)',
+  inProgress: 'var(--warning, #d6a62e)',
+  notStarted: 'var(--faint, #94a1a3)',
+  created: '#0d97d5', // curated blue (design-brief 2.4)
+  overdue: 'var(--destructive, #d8625c)',
 };
 
 interface TaskAnalyticsDialogProps {
@@ -195,13 +197,13 @@ function StatusBar({
       percent: ((statusCounts.done / total) * 100).toFixed(0),
     },
     {
-      name: 'In Progress',
+      name: 'In progress',
       value: statusCounts.inProgress,
       color: COLORS.inProgress,
       percent: ((statusCounts.inProgress / total) * 100).toFixed(0),
     },
     {
-      name: 'Not Started',
+      name: 'Not started',
       value: statusCounts.notStarted,
       color: COLORS.notStarted,
       percent: ((statusCounts.notStarted / total) * 100).toFixed(0),
@@ -219,7 +221,7 @@ function StatusBar({
             style={{
               width: `${seg.percent}%`,
               backgroundColor: seg.color,
-              opacity: seg.name === 'Not Started' ? 0.6 : 1,
+              opacity: seg.name === 'Not started' ? 0.6 : 1,
             }}
           />
         ))}
@@ -233,7 +235,7 @@ function StatusBar({
               className="w-2.5 h-2.5 rounded-full"
               style={{
                 backgroundColor: seg.color,
-                opacity: seg.name === 'Not Started' ? 0.6 : 1,
+                opacity: seg.name === 'Not started' ? 0.6 : 1,
               }}
             />
             <span className="text-xs">
@@ -249,7 +251,7 @@ function StatusBar({
 
 /**
  * Weekly Activity Heatmap - Enhanced with status colors
- * Shows green (completed), yellow (in-progress), red (overdue) per day
+ * Shows aqua (completed), amber (in-progress), red (overdue) per day
  */
 function WeeklyHeatmap({
   tasks,
@@ -340,7 +342,7 @@ function WeeklyHeatmap({
                         }}
                       />
                     )}
-                    {/* Completed (green) - at bottom */}
+                    {/* Completed (aqua) - at bottom */}
                     {completedPct > 0 && (
                       <div
                         className="w-full"
@@ -641,12 +643,10 @@ function TaskAnalyticsDialogContent({
               // Conditional state styling
               includeCompleted
                 ? [
-                    // On state - calendar green with visible border and transparency
-                    'bg-[oklch(0.7_0.15_140_/_0.15)] text-foreground border border-[oklch(0.7_0.15_140)]',
-                    // Dark mode adjustments
-                    'dark:bg-[oklch(0.7_0.15_140_/_0.1)] dark:border-[oklch(0.7_0.15_140)]',
-                    // Hover states for on state
-                    'hover:bg-[oklch(0.7_0.15_140_/_0.2)] dark:hover:bg-[oklch(0.7_0.15_140_/_0.15)]',
+                    // On state - aqua film + rim (the retired today-green is
+                    // gone; aqua means live/selected, design-brief 2.3)
+                    'bg-aqua-film-08 text-foreground border border-aqua-rim',
+                    'hover:bg-aqua-film-08 hover:border-aqua',
                   ]
                 : [
                     // Off state - default ghost button styling
@@ -679,7 +679,7 @@ function TaskAnalyticsDialogContent({
               <StatRing
                 value={analyticsData.inProgress}
                 total={analyticsData.total}
-                label="In Progress"
+                label="In progress"
                 color={COLORS.inProgress}
                 icon={Clock}
               />

@@ -69,7 +69,14 @@ export function PreferencesSettings() {
       setSaving(true);
       setError(null);
       setSuccess(false);
-      const saved = await userAPI.updatePreferences(preferences);
+      // Send only the fields this panel edits. Theme is owned by the
+      // appearance control in General; including the stale value fetched at
+      // panel-open would overwrite a newer toggle (#68, #69).
+      const saved = await userAPI.updatePreferences({
+        defaultView: preferences.defaultView,
+        weekStartsOn: preferences.weekStartsOn,
+        notificationsEnabled: preferences.notificationsEnabled,
+      });
       setPreferences(saved);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -110,10 +117,7 @@ export function PreferencesSettings() {
                   <Select
                     value={preferences.defaultView}
                     onValueChange={(v) =>
-                      update(
-                        'defaultView',
-                        v as UserPreferences['defaultView']
-                      )
+                      update('defaultView', v as UserPreferences['defaultView'])
                     }
                   >
                     <SelectTrigger id="default-view" className="w-full">
@@ -183,7 +187,7 @@ export function PreferencesSettings() {
               )}
 
               {success && (
-                <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200">
+                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
                   <AlertDescription>Preferences saved.</AlertDescription>
                 </Alert>
               )}

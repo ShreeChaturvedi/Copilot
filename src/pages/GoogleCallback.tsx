@@ -139,8 +139,8 @@ export function GoogleCallbackPage() {
 
           {status === 'success' && (
             <div className="flex flex-col items-center space-y-4">
-              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
-                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <div className="p-3 rounded-full bg-aqua-film-08">
+                <CheckCircle className="h-8 w-8 text-success" />
               </div>
               <div className="text-center">
                 <p className="font-medium text-slate-900 dark:text-slate-100">
@@ -158,8 +158,8 @@ export function GoogleCallbackPage() {
           {status === 'error' && (
             <div className="w-full space-y-4">
               <div className="flex flex-col items-center space-y-4">
-                <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
-                  <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                <div className="p-3 rounded-full bg-destructive/10">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
                 </div>
                 <div className="text-center">
                   <p className="font-medium text-slate-900 dark:text-slate-100">
@@ -168,8 +168,8 @@ export function GoogleCallbackPage() {
                 </div>
               </div>
 
-              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50">
-                <AlertDescription className="text-red-800 dark:text-red-200 text-sm">
+              <Alert className="border-destructive/40 bg-destructive/10">
+                <AlertDescription className="text-destructive text-sm">
                   {errorMessage}
                 </AlertDescription>
               </Alert>

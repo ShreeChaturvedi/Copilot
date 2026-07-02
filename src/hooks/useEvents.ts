@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 import type { CalendarEvent } from '@shared/types';
 import { eventApi, type UpdateEventData } from '../services/api';
 import { toUTC } from '../utils/date';
@@ -236,7 +237,7 @@ export const useCreateEvent = () => {
       if (context?.previousEvents) {
         queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
       }
-      toast.error(error.message || 'Failed to create event');
+      toast.error(toUserMessage(error, 'Failed to create event'));
     },
     onSuccess: (newEvent, _variables, context) => {
       queryClient.setQueriesData(
@@ -290,7 +291,7 @@ export const useUpdateEvent = () => {
       if (context?.previousEvents) {
         queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
       }
-      toast.error(error.message || 'Failed to update event');
+      toast.error(toUserMessage(error, 'Failed to update event'));
     },
     // Avoid immediate invalidation to keep optimistic position stable
   });
@@ -327,7 +328,7 @@ export const useDeleteEvent = () => {
       if (context?.previousEvents) {
         queryClient.setQueryData(eventQueryKeys.all, context.previousEvents);
       }
-      toast.error(error.message || 'Failed to delete event');
+      toast.error(toUserMessage(error, 'Failed to delete event'));
     },
     // Avoid immediate invalidation to keep optimistic delete stable
   });

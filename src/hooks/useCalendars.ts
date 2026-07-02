@@ -4,6 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 import type { Calendar } from '@shared/types';
 import {
   calendarApi,
@@ -117,7 +118,7 @@ export const useCalendars = () => {
       if (context?.previousCalendars) {
         queryClient.setQueryData(calendarQueryKeys.all, context.previousCalendars);
       }
-      toast.error(error.message || 'Failed to create calendar');
+      toast.error(toUserMessage(error, 'Failed to create calendar'));
     },
     onSuccess: (newCalendar, _vars, context) => {
       queryClient.setQueriesData(
@@ -185,7 +186,7 @@ export const useCalendars = () => {
           context.previousCalendars
         );
       }
-      toast.error(error.message || 'Failed to update calendar');
+      toast.error(toUserMessage(error, 'Failed to update calendar'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
@@ -218,7 +219,7 @@ export const useCalendars = () => {
           context.previousCalendars
         );
       }
-      toast.error(error.message || 'Failed to delete calendar');
+      toast.error(toUserMessage(error, 'Failed to delete calendar'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
@@ -256,7 +257,7 @@ export const useCalendars = () => {
           context.previousCalendars
         );
       }
-      toast.error(error.message || 'Failed to toggle calendar visibility');
+      toast.error(toUserMessage(error, 'Failed to toggle calendar visibility'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
@@ -385,7 +386,7 @@ export const useCreateCalendar = () => {
       );
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to create calendar');
+      toast.error(toUserMessage(error, 'Failed to create calendar'));
     },
   });
 };
@@ -438,7 +439,7 @@ export const useUpdateCalendar = () => {
           context.previousCalendars
         );
       }
-      toast.error(error.message || 'Failed to update calendar');
+      toast.error(toUserMessage(error, 'Failed to update calendar'));
     },
     onSettled: () => {
       // Always refetch after error or success
@@ -483,7 +484,7 @@ export const useDeleteCalendar = () => {
           context.previousCalendars
         );
       }
-      toast.error(error.message || 'Failed to delete calendar');
+      toast.error(toUserMessage(error, 'Failed to delete calendar'));
     },
     onSettled: () => {
       // Always refetch after error or success
@@ -554,7 +555,7 @@ export const useSetDefaultCalendar = () => {
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to set default calendar');
+      toast.error(toUserMessage(error, 'Failed to set default calendar'));
     },
   });
 };

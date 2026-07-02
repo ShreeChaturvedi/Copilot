@@ -306,7 +306,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             sizeClasses[size],
             'p-0 transition-all duration-200',
             isListening && [
-              'bg-red-500 hover:bg-red-600 text-white',
+              'bg-destructive hover:bg-destructive/90 text-white',
               'animate-pulse shadow-lg shadow-red-500/25',
             ],
             permissionDenied && 'text-destructive',

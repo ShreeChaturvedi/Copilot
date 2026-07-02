@@ -38,7 +38,7 @@ describe('TaskInput Component', () => {
     renderTaskInput();
 
     const input = screen.getByRole('textbox', { name: 'New task input' });
-    expect(input).toHaveAttribute('placeholder', 'Add Task');
+    expect(input).toHaveAttribute('placeholder', 'Add task');
   });
 
   it('submits task with active group', async () => {
@@ -101,7 +101,7 @@ describe('TaskInput Component', () => {
     });
 
     await user.click(trigger);
-    await user.click(await screen.findByText('New List'));
+    await user.click(await screen.findByText('New list'));
     await waitFor(() => {
       expect(onCreateTaskGroup).toHaveBeenCalled();
     });

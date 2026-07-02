@@ -593,8 +593,8 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       {/* Conflicts Warning */}
       {hasConflicts && smartParsingEnabled && showConfidence && (
         <div className="mt-2 px-1">
-          <div className="text-sm text-yellow-600 flex items-center gap-1">
-            <span className="w-3 h-3 inline-block rounded-full bg-yellow-500" />
+          <div className="text-sm text-warning flex items-center gap-1">
+            <span className="w-3 h-3 inline-block rounded-full bg-warning" />
             Some tags may overlap. Using highest confidence matches.
           </div>
         </div>

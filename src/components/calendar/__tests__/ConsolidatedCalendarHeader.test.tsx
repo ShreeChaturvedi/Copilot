@@ -42,7 +42,7 @@ describe('ConsolidatedCalendarHeader', () => {
     expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
 
     // Check for new event button (now a plus icon with aria-label)
-    expect(screen.getByLabelText('New Event')).toBeInTheDocument();
+    expect(screen.getByLabelText('New event')).toBeInTheDocument();
   });
 
   it('calls onTodayClick when Today button is clicked', () => {
@@ -69,7 +69,7 @@ describe('ConsolidatedCalendarHeader', () => {
   it('calls onCreateEvent when New Event button is clicked', () => {
     render(<ConsolidatedCalendarHeader {...defaultProps} />);
 
-    fireEvent.click(screen.getByLabelText('New Event'));
+    fireEvent.click(screen.getByLabelText('New event'));
     expect(defaultProps.onCreateEvent).toHaveBeenCalledTimes(1);
   });
 

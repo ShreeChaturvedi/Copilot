@@ -3,7 +3,8 @@
  */
 
 import React, { useState } from 'react';
-import { ArrowUp, Plus } from 'lucide-react';
+import { ArrowUp, Plus, Folder } from 'lucide-react';
+import { getIconByName } from '@/components/ui/icons';
 // Emoji-based task group UI
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +17,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 // Task group types
+
+/**
+ * List glyph for group pickers: lucide icon in the list color, matching the
+ * folder grid (getIconByName with Folder fallback; emoji ids never render
+ * raw, the audit's clashing-emoji defect).
+ */
+function GroupGlyph({ iconId, color }: { iconId: string; color?: string }) {
+  const Icon = getIconByName(iconId, Folder);
+  return (
+    <span className="inline-flex" style={{ color }} aria-hidden="true">
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
 export interface TaskGroup {
   id: string;
   name: string;
@@ -90,12 +106,10 @@ export const TaskInput: React.FC<TaskInputProps> = ({
             className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 z-10"
             aria-label={`Current task group: ${activeTaskGroup.name}`}
           >
-            <span
-              className="text-base"
-              style={{ color: activeTaskGroup.color }}
-            >
-              {activeTaskGroup.emoji}
-            </span>
+            <GroupGlyph
+              iconId={activeTaskGroup.emoji}
+              color={activeTaskGroup.color}
+            />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
@@ -105,8 +119,8 @@ export const TaskInput: React.FC<TaskInputProps> = ({
               onClick={() => onSelectTaskGroup?.(group.id)}
               className={activeTaskGroup.id === group.id ? 'bg-accent' : ''}
             >
-              <span className="mr-2 text-base" style={{ color: group.color }}>
-                {group.emoji}
+              <span className="mr-2">
+                <GroupGlyph iconId={group.emoji} color={group.color} />
               </span>
               <span>{group.name}</span>
             </DropdownMenuItem>
@@ -118,7 +132,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
             className="text-success hover:text-success hover:bg-success/10 focus:text-success focus:bg-success/10"
           >
             <Plus className="mr-2 h-4 w-4 text-success" />
-            <span>New List</span>
+            <span>New list</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -127,7 +141,7 @@ export const TaskInput: React.FC<TaskInputProps> = ({
         type="text"
         id="task-input"
         name="task-input"
-        placeholder="Add Task"
+        placeholder="Add task"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyPress={handleKeyPress}
