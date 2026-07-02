@@ -403,10 +403,11 @@ export async function deleteEventByGoogleId(
 /**
  * Add an occurrence-start ISO to a recurring master's exceptions (dedup) by
  * the master's Google event id. No-ops when the master is not mapped locally.
- * The googleSyncSnapshot's exceptions are extended too: this exclusion comes
- * FROM Google (an instance shell), so it belongs to the synced base —
- * otherwise the next three-way merge would read it as an app-side addition
- * and write back an EXDATE that could cancel Google's override instance.
+ * The exclusion is also recorded under the snapshot's `instanceExceptions`
+ * key: it is INSTANCE-derived (Google models it as an override/cancelled
+ * instance, not an EXDATE), so the merge must not read it as an app-side
+ * addition and no outbound EXDATE may ever be written for it — an EXDATE on
+ * an overridden instance cancels the override on Google.
  * Returns true when the exception was added.
  */
 export async function addExceptionToMaster(
@@ -421,8 +422,8 @@ export async function addExceptionToMaster(
          "googleSyncSnapshot" = CASE
            WHEN "googleSyncSnapshot" IS NULL THEN NULL
            ELSE jsonb_set(
-             "googleSyncSnapshot", '{exceptions}',
-             COALESCE("googleSyncSnapshot"->'exceptions', '[]'::jsonb)
+             "googleSyncSnapshot", '{instanceExceptions}',
+             COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb)
                || to_jsonb($3::text))
          END,
          "updatedAt" = NOW()
@@ -491,12 +492,21 @@ export async function applyMergedEvent(
   tx: PoolClient,
   input: {
     eventId: string;
+    /** Merged synced fields; exceptions = the EXDATE-backed set only. */
     fields: AppEventFields;
     etag: string;
     googleUpdatedAt: Date | null;
+    /** Instance-derived exclusions to preserve (see addExceptionToMaster). */
+    instanceExceptions?: string[];
   }
 ): Promise<void> {
   const { fields } = input;
+  const instance = [...new Set(input.instanceExceptions ?? [])].sort();
+  const rowExceptions = [
+    ...new Set([...fields.exceptions, ...instance]),
+  ].sort();
+  const snapshot = JSON.parse(snapshotOf(fields)) as Record<string, unknown>;
+  snapshot.instanceExceptions = instance;
   await query(
     `UPDATE events SET
        title = $2, description = $3, location = $4, start = $5, "end" = $6,
@@ -513,10 +523,10 @@ export async function applyMergedEvent(
       fields.end.toISOString(),
       fields.allDay,
       fields.recurrence,
-      fields.exceptions,
+      rowExceptions,
       input.etag,
       input.googleUpdatedAt?.toISOString() ?? null,
-      snapshotOf(fields),
+      JSON.stringify(snapshot),
     ],
     tx
   );
@@ -594,13 +604,21 @@ export async function markEventPatched(
 }
 
 // `to_char` with the literal ISO shape Date.toISOString() emits, so snapshot
-// comparisons in the merge are exact string matches.
+// comparisons in the merge are exact string matches. The snapshot's
+// `exceptions` are the EXDATE-backed set (row exceptions MINUS the
+// instance-derived ones, which are preserved under `instanceExceptions`).
 const ROW_SNAPSHOT_SQL = `jsonb_build_object(
   'title', title, 'description', description, 'location', location,
   'start', to_char(start, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
   'end', to_char("end", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
   'allDay', "allDay", 'recurrence', recurrence,
-  'exceptions', to_jsonb(exceptions))`;
+  'exceptions', (
+    SELECT COALESCE(jsonb_agg(e ORDER BY e), '[]'::jsonb)
+    FROM unnest(exceptions) AS e
+    WHERE NOT COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb) ? e
+  ),
+  'instanceExceptions',
+    COALESCE("googleSyncSnapshot"->'instanceExceptions', '[]'::jsonb))`;
 
 /** Minimal existence/mapping probe used by the outbox drain. */
 export async function getEventCore(
@@ -829,9 +847,12 @@ export async function listDueOpIds(userId: string): Promise<string[]> {
  * held across the network call). Returns null when already claimed/undue.
  */
 export async function claimOp(opId: string): Promise<SyncOpRow | null> {
+  // date_trunc to milliseconds: the claim value round-trips through a JS
+  // Date (ms precision), and deleteClaimedOp matches it exactly.
   const res = await query<SyncOpRow>(
     `UPDATE google_sync_ops
-     SET attempts = attempts + 1, "nextAttemptAt" = NOW() + interval '120 seconds'
+     SET attempts = attempts + 1,
+         "nextAttemptAt" = date_trunc('milliseconds', NOW() + interval '120 seconds')
      WHERE id = $1 AND "nextAttemptAt" <= NOW()
      RETURNING ${OP_COLUMNS}`,
     [opId]

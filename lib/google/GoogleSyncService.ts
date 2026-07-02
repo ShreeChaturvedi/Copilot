@@ -45,6 +45,7 @@ import {
 } from './mapping.js';
 import {
   appFieldsToSynced,
+  instanceExceptionsOf,
   normalizeSnapshot,
   syncedFieldsEqual,
   syncedToAppFields,
@@ -337,10 +338,20 @@ export class GoogleSyncService {
     }
 
     // Existing mapped row with a real inbound change: three-way merge.
+    // Instance-derived exclusions are invisible in Google's recurrence[]
+    // (they are override/cancelled instances there), so they are stripped
+    // from the app side of the merge and re-attached afterwards.
     const base = normalizeSnapshot(existing.googleSyncSnapshot);
+    const instanceExceptions = instanceExceptionsOf(
+      existing.googleSyncSnapshot
+    );
+    const appFields = rowToAppFields(existing);
+    appFields.exceptions = appFields.exceptions.filter(
+      (e) => !instanceExceptions.includes(e)
+    );
     const merge = threeWayMergeEvent(
       base,
-      appFieldsToSynced(rowToAppFields(existing)),
+      appFieldsToSynced(appFields),
       appFieldsToSynced(fields),
       existing.updatedAt,
       googleUpdatedAt
@@ -350,6 +361,7 @@ export class GoogleSyncService {
       fields: syncedToAppFields(merge.merged),
       etag: item.etag,
       googleUpdatedAt,
+      instanceExceptions,
     });
     // Pending upsert ops for this row predate the merge (stale payload and a
     // stale If-Match): replace them with one fresh patch when the app side
@@ -392,11 +404,18 @@ export class GoogleSyncService {
     const existing = await repo.getEventByGoogleId(link.userId, item.id, tx);
     if (!existing) return;
 
-    // Was the app row edited since the last successful sync?
+    // Was the app row edited since the last successful sync? (Instance-
+    // derived exclusions are part of the synced base, not app edits.)
     const base = normalizeSnapshot(existing.googleSyncSnapshot);
+    const instanceExceptions = instanceExceptionsOf(
+      existing.googleSyncSnapshot
+    );
+    const appFields = rowToAppFields(existing);
+    appFields.exceptions = appFields.exceptions.filter(
+      (e) => !instanceExceptions.includes(e)
+    );
     const appChanged =
-      !!base &&
-      !syncedFieldsEqual(appFieldsToSynced(rowToAppFields(existing)), base);
+      !!base && !syncedFieldsEqual(appFieldsToSynced(appFields), base);
     const googleUpdated = item.updated ? new Date(item.updated) : null;
 
     if (

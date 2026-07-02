@@ -108,8 +108,26 @@ export function syncedToAppFields(s: SyncedFields): AppEventFields {
 }
 
 /**
+ * Instance-derived exclusions recorded on a snapshot (jsonb key
+ * `instanceExceptions`): occurrence starts excluded locally because Google
+ * models them as override/cancelled INSTANCES of the master, not as EXDATE
+ * lines. They live in the app row's exceptions[] but are invisible in
+ * Google's recurrence[], so they must be filtered out of both sides of the
+ * exceptions merge and out of every outbound EXDATE payload — writing an
+ * EXDATE for an overridden instance cancels the override on Google.
+ */
+export function instanceExceptionsOf(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object') return [];
+  return normalizeExceptions(
+    (raw as Record<string, unknown>).instanceExceptions
+  );
+}
+
+/**
  * Parse a stored googleSyncSnapshot (jsonb -> object) into SyncedFields.
  * Returns null on any malformed/missing snapshot (merge degrades to LWW).
+ * The `exceptions` here are the EXDATE-backed set only; instance-derived
+ * exclusions are read separately via instanceExceptionsOf().
  */
 export function normalizeSnapshot(raw: unknown): SyncedFields | null {
   if (!raw || typeof raw !== 'object') return null;

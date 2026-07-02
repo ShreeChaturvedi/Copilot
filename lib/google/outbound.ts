@@ -13,6 +13,7 @@
  */
 import { query, type SqlClient } from '../config/database.js';
 import { appEventToGoogle, type AppEventFields } from './mapping.js';
+import { instanceExceptionsOf } from './merge.js';
 import {
   deletePendingUpsertOps,
   enqueueDeleteOp,
@@ -53,6 +54,7 @@ export interface OutboundEventRow {
   googleEventId?: string | null;
   googleCalendarId?: string | null;
   googleEtag?: string | null;
+  googleSyncSnapshot?: unknown;
 }
 
 /**
@@ -117,6 +119,14 @@ export function targetIsSynced(target: OutboundTarget | null): boolean {
 }
 
 function rowToAppFields(row: OutboundEventRow): AppEventFields {
+  // Instance-derived exclusions (snapshot.instanceExceptions) exist on
+  // Google as override/cancelled INSTANCES, not EXDATE lines: emitting an
+  // EXDATE for one would cancel the override there, so they never enter an
+  // outbound payload.
+  const instance = instanceExceptionsOf(row.googleSyncSnapshot);
+  const exceptions = (row.exceptions ?? []).filter(
+    (e) => !instance.includes(e)
+  );
   return {
     title: row.title,
     description: row.description ?? null,
@@ -125,7 +135,7 @@ function rowToAppFields(row: OutboundEventRow): AppEventFields {
     end: row.end instanceof Date ? row.end : new Date(row.end),
     allDay: !!row.allDay,
     recurrence: row.recurrence ?? null,
-    exceptions: row.exceptions ?? [],
+    exceptions,
   };
 }
 
