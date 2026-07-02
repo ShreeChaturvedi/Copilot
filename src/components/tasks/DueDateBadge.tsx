@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Bell, BellRing } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import {
   Popover,
   PopoverContent,
@@ -18,10 +17,32 @@ import {
 } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import {
+  format,
+  isToday,
+  isTomorrow,
+  isYesterday,
+  differenceInCalendarDays,
+} from 'date-fns';
 import { useSettingsStore, type DateDisplayMode } from '@/stores/settingsStore';
-import { formatRelative } from '@/utils/date';
+import './task-item.css';
+
+type Proximity = 'overdue' | 'today' | 'later' | 'none';
+
+const hasTimeComponent = (d: Date) =>
+  !(d.getHours() === 0 && d.getMinutes() === 0);
+
+/** Proximity ink (design-brief §4.1): overdue --destructive, today --aqua,
+ *  later/none --muted. Keyed on the date itself, never on reminder state. */
+const getDueProximity = (d?: Date, now: Date = new Date()): Proximity => {
+  if (!d) return 'none';
+  const overdue = hasTimeComponent(d)
+    ? d.getTime() < now.getTime()
+    : differenceInCalendarDays(d, now) < 0;
+  if (overdue) return 'overdue';
+  if (isToday(d)) return 'today';
+  return 'later';
+};
 
 interface DueDateBadgeProps {
   taskId: string;
@@ -69,20 +90,25 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
     );
   }, [date]);
 
+  // Compact mono chip text (design-brief §4.1/§3: every time-numeral mono).
+  // Relative: `Today 14:00` / `Thu 14:00` / `Jul 21`; absolute: `07/21/2026 14:00`.
   const formatDisplay = useMemo(() => {
     return (d?: Date) => {
       if (!d) return emptyLabel;
-      if (dateDisplayMode === 'relative') {
-        if (includeTime) return formatRelative(d);
-        // relative date without time
-        const rel = formatRelative(d);
-        return rel.replace(/\s+at\s+.*/i, '');
+      const withTime = includeTime && hasTimeComponent(d);
+      if (dateDisplayMode === 'absolute') {
+        const base = format(d, 'MM/dd/yyyy');
+        return withTime ? `${base} ${format(d, 'HH:mm')}` : base;
       }
-      const base = format(d, 'MM/dd/yyyy');
-      if (includeTime) {
-        return `${base} @ ${format(d, 'h:mm a')}`;
-      }
-      return base;
+      const time = withTime ? ` ${format(d, 'HH:mm')}` : '';
+      if (isToday(d)) return `Today${time}`;
+      if (isTomorrow(d)) return `Tomorrow${time}`;
+      if (isYesterday(d)) return `Yesterday${time}`;
+      const days = differenceInCalendarDays(d, new Date());
+      if (days > 0 && days < 7) return `${format(d, 'EEE')}${time}`;
+      if (d.getFullYear() === new Date().getFullYear())
+        return `${format(d, 'MMM d')}${time}`;
+      return format(d, 'MMM d yyyy');
     };
   }, [dateDisplayMode, includeTime, emptyLabel]);
 
@@ -116,44 +142,22 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Badge
-          variant="outline"
-          className={cn(
-            'text-xs px-2 py-1 gap-1 transition-colors cursor-pointer',
-            (() => {
-              // Proximity ink (design-brief §4.1): overdue = --destructive,
-              // live/upcoming = the aqua, unset = --muted
-              const hasReminder = remind !== 'none';
-              const overdue =
-                hasReminder && selectedDate
-                  ? selectedDate.getTime() < Date.now()
-                  : false;
-              if (hasReminder && overdue)
-                return 'text-destructive border-destructive hover:border-destructive';
-              if (hasReminder)
-                return 'text-primary border-primary hover:border-primary';
-              return 'text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/50';
-            })()
-          )}
-          style={{
-            backgroundColor:
-              'color-mix(in oklab, currentColor 10%, transparent)',
-          }}
+        <button
+          type="button"
+          className="ti-due"
+          data-proximity={getDueProximity(selectedDate)}
           aria-label="Edit due date"
           data-testid="due-date-badge"
         >
           {(() => {
             const hasReminder = remind !== 'none';
-            const overdue =
-              hasReminder && selectedDate
-                ? selectedDate.getTime() < Date.now()
-                : false;
-            if (hasReminder && overdue) return <BellRing className="w-3 h-3" />;
-            if (hasReminder) return <Bell className="w-3 h-3" />;
-            return <Calendar className="w-3 h-3" />;
+            const overdue = getDueProximity(selectedDate) === 'overdue';
+            if (hasReminder && overdue) return <BellRing />;
+            if (hasReminder) return <Bell />;
+            return <Calendar />;
           })()}
           {formatDisplay(selectedDate)}
-        </Badge>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="p-3 w-auto" align="start">
         <div className="space-y-3">
