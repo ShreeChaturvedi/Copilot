@@ -38,6 +38,8 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
   private idCounter = 0;
   private clock = Date.parse('2026-07-01T00:00:00Z');
   private syncTokensExpired = false;
+  /** Test hook: cap page size below maxResults to exercise paging. */
+  forcePageSize?: number;
   readonly stoppedChannels: Array<{ id: string; resourceId: string }> = [];
   readonly watchedChannels: WatchRequest[] = [];
 
@@ -116,7 +118,7 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
     params: ListParams,
     tokenAtEnd: string
   ): EventsPage {
-    const pageSize = params.maxResults ?? 250;
+    const pageSize = this.forcePageSize ?? params.maxResults ?? 250;
     const offset = params.pageToken ? parseInt(params.pageToken, 10) : 0;
     const slice = items.slice(offset, offset + pageSize);
     const nextOffset = offset + pageSize;
@@ -161,12 +163,17 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
       return this.page(items, params, tokenAtEnd);
     }
 
-    // Full listing: active events only (Google omits cancelled ones unless
-    // showDeleted). timeMin is honored loosely: recurring masters always pass,
-    // timed events pass when they end at/after timeMin (parity with Google).
+    // Full listing: active events only, EXCEPT cancelled instances of
+    // recurring events, which Google includes even with showDeleted=false as
+    // long as singleEvents is also false (events.list reference). timeMin is
+    // honored loosely: recurring masters always pass, timed events pass when
+    // they end at/after timeMin (parity with Google).
     const timeMin = params.timeMin ? Date.parse(params.timeMin) : undefined;
     const items = [...cal.events.values()]
-      .filter((e) => e.status !== 'cancelled' || params.showDeleted)
+      .filter(
+        (e) =>
+          e.status !== 'cancelled' || params.showDeleted || !!e.recurringEventId
+      )
       .filter((e) => {
         if (timeMin === undefined || e.recurrence?.length) return true;
         const end = e.end?.dateTime ?? e.end?.date;
