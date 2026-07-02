@@ -7,7 +7,7 @@
  * main bundle. Endpoint logic lives in lib/google/googleApi.ts and is shared
  * with the dev-server mirrors.
  *
- * M1 routes (plan §3/§6):
+ * Routes (plan §3/§6):
  *   GET  /api/google/status         (JWT)  connection + per-link sync state
  *   GET  /api/google/connect        (JWT)  consent URL (?redirectUri= allowlisted)
  *   POST /api/google/connect        (JWT)  {code, redirectUri} -> store tokens
@@ -16,9 +16,10 @@
  *   POST /api/google/sync           (JWT caller-only; Bearer GOOGLE_SYNC_CRON_SECRET
  *                                    runs reconciliation across all users)
  *   POST /api/google/disconnect     (JWT)  {removeImportedEvents?}
- *
- * M3 will add here: POST /api/google/webhook (public, channel-token
- * validated) and GET /api/google/cron/renew (Vercel cron, CRON_SECRET).
+ *   POST /api/google/webhook        (public; per-channel token validated,
+ *                                    always answers 200 to Google — M3)
+ *   GET  /api/google/cron/renew     (Vercel daily cron, Bearer CRON_SECRET;
+ *                                    re-watches channels expiring <48h — M3)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ApiError, HttpMethod } from '../../lib/types/api.js';
@@ -157,6 +158,50 @@ const syncHandler = asyncHandler(
   }
 );
 
+/**
+ * POST /api/google/webhook — public (Google sends no auth; the per-channel
+ * token authenticates the sender inside handleWebhook). No JWT, no rate
+ * limiting: a 429/401 would only make Google retry. Only a request missing
+ * the X-Goog ids (not from Google) gets a 400; internal failures still
+ * answer 200 so Google does not retry what the 15-min cron will fix anyway.
+ */
+const webhookHandler = asyncHandler(
+  async (req: AuthenticatedRequest, res: VercelResponse) => {
+    if (req.method !== 'POST') {
+      return sendError(
+        res,
+        new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
+      );
+    }
+    try {
+      sendSuccess(res, await googleApi.handleWebhook(req.headers));
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 400) throw error;
+      console.error('Google webhook handler error:', error);
+      sendSuccess(res, { outcome: 'error' });
+    }
+  }
+);
+
+/** GET /api/google/cron/renew — Vercel daily cron (Bearer CRON_SECRET). */
+const renewHandler = asyncHandler(
+  async (req: AuthenticatedRequest, res: VercelResponse) => {
+    if (req.method !== 'GET') {
+      return sendError(
+        res,
+        new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
+      );
+    }
+    if (!googleApi.isRenewCronRequest(req.headers.authorization)) {
+      return sendError(
+        res,
+        new ApiError(401, 'UNAUTHORIZED', 'Invalid cron credential')
+      );
+    }
+    sendSuccess(res, await googleApi.renewChannels());
+  }
+);
+
 const routes: Record<string, ApiHandler> = {
   status: statusHandler,
   connect: connectHandler,
@@ -164,6 +209,8 @@ const routes: Record<string, ApiHandler> = {
   link: linkHandler,
   sync: syncHandler,
   disconnect: disconnectHandler,
+  webhook: webhookHandler,
+  'cron/renew': renewHandler,
 };
 
 export default async function handler(
@@ -174,10 +221,13 @@ export default async function handler(
   const segments = pathname.split('/').filter(Boolean);
   // Accept both /api/google/<route> and /google/<route> (Vercel may strip /api).
   const start = segments[0] === 'api' ? 1 : 0;
-  const route = segments[start] === 'google' ? segments[start + 1] : undefined;
+  const route =
+    segments[start] === 'google'
+      ? segments.slice(start + 1).join('/')
+      : undefined;
 
   const matched = route ? routes[route] : undefined;
-  if (!matched || segments.length > start + 2) {
+  if (!matched) {
     sendError(res, new ApiError(404, 'NOT_FOUND', 'Endpoint not found'));
     return;
   }

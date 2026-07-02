@@ -1371,4 +1371,37 @@ app.post('/api/google/disconnect', async (req, res) => {
     sendGoogleRouteError(res, error);
   }
 });
+
+// M3: public webhook receiver. 400 only for requests missing the X-Goog ids
+// (not from Google); every other outcome answers 200 — a non-2xx would just
+// make Google retry what the 15-min reconciliation cron fixes anyway.
+app.post('/api/google/webhook', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: await googleApi.handleWebhook(req.headers),
+    });
+  } catch (error) {
+    if (error instanceof GoogleApiRouteError && error.statusCode === 400) {
+      return sendGoogleRouteError(res, error);
+    }
+    console.error('Google webhook handler error:', error);
+    res.json({ success: true, data: { outcome: 'error' } });
+  }
+});
+
+// M3: daily channel-renewal cron (Vercel sends Bearer CRON_SECRET in prod).
+app.get('/api/google/cron/renew', async (req, res) => {
+  try {
+    if (!googleApi.isRenewCronRequest(req.headers.authorization)) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Invalid cron credential' },
+      });
+    }
+    res.json({ success: true, data: await googleApi.renewChannels() });
+  } catch (error) {
+    sendGoogleRouteError(res, error);
+  }
+});
 // ========================= end Google sync block ============================
