@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
+import { generateTokenPair } from '../../utils/jwt.js';
 
 // Mock database module
 const mockQuery = vi.fn();
@@ -340,9 +341,9 @@ describe('AuthService', () => {
       process.env.FRONTEND_URL = 'https://app.taskflow.com';
       process.env.VERCEL_URL = 'taskflow-abc123-user.vercel.app';
       const link = await capturedResetLink();
-      expect(link.startsWith('https://app.taskflow.com/reset-password?token=')).toBe(
-        true
-      );
+      expect(
+        link.startsWith('https://app.taskflow.com/reset-password?token=')
+      ).toBe(true);
     });
 
     it('defaults to the local Vite port 5173 (not 3000) when nothing is set', async () => {
@@ -350,6 +351,57 @@ describe('AuthService', () => {
       expect(
         link.startsWith('http://localhost:5173/reset-password?token=')
       ).toBe(true);
+    });
+  });
+
+  describe('token role claim (role in access token)', () => {
+    it('loginUser passes the user role to generateTokenPair', async () => {
+      const hashedPassword = await bcrypt.hash('TestPassword123!', 12);
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...testUser, password: hashedPassword, role: 'ADMIN' }],
+      });
+
+      await authService.loginUser({
+        email: 'test@example.com',
+        password: 'TestPassword123!',
+      });
+
+      expect(vi.mocked(generateTokenPair)).toHaveBeenCalledWith(
+        'user-123',
+        'test@example.com',
+        'ADMIN'
+      );
+    });
+
+    it('registerUser passes the default role to generateTokenPair', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // exists check
+      mockWithTransaction.mockImplementationOnce(async (callback) => {
+        mockQuery.mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'user-123',
+              email: 'new@example.com',
+              name: 'New User',
+              createdAt: testUser.createdAt,
+              role: 'USER',
+            },
+          ],
+        });
+        mockQuery.mockResolvedValueOnce({ rows: [] }); // profile insert
+        return callback();
+      });
+
+      await authService.registerUser({
+        email: 'new@example.com',
+        password: 'TestPassword123!',
+        name: 'New User',
+      });
+
+      expect(vi.mocked(generateTokenPair)).toHaveBeenCalledWith(
+        'user-123',
+        'new@example.com',
+        'USER'
+      );
     });
   });
 });

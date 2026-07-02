@@ -100,7 +100,14 @@ class RefreshTokenService {
    */
   async rotateRefreshToken(oldRefreshToken: string): Promise<TokenPair> {
     const info = await this.validateRefreshToken(oldRefreshToken);
-    const newPair = await generateTokenPair(info.userId, info.email);
+    // Carry the role claim into the rotated access token so requireRole avoids
+    // a per-request DB lookup (refresh tokens themselves do not store the role).
+    const roleRes = await query<{ role: string | null }>(
+      `SELECT "role" FROM users WHERE id = $1 LIMIT 1`,
+      [info.userId]
+    );
+    const role = roleRes.rows[0]?.role ?? undefined;
+    const newPair = await generateTokenPair(info.userId, info.email, role);
     await this.storeRefreshToken(
       newPair.refreshToken,
       info.userId,

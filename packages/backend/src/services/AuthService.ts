@@ -66,10 +66,11 @@ class AuthService {
         email: string;
         name: string | null;
         createdAt: Date;
+        role: string;
       }>(
         `INSERT INTO users (id, email, name, password, "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, NOW(), NOW())
-         RETURNING id, email, name, "createdAt"`,
+         RETURNING id, email, name, "createdAt", "role"`,
         [email.toLowerCase(), name || null, hashedPassword],
         tx
       );
@@ -82,8 +83,8 @@ class AuthService {
       return u;
     });
 
-    // Generate tokens
-    const tokens = await generateTokenPair(user.id, user.email);
+    // Generate tokens (carry the role claim so requireRole avoids a DB lookup)
+    const tokens = await generateTokenPair(user.id, user.email, user.role);
 
     // Store refresh token
     await refreshTokenService.storeRefreshToken(
@@ -116,8 +117,9 @@ class AuthService {
       name: string | null;
       password: string | null;
       createdAt: Date;
+      role: string;
     }>(
-      `SELECT id, email, name, password, "createdAt" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      `SELECT id, email, name, password, "createdAt", "role" FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email.toLowerCase()]
     );
     const user = res.rows[0];
@@ -137,8 +139,8 @@ class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // Generate tokens
-    const tokens = await generateTokenPair(user.id, user.email);
+    // Generate tokens (carry the role claim so requireRole avoids a DB lookup)
+    const tokens = await generateTokenPair(user.id, user.email, user.role);
 
     // Store refresh token
     await refreshTokenService.storeRefreshToken(
