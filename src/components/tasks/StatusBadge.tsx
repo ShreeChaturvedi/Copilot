@@ -35,19 +35,21 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         : 'Not Started';
   const Icon =
     status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
+  // Status inks re-based onto tokens (design-brief §2.3): in-progress =
+  // the sanctioned amber --warning, done = --success (the aqua), rest muted.
   const colorClass =
     status === 'in_progress'
-      ? 'text-amber-500'
+      ? 'text-warning'
       : status === 'done'
-        ? 'text-emerald-600'
+        ? 'text-success'
         : 'text-muted-foreground';
 
   // Consistent sizing:
   // - iconOnly: 20x20 container, 2px inner padding to give breathing room around a 14px icon
   // - full: md chip spacing with text-xs, aligning with shadcn Badge md size
   const triggerBase = iconOnly
-    ? 'inline-flex items-center justify-center h-5 w-5 p-0.5 rounded border border-border/60 hover:bg-muted transition-colors'
-    : 'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-border/60 hover:bg-muted transition-colors whitespace-nowrap';
+    ? 'inline-flex items-center justify-center h-5 w-5 p-0.5 rounded-md border border-hairline-strong hover:bg-muted transition-colors'
+    : 'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-hairline-strong hover:bg-muted transition-colors whitespace-nowrap';
 
   return (
     <DropdownMenu>

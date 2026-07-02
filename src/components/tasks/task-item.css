@@ -1,0 +1,414 @@
+/* ============================================================
+   TaskItem surface (design-brief §4.1) — SETTLE system.
+   Imported by TaskItem.tsx only. All motion is CSS keyframe
+   ANIMATION on inner elements, never on the row root (the row
+   root is the FullCalendar Draggable element in calendarMode
+   and must keep transform: none). The transition kill during a
+   drag is scoped to `.group/task.is-dragging` in index.css.
+   ============================================================ */
+
+/* --- Shell: closes the vacated gap after settle-out (grid-rows,
+       the one sanctioned height animation, §5) --- */
+.ti-shell {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.ti-shell[data-collapsed='true'] {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms var(--ease-settle);
+}
+.ti-clip {
+  min-height: 0;
+}
+.ti-shell[data-collapsed='true'] .ti-clip {
+  overflow: hidden;
+}
+
+/* --- Row root --- */
+.ti-row {
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  /* hover: instant on, 150ms off (§5) */
+  transition: background-color var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .ti-row:not([data-in-card='true']):hover {
+    background-color: var(--surface-2);
+    transition-duration: 0s;
+  }
+}
+.ti-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+/* selected = aqua film + 2px inset left bar (§4.1) */
+.ti-row[data-selected='true'] {
+  background-color: var(--aqua-film-08);
+  box-shadow: inset 2px 0 0 var(--aqua);
+}
+
+/* --- Grid anatomy: [16px ring] 10px [title 1fr] [actions] --- */
+.ti-grid {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  column-gap: 10px;
+  align-items: center;
+  align-content: center;
+  min-height: 24px;
+}
+.ti-grid[data-no-ring='true'] {
+  grid-template-columns: 1fr auto;
+}
+.ti-cell-meta {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ti-grid[data-no-ring='true'] .ti-cell-meta {
+  grid-column: 1 / -1;
+}
+
+/* --- Title: 13px/500 Inter --- */
+.ti-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--ink);
+}
+.ti-inner[data-struck='true'] .ti-title {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+
+/* --- Inner wrapper: the ONLY settle-out animation target --- */
+.ti-inner {
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.ti-inner[data-struck='true'] {
+  opacity: 0.55;
+}
+.ti-inner[data-phase='settling'] {
+  animation: ti-settle-out var(--dur-3) var(--ease-settle) forwards;
+}
+/* calendarMode degrades to opacity-only (Draggable rows keep
+   transform: none; §4.1 CONSTRAINT) */
+.ti-inner[data-phase='settling'][data-cal='true'] {
+  animation: ti-fade-out 160ms var(--ease-out) forwards;
+}
+@keyframes ti-settle-out {
+  from {
+    opacity: 0.55;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+@keyframes ti-fade-out {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* --- Hover actions: quick-schedule + menu, opacity-only,
+       hover-capable pointers only (§4.1, §4.9) --- */
+.ti-actions {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .ti-row:hover .ti-actions,
+  .ti-row:focus-within .ti-actions {
+    opacity: 1;
+    transition-duration: 0s;
+  }
+}
+@media (hover: none) {
+  /* touch: visible equivalent at 40% (§4.9) */
+  .ti-actions {
+    opacity: 0.4;
+  }
+  .ti-row:focus-within .ti-actions {
+    opacity: 1;
+  }
+}
+/* keep visible while a menu opened from the row is up */
+.ti-actions:has([data-state='open']) {
+  opacity: 1;
+}
+
+/* --- Status ring: 16px, 1.5px stroke (§4.1) --- */
+.ti-ring {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.ti-ring:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+.ti-ring svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.ti-ring:active svg {
+  transform: scale(0.97);
+}
+.ti-ring-base {
+  fill: none;
+  stroke: var(--hairline-strong);
+  stroke-width: 1.5;
+  transition: stroke var(--dur-2) var(--ease-out);
+}
+/* hover = the row's list color at 60% */
+@media (hover: hover) {
+  .ti-row:hover .ti-ring[data-status='rest'] .ti-ring-base,
+  .ti-ring[data-status='rest']:hover .ti-ring-base {
+    stroke: color-mix(in oklab, var(--ti-list-c, var(--aqua)) 60%, transparent);
+  }
+}
+/* in-progress = amber 270° arc over the resting ring */
+.ti-ring-arc {
+  display: none;
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 34.16 45.55;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.ti-ring[data-status='in-progress'] .ti-ring-arc {
+  display: block;
+}
+/* completion draw stroke (list color), animated only while completing */
+.ti-ring-draw {
+  display: none;
+  fill: none;
+  stroke: var(--ti-list-c, var(--aqua));
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 45.55;
+  stroke-dashoffset: 0;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.ti-ring[data-anim='true'] .ti-ring-draw {
+  display: block;
+  animation: ti-ring-draw 160ms var(--ease-out) both;
+}
+/* done = filled with the LIST color + white check (never the brand) */
+.ti-ring-done {
+  display: none;
+}
+.ti-ring[data-status='done'] .ti-ring-done {
+  display: block;
+}
+.ti-ring-fill {
+  fill: var(--ti-list-c, var(--aqua));
+  transform-origin: center;
+}
+.ti-ring-check {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 10.4;
+  stroke-dashoffset: 0;
+}
+.ti-ring[data-anim='true'] .ti-ring-fill {
+  animation: ti-fill-pop 120ms 160ms var(--ease-out) both;
+}
+.ti-ring[data-anim='true'] .ti-ring-check {
+  animation: ti-check-draw 120ms 280ms var(--ease-out) both;
+}
+@keyframes ti-ring-draw {
+  from {
+    stroke-dashoffset: 45.55;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ti-fill-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  1% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ti-check-draw {
+  from {
+    stroke-dashoffset: 10.4;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* --- Meta chips: due chip + tag pills, 20px / 11px --- */
+.ti-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  /* proximity ink (§4.1): later/none */
+  color: var(--ink-muted);
+  background-color: color-mix(in oklab, currentColor 10%, transparent);
+  transition: color var(--dur-2) var(--ease-out);
+}
+.ti-due[data-proximity='today'] {
+  color: var(--aqua);
+}
+.ti-due[data-proximity='overdue'] {
+  color: var(--destructive);
+}
+.ti-due:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+.ti-due svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.ti-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 140px;
+  min-width: 0;
+  flex-shrink: 1;
+  /* chip-film formula lite (§2.4): light = 12% film + sunk text */
+  background-color: color-mix(
+    in oklab,
+    var(--tag-c, var(--ink-muted)) 12%,
+    transparent
+  );
+  color: oklch(from var(--tag-c, var(--ink-muted)) 0.5 c h);
+}
+.dark .ti-tag {
+  /* dark = 24% film + lifted text */
+  background-color: color-mix(
+    in oklab,
+    var(--tag-c, var(--ink-muted)) 24%,
+    transparent
+  );
+  color: oklch(from var(--tag-c, var(--ink-muted)) 0.82 min(c, 0.1) h);
+}
+.ti-tag svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* mono overflow counter: `+N` */
+.ti-more {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ti-due {
+  flex-shrink: 0;
+}
+
+/* neutral chip (attachments) */
+.ti-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ink-muted);
+  background-color: var(--surface-2);
+  cursor: pointer;
+}
+.ti-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.ti-chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* --- Mobile (§4.9): rows min 44px under 768px --- */
+@media (max-width: 767px) {
+  .ti-row:not([data-in-card='true']) {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* --- Reduced motion (§5): completion keeps ring fill + strike
+       without movement; gap close snaps --- */
+@media (prefers-reduced-motion: reduce) {
+  .ti-ring svg,
+  .ti-ring-draw,
+  .ti-ring-fill,
+  .ti-ring-check,
+  .ti-inner {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ti-inner[data-phase='settling'] {
+    opacity: 0;
+  }
+  .ti-shell[data-collapsed='true'] {
+    transition: none;
+  }
+}

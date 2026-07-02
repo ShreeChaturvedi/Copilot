@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -115,8 +115,11 @@ describe('TaskItem Component', () => {
   });
 
   describe('Task Completion', () => {
-    it('should toggle task completion when checkbox is clicked', async () => {
-      const user = userEvent.setup();
+    it('should toggle task completion after the settle-out timeline when the ring is clicked', async () => {
+      // Completion runs the design-brief §4.1 timeline: strike at 400ms,
+      // 800ms grace (reversible), settle-out + gap close, THEN commit.
+      // fireEvent with detail: 1 = a real mouse click (detail 0 would be
+      // keyboard-initiated, which commits immediately per §5).
       const onToggle = vi.fn();
 
       renderTaskItem(mockTask, { onToggle });
@@ -124,9 +127,61 @@ describe('TaskItem Component', () => {
       const checkbox = screen.getByRole('checkbox', {
         name: /Mark "Test Task" as complete/,
       });
-      await user.click(checkbox);
+      fireEvent.click(checkbox, { detail: 1 });
+
+      // Inside the grace window nothing is committed yet
+      expect(onToggle).not.toHaveBeenCalled();
+      expect(checkbox).toBeChecked();
+
+      // Ride out strike (400) + grace (800) + settle (240) + close (200)
+      await waitFor(
+        () => expect(onToggle).toHaveBeenCalledWith('test-task-1'),
+        { timeout: 3000 }
+      );
+    }, 8000);
+
+    it('should reverse completion when the ring is clicked again inside the grace window', async () => {
+      const onToggle = vi.fn();
+
+      renderTaskItem(mockTask, { onToggle });
+
+      const checkbox = screen.getByRole('checkbox', {
+        name: /Mark "Test Task" as complete/,
+      });
+      fireEvent.click(checkbox, { detail: 1 });
+      await new Promise((r) => setTimeout(r, 600)); // inside strike+grace
+      fireEvent.click(checkbox, { detail: 1 }); // reverse
+
+      await new Promise((r) => setTimeout(r, 1600)); // past the full timeline
+      expect(onToggle).not.toHaveBeenCalled();
+      expect(checkbox).not.toBeChecked();
+    }, 8000);
+
+    it('should commit immediately on keyboard-initiated toggle (detail 0, no animation)', () => {
+      const onToggle = vi.fn();
+
+      renderTaskItem(mockTask, { onToggle });
+
+      const checkbox = screen.getByRole('checkbox', {
+        name: /Mark "Test Task" as complete/,
+      });
+      fireEvent.click(checkbox, { detail: 0 });
 
       expect(onToggle).toHaveBeenCalledWith('test-task-1');
+    });
+
+    it('should un-complete a completed task immediately', async () => {
+      const user = userEvent.setup();
+      const onToggle = vi.fn();
+
+      renderTaskItem(completedTask, { onToggle });
+
+      const checkbox = screen.getByRole('checkbox', {
+        name: /Mark "Completed Task" as incomplete/,
+      });
+      await user.click(checkbox);
+
+      expect(onToggle).toHaveBeenCalledWith('completed-task');
     });
 
     it('should show checked state for completed tasks', () => {
