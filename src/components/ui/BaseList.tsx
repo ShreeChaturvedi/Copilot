@@ -238,7 +238,7 @@ export function BaseList<T extends BaseListItem>({
           {items.map((item, index) => (
             <div
               key={item.id || item.name}
-              className="calendar-item"
+              className="list-stagger-item"
               style={
                 {
                   '--animation-delay': `${index * 50}ms`,
@@ -268,7 +268,7 @@ export function BaseList<T extends BaseListItem>({
           {/* Inline Add Form */}
           {isAddingItem && (
             <div
-              className="p-3 border rounded-md space-y-3 calendar-item"
+              className="p-3 border rounded-md space-y-3 list-stagger-item"
               style={
                 {
                   '--animation-delay': `${items.length * 50}ms`,
@@ -327,7 +327,7 @@ export function BaseList<T extends BaseListItem>({
           {/* Empty State */}
           {items.length === 0 && !isAddingItem && (
             <div
-              className="text-center py-3 text-muted-foreground calendar-item"
+              className="text-center py-3 text-muted-foreground list-stagger-item"
               style={{ '--animation-delay': '0ms' } as React.CSSProperties}
             >
               <p className="text-xs">{emptyStateText}</p>
@@ -474,7 +474,7 @@ function BaseListItem<T extends BaseListItem>({
 
   return (
     <>
-      <div className="group/calendar flex items-center gap-3 py-2 px-3 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors">
+      <div className="group/calendar flex items-center gap-3 py-2 px-3 hover:bg-surface-hover rounded-md transition-colors">
         {/* Toggle/Selection Control */}
         {mode === 'checkbox' ? (
           <Checkbox

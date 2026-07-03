@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 import { cn } from '@/lib/utils';
 
@@ -56,9 +57,10 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          // SETTLE material (§4.5): surface-3 + hairline edge; slide motion
-          // lives in index.css keyed on [data-side] + [data-state].
-          'bg-surface-3 fixed z-50 flex flex-col gap-4 [box-shadow:var(--shadow-3)]',
+          // SETTLE material (§4.5): surface-3 + machined edge; slide motion
+          // lives in index.css keyed on [data-side] + [data-state]. Uses the
+          // named --shadow-dialog (edge-machined + shadow-3) to match dialog.
+          'bg-surface-3 fixed z-50 flex flex-col gap-4 [box-shadow:var(--shadow-dialog)]',
           side === 'right' &&
             'inset-y-0 right-0 h-full w-3/4 border-l border-hairline sm:max-w-sm',
           side === 'left' &&
@@ -73,9 +75,16 @@ function SheetContent({
       >
         {children}
         {!hideCloseButton && (
-          <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
-            <XIcon className="size-4" />
-            <span className="sr-only">Close</span>
+          <SheetPrimitive.Close asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Close"
+              className="absolute top-4 right-4 p-2 hover:bg-surface-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </Button>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Content>

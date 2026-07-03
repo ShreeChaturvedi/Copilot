@@ -864,46 +864,6 @@
 
 /* ================================
    CALENDAR LIST ANIMATIONS
+   Relocated to src/index.css @layer components as `.list-stagger-item`
+   (with a transitional `.calendar-item` alias). See empty/loading spec §2.4.1.
    ================================ */
-
-.calendar-item {
-  opacity: 0;
-  transform: translateY(-8px);
-  transition:
-    opacity 0.2s ease-out,
-    transform 0.2s ease-out;
-  animation-delay: var(--animation-delay, 0ms);
-  animation-fill-mode: forwards;
-}
-
-/* When collapsible content is open, animate items in */
-[data-state='open'] .calendar-item {
-  animation: fadeInStagger 0.2s ease-out forwards;
-}
-
-/* When collapsible content is closed, animate items out */
-[data-state='closed'] .calendar-item {
-  animation: fadeOutStagger 0.15s ease-out forwards;
-}
-
-@keyframes fadeInStagger {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeOutStagger {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-}

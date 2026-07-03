@@ -60,7 +60,7 @@ function DialogContent({
         className={cn(
           // SETTLE material (design-brief §4.5): surface-3, radius 12, machined
           // edge, 20px padding. Motion lives in index.css on the data-slot.
-          'bg-surface-3 fixed z-50 grid w-full gap-4 p-5 rounded-dialog [box-shadow:var(--edge-machined),var(--shadow-3)]',
+          'bg-surface-3 fixed z-50 grid w-full gap-4 p-5 rounded-dialog [box-shadow:var(--shadow-dialog)]',
           'top-[50%] left-[50%] max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] sm:max-w-lg overflow-hidden',
           // Below 640px every dialog is a bottom sheet (#46): pinned to the
           // bottom edge, radius 16 16 0 0, max-h 92vh, scrollable.
@@ -91,7 +91,7 @@ function DialogContent({
                 (e.currentTarget as HTMLButtonElement).blur();
               }}
               className={cn(
-                "absolute top-4 right-4 p-2 hover:bg-accent hover:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+                "absolute top-4 right-4 p-2 hover:bg-surface-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
                 closeButtonClassName
               )}
             >

@@ -7,6 +7,7 @@ import type { Calendar } from '@shared/types';
 import { calendarStorage } from '../../utils/storage';
 import { validateCalendar } from '../../utils/validation';
 import { useAuthStore } from '@/stores/authStore';
+import { COLOR_PRESETS, DEFAULT_PRESET_COLOR } from '@/constants/colors';
 
 /**
  * Calendar creation data
@@ -31,20 +32,14 @@ export interface UpdateCalendarData {
 }
 
 /**
- * Default calendar colors
+ * Default calendar colors.
+ *
+ * The sanctioned palette is the single source of truth in
+ * `constants/colors.ts` (oklch-derived, aqua-hue-band excluded, contrast-guarded
+ * via `chipColor.ts`). This is kept as an alias of `COLOR_PRESETS` so existing
+ * importers keep working, instead of a parallel raw-Tailwind-500 hex array.
  */
-export const DEFAULT_CALENDAR_COLORS = [
-  '#3B82F6', // Blue
-  '#EF4444', // Red
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6B7280', // Gray
-];
+export const DEFAULT_CALENDAR_COLORS: readonly string[] = COLOR_PRESETS;
 
 const apiBase = '/api';
 
@@ -84,7 +79,7 @@ export const calendarApi = {
       if (calendars.length === 0) {
         const defaultCalendar: Calendar = {
           name: 'Personal',
-          color: DEFAULT_CALENDAR_COLORS[0],
+          color: DEFAULT_PRESET_COLOR,
           visible: true,
           isDefault: true,
           description: 'Personal calendar',
@@ -224,7 +219,7 @@ export const calendarApi = {
       const validationResult = validateCalendar({
         ...data,
         name: data.name!,
-        color: data.color || '#3B82F6',
+        color: data.color || DEFAULT_PRESET_COLOR,
       });
       if (!validationResult.isValid)
         throw new Error(validationResult.errors[0].message);

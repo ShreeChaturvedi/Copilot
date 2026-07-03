@@ -126,6 +126,50 @@
   --edge-machined:
     inset 0 0 0 0.5px rgb(255 255 255 / 0.9), 0 0 0 0.5px rgb(17 25 26 / 0.14);
 
+  /* §1.8 [NEW] Interaction wash — two-tier, theme-adaptive via --ink (which
+     flips near-black↔near-white per theme), so NO .dark override is needed:
+     darkens on hover in light, lightens on hover in dark, automatically. */
+  --surface-hover: color-mix(in oklab, var(--ink) 4%, transparent);
+  --surface-active: color-mix(in oklab, var(--ink) 8%, transparent);
+
+  /* §1.8 [NEW] Composite floating-tier elevation. Both compose from tokens
+     that already swap per theme via .dark, so no .dark override is needed. */
+  --shadow-popover:
+    var(--edge-machined), var(--shadow-2); /* popover/dropdown/select/tooltip/combobox */
+  --shadow-dialog:
+    var(--edge-machined), var(--shadow-3); /* dialog/alert-dialog/sheet/command palette */
+
+  /* §1.8 [NEW] Warning foreground — --warning does NOT flip per theme (fixed
+     mid-light amber both ways), so its foreground can't either; chained to
+     light-mode --ink here and pinned to that raw value in .dark. */
+  --warning-foreground: var(--ink);
+
+  /* [NEW, opt-in §1.8] Destructive film/rim — mirrors the aqua-film/rim
+     color-mix formula for a future overdue/urgent "loud" moment. */
+  --destructive-film-08: color-mix(
+    in oklab,
+    var(--destructive) 8%,
+    transparent
+  );
+  --destructive-rim: color-mix(in oklab, var(--destructive) 40%, transparent);
+
+  /* [NEW] Loading shimmer band — neutral ink-based (NOT etch: loading ≠ empty);
+     adapts across themes via --ink's own flip, no .dark override. */
+  --shimmer-band: color-mix(in oklab, var(--ink) 6%, transparent);
+
+  /* [NEW] File-type brand-identity marks — intentionally theme-invariant
+     (:root only). Fed as --chip-c into the chip-film formula (see
+     .folder-card-icon), NOT applied as flat fills; theme adaptation happens
+     through that film, not the base hues. */
+  --filetype-pdf: #dc3545;
+  --filetype-doc: #2b579a;
+  --filetype-sheet: #217346; /* also covers .csv */
+  --filetype-slides: #d24726;
+  --filetype-archive: #f59e0b;
+  --filetype-image: #0d97d5; /* = DEFAULT_PRESET_COLOR; was #059669 (clashed w/ sheet green) */
+  --filetype-video: #dc2626;
+  --filetype-audio: #7c3aed;
+
   /* §5 Motion durations (ease tokens live in @theme) */
   --dur-1: 100ms; /* press */
   --dur-2: 150ms; /* hover-off */
@@ -298,6 +342,21 @@ body {
   --color-etch-line: var(--etch-line);
   --color-etch-strong: var(--etch-strong);
   --color-etch-text: var(--etch-text);
+
+  /* [NEW] interaction wash, warning-fg, destructive film/rim, file-type marks */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive-film-08: var(--destructive-film-08);
+  --color-destructive-rim: var(--destructive-rim);
+  --color-filetype-pdf: var(--filetype-pdf);
+  --color-filetype-doc: var(--filetype-doc);
+  --color-filetype-sheet: var(--filetype-sheet);
+  --color-filetype-slides: var(--filetype-slides);
+  --color-filetype-archive: var(--filetype-archive);
+  --color-filetype-image: var(--filetype-image);
+  --color-filetype-video: var(--filetype-video);
+  --color-filetype-audio: var(--filetype-audio);
 }
 
 .dark {
@@ -339,6 +398,19 @@ body {
   --shadow-3: 0 16px 48px -16px rgb(0 0 0 / 0.7);
   --edge-machined:
     inset 0 0.5px 0 rgb(246 248 248 / 0.08), 0 0 0 0.5px rgb(0 0 0 / 0.5);
+
+  /* §1.8 [NEW] warning-foreground pinned to light-mode ink's raw value — the
+     warning bg doesn't flip, so its foreground can't either. */
+  --warning-foreground: oklch(0.206 0.012 210);
+
+  /* [NEW] Destructive film/rim — dark split (16%/44%), matching aqua's own
+     light/dark intensity split. */
+  --destructive-film-08: color-mix(
+    in oklab,
+    var(--destructive) 16%,
+    transparent
+  );
+  --destructive-rim: color-mix(in oklab, var(--destructive) 44%, transparent);
 
   /* shadcn names whose values differ structurally in dark */
   --background: oklch(0.174 0.008 200); /* #0c1112 = void + one step */
@@ -674,102 +746,6 @@ body {
     display: none; /* Safari and Chrome */
   }
 
-  /* Gradient text utilities, re-based from chart blues/reds onto the aqua
-     ladder (no current consumers; kept for compatibility) */
-  .gradient-text-blue-red {
-    background: linear-gradient(135deg, var(--aqua) 0%, var(--aqua-hover) 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-size: 200% 200%;
-    /* animation: gradient-shift 3s ease infinite; */ /* Disabled to prevent drag interference */
-  }
-
-  .gradient-bg-blue-red {
-    background: linear-gradient(135deg, var(--aqua) 0%, var(--aqua-hover) 100%);
-    background-size: 200% 200%;
-    /* animation: gradient-shift 3s ease infinite; */ /* Disabled to prevent drag interference */
-  }
-
-  /* WORKING GRADIENT EFFECTS - Using the debug structure that works */
-
-  /* Schedule text - hover state with better gradient colors using color-interpolation-method */
-  .debug-dropdown-item:hover .debug-text {
-    background: linear-gradient(
-      in oklch 90deg,
-      oklch(85% 0.09 236.25),
-      oklch(85% 0.09 145.71)
-    ) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-  }
-
-  /* Clock icon - hover state (blue only on hover) */
-  .debug-dropdown-item:hover .debug-icon {
-    color: oklch(85% 0.09 236.25) !important;
-  }
-
-  /* Light mode gradient colors (darker for better contrast on light background) using color-interpolation-method */
-  @media (prefers-color-scheme: light) {
-    .debug-dropdown-item:hover .debug-text {
-      background: linear-gradient(
-        in oklch 90deg,
-        oklch(45% 0.12 236.25),
-        oklch(45% 0.12 145.71)
-      ) !important;
-      -webkit-background-clip: text !important;
-      -webkit-text-fill-color: transparent !important;
-      background-clip: text !important;
-    }
-    .debug-dropdown-item:hover .debug-icon {
-      color: oklch(45% 0.12 236.25) !important;
-    }
-  }
-
-  /* AI Badge - outline style with gradient text for both light and dark modes */
-  .debug-ai-badge {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: 1px solid oklch(85% 0.09 236.25) !important;
-    border-radius: var(--radius-sm) !important;
-    color: transparent !important;
-    background-image: linear-gradient(
-      in oklch 90deg,
-      oklch(85% 0.09 236.25),
-      oklch(85% 0.09 145.71)
-    ) !important;
-    -webkit-background-clip: text !important;
-    background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-  }
-
-  /* AI Badge light mode - same gradient text treatment */
-  @media (prefers-color-scheme: light) {
-    .debug-ai-badge {
-      background: transparent !important;
-      background-color: transparent !important;
-      border: 1px solid oklch(45% 0.12 236.25) !important;
-      border-radius: var(--radius-sm) !important;
-      color: transparent !important;
-      background-image: linear-gradient(
-        in oklch 90deg,
-        oklch(45% 0.12 236.25),
-        oklch(45% 0.12 145.71)
-      ) !important;
-      -webkit-background-clip: text !important;
-      background-clip: text !important;
-      -webkit-text-fill-color: transparent !important;
-    }
-  }
-
-  .dropdown-gradient-text,
-  .dropdown-gradient-icon {
-    transition:
-      color 0.3s ease,
-      background 0.3s ease;
-  }
-
   /* Kill transitions ONLY during an active FullCalendar drag so the drag
      mirror (a deep clone of the task row) doesn't ghost while it tracks the
      pointer. TaskItem toggles `.is-dragging` on the row from the Draggable's
@@ -779,16 +755,6 @@ body {
   .group\/task.is-dragging,
   .group\/task.is-dragging * {
     transition: none !important;
-  }
-
-  @keyframes gradient-shift {
-    0%,
-    100% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
   }
 }
 
@@ -957,6 +923,94 @@ body {
     [data-slot='alert-dialog-content'][data-state='closed'],
     [data-slot='sheet-content'][data-state='closed'] {
       animation: settle-fade-out 120ms ease-out forwards;
+    }
+  }
+}
+
+/* ==========================================
+   List stagger + loading shimmer (empty/loading spec §2.4)
+   .list-stagger-item is the relocated, renamed .calendar-item entrance — rows
+   arrive from above and drop down (a distinct primitive from "The Settle",
+   which rises from below). It drives cascading-list reveals (BaseList rows,
+   BaseList empty state, LeftPane smart-input/mini-calendar). `.calendar-item`
+   is kept here only as a transitional alias for LeftPane until the Layout area
+   migrates its call sites. Durations are token-driven; exit is faster than
+   entrance per the app's "close ≤ open" rule.
+   ========================================== */
+@layer components {
+  .list-stagger-item,
+  .calendar-item {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      transform var(--dur-2) var(--ease-out);
+    animation-delay: var(--animation-delay, 0ms);
+    animation-fill-mode: forwards;
+  }
+  [data-state='open'] .list-stagger-item,
+  [data-state='open'] .calendar-item {
+    animation: fadeInStagger var(--dur-2) var(--ease-out) forwards;
+  }
+  [data-state='closed'] .list-stagger-item,
+  [data-state='closed'] .calendar-item {
+    animation: fadeOutStagger var(--dur-1) var(--ease-out) forwards;
+  }
+  @keyframes fadeInStagger {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fadeOutStagger {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  /* Skeleton shimmer — a translated highlight sweep over --surface-2, not a
+     flat opacity pulse. --shimmer-band stays neutral (ink-based) in both
+     themes on purpose: loading ≠ empty (§2.4.2). */
+  .skeleton-shimmer {
+    background-color: var(--surface-2);
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      var(--shimmer-band) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.8s linear infinite;
+  }
+  @keyframes skeleton-shimmer {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .list-stagger-item,
+    .calendar-item {
+      animation: none;
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .skeleton-shimmer {
+      animation: none;
+      background-image: none;
+      opacity: 0.7;
     }
   }
 }

@@ -238,7 +238,8 @@ function App() {
                 success:
                   'bg-success text-success-foreground border-transparent',
                 error: 'bg-destructive text-white border-transparent',
-                warning: 'bg-warning text-[#11191a] border-transparent',
+                warning:
+                  'bg-warning text-warning-foreground border-transparent',
               },
             }}
           />

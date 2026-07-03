@@ -11,6 +11,7 @@ import type {
   GoogleAuthState,
 } from '@shared/types';
 import { parseISOToDate } from './date';
+import { COLOR_PRESETS, DEFAULT_PRESET_COLOR } from '@/constants/colors';
 
 /**
  * Storage keys for different data types
@@ -41,14 +42,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export const DEFAULT_CALENDARS: Calendar[] = [
   {
     name: 'Personal',
-    color: '#3B82F6',
+    color: DEFAULT_PRESET_COLOR,
     visible: true,
     isDefault: true,
     description: 'Personal events and appointments',
   },
   {
     name: 'Work',
-    color: '#EF4444',
+    color: COLOR_PRESETS[0],
     visible: true,
     isDefault: false,
     description: 'Work-related events and meetings',
