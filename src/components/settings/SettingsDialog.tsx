@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -110,6 +111,9 @@ export function SettingsDialog({
       >
         <DialogHeader className="px-5 py-3 border-b border-hairline max-sm:pt-5">
           <DialogTitle>Settings</DialogTitle>
+          <DialogDescription className="sr-only">
+            Manage your account, preferences, and integrations
+          </DialogDescription>
         </DialogHeader>
 
         <div className="relative min-h-0 overflow-hidden md:flex">

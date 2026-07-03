@@ -442,6 +442,27 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
           'w-full sm:max-w-lg md:max-w-xl p-5 overflow-y-auto [&>button]:hidden',
           className
         )}
+        onOpenAutoFocus={(e) => {
+          // Radix's default autofocus lands on the action bar's Edit button,
+          // whose Tooltip then opens on focus and — as the topmost Radix
+          // dismissable layer — silently swallows the very first Escape
+          // press meant for this sheet. Keep focus on the panel itself.
+          e.preventDefault();
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape' || e.defaultPrevented) return;
+          // Let a genuinely nested layer (add-tag/schedule/list/priority
+          // popovers, the attachment preview dialog) handle its own Escape
+          // first; otherwise close the sheet.
+          if (
+            document.querySelector(
+              '[data-slot="popover-content"], [data-slot="dropdown-menu-content"], [role="dialog"]:not([data-slot="sheet-content"])'
+            )
+          ) {
+            return;
+          }
+          onOpenChange(false);
+        }}
       >
         <SheetDescription className="sr-only">
           Task details for {task.title}

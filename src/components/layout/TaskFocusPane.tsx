@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { EASE_SETTLE, EASE_OUT, DUR_3_S } from '@/lib/motion';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
@@ -11,6 +11,15 @@ import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { cn } from '@/lib/utils';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useCommandBarStore } from '@/stores/commandBarStore';
+
+// Floating layers the quick-add panel should never fight with: Radix
+// popover/dropdown/select portals (all share this wrapper attribute) plus
+// any Dialog/AlertDialog/Sheet content (all render role="(alert)dialog").
+// A click or Escape that lands inside one of these is that layer's to
+// handle, not the panel's.
+const NESTED_OVERLAY_SELECTOR =
+  '[data-radix-popper-content-wrapper], [role="dialog"], [role="alertdialog"]';
 const KanbanBoard = lazy(() => import('@/components/tasks/TaskKanbanBoard'));
 
 interface TaskFocusPaneProps {
@@ -128,6 +137,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     useState(enhancedInputVisible);
   const handleToggleAddTaskInput = () => setShowEnhancedInput((v) => !v);
   const handleHideAddTaskInput = () => setShowEnhancedInput(false);
+  const enhancedInputRef = useRef<HTMLDivElement>(null);
 
   // Follow external toggles too (e.g. the kanban board's "+ New task" ghost
   // row sets enhancedInputVisible in the settings store)
@@ -140,6 +150,65 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     const onNewTask = () => setShowEnhancedInput(true);
     window.addEventListener('app:new-task', onNewTask);
     return () => window.removeEventListener('app:new-task', onNewTask);
+  }, []);
+
+  // Escape dismisses the panel — but only when it's the topmost layer. If a
+  // popover/dropdown/dialog spawned from within it (task-group picker,
+  // attach-files dialog, ...) is open, let that layer handle Escape first.
+  useEffect(() => {
+    if (!showEnhancedInput) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (document.querySelector(NESTED_OVERLAY_SELECTOR)) return;
+      setShowEnhancedInput(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showEnhancedInput]);
+
+  // Click-outside dismisses the panel too. Clicks inside the panel itself,
+  // inside a nested overlay it spawned, or on the header toggle button
+  // (which already has its own open/close handling) are not "outside".
+  useEffect(() => {
+    if (!showEnhancedInput) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (enhancedInputRef.current?.contains(target)) return;
+      if (target.closest('[data-slot="add-task-toggle"]')) return;
+      if (target.closest(NESTED_OVERLAY_SELECTOR)) return;
+      setShowEnhancedInput(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [showEnhancedInput]);
+
+  // Close the panel when the Cmd+K command bar opens on top of it, instead
+  // of leaving it lingering behind the scrim.
+  const commandBarOpen = useCommandBarStore((s) => s.open);
+  useEffect(() => {
+    if (commandBarOpen) setShowEnhancedInput(false);
+  }, [commandBarOpen]);
+
+  // Close the panel on List/Board/Folder switches so it doesn't linger over
+  // a view it wasn't opened in (skip the initial mount).
+  const didMountTaskViewMode = useRef(false);
+  useEffect(() => {
+    if (!didMountTaskViewMode.current) {
+      didMountTaskViewMode.current = true;
+      return;
+    }
+    setShowEnhancedInput(false);
+  }, [taskViewMode]);
+
+  // Clear the persisted visibility flag on unmount (e.g. switching from
+  // Tasks to Calendar) so a later remount doesn't resurrect a stale open
+  // panel from before.
+  useEffect(() => {
+    return () => {
+      setEnhancedInputVisible(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Board scope for the back chevron label (#56)
@@ -277,7 +346,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
             }}
             className="absolute inset-x-0 bottom-0 z-50 pointer-events-none"
           >
-            <div className="pointer-events-auto mx-4 mb-4">
+            <div
+              ref={enhancedInputRef}
+              className="pointer-events-auto mx-4 mb-4"
+            >
               <EnhancedTaskInput
                 onAddTask={(...args) => {
                   handleAddTask(...args);

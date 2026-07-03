@@ -595,6 +595,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                   size="sm"
                   className="h-7 w-7 p-0"
                   aria-label="Add task"
+                  data-slot="add-task-toggle"
                 >
                   {isAddTaskInputVisible ? (
                     <ArrowDownToDot className="h-3.5 w-3.5" />
