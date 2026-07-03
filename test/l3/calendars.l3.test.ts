@@ -63,8 +63,10 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
       body,
     });
 
-  it('POST 201: first calendar becomes isDefault; the client reads isVisible (mapped to `visible`, calendars.ts:95-105)', async () => {
+  it('POST 201: a calendar created after registration is non-default (registration seeds the Personal default); the client reads isVisible (mapped to `visible`, calendars.ts:95-105)', async () => {
     const u = await registerUser(req);
+    // Registration seeds a default "Personal" calendar, so the account already
+    // has its default; calendars created via POST are therefore NOT default.
     const r = await createCal({ name: 'Work', color: '#10b981' }, u);
     expect(r.status).toBe(201);
     expect(r.body.data).toMatchObject({
@@ -72,12 +74,24 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
       color: '#10b981',
       description: null,
       isVisible: true,
-      isDefault: true, // first calendar for the user
+      isDefault: false,
       userId: u.userId,
     });
 
     const second = await createCal({ name: 'Home', color: '#0ea5e9' }, u);
     expect(second.body.data!.isDefault).toBe(false);
+
+    // The seeded Personal calendar remains the exclusive default.
+    const list = await req<Envelope<CalendarEntity[]>>(
+      'GET',
+      '/api/calendars',
+      {
+        token: u.accessToken,
+      }
+    );
+    expect(
+      list.body.data!.filter((c) => c.isDefault).map((c) => c.name)
+    ).toEqual(['Personal']);
   });
 
   it('POST 400 VALIDATION_ERROR: name and color are both required (color required only here, not in task-lists)', async () => {
@@ -118,7 +132,11 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
     );
     expect(plain.status).toBe(200);
     expect(Array.isArray(plain.body.data)).toBe(true);
-    expect(plain.body.data!.map((c) => c.name)).toEqual(['Counted']);
+    // The seeded Personal calendar is listed alongside the created one.
+    expect(plain.body.data!.map((c) => c.name).sort()).toEqual([
+      'Counted',
+      'Personal',
+    ]);
 
     const counted = await req<Envelope<CalendarEntity[]>>(
       'GET',
@@ -178,7 +196,8 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
     const u = await registerUser(req);
     const first = await createCal({ name: 'First', color: '#111111' }, u);
     const second = await createCal({ name: 'Second', color: '#222222' }, u);
-    expect(first.body.data!.isDefault).toBe(true);
+    // The seeded Personal calendar holds the default; neither POST is default.
+    expect(first.body.data!.isDefault).toBe(false);
 
     const r = await req<Envelope<CalendarEntity>>(
       'PATCH',
@@ -195,6 +214,7 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
         token: u.accessToken,
       }
     );
+    // set-default is exclusive: it moves the flag off the seeded Personal.
     const defaults = list.body.data!.filter((c) => c.isDefault);
     expect(defaults.map((c) => c.name)).toEqual(['Second']);
   });
@@ -233,25 +253,26 @@ describe.skipIf(!dbAvailable)('L3 calendars contracts', () => {
 
   it("deleting a user's only calendar is blocked by the guard (row survives)", async () => {
     const u = await registerUser(req);
-    const cal = await createCal({ name: 'Solo', color: '#111111' }, u);
-    const del = await req<Envelope>(
-      'DELETE',
-      `/api/calendars/${cal.body.data!.id}`,
+    // A freshly-registered user has exactly one calendar: the seeded Personal.
+    const list = await req<Envelope<CalendarEntity[]>>(
+      'GET',
+      '/api/calendars',
       {
         token: u.accessToken,
       }
     );
+    expect(list.body.data).toHaveLength(1);
+    const only = list.body.data![0];
+    const del = await req<Envelope>('DELETE', `/api/calendars/${only.id}`, {
+      token: u.accessToken,
+    });
     // The service throws VALIDATION_ERROR: "Cannot delete the only calendar";
     // the DELETE handler doesn't map that string, so it surfaces as 500. The
     // point pinned here is that the calendar is NOT deleted.
     expect(del.status).toBeGreaterThanOrEqual(400);
-    const still = await req<Envelope>(
-      'GET',
-      `/api/calendars/${cal.body.data!.id}`,
-      {
-        token: u.accessToken,
-      }
-    );
+    const still = await req<Envelope>('GET', `/api/calendars/${only.id}`, {
+      token: u.accessToken,
+    });
     expect(still.status).toBe(200);
   });
 
