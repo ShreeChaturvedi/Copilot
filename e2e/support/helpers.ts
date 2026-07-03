@@ -217,11 +217,17 @@ export async function createEventViaDialog(
 /** Switch to Month view for stable occurrence/title rendering. */
 export async function gotoMonthView(page: Page): Promise<void> {
   await gotoCalendarView(page);
+  // Wait for the view-selection toolbar to actually mount before switching. A
+  // bare isVisible() check is instantaneous (no auto-wait), so under CI timing
+  // it races the calendar's first render and silently skips the switch, leaving
+  // the default (Week) view — where a freshly-created event never matches the
+  // month-grid assertions. Wait, then click only if not already on Month.
   const monthBtn = page.getByRole('button', { name: 'Month', exact: true });
-  if (await monthBtn.isVisible().catch(() => false)) {
+  await expect(monthBtn).toBeVisible();
+  if ((await monthBtn.getAttribute('aria-pressed')) !== 'true') {
     await monthBtn.click();
-    await expect(monthBtn).toHaveAttribute('aria-pressed', 'true');
   }
+  await expect(monthBtn).toHaveAttribute('aria-pressed', 'true');
 }
 
 /** Switch the shell into Calendar view. Idempotent. */
