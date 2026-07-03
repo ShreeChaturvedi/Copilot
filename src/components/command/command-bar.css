@@ -115,6 +115,14 @@
   color: var(--ink-2);
 }
 
+/* Pending: dim + lock the row while the mutation is in flight. No spinner --
+   the mutation resolves in well under 200ms in practice, faster than a
+   spinner would even register. */
+.tf-cmdk-place[data-pending='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .tf-cmdk-label {
   flex: 1 1 auto;
   min-width: 0;
@@ -150,11 +158,36 @@
   font-size: 13px;
   color: var(--ink-muted);
 }
+.tf-cmdk-empty-icon {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto 10px;
+  color: var(--faint);
+  display: block;
+}
 .tf-cmdk-empty-hint {
   display: block;
   margin-top: 4px;
   font-size: 12px;
   color: var(--faint);
+}
+
+/* Persistent keyboard-hint footer -- sibling of <Command>, never scrolls
+   away with the list. */
+.tf-cmdk-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-2);
+}
+.tf-cmdk-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 
 @keyframes tf-cmdk-panel-in {

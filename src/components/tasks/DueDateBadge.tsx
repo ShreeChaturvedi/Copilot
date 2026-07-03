@@ -163,7 +163,7 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
         <div className="space-y-3">
           {/* Top display with optional time field */}
           <div className="flex items-center gap-2">
-            <div className="flex-1 text-sm font-medium">
+            <div className="flex-1 text-sm font-medium font-mono tabular-nums">
               {selectedDate
                 ? format(selectedDate, 'MMM d, yyyy')
                 : 'Select a date'}

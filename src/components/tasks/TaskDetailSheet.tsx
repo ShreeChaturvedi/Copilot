@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
 import { MapPin, Paperclip, FileText, Plus, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/textarea';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
 import {
   Popover,
   PopoverContent,
@@ -25,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { IntegratedActionBar } from '@/components/dialogs/IntegratedActionBar';
 import { cn } from '@/lib/utils';
+import { DEFAULT_PRESET_COLOR } from '@/constants/colors';
 import type { FileAttachment, Task, TaskTag, Priority } from '@shared/types';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -37,6 +40,8 @@ import { taskQueryKeys } from '@/hooks/useTasks';
 import { DefaultPreview } from '@/components/smart-input/components/previews/DefaultPreview';
 import { useTasks } from '@/hooks/useTasks';
 import StatusBadge from './StatusBadge';
+import './task-item.css';
+import './task-detail-sheet.css';
 
 /* ----------------------------------------------------------------------------
  * Permanent field rows (#45): SCHEDULE, PRIORITY, LIST, TAGS are always
@@ -80,7 +85,7 @@ function useTaskListOptions(): TaskListOption[] {
         id: String(item.id),
         name: String(item.name ?? 'Tasks'),
         emoji: String(item.icon ?? ''),
-        color: String(item.color ?? '#789296'),
+        color: String(item.color ?? DEFAULT_PRESET_COLOR),
       }));
     },
     staleTime: 30_000,
@@ -116,13 +121,13 @@ function FieldRow({
 const ghostTriggerClass = cn(
   'inline-flex items-center gap-1.5 rounded-md border border-dashed border-etch-strong',
   'px-2.5 py-1 text-[13px] text-faint',
-  'hover:bg-surface-2 hover:text-ink-muted transition-colors duration-150',
+  'hover:bg-surface-hover hover:text-ink-muted transition-colors duration-150',
   'outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
 );
 
 const setTriggerClass = cn(
   'inline-flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 text-[13px] text-ink',
-  'hover:bg-surface-2 transition-colors duration-150',
+  'hover:bg-surface-hover transition-colors duration-150',
   'outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
 );
 
@@ -131,6 +136,46 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   medium: 'Medium',
   high: 'High',
 };
+
+/** Ascending fill count per priority — feeds PrioritySignalBars. */
+const PRIORITY_LEVEL: Record<Priority, 1 | 2 | 3> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+/**
+ * Neutral signal-strength glyph (design-brief Craft): `currentColor` for
+ * filled bars, `--hairline-strong` for the unfilled remainder. Deliberately
+ * no red/amber/green mapping — priority isn't one of §1.6's five sanctioned
+ * aqua uses, and a traffic-light scheme would plant a second saturated-color
+ * system next to the one this app is disciplined about. `currentColor` means
+ * it inherits the trigger's own ink color (set vs. ghost) for free.
+ */
+function PrioritySignalBars({ level }: { level: 0 | 1 | 2 | 3 }) {
+  const heights = [5, 8, 12];
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      {heights.map((h, i) => (
+        <rect
+          key={h}
+          x={1 + i * 4}
+          y={12 - h}
+          width="2"
+          height={h}
+          rx="0.5"
+          fill={i < level ? 'currentColor' : 'var(--hairline-strong)'}
+        />
+      ))}
+    </svg>
+  );
+}
 
 export interface TaskDetailSheetProps {
   open: boolean;
@@ -159,6 +204,9 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const [addTagOpen, setAddTagOpen] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const descriptionEditActiveRef = useRef(false);
 
   const handlePeekToggle = useCallback(() => {
     setPeekMode(peekMode === 'center' ? 'right' : 'center');
@@ -324,6 +372,34 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     [task.tags, replaceTags]
   );
 
+  const descriptionText = String(
+    task.description || task.parsedMetadata?.originalInput || ''
+  );
+
+  const startEditingDescription = useCallback(() => {
+    setDescriptionDraft(descriptionText);
+    descriptionEditActiveRef.current = true;
+    setIsEditingDescription(true);
+  }, [descriptionText]);
+
+  const saveDescription = useCallback(() => {
+    if (!descriptionEditActiveRef.current) return;
+    descriptionEditActiveRef.current = false;
+    setIsEditingDescription(false);
+    setDescriptionDraft((draft) => {
+      const next = draft.trim();
+      if (next !== descriptionText) {
+        updateTask.mutate({ id: task.id, updates: { description: next } });
+      }
+      return draft;
+    });
+  }, [descriptionText, task.id, updateTask]);
+
+  const cancelEditingDescription = useCallback(() => {
+    descriptionEditActiveRef.current = false;
+    setIsEditingDescription(false);
+  }, []);
+
   /* ---- display helpers ---- */
 
   const scheduled = task.scheduledDate ? new Date(task.scheduledDate) : null;
@@ -336,6 +412,19 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
         ? 'text-aqua'
         : 'text-ink'
     : '';
+
+  const metaCaption = [
+    `Created ${format(new Date(task.createdAt), 'MMM d, yyyy')}`,
+    task.updatedAt &&
+    new Date(task.updatedAt).getTime() !== new Date(task.createdAt).getTime()
+      ? `Updated ${format(new Date(task.updatedAt), 'MMM d, yyyy')}`
+      : null,
+    task.completed && task.completedAt
+      ? `Completed ${format(new Date(task.completedAt), 'MMM d, yyyy')}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const handleEdit = useCallback(() => {
     onEdit?.(task.id);
@@ -358,9 +447,9 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
           Task details for {task.title}
         </SheetDescription>
         {/* Header: Title + action bar (Edit / Delete / Close) */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 pb-4 mb-1 border-b border-hairline">
           <SheetTitle
-            className="text-lg font-semibold leading-tight tracking-[-0.01em] truncate whitespace-nowrap"
+            className="text-lg font-semibold leading-tight tracking-[-0.01em] line-clamp-2"
             title={task.title}
           >
             {task.title}
@@ -380,13 +469,14 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
         </div>
 
         {/* Permanent field rows (#45): drawn whether set or not */}
-        <div className="mt-2 space-y-1">
+        <div className="mt-4 space-y-2">
           <FieldRow label="Status" isSet>
             <StatusBadge
               task={task}
               onChange={(status) =>
                 updateTask.mutate({ id: task.id, updates: { status } })
               }
+              className="border-transparent bg-transparent -mx-2 px-2 hover:bg-surface-hover hover:border-transparent"
             />
           </FieldRow>
 
@@ -430,17 +520,14 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                   <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-muted">
                     Time
                   </span>
-                  <Input
-                    type="time"
-                    aria-label="Time"
-                    className="h-8 w-auto font-mono text-xs"
+                  <CustomTimeInput
                     value={
                       scheduled && scheduledHasTime
                         ? format(scheduled, 'HH:mm')
                         : ''
                     }
                     onChange={handleTimeChange}
-                    disabled={!scheduled}
+                    className="h-8 w-28 font-mono text-xs"
                   />
                   {scheduled && (
                     <Button
@@ -475,6 +562,9 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                       : 'Set a priority'
                   }
                 >
+                  <PrioritySignalBars
+                    level={task.priority ? PRIORITY_LEVEL[task.priority] : 0}
+                  />
                   {task.priority
                     ? PRIORITY_LABELS[task.priority]
                     : 'No priority'}
@@ -554,17 +644,18 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               {labelTags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="group/tag inline-flex h-5 items-center gap-1 rounded-full px-2 font-mono text-[11px]"
-                  style={{
-                    backgroundColor: `${tag.color || '#789296'}1f`,
-                    color: tag.color || 'var(--ink-2)',
-                  }}
+                  className="ti-tag group/tag"
+                  style={
+                    {
+                      '--tag-c': tag.color || DEFAULT_PRESET_COLOR,
+                    } as React.CSSProperties
+                  }
                 >
                   {tag.displayText}
                   <button
                     type="button"
                     aria-label={`Remove tag ${tag.displayText}`}
-                    className="opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none"
+                    className="opacity-50 hover:opacity-100 focus-visible:opacity-100 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1"
                     onClick={() => removeTag(tag.id)}
                   >
                     <X className="h-3 w-3" />
@@ -612,19 +703,44 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
         </div>
 
         {/* Content rows: render only when data exists */}
-        <div className="space-y-5 mt-5 border-t border-hairline pt-5">
-          {/* Description */}
+        <div className="space-y-5 mt-6 border-t border-hairline pt-5">
+          {/* Description — click to edit, the one primary field this sheet
+              can't otherwise edit inline. */}
           {task.description || task.parsedMetadata?.originalInput ? (
             <div className="flex items-start gap-3">
-              <div className="text-muted-foreground flex-shrink-0 mt-1">
+              <div className="text-ink-muted flex-shrink-0 mt-1">
                 <FileText className="h-4 w-4" />
               </div>
-              <div className="flex-1">
-                <div className="text-sm whitespace-pre-wrap">
-                  {String(
-                    task.description || task.parsedMetadata?.originalInput || ''
-                  )}
-                </div>
+              <div className="flex-1 min-w-0">
+                {isEditingDescription ? (
+                  <Textarea
+                    autoFocus
+                    value={descriptionDraft}
+                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                    onBlur={saveDescription}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEditingDescription();
+                      } else if (
+                        (e.metaKey || e.ctrlKey) &&
+                        e.key === 'Enter'
+                      ) {
+                        e.preventDefault();
+                        saveDescription();
+                      }
+                    }}
+                    placeholder="Add a description…"
+                    className="min-h-20 text-sm"
+                  />
+                ) : (
+                  <div
+                    className="text-sm whitespace-pre-wrap cursor-pointer hover:bg-surface-hover rounded-md -mx-2 px-2 py-1 transition-colors"
+                    onClick={startEditingDescription}
+                  >
+                    {descriptionText}
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
@@ -632,7 +748,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
           {/* Location */}
           {locationTag && (
             <div className="flex items-center gap-3">
-              <div className="text-muted-foreground flex-shrink-0">
+              <div className="text-ink-muted flex-shrink-0">
                 <MapPin className="h-4 w-4" />
               </div>
               <div className="flex-1">
@@ -645,10 +761,10 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
           {task.attachments && task.attachments.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <Paperclip className="h-4 w-4 text-ink-muted" />
                 <div className="text-sm font-medium">Attachments</div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {task.attachments.map((att) => {
                   const isImage = (att.type || '').startsWith('image/');
                   const fileLike = new File([], att.name, {
@@ -657,7 +773,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                   return (
                     <div
                       key={att.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-hairline bg-surface-1 cursor-pointer hover:bg-surface-2 transition-colors"
+                      className="tds-attachment-row flex items-center gap-2 px-2 py-1.5 rounded-md border border-hairline bg-surface-1 cursor-pointer hover:bg-surface-hover transition-colors"
                       onClick={() => openAttachment(att)}
                       title={`Preview ${att.name}`}
                     >
@@ -676,16 +792,35 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                         />
                       )}
                       <div className="min-w-0">
-                        <div className="text-xs font-medium text-foreground max-w-[180px] truncate">
+                        <div className="text-xs font-medium text-ink max-w-[180px] truncate">
                           {att.name}
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${att.name}`}
+                        className="tds-attachment-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDeleteAttachment(att);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </div>
                   );
                 })}
               </div>
             </div>
           )}
+        </div>
+
+        {/* Footer meta caption: gives the sheet a deliberate close even when
+            every optional section above is empty. */}
+        <div className="mt-5 border-t border-hairline pt-3">
+          <p className="font-mono text-[11px] text-etch-text tabular-nums">
+            {metaCaption}
+          </p>
         </div>
       </SheetContent>
 

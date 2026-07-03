@@ -11,6 +11,8 @@ import React, {
   lazy,
   Suspense,
 } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { EASE_SETTLE, DUR_3_S } from '@/lib/motion';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 // Lazy load SmartTaskInput to code-split the 405KB bundle
 const SmartTaskInput = lazy(async () => ({
@@ -183,7 +185,9 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
           }
         >
           <div
-            className={hasUserToggledSmartInput ? 'calendar-item' : undefined}
+            className={
+              hasUserToggledSmartInput ? 'list-stagger-item' : undefined
+            }
           >
             <div className="mt-4 text-sm">
               <Suspense
@@ -215,7 +219,6 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
                   useInlineHighlighting={false}
                   useOverlayHighlighting={false}
                   useFlexInputGroup={true}
-                  hideFocusOutline={true}
                 />
               </Suspense>
             </div>
@@ -315,7 +318,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
               ? 'Hide mini calendar'
               : 'Show mini calendar'
           }
-          className="h-8 w-8"
+          className="size-7"
           onClick={handleToggleMiniCalendar}
         >
           {taskViewMiniCalendarExpanded ? (
@@ -332,7 +335,7 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
           variant="ghost"
           size="icon"
           aria-label={calendarViewInputExpanded ? 'Hide input' : 'Show input'}
-          className="h-8 w-8"
+          className="size-7"
           onClick={handleToggleSmartInput}
         >
           {calendarViewInputExpanded ? (
@@ -352,77 +355,98 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     handleToggleSmartInput,
   ]);
 
-  // Main content - TaskList in calendar view, EventOverview in task view
+  // Main content - TaskList in calendar view, EventOverview in task view.
+  // The View Settle: cross-fade + small y-drift between the two views' content
+  // on the shared --ease-settle curve (foundation §3/§4's entrance signature),
+  // replacing what used to be a hard, unanimated content swap.
   const mainContent = useMemo(() => {
-    return currentView === 'calendar' ? (
-      <Suspense
-        fallback={<div className="h-40 animate-pulse bg-muted rounded-md" />}
-      >
-        <TaskList
-          tasks={tasks}
-          taskGroups={taskGroups}
-          activeTaskGroupId={activeTaskGroupId}
-          onToggleTask={memoizedHandleToggleTask}
-          onEditTask={memoizedHandleEditTask}
-          onDeleteTask={memoizedHandleDeleteTask}
-          onScheduleTask={memoizedHandleScheduleTask}
-          onRemoveTag={memoizedHandleRemoveTag}
-          onCreateTaskGroup={memoizedHandleAddTaskGroupForTaskList}
-          onEditTaskGroup={memoizedHandleEditTaskGroup}
-          onSelectTaskGroup={memoizedHandleSelectTaskGroup}
-          onUpdateTaskGroupIcon={memoizedHandleUpdateTaskGroupIcon}
-          onUpdateTaskGroupColor={memoizedHandleUpdateTaskGroupColor}
-          onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
-          showCreateTaskDialog={showCreateTaskDialog}
-          onShowCreateTaskDialog={memoizedSetShowCreateTaskDialog}
-          calendarMode={true}
-          maxTasks={10}
-        />
-      </Suspense>
-    ) : (
-      <div className="space-y-3">
-        <Collapsible open={taskViewMiniCalendarExpanded}>
-          <CollapsibleContent
-            className={
-              'overflow-hidden ' +
-              (hasUserToggledMiniCalendar
-                ? 'data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up'
-                : '')
-            }
-          >
-            <div
-              className={
-                hasUserToggledMiniCalendar ? 'calendar-item' : undefined
+    return (
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={currentView}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+        >
+          {currentView === 'calendar' ? (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse bg-muted rounded-md" />
               }
             >
-              <div className="pt-1">
-                <MiniCalendar
-                  className="w-full rounded-md bg-card [--cell-size:--spacing(7)]"
-                  classNames={{
-                    root: 'w-full',
-                    months: 'flex flex-col gap-2 md:flex-row relative',
-                    month: 'flex flex-col w-full gap-2',
-                    week: 'flex w-full',
-                  }}
-                  captionLayout="label"
-                  showOutsideDays
-                  mode="single"
-                  selected={today}
-                />
-                <div className="h-2" />
-              </div>
+              <TaskList
+                tasks={tasks}
+                taskGroups={taskGroups}
+                activeTaskGroupId={activeTaskGroupId}
+                onToggleTask={memoizedHandleToggleTask}
+                onEditTask={memoizedHandleEditTask}
+                onDeleteTask={memoizedHandleDeleteTask}
+                onScheduleTask={memoizedHandleScheduleTask}
+                onRemoveTag={memoizedHandleRemoveTag}
+                onCreateTaskGroup={memoizedHandleAddTaskGroupForTaskList}
+                onEditTaskGroup={memoizedHandleEditTaskGroup}
+                onSelectTaskGroup={memoizedHandleSelectTaskGroup}
+                onUpdateTaskGroupIcon={memoizedHandleUpdateTaskGroupIcon}
+                onUpdateTaskGroupColor={memoizedHandleUpdateTaskGroupColor}
+                onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
+                showCreateTaskDialog={showCreateTaskDialog}
+                onShowCreateTaskDialog={memoizedSetShowCreateTaskDialog}
+                calendarMode={true}
+                maxTasks={10}
+              />
+            </Suspense>
+          ) : (
+            <div className="space-y-4">
+              <Collapsible open={taskViewMiniCalendarExpanded}>
+                <CollapsibleContent
+                  className={
+                    'overflow-hidden ' +
+                    (hasUserToggledMiniCalendar
+                      ? 'data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up'
+                      : '')
+                  }
+                >
+                  <div
+                    className={
+                      hasUserToggledMiniCalendar
+                        ? 'list-stagger-item'
+                        : undefined
+                    }
+                  >
+                    <div className="pt-1">
+                      <MiniCalendar
+                        className="w-full rounded-md bg-card [--cell-size:--spacing(7)]"
+                        classNames={{
+                          root: 'w-full',
+                          months: 'flex flex-col gap-2 md:flex-row relative',
+                          month: 'flex flex-col w-full gap-2',
+                          week: 'flex w-full',
+                        }}
+                        captionLayout="label"
+                        showOutsideDays
+                        mode="single"
+                        selected={today}
+                      />
+                      <div className="h-2" />
+                    </div>
+                  </div>
+                  <div
+                    className={
+                      hasUserToggledMiniCalendar
+                        ? 'list-stagger-item'
+                        : undefined
+                    }
+                  >
+                    <Separator />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+              <EventOverview maxEvents={7} showHeader={false} />
             </div>
-            <div
-              className={
-                hasUserToggledMiniCalendar ? 'calendar-item' : undefined
-              }
-            >
-              <Separator />
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        <EventOverview maxEvents={7} showHeader={false} />
-      </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     );
   }, [
     currentView,
@@ -496,37 +520,51 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     [handleEditTaskGroup]
   );
 
-  // Footer content - CalendarList in calendar view, TaskGroupList in task view
+  // Footer content - CalendarList in calendar view, TaskGroupList in task view.
+  // Same View Settle cross-fade as mainContent (§2.6) so header/main/footer
+  // all resolve the calendar⟷task swap on the one shared entrance curve.
   const footerListContent = useMemo(() => {
-    return currentView === 'calendar' ? (
-      <CalendarList
-        calendars={calendars}
-        onToggleCalendar={memoizedHandleToggleCalendar}
-        onAddCalendar={memoizedHandleAddCalendar}
-        onEditCalendar={memoizedHandleEditCalendar}
-        onDeleteCalendar={memoizedHandleDeleteCalendar}
-      />
-    ) : (
-      <div className="space-y-2">
-        <TaskGroupList
-          taskGroups={taskGroups}
-          activeTaskGroupId={activeTaskGroupId}
-          onAddTaskGroup={memoizedHandleAddTaskGroupForList}
-          onEditTaskGroup={memoizedHandleEditTaskGroupForList}
-          onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
-          onArchiveTaskGroup={memoizedHandleArchiveTaskGroup}
-          onSelectTaskGroup={memoizedHandleSelectTaskGroup}
-        />
-        {showSidebarTaskAnalytics && (
-          <Suspense
-            fallback={
-              <div className="h-20 animate-pulse bg-muted rounded-md" />
-            }
-          >
-            <TaskAnalyticsSummary />
-          </Suspense>
-        )}
-      </div>
+    return (
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={currentView}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+        >
+          {currentView === 'calendar' ? (
+            <CalendarList
+              calendars={calendars}
+              onToggleCalendar={memoizedHandleToggleCalendar}
+              onAddCalendar={memoizedHandleAddCalendar}
+              onEditCalendar={memoizedHandleEditCalendar}
+              onDeleteCalendar={memoizedHandleDeleteCalendar}
+            />
+          ) : (
+            <div className="space-y-4">
+              <TaskGroupList
+                taskGroups={taskGroups}
+                activeTaskGroupId={activeTaskGroupId}
+                onAddTaskGroup={memoizedHandleAddTaskGroupForList}
+                onEditTaskGroup={memoizedHandleEditTaskGroupForList}
+                onDeleteTaskGroup={memoizedHandleDeleteTaskGroup}
+                onArchiveTaskGroup={memoizedHandleArchiveTaskGroup}
+                onSelectTaskGroup={memoizedHandleSelectTaskGroup}
+              />
+              {showSidebarTaskAnalytics && (
+                <Suspense
+                  fallback={
+                    <div className="h-20 animate-pulse bg-muted rounded-md" />
+                  }
+                >
+                  <TaskAnalyticsSummary />
+                </Suspense>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     );
   }, [
     currentView,

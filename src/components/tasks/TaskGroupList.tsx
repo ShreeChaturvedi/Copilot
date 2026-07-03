@@ -168,6 +168,8 @@ const TaskGroupListComponent: React.FC<TaskGroupListProps> = ({
       }
       addButtonLabel="Task List"
       emptyStateText="No task lists yet"
+      emptyStateVoice="No lists yet."
+      emptyStateNote="Lists keep related tasks together."
       createFirstItemText="Create your first task list"
       deleteDialogTitle="Delete Task List"
       deleteDialogDescription={(itemName) =>

@@ -6,13 +6,6 @@ import { Loader2, Camera, Info } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   Form,
   FormControl,
   FormField,
@@ -23,9 +16,17 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/Select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import {
   useProfileData,
   useProfileFormData,
@@ -120,18 +121,21 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Profile Header */}
-      <div className="flex items-center space-x-4 p-4 border rounded-lg">
+      {/* Profile Header — flat, closed by a single hairline instead of its
+          own box (§2.1/§2.7): the header zone "ended," not "fenced." */}
+      <div className="flex items-center gap-4 border-b border-hairline py-5">
         <Avatar className="h-16 w-16">
           <AvatarImage src={profileData.picture} alt={profileData.name} />
           <AvatarFallback className="text-lg">
             {getInitials(profileData.name)}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1">
-          <h3 className="font-medium text-lg">{profileData.name}</h3>
-          <p className="text-sm text-muted-foreground">{profileData.email}</p>
-          <div className="flex items-center gap-2 mt-1">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-lg text-foreground truncate">
+            {profileData.name}
+          </h3>
+          <p className="text-sm text-ink-muted truncate">{profileData.email}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <Badge
               variant={authMethod === 'google' ? 'secondary' : 'outline'}
               className="text-xs"
@@ -139,17 +143,23 @@ export function ProfileSettings() {
               {authMethod === 'google' ? 'Google Account' : 'Local Account'}
             </Badge>
             {profileData.joinedAt && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-ink-muted">
                 Member since{' '}
-                {new Date(profileData.joinedAt).toLocaleDateString()}
+                {new Date(profileData.joinedAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
               </span>
             )}
           </div>
         </div>
-        <Button variant="outline" size="sm" disabled>
-          <Camera className="h-4 w-4 mr-2" />
-          Change Photo
-        </Button>
+        <CursorTooltip content="Avatar upload isn't available yet">
+          <Button variant="outline" size="sm" disabled>
+            <Camera className="h-4 w-4 mr-2" />
+            Change Photo
+          </Button>
+        </CursorTooltip>
       </div>
 
       {/* Authentication Info */}
@@ -163,161 +173,148 @@ export function ProfileSettings() {
         </Alert>
       )}
 
-      {/* Profile Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
-            Update your personal details and preferences
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form
-            {...(form as unknown as import('react-hook-form').UseFormReturn)}
-          >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Name Field */}
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Display Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your full name"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        This is the name that will be displayed across the app
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Email is not editable. Display-only row mirrors form inputs for consistency. */}
-                <div className="space-y-2">
-                  <FormLabel>Email Address</FormLabel>
-                  <Input
-                    type="email"
-                    value={profileData.email}
-                    readOnly
-                    disabled
-                  />
+      {/* Profile Form — no Card wrapper: this panel is one continuous form,
+          the dialog header already states "Profile / Manage your personal
+          information and preferences" once (§2.7). */}
+      <Form {...(form as unknown as import('react-hook-form').UseFormReturn)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Name Field */}
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Display Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter your full name"
+                      {...field}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
                   <FormDescription>
-                    {profileData.canEditEmail
-                      ? 'Email changes are restricted for security reasons. Contact support to update.'
-                      : 'Email managed by your Google account'}
+                    This is the name that will be displayed across the app
                   </FormDescription>
-                </div>
-              </div>
-
-              {/* Bio Field */}
-              <FormField
-                control={form.control}
-                name="bio"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bio</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Tell us a bit about yourself..."
-                        className="resize-none"
-                        rows={3}
-                        {...field}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      A brief description about yourself (optional)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Timezone Field */}
-              <FormField
-                control={form.control}
-                name="timezone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Timezone</FormLabel>
-                    <FormControl>
-                      <select
-                        {...field}
-                        disabled={isSubmitting}
-                        className="h-9 w-full px-3 border border-input rounded-md bg-background text-sm outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 disabled:opacity-40"
-                      >
-                        <option value="">Select timezone...</option>
-                        {TIMEZONE_OPTIONS.map((tz) => (
-                          <option key={tz.value} value={tz.value}>
-                            {tz.label}
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormDescription>
-                      Your local timezone for scheduling and notifications
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Error/Success Messages */}
-              {updateError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{updateError}</AlertDescription>
-                </Alert>
+                  <FormMessage />
+                </FormItem>
               )}
+            />
 
-              {updateSuccess && (
-                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
-                  <AlertDescription>
-                    Profile updated successfully!
-                  </AlertDescription>
-                </Alert>
+            {/* Email is not editable. Display-only row mirrors form inputs for consistency. */}
+            <div className="space-y-2">
+              <FormLabel>Email Address</FormLabel>
+              <Input type="email" value={profileData.email} readOnly disabled />
+              <FormDescription>
+                {profileData.canEditEmail
+                  ? 'Email changes are restricted for security reasons. Contact support to update.'
+                  : 'Email managed by your Google account'}
+              </FormDescription>
+            </div>
+          </div>
+
+          {/* Bio Field */}
+          <FormField
+            control={form.control}
+            name="bio"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bio</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Tell us a bit about yourself..."
+                    className="resize-none"
+                    rows={3}
+                    {...field}
+                    disabled={isSubmitting}
+                  />
+                </FormControl>
+                <FormDescription>
+                  A brief description about yourself (optional)
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Timezone Field — themed ui/Select, not the OS-rendered native
+              <select> (§1.E/§3): fixes both the ring-vs-outline focus drift
+              and the dark-mode/light-OS popup mismatch in one change. */}
+          <FormField
+            control={form.control}
+            name="timezone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Timezone</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={isSubmitting}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select timezone..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Your local timezone for scheduling and notifications
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Error/Success Messages */}
+          {updateError && (
+            <Alert variant="destructive">
+              <AlertDescription>{updateError}</AlertDescription>
+            </Alert>
+          )}
+
+          {updateSuccess && (
+            <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
+              <AlertDescription>Profile updated successfully!</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between border-t border-hairline pt-4">
+            <div className="text-sm text-muted-foreground">
+              {isDirty && (
+                <span className="text-warning">You have unsaved changes</span>
               )}
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-4">
-                <div className="text-sm text-muted-foreground">
-                  {isDirty && (
-                    <span className="text-warning">
-                      You have unsaved changes
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!isDirty || isSubmitting}
-                    onClick={() => form.reset()}
-                  >
-                    Reset
-                  </Button>
-                  <Button type="submit" disabled={!isDirty || isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Changes'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!isDirty || isSubmitting}
+                onClick={() => form.reset()}
+              >
+                Reset
+              </Button>
+              <Button type="submit" disabled={!isDirty || isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }

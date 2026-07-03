@@ -21,6 +21,7 @@ import {
   CalendarPlus,
 } from 'lucide-react';
 import { Draggable } from '@fullcalendar/interaction';
+import { DEFAULT_PRESET_COLOR } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -342,7 +343,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         calendars.find((c) => hasDefaultProperty(c) && c.isDefault) ||
         calendars[0];
       const defaultCalendarColor = defaultCal?.color;
-      const dragColor = defaultCalendarColor || groupColor || '#3788d8';
+      const dragColor =
+        defaultCalendarColor || groupColor || DEFAULT_PRESET_COLOR;
 
       const draggable = new Draggable(element, {
         eventData: {
@@ -526,7 +528,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                                 id: 'default',
                                 name: 'Tasks',
                                 emoji: '📋',
-                                color: '#0d97d5',
+                                color: DEFAULT_PRESET_COLOR,
                               }
                             : undefined);
                         return taskList ? (

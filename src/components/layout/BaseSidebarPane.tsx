@@ -1,23 +1,22 @@
 import React, { ReactNode } from 'react';
-import { 
+import {
   Sidebar,
-  SidebarHeader, 
-  SidebarContent, 
+  SidebarHeader,
+  SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarSeparator 
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import { useUIStore } from '@/stores/uiStore';
 import { Separator } from '@/components/ui/separator';
 import { SmoothSidebarTrigger } from './SmoothSidebarTrigger';
 import { UserDropdown } from './UserDropdown';
-import { cn } from '@/lib/utils';
 
 export interface BaseSidebarPaneProps {
   // Core layout props
   className?: string;
-  
+
   // Header content
   headerContent?: ReactNode;
   additionalHeaderContent?: ReactNode; // Additional content to append after default header
@@ -25,24 +24,21 @@ export interface BaseSidebarPaneProps {
   showSidebarTrigger?: boolean;
   // Optional right-side header controls rendered before the sidebar trigger
   rightHeaderControls?: ReactNode;
-  
+
   // Main content
   mainContent?: ReactNode;
-  
+
   // Footer content - lists section
   footerListContent?: ReactNode;
-  
+
   // Footer content - user profile (can be overridden)
   userProfileContent?: ReactNode;
-  
+
   // Settings dialog handler
   onOpenSettings?: (section: 'general' | 'profile' | 'help') => void;
-  
+
   // Event handlers
   onViewToggle?: (view: ViewMode) => void;
-  
-  // Styling options
-  useMinimalMode?: boolean; // For CalendarSummaryPane-style layout without full Sidebar wrapper
 }
 
 export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
@@ -57,7 +53,6 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
   userProfileContent,
   onViewToggle,
   onOpenSettings,
-  useMinimalMode = false
 }) => {
   const { currentView, setCurrentView } = useUIStore();
 
@@ -71,96 +66,54 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2 relative">
         {showViewToggle && (
-          <ViewToggle
-            currentView={currentView}
-            onToggle={handleViewToggle}
-          />
+          <ViewToggle currentView={currentView} onToggle={handleViewToggle} />
         )}
       </div>
       <div className="flex items-center gap-2">
         {rightHeaderControls}
-        {showSidebarTrigger && (
-          <SmoothSidebarTrigger position="sidebar" />
-        )}
+        {showSidebarTrigger && <SmoothSidebarTrigger position="sidebar" />}
       </div>
     </div>
   );
 
   // Default user profile content
-  const defaultUserProfileContent = <UserDropdown onOpenSettings={onOpenSettings} />;
+  const defaultUserProfileContent = (
+    <UserDropdown onOpenSettings={onOpenSettings} />
+  );
 
-  // Minimal mode (for CalendarSummaryPane)
-  if (useMinimalMode) {
-    return (
-      <div 
-        className={cn(
-          'bg-sidebar text-sidebar-foreground',
-          'flex flex-col h-full',
-          className
-        )}
-        data-slot="sidebar-pane"
-      >
-        {/* Header */}
-        <SidebarHeader className="pt-4 pb-2 px-2">
-          {headerContent || defaultHeaderContent}
-          {additionalHeaderContent}
-        </SidebarHeader>
-
-        <SidebarSeparator />
-
-        {/* Main Content Area */}
-        <SidebarContent className="flex-1 px-4 py-2">
-          {mainContent}
-        </SidebarContent>
-
-        {/* Footer */}
-        <SidebarFooter>
-          {footerListContent && (
-            <>
-              <Separator />
-              <SidebarGroup>
-                {footerListContent}
-              </SidebarGroup>
-            </>
-          )}
-          
-          {/* User Profile */}
-          {userProfileContent || defaultUserProfileContent}
-        </SidebarFooter>
-      </div>
-    );
-  }
-
-  // Full sidebar mode (for LeftPane)
+  // "16 outer / 12 inner" rhythm: 16px horizontal inset the whole way down,
+  // 12px vertical seams between header/content/footer regions. Exactly two
+  // full-bleed dividers — header→content and content→footer-list — so every
+  // seam that needs a line has one and every seam that doesn't, doesn't.
   return (
     <Sidebar collapsible="offcanvas" className={className}>
       {/* Header */}
-      <SidebarHeader className="pt-4 pb-2 px-2">
+      <SidebarHeader className="px-4 pt-4 pb-3">
         {headerContent || defaultHeaderContent}
         {additionalHeaderContent}
       </SidebarHeader>
 
+      <Separator />
+
       {/* Main Content */}
       <SidebarContent>
-        <SidebarGroup>
-          {mainContent}
-        </SidebarGroup>
+        <SidebarGroup className="px-4 py-3">{mainContent}</SidebarGroup>
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter>
+      <SidebarFooter className="gap-3 px-4 pt-3 pb-4">
         {footerListContent && (
           <>
             <Separator />
-            <SidebarGroup>
-              {footerListContent}
-            </SidebarGroup>
+            <div className="flex flex-col gap-1">{footerListContent}</div>
           </>
         )}
-        
+
         {/* User Profile */}
         {userProfileContent || defaultUserProfileContent}
       </SidebarFooter>
+
+      <SidebarRail />
     </Sidebar>
   );
 };

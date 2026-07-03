@@ -112,6 +112,13 @@ export interface BaseListProps<T extends BaseListItem> {
   // Styling
   addButtonLabel: string;
   emptyStateText: string;
+  // [NEW, additive/opt-in] Etched empty-state voice + note (F1-15). When both
+  // are provided, the empty state renders the etch-language block (dashed
+  // row-glyph + Sentient voice line + muted note) instead of the plain
+  // emptyStateText paragraph. emptyStateText stays required so existing
+  // consumers that haven't opted in keep rendering unchanged.
+  emptyStateVoice?: string;
+  emptyStateNote?: string;
   createFirstItemText: string;
   deleteDialogTitle: string;
   deleteDialogDescription: (itemName: string) => string;
@@ -146,6 +153,8 @@ export function BaseList<T extends BaseListItem>({
   CreateDialogComponent,
   addButtonLabel,
   emptyStateText,
+  emptyStateVoice,
+  emptyStateNote,
   createFirstItemText,
   deleteDialogTitle,
   deleteDialogDescription,
@@ -325,22 +334,57 @@ export function BaseList<T extends BaseListItem>({
           )}
 
           {/* Empty State */}
-          {items.length === 0 && !isAddingItem && (
-            <div
-              className="text-center py-3 text-muted-foreground list-stagger-item"
-              style={{ '--animation-delay': '0ms' } as React.CSSProperties}
-            >
-              <p className="text-xs">{emptyStateText}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAddingItem(true)}
-                className="mt-1 text-xs h-7"
+          {items.length === 0 &&
+            !isAddingItem &&
+            (emptyStateVoice && emptyStateNote ? (
+              // [NEW, opt-in] Etched sidebar-list empty state (F1-15): dashed
+              // row-glyph + Sentient voice line + muted note, per the "Sidebar
+              // list" density tier.
+              <div
+                className="flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center list-stagger-item"
+                style={{ '--animation-delay': '0ms' } as React.CSSProperties}
               >
-                {createFirstItemText}
-              </Button>
-            </div>
-          )}
+                <div className="flex flex-col gap-1.5 mb-1" aria-hidden="true">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full border-[1.5px] border-dashed border-etch-strong" />
+                    <span className="h-2 w-[72px] rounded border border-dashed border-etch-strong" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full border-[1.5px] border-dashed border-etch-strong" />
+                    <span className="h-2 w-[52px] rounded border border-dashed border-etch-strong" />
+                  </div>
+                </div>
+                <p className="font-serif text-base leading-[1.3] text-ink">
+                  {emptyStateVoice}
+                </p>
+                <p className="text-xs leading-[18px] text-ink-muted max-w-[22ch]">
+                  {emptyStateNote}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAddingItem(true)}
+                  className="mt-1.5 text-xs h-7"
+                >
+                  {createFirstItemText}
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="text-center py-3 text-muted-foreground list-stagger-item"
+                style={{ '--animation-delay': '0ms' } as React.CSSProperties}
+              >
+                <p className="text-xs">{emptyStateText}</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAddingItem(true)}
+                  className="mt-1 text-xs h-7"
+                >
+                  {createFirstItemText}
+                </Button>
+              </div>
+            ))}
         </CollapsibleContent>
 
         {/* Create Dialog */}

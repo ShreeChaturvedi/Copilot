@@ -4,8 +4,7 @@
  */
 
 import nlp from 'compromise';
-import { Parser, ParsedTag } from "@shared/types";
-import { v4 as uuidv4 } from 'uuid';
+import { Parser, ParsedTag } from '@shared/types';
 
 // Using minimal interfaces for compromise objects we actually use
 // to avoid pulling in heavy and conflicting type definitions.
@@ -117,7 +116,9 @@ export class CompromiseNLPParser implements Parser {
 
       if (startIndex !== -1) {
         tags.push({
-          id: uuidv4(),
+          // Deterministic id (parser + span): stable across debounced
+          // re-parses so tag identity survives unrelated keystrokes.
+          id: `${this.id}:${startIndex}:${startIndex + personText.length}`,
           type: 'person',
           value: personText,
           displayText: personText,
@@ -149,7 +150,7 @@ export class CompromiseNLPParser implements Parser {
 
       if (startIndex !== -1) {
         tags.push({
-          id: uuidv4(),
+          id: `${this.id}:${startIndex}:${startIndex + placeText.length}`,
           type: 'location',
           value: placeText,
           displayText: placeText,
@@ -181,7 +182,7 @@ export class CompromiseNLPParser implements Parser {
 
       if (startIndex !== -1) {
         tags.push({
-          id: uuidv4(),
+          id: `${this.id}:${startIndex}:${startIndex + orgText.length}`,
           type: 'project', // Treat organizations as projects
           value: orgText,
           displayText: orgText,
@@ -218,7 +219,7 @@ export class CompromiseNLPParser implements Parser {
 
         if (!alreadyExists) {
           tags.push({
-            id: uuidv4(),
+            id: `${this.id}:${match.index}:${match.index + fullMatch.length}`,
             type: 'location',
             value: location,
             displayText: location,
@@ -249,7 +250,9 @@ export class CompromiseNLPParser implements Parser {
       const matches = Array.from(text.matchAll(pattern)) as RegExpMatchArray[];
 
       if (matches.length > 0) {
-        const score = matches.length + (matches.some((m) => (m[0] || '').length > 5) ? 0.2 : 0);
+        const score =
+          matches.length +
+          (matches.some((m) => (m[0] || '').length > 5) ? 0.2 : 0);
 
         if (score > bestScore) {
           bestScore = score;
@@ -261,11 +264,12 @@ export class CompromiseNLPParser implements Parser {
 
     // Create semantic label tag
     if (bestCategory && bestMatch) {
-      const matchIndex = (bestMatch as RegExpMatchArray & { index?: number }).index ?? -1;
+      const matchIndex =
+        (bestMatch as RegExpMatchArray & { index?: number }).index ?? -1;
       const matchText: string = (bestMatch[0] as unknown as string) || '';
       if (matchIndex >= 0 && typeof matchText === 'string') {
         tags.push({
-          id: uuidv4(),
+          id: `${this.id}:${matchIndex}:${matchIndex + (matchText?.length || 0)}`,
           type: 'label',
           value: bestCategory,
           displayText: this.formatCategoryDisplayText(bestCategory),

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { EASE_SETTLE, EASE_OUT, DUR_3_S } from '@/lib/motion';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import type { UploadedFile } from '@/components/smart-input/components/FileUploadZone';
 import { TaskControls } from '@/components/tasks/TaskControls';
@@ -215,34 +216,31 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
         />
       </div>
 
-      {/* Scheduling Drop Zones - Only visible when dragging */}
+      {/* Scheduling Drop Zones - Only visible when dragging. One bordered,
+          internally-divided frame (Factory's "one container, internal
+          hairlines" pattern) instead of 5 independent boxes on a tinted
+          band — the border + hairline dividers carry the structure, so no
+          extra wash is needed under the header. Today keeps the sanctioned
+          aqua film (§1.6 rule 3, "live/immediate"); the rest are neutral
+          hover wells, Later muted to rank it last (drop-target *behavior*
+          here is Tasks-owned; this is visual/structural only). */}
       {dragState.isDragging && (
-        <div className="px-6 py-4 border-b border-border bg-muted/20 transition-all duration-200 ease-out">
-          {/* Token-based drop targets (theme-aware): Today is the live/aqua
-              target, the rest are neutral wells (design-brief §2.3) */}
-          <div className="flex items-center gap-3 h-12">
-            <div className="flex-1 h-11 bg-aqua-film-08 border border-aqua-rim rounded-lg flex items-center justify-center hover:bg-aqua-film-08 hover:border-primary transition-colors cursor-pointer">
+        <div className="px-4 py-3 border-b border-hairline">
+          <div className="flex items-stretch h-11 rounded-btn border border-hairline overflow-hidden divide-x divide-hairline">
+            <div className="flex-1 flex items-center justify-center bg-aqua-film-08 cursor-pointer transition-colors duration-150 ease-out">
               <span className="text-sm font-medium text-primary">Today</span>
             </div>
-            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-foreground">
-                Tomorrow
-              </span>
+            <div className="flex-1 flex items-center justify-center hover:bg-surface-hover cursor-pointer transition-colors duration-150 ease-out">
+              <span className="text-sm font-medium text-ink">Tomorrow</span>
             </div>
-            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-foreground">
-                This Week
-              </span>
+            <div className="flex-1 flex items-center justify-center hover:bg-surface-hover cursor-pointer transition-colors duration-150 ease-out">
+              <span className="text-sm font-medium text-ink">This Week</span>
             </div>
-            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-foreground">
-                Next Week
-              </span>
+            <div className="flex-1 flex items-center justify-center hover:bg-surface-hover cursor-pointer transition-colors duration-150 ease-out">
+              <span className="text-sm font-medium text-ink">Next Week</span>
             </div>
-            <div className="flex-1 h-11 bg-muted/60 border border-border rounded-lg flex items-center justify-center hover:bg-muted transition-colors cursor-pointer">
-              <span className="text-sm font-medium text-muted-foreground">
-                Later
-              </span>
+            <div className="flex-1 flex items-center justify-center hover:bg-surface-hover cursor-pointer transition-colors duration-150 ease-out">
+              <span className="text-sm font-medium text-ink-muted">Later</span>
             </div>
           </div>
         </div>
@@ -267,9 +265,16 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
           <motion.div
             key="enhanced-input"
             initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              transition: { duration: DUR_3_S, ease: EASE_SETTLE },
+            }}
+            exit={{
+              opacity: 0,
+              y: 12,
+              transition: { duration: 0.16, ease: EASE_OUT },
+            }}
             className="absolute inset-x-0 bottom-0 z-50 pointer-events-none"
           >
             <div className="pointer-events-auto mx-4 mb-4">

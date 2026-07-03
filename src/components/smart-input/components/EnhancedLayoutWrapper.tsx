@@ -5,12 +5,18 @@
  * the horizontal FlexInputGroup layout into a vertical Claude AI-inspired layout:
  * - Large textarea at the top
  * - All controls positioned below the input
- * - Card container with proper focus states
+ * - Real floating-tier material with a permanent focus-within ring
  * - Multi-line textarea support with highlighting
+ *
+ * Compose is a `position: absolute` panel floating over page content
+ * (TaskFocusPane) -- it *is* a floating surface by function, so it gets the
+ * same material as dialog/sheet/command-palette (`--shadow-dialog` +
+ * `--edge-machined` via the token, `rounded-dialog`), not the generic `Card`
+ * primitive's resting-tier `shadow-sm`, which read as a barely-there
+ * rectangle in light mode (surface-1 and background are both near-white).
  */
 
-import React, { useState, useRef, useCallback } from 'react';
-import { Card } from '@/components/ui/card';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface EnhancedLayoutWrapperProps {
@@ -24,22 +30,20 @@ export interface EnhancedLayoutWrapperProps {
   minHeight?: string;
   /** Whether the wrapper is disabled */
   disabled?: boolean;
-  /** Whether to show focus states */
-  showFocusStates?: boolean;
 }
 
 /**
  * Enhanced layout wrapper that implements the Claude AI pattern
  *
  * Structure:
- * <Card className="enhanced-input-card">
+ * <div className="enhanced-input-card">
  *   <div className="input-area">
  *     {children} // HighlightedInputField or textarea
  *   </div>
  *   <div className="controls-area">
  *     {controls} // All buttons and selectors
  *   </div>
- * </Card>
+ * </div>
  */
 export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
   children,
@@ -47,41 +51,22 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
   className,
   minHeight,
   disabled = false,
-  showFocusStates = true,
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  // Handle focus events from child input
-  const handleFocusIn = useCallback((e: React.FocusEvent) => {
-    // Only set focus if the focus is coming from within the input area
-    if (wrapperRef.current?.contains(e.target as Node)) {
-      setIsFocused(true);
-    }
-  }, []);
-
-  const handleFocusOut = useCallback((e: React.FocusEvent) => {
-    // Only remove focus if focus is leaving the entire wrapper
-    if (!wrapperRef.current?.contains(e.relatedTarget as Node)) {
-      setIsFocused(false);
-    }
-  }, []);
-
   return (
-    <Card
-      ref={wrapperRef}
-      onFocusCapture={handleFocusIn}
-      onBlurCapture={handleFocusOut}
+    <div
+      data-slot="card"
       className={cn(
-        // Base card styling with enhanced input specific adjustments
-        'relative overflow-hidden transition-all duration-200',
-        // Remove default card padding to control it precisely
-        'p-0',
-        // Constrain width for better proportions
-        'w-full',
-        // Focus states - highlight entire card when input is focused
-        // Remove outline/ring when the inner input is focused
-        showFocusStates && isFocused && ['outline-none ring-0'],
+        'relative overflow-hidden w-full',
+        // Floating tier (§1.4): surface-3 + machined edge + shadow-3, the
+        // same material dialog/sheet/command-palette use, via the named
+        // --shadow-dialog composite token.
+        'bg-surface-3 border border-hairline rounded-dialog',
+        '[box-shadow:var(--shadow-dialog)]',
+        // Focus state: a real, permanent ring on top of the floating shadow
+        // -- never suppressed. This is the primary "start typing" surface of
+        // the task-focus view; it must always have a focus affordance.
+        'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
+        'transition-[border-color,box-shadow] duration-150 ease-out',
         // Disabled state
         disabled && 'opacity-50 cursor-not-allowed',
         className
@@ -91,9 +76,7 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
       <div
         className={cn(
           // Container for the input with reduced bottom padding
-          'relative p-4 pb-0',
-          // Explicit background to match controls area
-          'bg-card'
+          'relative p-4 pb-0'
         )}
         style={
           minHeight
@@ -112,17 +95,16 @@ export const EnhancedLayoutWrapper: React.FC<EnhancedLayoutWrapperProps> = ({
           'flex items-center justify-between',
           // Reduced padding for tighter gap
           'px-4 pt-2 pb-3',
-          // Unified background - match input area exactly using bg-card
-          'bg-card',
-          // Visual separator between input and controls
-          'border-t border-border/50',
+          // Visual separator between input and controls (hairline, not a
+          // third ad hoc opacity cut of --border)
+          'border-t border-hairline',
           // Disabled state
           disabled && 'pointer-events-none'
         )}
       >
         {controls}
       </div>
-    </Card>
+    </div>
   );
 };
 

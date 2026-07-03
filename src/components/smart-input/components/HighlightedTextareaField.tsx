@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { ParsedTag } from '@shared/types';
 import { cn } from '@/lib/utils';
+import { buildHighlightedHtml } from '../lib/highlightMarkup';
 
 export interface HighlightedTextareaFieldProps {
   /** Current input value */
@@ -31,10 +32,6 @@ export interface HighlightedTextareaFieldProps {
   onBlur?: () => void;
   /** Focus handler */
   onFocus?: () => void;
-  /** Parsing confidence (0-1) */
-  confidence?: number;
-  /** Whether to show confidence indicators */
-  showConfidence?: boolean;
   /** Minimum height for the textarea */
   minHeight?: string;
   /** Maximum height before scrolling */
@@ -59,8 +56,6 @@ export const HighlightedTextareaField: React.FC<
   onKeyDown,
   onBlur,
   onFocus,
-  confidence = 1,
-  showConfidence = false,
   minHeight = '120px',
   maxHeight = '300px',
   id,
@@ -124,34 +119,10 @@ export const HighlightedTextareaField: React.FC<
     autoResize();
   }, [value, autoResize]);
 
-  const highlightedHTML = useMemo(() => {
-    if (!value || tags.length === 0) {
-      return escapeHtml(value || '').replace(/\n/g, '<br>');
-    }
-
-    const sortedTags = [...tags].sort((a, b) => a.startIndex - b.startIndex);
-    let html = '';
-    let lastIndex = 0;
-
-    for (const tag of sortedTags) {
-      if (tag.startIndex > lastIndex) {
-        html += escapeHtml(value.substring(lastIndex, tag.startIndex)).replace(
-          /\n/g,
-          '<br>'
-        );
-      }
-      const tagText = value.substring(tag.startIndex, tag.endIndex);
-      const color = tag.color || '#0d97d5';
-      html += `<mark class="inline-highlight-span" style="--tag-color: ${color}; background-color: ${color}20; border: 1px solid ${color}30; color: inherit; padding: 1px 2px; border-radius: 2px; font-weight: 500;">${escapeHtml(tagText)}</mark>`;
-      lastIndex = tag.endIndex;
-    }
-
-    if (lastIndex < value.length) {
-      html += escapeHtml(value.substring(lastIndex)).replace(/\n/g, '<br>');
-    }
-
-    return html;
-  }, [value, tags]);
+  const highlightedHTML = useMemo(
+    () => buildHighlightedHtml(value, tags, { newlineToBr: true }),
+    [value, tags]
+  );
 
   // Handle textarea changes
   const handleChange = useCallback(
@@ -311,34 +282,8 @@ export const HighlightedTextareaField: React.FC<
         }}
         aria-hidden="true"
       />
-
-      {/* Confidence indicator */}
-      {showConfidence && confidence < 1 && tags.length > 0 && (
-        <div className="absolute -bottom-1 right-1 flex items-center gap-1 z-20">
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full',
-              confidence >= 0.8
-                ? 'bg-success'
-                : confidence >= 0.6
-                  ? 'bg-warning'
-                  : 'bg-destructive'
-            )}
-            title={`Parsing confidence: ${Math.round(confidence * 100)}%`}
-          />
-        </div>
-      )}
     </div>
   );
 };
-
-/**
- * Escape HTML characters for safe innerHTML usage
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 export default HighlightedTextareaField;

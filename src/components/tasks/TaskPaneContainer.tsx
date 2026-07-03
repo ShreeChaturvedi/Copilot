@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -23,11 +24,15 @@ import { Task, TaskPaneData } from '@shared/types';
 import { useUIStore, TaskPaneConfig, TaskGrouping } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
+import '@/styles/new-folder.css';
 
 export interface TaskPaneContainerProps {
   className?: string;
   searchValue?: string;
 }
+
+/** Width-staggered loading rows, echoing .ti-row's rhythm (§2.9). */
+const SKELETON_ROW_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-3/4', 'w-2/5'];
 
 /**
  * Generate filtered tasks for a specific pane configuration
@@ -223,6 +228,8 @@ interface TaskPaneProps {
     description?: string;
   }>;
   onUpdateTaskList: (paneId: string, taskListId: string | null) => void;
+  searchValue?: string;
+  onClearFilters: (paneId: string) => void;
 }
 
 const TaskPane: React.FC<TaskPaneProps> = ({
@@ -232,6 +239,8 @@ const TaskPane: React.FC<TaskPaneProps> = ({
   onRemove,
   taskGroups,
   onUpdateTaskList,
+  searchValue,
+  onClearFilters,
 }) => {
   // Get task management operations and UI state
   const taskManagement = useTaskManagement({ includeTaskOperations: true });
@@ -241,7 +250,12 @@ const TaskPane: React.FC<TaskPaneProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Clean Pane Header */}
-      <div className="border-b border-border px-4 py-2 bg-muted/10">
+      <div
+        className={cn(
+          'px-4 py-2',
+          canRemove && 'border-b border-border bg-muted/10'
+        )}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Task list selector for taskList grouping, plain title for others */}
@@ -262,7 +276,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                 {paneData.title}
               </h3>
             )}
-            <Badge variant="outline" className="text-xs h-5">
+            <Badge variant="outline" className="text-xs h-5 tabular-nums">
               {paneData.tasks.length}
             </Badge>
 
@@ -280,7 +294,7 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                       className={cn(
                         'h-6 w-6 p-0 ml-1',
                         showTaskListContextInAll
-                          ? 'bg-muted text-foreground border border-border'
+                          ? 'bg-aqua-film-08 text-foreground border border-aqua-rim hover:bg-aqua-film-08 hover:border-aqua'
                           : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50'
                       )}
                       aria-label={`${showTaskListContextInAll ? 'Hide' : 'Show'} list context`}
@@ -315,11 +329,46 @@ const TaskPane: React.FC<TaskPaneProps> = ({
 
       {/* Pane Content */}
       <div className="flex-1 overflow-auto px-4">
-        {paneData.isEmpty ? (
-          <div className="flex items-center justify-center h-32 text-center">
-            <div className="text-sm text-muted-foreground">
-              No tasks match the current filters
+        {taskManagement.tasksLoading ? (
+          <div className="pt-2" aria-hidden="true">
+            {SKELETON_ROW_WIDTHS.map((width, i) => (
+              <div key={i} className="flex items-center gap-3 min-h-10 px-1">
+                <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+                <Skeleton className={cn('h-3.5', width)} />
+              </div>
+            ))}
+          </div>
+        ) : paneData.isEmpty ? (
+          <div className="pane-empty flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center h-full justify-center">
+            <div
+              className="flex flex-col gap-2 w-[120px] mb-1"
+              aria-hidden="true"
+            >
+              <span className="block h-4 w-full rounded-md border border-dashed border-etch-strong" />
+              <span className="block h-4 w-[68%] rounded-md border border-dashed border-etch-strong" />
             </div>
+            <p className="font-serif text-base leading-[1.3] text-ink">
+              Nothing matches.
+            </p>
+            {searchValue?.trim() ? (
+              <p className="text-xs leading-[18px] text-ink-muted max-w-[26ch]">
+                No tasks match &ldquo;{searchValue}&rdquo;.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs leading-[18px] text-ink-muted max-w-[24ch]">
+                  No tasks fit the current filters.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1.5"
+                  onClick={() => onClearFilters(paneConfig.id)}
+                >
+                  Clear filters
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <TaskList
@@ -474,6 +523,13 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
     [updateTaskPane]
   );
 
+  const handleClearFilters = useCallback(
+    (paneId: string) => {
+      updateTaskPane(paneId, { filterValue: undefined, showCompleted: true });
+    },
+    [updateTaskPane]
+  );
+
   const canRemovePane = taskPanes.length > 1;
 
   // Persist pane configurations when taskPanes change
@@ -511,12 +567,14 @@ export const TaskPaneContainer: React.FC<TaskPaneContainerProps> = ({
                 onRemove={handleRemovePane}
                 taskGroups={taskManagement.taskGroups}
                 onUpdateTaskList={handleUpdateTaskList}
+                searchValue={searchValue}
+                onClearFilters={handleClearFilters}
               />
             </ResizablePanel>
 
             {/* Resize Handle - Only between panes */}
             {index < paneData.length - 1 && (
-              <ResizableHandle className="w-1 bg-border hover:bg-border-hover transition-colors" />
+              <ResizableHandle className="hover:bg-hairline-strong transition-colors" />
             )}
           </React.Fragment>
         ))}

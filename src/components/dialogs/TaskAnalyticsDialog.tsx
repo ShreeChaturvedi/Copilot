@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  BarChart3,
   Check,
 } from 'lucide-react';
 import {
@@ -28,7 +27,13 @@ import {
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { ViewSwitcher } from '@/components/ui/ViewSwitcher';
+import {
+  Tooltip as UiTooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { IntegratedActionBar } from './IntegratedActionBar';
+import { UpcomingEmptyState } from '@/components/tasks/UpcomingTasksEmpty';
 import { useUIStore } from '@/stores/uiStore';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
@@ -54,17 +59,55 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { Task } from '@shared/types';
+import { ANALYTICS_COLORS } from '@/constants/analyticsColors';
 
-// Chart colors - SETTLE tokens (design-brief 2.3/2.4): done = aqua
-// (success), amber = in progress, curated blue for created, red only for
-// overdue. CSS vars resolve in SVG fills, so both themes stay in sync.
-const COLORS = {
-  done: 'var(--aqua, #1a7c70)',
-  inProgress: 'var(--warning, #d6a62e)',
-  notStarted: 'var(--faint, #94a1a3)',
-  created: '#0d97d5', // curated blue (design-brief 2.4)
-  overdue: 'var(--destructive, #d8625c)',
-};
+// Chart colors - single source of truth (foundation's constants/analyticsColors.ts):
+// done = aqua (success), amber = in progress, curated blue for created, red
+// only for overdue. CSS vars resolve in SVG fills, so both themes stay in
+// sync with zero JS branching.
+const COLORS = ANALYTICS_COLORS;
+
+/** Etched "ghost chart" for the Trends empty state — dashed bars echo the
+ *  shape TrendsChart itself would draw, matching the kanban empty-column
+ *  convention of drawing the shape of what would be there. */
+const AnalyticsEmptyArt: React.FC = () => (
+  <svg
+    viewBox="0 0 96 72"
+    role="img"
+    aria-hidden="true"
+    focusable="false"
+    className="w-24 h-auto mb-3"
+  >
+    <line
+      x1="8"
+      y1="60"
+      x2="88"
+      y2="60"
+      strokeDasharray="3 5"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      className="fill-none stroke-etch-strong"
+    />
+    {[
+      { x: 20, h: 18 },
+      { x: 40, h: 32 },
+      { x: 60, h: 12 },
+      { x: 80, h: 24 },
+    ].map((bar) => (
+      <rect
+        key={bar.x}
+        x={bar.x - 6}
+        y={60 - bar.h}
+        width="12"
+        height={bar.h}
+        rx="3"
+        strokeDasharray="4 4"
+        strokeWidth="1.5"
+        className="fill-none stroke-etch-strong"
+      />
+    ))}
+  </svg>
+);
 
 interface TaskAnalyticsDialogProps {
   open: boolean;
@@ -91,7 +134,7 @@ const ChartTooltip = ({ active, payload, label }: ChartTooltipProps) => {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border bg-popover text-popover-foreground shadow-lg px-3 py-2 text-sm">
+    <div className="rounded-card border border-hairline bg-popover text-popover-foreground [box-shadow:var(--shadow-popover)] px-3 py-2 text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map((entry, index) => (
         <div key={index} className="flex items-center gap-2 text-xs">
@@ -139,7 +182,7 @@ function StatRing({
             fill="none"
             stroke="currentColor"
             strokeWidth="6"
-            className="text-muted/30"
+            className="text-hairline-strong"
           />
           <circle
             cx="40"
@@ -156,7 +199,7 @@ function StatRing({
         </svg>
         {/* Center content - just the number */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-bold">{value}</span>
+          <span className="text-2xl font-semibold tabular-nums">{value}</span>
         </div>
       </div>
       {/* Label with icon beside it */}
@@ -270,18 +313,21 @@ function WeeklyHeatmap({
   const totalActivity = totalCompleted + totalInProgress + totalOverdue;
 
   return (
-    <div className="rounded-lg border bg-card/50 p-4">
+    <div className="rounded-card border border-hairline bg-surface-2 p-4">
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-medium">This Week</span>
         <div className="flex items-center gap-2">
           {totalCompleted > 0 && (
-            <span className="text-sm font-bold" style={{ color: COLORS.done }}>
+            <span
+              className="text-sm font-semibold tabular-nums"
+              style={{ color: COLORS.done }}
+            >
               {totalCompleted}
             </span>
           )}
           {totalInProgress > 0 && (
             <span
-              className="text-sm font-bold"
+              className="text-sm font-semibold tabular-nums"
               style={{ color: COLORS.inProgress }}
             >
               {totalInProgress}
@@ -289,14 +335,16 @@ function WeeklyHeatmap({
           )}
           {totalOverdue > 0 && (
             <span
-              className="text-sm font-bold"
+              className="text-sm font-semibold tabular-nums"
               style={{ color: COLORS.overdue }}
             >
               {totalOverdue}
             </span>
           )}
           {totalActivity === 0 && (
-            <span className="text-2xl font-bold text-muted-foreground">0</span>
+            <span className="text-2xl font-semibold tabular-nums text-muted-foreground">
+              0
+            </span>
           )}
         </div>
       </div>
@@ -311,50 +359,58 @@ function WeeklyHeatmap({
           const inProgressPct = total > 0 ? (day.inProgress / total) * 100 : 0;
           const overduePct = total > 0 ? (day.overdue / total) * 100 : 0;
 
+          const heatmapCellLabel = `${day.day}: ${day.completed} completed, ${day.inProgress} in progress, ${day.overdue} overdue`;
+
           return (
             <div key={day.day} className="flex flex-col items-center gap-1">
-              <div
-                className="w-full aspect-square rounded-md transition-all duration-300 hover:scale-110 overflow-hidden flex flex-col justify-end"
-                style={{
-                  backgroundColor: hasActivity ? 'transparent' : 'var(--muted)',
-                }}
-                title={`${day.day}: ${day.completed} completed, ${day.inProgress} in progress, ${day.overdue} overdue`}
-              >
-                {hasActivity && (
-                  <div className="w-full h-full flex flex-col">
-                    {/* Overdue (red) - at top */}
-                    {overduePct > 0 && (
-                      <div
-                        className="w-full"
-                        style={{
-                          height: `${overduePct}%`,
-                          backgroundColor: COLORS.overdue,
-                        }}
-                      />
-                    )}
-                    {/* In Progress (yellow) - middle */}
-                    {inProgressPct > 0 && (
-                      <div
-                        className="w-full"
-                        style={{
-                          height: `${inProgressPct}%`,
-                          backgroundColor: COLORS.inProgress,
-                        }}
-                      />
-                    )}
-                    {/* Completed (aqua) - at bottom */}
-                    {completedPct > 0 && (
-                      <div
-                        className="w-full"
-                        style={{
-                          height: `${completedPct}%`,
-                          backgroundColor: COLORS.done,
-                        }}
-                      />
+              <UiTooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="w-full aspect-square rounded-md transition-all duration-300 hover:brightness-110 dark:hover:brightness-125 overflow-hidden flex flex-col justify-end"
+                    style={{
+                      backgroundColor: hasActivity
+                        ? 'transparent'
+                        : 'var(--muted)',
+                    }}
+                  >
+                    {hasActivity && (
+                      <div className="w-full h-full flex flex-col">
+                        {/* Overdue (red) - at top */}
+                        {overduePct > 0 && (
+                          <div
+                            className="w-full"
+                            style={{
+                              height: `${overduePct}%`,
+                              backgroundColor: COLORS.overdue,
+                            }}
+                          />
+                        )}
+                        {/* In Progress (yellow) - middle */}
+                        {inProgressPct > 0 && (
+                          <div
+                            className="w-full"
+                            style={{
+                              height: `${inProgressPct}%`,
+                              backgroundColor: COLORS.inProgress,
+                            }}
+                          />
+                        )}
+                        {/* Completed (aqua) - at bottom */}
+                        {completedPct > 0 && (
+                          <div
+                            className="w-full"
+                            style={{
+                              height: `${completedPct}%`,
+                              backgroundColor: COLORS.done,
+                            }}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                </TooltipTrigger>
+                <TooltipContent>{heatmapCellLabel}</TooltipContent>
+              </UiTooltip>
               <span className="text-[10px] text-muted-foreground">
                 {day.day}
               </span>
@@ -404,20 +460,18 @@ function TrendsChart({
 
   if (isEmpty) {
     return (
-      <div className="rounded-lg border bg-card/50 p-6">
-        <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground">
-          <BarChart3 className="w-10 h-10 mb-3 opacity-30" />
-          <p className="text-sm font-medium">No data in selected range</p>
-          <p className="text-xs mt-1 opacity-70">
-            Try adjusting the time range
-          </p>
-        </div>
+      <div className="rounded-card border border-hairline bg-surface-2 py-6">
+        <UpcomingEmptyState
+          voice="Nothing charted yet."
+          note="Widen the range or pick another list."
+          art={<AnalyticsEmptyArt />}
+        />
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border bg-card/50 p-4">
+    <div className="rounded-card border border-hairline bg-surface-2 p-4">
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-medium">Task Activity</span>
         <ViewSwitcher
@@ -595,27 +649,31 @@ function TaskAnalyticsDialogContent({
 
   return (
     <>
-      {/* Header with context and tab switcher */}
-      <div className="flex items-center gap-2 mb-4 flex-nowrap min-w-0">
-        <PieChartIcon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-        <h2 className="text-lg font-semibold whitespace-nowrap">
-          Task Analytics
-        </h2>
-        {listId && (
-          <span className="text-sm text-muted-foreground truncate">
-            • {contextLabel}
-          </span>
-        )}
-        {/* Tab Switcher moved to header */}
-        <ViewSwitcher
-          value={activeTab}
-          onChange={(v) => setActiveTab(v as 'overview' | 'trends')}
-          options={[
-            { value: 'overview', label: 'Overview' },
-            { value: 'trends', label: 'Trends' },
-          ]}
-        />
-        {actions && <div className="ml-auto flex-shrink-0">{actions}</div>}
+      {/* Header: title cluster wraps onto its own row in sheet/narrow mode
+          instead of forcing all 5 elements onto one squeezed line. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <PieChartIcon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+          <h2 className="text-base font-semibold tracking-[-0.01em] whitespace-nowrap">
+            Task Analytics
+          </h2>
+          {listId && (
+            <span className="text-sm text-muted-foreground truncate">
+              • {contextLabel}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ViewSwitcher
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as 'overview' | 'trends')}
+            options={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'trends', label: 'Trends' },
+            ]}
+          />
+          {actions}
+        </div>
       </div>
 
       {/* Trends-only Toolbar - only shown when Trends tab active */}

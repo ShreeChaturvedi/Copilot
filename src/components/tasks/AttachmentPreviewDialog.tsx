@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,19 +6,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Download,
   Trash2,
   FileText,
+  FileCode,
+  FileSpreadsheet,
+  Presentation,
   Music,
   Video,
-  FileImage,
+  Image as ImageIcon,
   Archive,
   X,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { FileAttachment } from '@shared/types';
 import { formatFileSize } from '@shared/config/fileTypes';
+import './attachment-preview.css';
 
 export interface AttachmentPreviewDialogProps {
   open: boolean;
@@ -28,253 +33,108 @@ export interface AttachmentPreviewDialogProps {
   onDownload?: (attachment: FileAttachment) => Promise<void> | void;
 }
 
+/* ----------------------------------------------------------------------------
+ * File-type visual (§2C): one calm tile on the same --chip-c chip-film
+ * formula .folder-card-icon already uses, fed by the foundation's
+ * theme-invariant --filetype-* brand tokens. The icon says "what kind of
+ * file" (shared across close variants, e.g. doc/docx); --chip-c carries the
+ * brand-identity color per exact type. Every code/plaintext/unrecognized
+ * extension gets one neutral fallback (FileCode, no --chip-c) instead of the
+ * old JS/Python/Java-only special cases plus ten silent gray fallbacks.
+ * ------------------------------------------------------------------------- */
+const EXT_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  pdf: FileText,
+  doc: FileText,
+  docx: FileText,
+  txt: FileText,
+  xls: FileSpreadsheet,
+  xlsx: FileSpreadsheet,
+  csv: FileSpreadsheet,
+  ppt: Presentation,
+  pptx: Presentation,
+  zip: Archive,
+  rar: Archive,
+  '7z': Archive,
+  tar: Archive,
+  gz: Archive,
+  mp3: Music,
+  m4a: Music,
+  wav: Music,
+  webm: Music,
+  ogg: Music,
+  flac: Music,
+  aac: Music,
+};
+
+const EXT_CHIP_COLOR: Record<string, string> = {
+  pdf: 'var(--filetype-pdf)',
+  doc: 'var(--filetype-doc)',
+  docx: 'var(--filetype-doc)',
+  xls: 'var(--filetype-sheet)',
+  xlsx: 'var(--filetype-sheet)',
+  csv: 'var(--filetype-sheet)',
+  ppt: 'var(--filetype-slides)',
+  pptx: 'var(--filetype-slides)',
+  zip: 'var(--filetype-archive)',
+  rar: 'var(--filetype-archive)',
+  '7z': 'var(--filetype-archive)',
+  tar: 'var(--filetype-archive)',
+  gz: 'var(--filetype-archive)',
+  mp3: 'var(--filetype-audio)',
+  m4a: 'var(--filetype-audio)',
+  wav: 'var(--filetype-audio)',
+  webm: 'var(--filetype-audio)',
+  ogg: 'var(--filetype-audio)',
+  flac: 'var(--filetype-audio)',
+  aac: 'var(--filetype-audio)',
+};
+
+function getAttachmentVisual(
+  attachment: FileAttachment,
+  ext: string
+): {
+  Icon: React.ComponentType<{ className?: string }>;
+  chipColor?: string;
+} {
+  const type = attachment.type || '';
+
+  if (type.startsWith('video/')) {
+    return { Icon: Video, chipColor: 'var(--filetype-video)' };
+  }
+  const Icon = EXT_ICON[ext];
+  if (Icon) {
+    return { Icon, chipColor: EXT_CHIP_COLOR[ext] };
+  }
+  return { Icon: FileCode, chipColor: undefined };
+}
+
 export const AttachmentPreviewDialog: React.FC<
   AttachmentPreviewDialogProps
 > = ({ open, onOpenChange, attachment, onDelete, onDownload }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageErrored, setImageErrored] = useState(false);
+
+  // Reset image load/error state each time a different attachment opens —
+  // this dialog instance persists across previews (TaskDetailSheet swaps
+  // `attachment` while re-using one dialog), so stale state would otherwise
+  // leak between files.
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageErrored(false);
+  }, [attachment?.id]);
+
   if (!attachment) return null;
 
-  const isImage = attachment.type?.startsWith('image/');
+  const isImage = Boolean(attachment.type?.startsWith('image/'));
+  const showImagePreview = isImage && !imageErrored;
+  const ext = (attachment.name.split('.').pop() || '').toLowerCase();
+  const visual = isImage
+    ? { Icon: ImageIcon, chipColor: 'var(--filetype-image)' }
+    : getAttachmentVisual(attachment, ext);
+  const TileIcon = visual.Icon;
 
-  const handleClickTopSheet = () => {
+  const handleDownloadClick = () => {
     void onDownload?.(attachment);
-  };
-
-  const FileSheets = () => {
-    const type = attachment.type || '';
-    const ext = (attachment.name.split('.').pop() || '').toLowerCase();
-
-    // Brand-like file type representation
-    const getFileTypeDisplay = () => {
-      if (ext === 'pdf') {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#DC3545' }}
-            >
-              PDF
-            </div>
-          ),
-        };
-      } else if (['doc', 'docx'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#2B579A' }}
-            >
-              DOC
-            </div>
-          ),
-        };
-      } else if (['xls', 'xlsx'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#217346' }}
-            >
-              XLS
-            </div>
-          ),
-        };
-      } else if (['ppt', 'pptx'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#D24726' }}
-            >
-              PPT
-            </div>
-          ),
-        };
-      } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#F59E0B' }}
-            >
-              <Archive className="w-8 h-8" />
-            </div>
-          ),
-        };
-      } else if (type.startsWith('image/')) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#059669' }}
-            >
-              <FileImage className="w-8 h-8" />
-            </div>
-          ),
-        };
-      } else if (type.startsWith('video/')) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#DC2626' }}
-            >
-              <Video className="w-8 h-8" />
-            </div>
-          ),
-        };
-      } else if (
-        ['mp3', 'm4a', 'wav', 'webm', 'ogg', 'flac', 'aac'].includes(ext)
-      ) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#7C3AED' }}
-            >
-              <Music className="w-8 h-8" />
-            </div>
-          ),
-        };
-      } else if (['js', 'ts'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-xs"
-              style={{ backgroundColor: '#F7DF1E', color: '#000' }}
-            >
-              {ext.toUpperCase()}
-            </div>
-          ),
-        };
-      } else if (['py'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-              style={{ backgroundColor: '#3776AB' }}
-            >
-              PY
-            </div>
-          ),
-        };
-      } else if (['java'].includes(ext)) {
-        return {
-          component: (
-            <div
-              className="w-20 h-20 rounded-lg flex items-center justify-center text-white font-bold text-xs"
-              style={{ backgroundColor: '#ED8B00' }}
-            >
-              JAVA
-            </div>
-          ),
-        };
-      } else {
-        return {
-          component: (
-            <div className="w-20 h-20 rounded-lg flex items-center justify-center text-muted-foreground border border-hairline-strong bg-surface-2">
-              <FileText className="w-8 h-8" />
-            </div>
-          ),
-        };
-      }
-    };
-
-    const fileTypeDisplay = getFileTypeDisplay();
-
-    return (
-      <div className="flex justify-center max-w-fit mx-auto">
-        <div
-          className="relative select-none group"
-          style={{ width: 200, height: 260 }}
-          onMouseEnter={(e) => {
-            const backSheet = e.currentTarget.children[0] as HTMLElement;
-            const middleSheet = e.currentTarget.children[1] as HTMLElement;
-            if (backSheet)
-              backSheet.style.transform =
-                'rotate(-5deg) translateX(-2px) translateY(1px)';
-            if (middleSheet)
-              middleSheet.style.transform =
-                'rotate(4deg) translateX(1px) translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            const backSheet = e.currentTarget.children[0] as HTMLElement;
-            const middleSheet = e.currentTarget.children[1] as HTMLElement;
-            if (backSheet)
-              backSheet.style.transform =
-                'rotate(-4deg) translateX(-2px) translateY(2px)';
-            if (middleSheet)
-              middleSheet.style.transform =
-                'rotate(3deg) translateX(1px) translateY(-1px)';
-          }}
-        >
-          {/* Back sheet - furthest back */}
-          <div
-            className="absolute inset-0 rounded-lg shadow-sm transition-all duration-300 ease-out bg-card border border-border"
-            style={{
-              transform: 'rotate(-4deg) translateX(-2px) translateY(2px)',
-              transformOrigin: 'center bottom',
-              zIndex: 1,
-            }}
-          />
-
-          {/* Middle sheet */}
-          <div
-            className="absolute inset-0 rounded-lg shadow-md transition-all duration-300 ease-out bg-card border border-border"
-            style={{
-              transform: 'rotate(3deg) translateX(1px) translateY(-1px)',
-              transformOrigin: 'center bottom',
-              zIndex: 2,
-            }}
-          />
-
-          {/* Top sheet - interactive */}
-          <div
-            className="absolute inset-0 rounded-lg shadow-lg border border-border cursor-pointer transition-all duration-300 ease-out will-change-transform group-hover:shadow-xl bg-card"
-            onClick={handleClickTopSheet}
-            title="Download"
-            style={{
-              transformOrigin: 'center bottom',
-              zIndex: 3,
-              boxShadow:
-                '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'rotate(-0.5deg) scale(1.02)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
-            }}
-          >
-            {/* Content area */}
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg">
-              <div className="flex flex-col items-center gap-4">
-                {fileTypeDisplay.component}
-                <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  {ext || 'File'}
-                </div>
-                <Badge
-                  variant="outline"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  Download
-                </Badge>
-              </div>
-            </div>
-
-            {/* Page edge effect */}
-            <div
-              className="absolute right-0 top-0 bottom-0 w-2 rounded-r-lg pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.05) 100%)',
-              }}
-            />
-          </div>
-
-          {/* Additional hover effects handled via CSS variables and onMouseEnter/Leave */}
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -292,77 +152,101 @@ export const AttachmentPreviewDialog: React.FC<
         <div className="flex items-center justify-between gap-2 overflow-hidden">
           <div className="min-w-0 flex-1">
             <h2
-              className="text-sm font-semibold leading-tight truncate"
+              className="text-base leading-none font-semibold tracking-[-0.01em] truncate"
               title={attachment.name}
             >
               {attachment.name}
             </h2>
           </div>
-          <div className="flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void onDownload?.(attachment)}
-                className="p-2 hover:bg-accent hover:text-accent-foreground"
-                aria-label="Download attachment"
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void onDelete?.(attachment)}
-                className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                aria-label="Delete attachment"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onOpenChange(false)}
-                className="p-2 hover:bg-accent hover:text-accent-foreground"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void onDownload?.(attachment)}
+              className="p-2 hover:bg-accent hover:text-accent-foreground"
+              aria-label="Download attachment"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void onDelete?.(attachment)}
+              className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              aria-label="Delete attachment"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="p-2 hover:bg-accent hover:text-accent-foreground"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
         {/* Preview */}
         <div className="mt-4 mb-5">
-          {isImage ? (
-            <div className="rounded-lg border overflow-hidden bg-black/5 p-2">
-              <div className="flex items-center justify-center">
-                {/* Prefer thumbnail, fall back to full URL */}
-                <img
-                  src={attachment.thumbnailUrl || attachment.url}
-                  alt={attachment.name}
-                  className="object-contain rounded-md"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '60vh',
-                    imageRendering: 'auto' as const,
-                  }}
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
+          {showImagePreview ? (
+            <div className="relative flex items-center justify-center min-h-[120px] rounded-card border border-hairline overflow-hidden bg-surface-2 p-2">
+              {!imageLoaded && (
+                <Skeleton className="absolute inset-2 rounded-card" />
+              )}
+              {/* Prefer thumbnail, fall back to full URL */}
+              <img
+                src={attachment.thumbnailUrl || attachment.url}
+                alt={attachment.name}
+                className={cn(
+                  'object-contain rounded-card transition-opacity duration-200',
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                )}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '60vh',
+                  imageRendering: 'auto' as const,
+                }}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageErrored(true)}
+              />
             </div>
           ) : (
-            <FileSheets />
+            <div className="flex flex-col items-center">
+              <button
+                type="button"
+                className="afp-tile"
+                style={
+                  visual.chipColor
+                    ? ({ '--chip-c': visual.chipColor } as React.CSSProperties)
+                    : undefined
+                }
+                onClick={handleDownloadClick}
+                aria-label={`Download ${attachment.name}`}
+              >
+                <TileIcon className="afp-tile-glyph" aria-hidden="true" />
+              </button>
+              <div className="mt-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                {ext || 'File'}
+              </div>
+              <p className="mt-2 text-center font-mono text-[11px] text-etch-text">
+                {isImage
+                  ? 'Preview unavailable — click to download'
+                  : 'Click to download'}
+              </p>
+            </div>
           )}
         </div>
 
         {/* Meta */}
         <div className="text-sm text-muted-foreground mt-2">
-          <div className="flex items-center gap-2">
-            <span className="truncate">
-              {(attachment.name.split('.').pop() || 'file').toUpperCase()}
-            </span>
+          <div className="flex items-center gap-2 font-mono text-xs tabular-nums">
+            <span className="truncate">{(ext || 'file').toUpperCase()}</span>
             <span>•</span>
             <span>{formatFileSize(attachment.size)}</span>
           </div>

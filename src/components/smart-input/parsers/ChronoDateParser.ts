@@ -68,9 +68,15 @@ export class ChronoDateParser implements Parser {
           !!normalizedEnd &&
           normalizedEnd.getTime() !== normalizedStart.getTime();
         const rangeId = isRange ? uuidv4() : undefined;
+        // Deterministic id (parser + span), not a fresh uuid per parse: the same
+        // conceptual tag must keep its identity across debounced re-parses of
+        // unchanged text so React keys stay stable and tag-settle motion (§2.6)
+        // doesn't replay. A range's start/end tags share one span, so they need
+        // a role suffix to stay distinct from each other.
+        const spanKey = `${result.index}:${result.index + result.text.length}`;
 
         const dateTag: ParsedTag = {
-          id: uuidv4(),
+          id: `${this.id}:${spanKey}:start`,
           type: hasTime ? 'time' : 'date',
           value: normalizedStart,
           displayText: this.formatDisplayText(normalizedStart, hasTime),
@@ -89,7 +95,7 @@ export class ChronoDateParser implements Parser {
         // If it's a date range, create a separate end date tag
         if (isRange) {
           const endTag: ParsedTag = {
-            id: uuidv4(),
+            id: `${this.id}:${spanKey}:end`,
             type: hasTime ? 'time' : 'date',
             value: normalizedEnd!,
             displayText: `Until ${this.formatDisplayText(normalizedEnd!, hasTime)}`,

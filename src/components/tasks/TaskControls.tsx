@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/SharedToggleButton';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -53,6 +54,7 @@ import {
   type SortOrder,
 } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { EASE_OUT } from '@/lib/motion';
 import { format, addDays, startOfDay } from 'date-fns';
 import { toLocal, isSameDay } from '@/utils/date';
 
@@ -238,7 +240,7 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
       <motion.div
         className="flex items-center"
         layout
-        transition={{ duration: 0.25, ease: 'easeOut' }}
+        transition={{ duration: 0.25, ease: EASE_OUT }}
       >
         {/* Search Icon/Button */}
         <motion.div layout>
@@ -262,19 +264,19 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: '200px', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+              transition={{ duration: 0.25, ease: EASE_OUT }}
               className="relative overflow-hidden"
               role="search"
               aria-label="Task search"
             >
-              <input
+              <Input
                 ref={inputRef}
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Search tasks..."
-                className="w-full h-7 px-3 pr-8 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-0 focus:border-border focus-visible:ring-0 focus-visible:outline-none"
+                className="h-7 pl-3 pr-8 text-xs md:text-xs"
                 aria-label="Search tasks by title or content"
                 aria-describedby="search-help"
               />
@@ -433,7 +435,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       {/* Right Section - Icon-Only Controls */}
       <div className="flex items-center gap-1 justify-self-end max-md:[grid-area:right]">
         {/* Grouped Action Buttons */}
-        <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1">
+        <div className="flex items-center gap-1 bg-surface-2 rounded-btn p-1">
           {/* Animated Search */}
           <AnimatedSearch
             value={searchValue}
@@ -476,7 +478,8 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                         {isActive && (
                           <Badge
                             variant="secondary"
-                            className="ml-auto text-xs"
+                            size="sm"
+                            className="ml-auto tabular-nums"
                           >
                             {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
                           </Badge>
@@ -549,7 +552,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             {completedCount > 0 && (
               <Badge
                 variant="secondary"
-                className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-medium"
+                className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-medium tabular-nums"
               >
                 {completedCount > 99 ? '99+' : completedCount}
               </Badge>
@@ -581,32 +584,22 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             </Tooltip>
           )}
 
-          {/* Shiny Add Task Button (same visual as calendar toolbar) with toggle */}
+          {/* Add Task Button — plain primary, no bespoke hover language
+              (§1.4/§3.3: no growing shadow, no third hover-scale idiom).
+              Rest/hover/press all come from Button's own default variant. */}
           {onToggleAddTaskInput && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   onClick={onToggleAddTaskInput}
                   size="sm"
-                  className={cn(
-                    'h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out',
-                    'bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95',
-                    'text-secondary-foreground shadow-xs border border-border/20',
-                    'hover:scale-105 hover:shadow-lg hover:shadow-secondary/20',
-                    'hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90',
-                    'before:absolute before:inset-0 before:bg-gradient-to-r',
-                    'before:from-transparent before:via-black/15 before:to-transparent',
-                    'dark:before:via-white/15',
-                    'before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]',
-                    'hover:before:translate-x-[150%]',
-                    'active:scale-[1.02] active:shadow-md'
-                  )}
+                  className="h-7 w-7 p-0"
                   aria-label="Add task"
                 >
                   {isAddTaskInputVisible ? (
-                    <ArrowDownToDot className="h-3.5 w-3.5 relative z-10" />
+                    <ArrowDownToDot className="h-3.5 w-3.5" />
                   ) : (
-                    <Plus className="h-3.5 w-3.5 relative z-10" />
+                    <Plus className="h-3.5 w-3.5" />
                   )}
                 </Button>
               </TooltipTrigger>

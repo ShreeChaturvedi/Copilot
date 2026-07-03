@@ -2,13 +2,12 @@
  * TaskList - Modern professional design with React.memo optimization
  */
 
-import { COLOR_PRESETS } from '@/constants/colors';
-import React, { useState, useMemo, memo } from 'react';
+import { COLOR_PRESETS, DEFAULT_PRESET_COLOR } from '@/constants/colors';
+import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   MoreVertical,
-  Settings,
   Edit,
   Trash2,
 } from 'lucide-react';
@@ -20,8 +19,11 @@ import { CursorTooltip } from '@/components/ui/CursorTooltip';
 import { groupItemsByDate, getDayKeyOrder } from '@/utils/dateGrouping';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 import { ColorPicker } from '@/components/ui/color-picker';
+import '@/styles/new-folder.css';
+import './task-item.css';
 import {
   Collapsible,
   CollapsibleContent,
@@ -106,6 +108,125 @@ export interface TaskListProps {
 // Curated swatch palette shared app-wide (design-brief §2.4)
 const TASK_COLORS = [...COLOR_PRESETS];
 
+interface TaskGroupHeaderProps {
+  activeTaskGroup: TaskGroup;
+  displayName: string;
+  tooltipContent: React.ReactNode;
+  showIconPicker: boolean;
+  onShowIconPickerChange: (open: boolean) => void;
+  onUpdateEmoji: (emoji: string) => void;
+  onEditClick: () => void;
+  onDeleteClick: () => void;
+  colorMenuItem: React.ReactNode;
+  /** Omit for the empty-state branch (nothing to collapse); pass the
+   *  Collapsible's open state in the populated branch for a real toggle. */
+  collapsibleOpen?: boolean;
+}
+
+/**
+ * Shared task-group identity header: icon picker, name + tooltip,
+ * management menu (Edit / Color / Delete), collapse control. One
+ * implementation for both the empty-state and populated branches so they
+ * can't drift into two different menus again — the previous per-branch
+ * copies had a dead "Settings" item in one and a Settings/Edit handler
+ * collision in the other; this keeps a single working "Edit" entry.
+ */
+const TaskGroupHeader: React.FC<TaskGroupHeaderProps> = ({
+  activeTaskGroup,
+  displayName,
+  tooltipContent,
+  showIconPicker,
+  onShowIconPickerChange,
+  onUpdateEmoji,
+  onEditClick,
+  onDeleteClick,
+  colorMenuItem,
+  collapsibleOpen,
+}) => (
+  <div className="flex items-center justify-between pb-2 border-b border-hairline">
+    <div className="flex items-center gap-2">
+      {/* Emoji Picker for Task Group */}
+      <Popover open={showIconPicker} onOpenChange={onShowIconPickerChange}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 hover:bg-surface-hover rounded-btn"
+            aria-label={`Task group: ${activeTaskGroup.name}`}
+          >
+            <span className="text-base">{activeTaskGroup.emoji}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-fit p-0" align="start">
+          <Suspense fallback={null}>
+            <EmojiPicker
+              selectedEmoji={activeTaskGroup.emoji}
+              onEmojiSelect={onUpdateEmoji}
+            />
+          </Suspense>
+        </PopoverContent>
+      </Popover>
+
+      {/* Task Group Name with Tooltip */}
+      <CursorTooltip content={tooltipContent} containerClassName="inline-block">
+        <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
+          {displayName}
+        </div>
+      </CursorTooltip>
+    </div>
+
+    <div className="flex items-center gap-1">
+      {/* Task Group Management Menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 hover:bg-surface-hover ml-auto"
+          >
+            <MoreVertical className="w-3 h-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem onClick={onEditClick}>
+            <Edit className="mr-2 h-4 w-4" />
+            <span>Edit</span>
+          </DropdownMenuItem>
+          {colorMenuItem}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={onDeleteClick}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 focus:text-destructive focus:bg-destructive/10"
+          >
+            <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {collapsibleOpen === undefined ? (
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled>
+          <ChevronDown className="w-3 h-3" />
+        </Button>
+      ) : (
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 hover:bg-surface-hover"
+          >
+            {collapsibleOpen ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+      )}
+    </div>
+  </div>
+);
+
 const TaskListComponent: React.FC<TaskListProps> = ({
   tasks,
   taskGroups = [],
@@ -140,7 +261,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#0d97d5',
+    color: DEFAULT_PRESET_COLOR,
     description: 'Default task group',
   };
 
@@ -165,6 +286,27 @@ const TaskListComponent: React.FC<TaskListProps> = ({
 
     return { activeTasks: active, completedTasks: completed };
   }, [tasks, activeTaskGroupId]);
+
+  // "List cleared" celebration (§1.6 rule 5, the one reserved loud-aqua
+  // moment; director-approved, non-blocking): detect the exact
+  // 1-active-task->0 transition within the SAME task group (not just "list
+  // is empty", which would also fire on switching into an already-empty
+  // list). Read against the previous render's committed values, updated
+  // only after commit, so this never triggers a state-during-render loop.
+  const prevActiveRef = useRef({
+    groupId: activeTaskGroupId,
+    count: activeTasks.length,
+  });
+  const justClearedLastActive =
+    prevActiveRef.current.groupId === activeTaskGroupId &&
+    prevActiveRef.current.count === 1 &&
+    activeTasks.length === 0;
+  useEffect(() => {
+    prevActiveRef.current = {
+      groupId: activeTaskGroupId,
+      count: activeTasks.length,
+    };
+  }, [activeTaskGroupId, activeTasks.length]);
 
   const displayedTasks = useMemo(() => {
     // Return stable reference when possible
@@ -252,17 +394,21 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     <div className="text-xs space-y-1">
       <div className="flex justify-between gap-4">
         <span>Active</span>
-        <span className="font-mono font-medium">{activeTasks.length}</span>
+        <span className="font-mono font-medium tabular-nums">
+          {activeTasks.length}
+        </span>
       </div>
       {completedTasks.length > 0 && (
         <div className="flex justify-between gap-4">
           <span>Completed</span>
-          <span className="font-mono font-medium">{completedTasks.length}</span>
+          <span className="font-mono font-medium tabular-nums">
+            {completedTasks.length}
+          </span>
         </div>
       )}
-      <div className="flex justify-between gap-4 pt-1 border-t border-border/50">
+      <div className="flex justify-between gap-4 pt-1 border-t border-hairline">
         <span>Total</span>
-        <span className="font-mono font-semibold">
+        <span className="font-mono font-semibold tabular-nums">
           {activeTasks.length + completedTasks.length}
         </span>
       </div>
@@ -272,7 +418,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
   const ColorMenuItem = () => (
     <DropdownMenuItem>
       <div
-        className="mr-2 h-4 w-4 rounded-full flex-shrink-0 border-2 border-border"
+        className="mr-2 h-3.5 w-3.5 rounded-full flex-shrink-0 border-[1.5px] border-border"
         style={{ backgroundColor: activeTaskGroup.color }}
       />
       <span>Color</span>
@@ -284,7 +430,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
               e.stopPropagation();
               handleUpdateColor(color);
             }}
-            className="w-3 h-3 rounded-full border border-border hover:scale-110 transition-transform"
+            className="w-3.5 h-3.5 rounded-full border-[1.5px] border-border hover:scale-110 transition-transform"
             style={{ backgroundColor: color }}
           />
         ))}
@@ -293,7 +439,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
           onChange={handleUpdateColor}
           recentColors={recentColors}
           onRecentColorAdd={handleRecentColorAdd}
-          className="w-3 h-3 border-0"
+          className="w-3.5 h-3.5 border-0"
         />
       </DropdownMenuShortcut>
     </DropdownMenuItem>
@@ -305,7 +451,12 @@ const TaskListComponent: React.FC<TaskListProps> = ({
       // Calendar mode empty state - the §4.7 schedule etch, shared with the
       // upcoming events list so tasks and events read as one system.
       return (
-        <div className="mt-4">
+        <div
+          className={cn(
+            'mt-4',
+            justClearedLastActive && 'ti-cleared-celebrate'
+          )}
+        >
           <UpcomingEmptyState
             voice="You're all caught up."
             note="Upcoming tasks appear here as their dates approach."
@@ -317,113 +468,39 @@ const TaskListComponent: React.FC<TaskListProps> = ({
     // Default mode empty state (existing)
     return (
       <div className="space-y-3 mt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Emoji Picker for Task Group */}
-            <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
-                  aria-label={`Task group: ${activeTaskGroup.name}`}
-                >
-                  <span className="text-base">{activeTaskGroup.emoji}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-fit p-0" align="start">
-                <Suspense fallback={null}>
-                  <EmojiPicker
-                    selectedEmoji={activeTaskGroup.emoji}
-                    onEmojiSelect={handleUpdateEmoji}
-                  />
-                </Suspense>
-              </PopoverContent>
-            </Popover>
+        <TaskGroupHeader
+          activeTaskGroup={activeTaskGroup}
+          displayName={
+            activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name
+          }
+          tooltipContent={tooltipContent}
+          showIconPicker={showIconPicker}
+          onShowIconPickerChange={setShowIconPicker}
+          onUpdateEmoji={handleUpdateEmoji}
+          onEditClick={() => setShowEditDialog(true)}
+          onDeleteClick={() => setShowDeleteDialog(true)}
+          colorMenuItem={<ColorMenuItem />}
+        />
 
-            {/* Task Group Name with Tooltip */}
-            <CursorTooltip
-              content={tooltipContent}
-              containerClassName="inline-block"
-            >
-              <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                {activeTaskGroupId === 'all'
-                  ? 'All Tasks'
-                  : activeTaskGroup.name}
+        {/* Etched placeholder (§4.7) — a "never had tasks" state, not a
+            "cleared" one, so it stays neutral: no aqua badge (that's
+            reserved for the caught-up case above). Three ghost rows echo
+            .ti-ring + .ti-title's own silhouette. */}
+        <div className="ti-empty">
+          <div className="ti-empty-ghost">
+            {[0.9, 0.7, 0.5].map((w) => (
+              <div className="ti-empty-ghost-row" key={w}>
+                <span className="ti-empty-ghost-ring" />
+                <span
+                  className="ti-empty-ghost-line"
+                  style={{ maxWidth: `${w * 100}%` }}
+                />
               </div>
-            </CursorTooltip>
+            ))}
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Task Group Management Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ml-auto"
-                >
-                  <MoreVertical className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem
-                  onClick={() =>
-                    onEditTaskGroup?.(activeTaskGroup.id, {
-                      name: activeTaskGroup.name,
-                      emoji: activeTaskGroup.emoji,
-                      color: activeTaskGroup.color,
-                      description: activeTaskGroup.description,
-                    })
-                  }
-                >
-                  <span
-                    className="mr-2"
-                    style={{ color: activeTaskGroup.color }}
-                  >
-                    <Settings className="h-4 w-4" />
-                  </span>
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    onEditTaskGroup?.(activeTaskGroup.id, {
-                      name: activeTaskGroup.name,
-                      emoji: activeTaskGroup.emoji,
-                      color: activeTaskGroup.color,
-                      description: activeTaskGroup.description,
-                    })
-                  }
-                >
-                  <span
-                    className="mr-2"
-                    style={{ color: activeTaskGroup.color }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </span>
-                  <span>Edit</span>
-                </DropdownMenuItem>
-                <ColorMenuItem />
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 focus:text-destructive focus:bg-destructive/10"
-                >
-                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled>
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </div>
-        </div>
-        <div className="text-center py-4 text-muted-foreground">
-          <p className="text-xs">
-            Your tasks will appear here <br />
-            once you add them
+          <p className="folder-empty-voice">Nothing on the list yet.</p>
+          <p className="folder-empty-action">
+            Add a task above to get started.
           </p>
         </div>
 
@@ -432,6 +509,27 @@ const TaskListComponent: React.FC<TaskListProps> = ({
           open={showCreateTaskDialog}
           onOpenChange={(open) => onShowCreateTaskDialog?.(open)}
           onCreateTask={handleCreateTaskGroup}
+        />
+
+        {/* Edit Task List Dialog */}
+        <CreateTaskDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          initialName={activeTaskGroup.name}
+          initialDescription={activeTaskGroup.description || ''}
+          initialEmoji={activeTaskGroup.emoji}
+          initialColor={activeTaskGroup.color}
+          submitLabel="Save changes"
+          titleLabel="Edit list"
+          onCreateTask={(data) => {
+            onEditTaskGroup?.(activeTaskGroup.id, {
+              name: data.name,
+              emoji: data.emoji,
+              color: data.color,
+              description: data.description,
+            });
+            setShowEditDialog(false);
+          }}
         />
 
         {/* Delete Confirmation Dialog */}
@@ -465,100 +563,39 @@ const TaskListComponent: React.FC<TaskListProps> = ({
       <Collapsible open={isTasksOpen} onOpenChange={setIsTasksOpen}>
         {/* Tasks Header with Icon and Tooltip - Hidden when hideHeader is true */}
         {!hideHeader && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {/* Emoji Picker for Task Group */}
-              <Popover open={showIconPicker} onOpenChange={setShowIconPicker}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
-                    aria-label={`Task group: ${activeTaskGroup.name}`}
-                  >
-                    <span className="text-base">{activeTaskGroup.emoji}</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-fit p-0" align="start">
-                  <Suspense fallback={null}>
-                    <EmojiPicker
-                      selectedEmoji={activeTaskGroup.emoji}
-                      onEmojiSelect={handleUpdateEmoji}
-                    />
-                  </Suspense>
-                </PopoverContent>
-              </Popover>
-
-              {/* Task Group Name with Tooltip */}
-              <CursorTooltip
-                content={tooltipContent}
-                containerClassName="inline-block"
-              >
-                <div className="text-sm font-semibold text-sidebar-foreground cursor-help select-none">
-                  {activeTaskGroupId === 'all'
-                    ? 'All Tasks'
-                    : activeTaskGroup.name}
-                </div>
-              </CursorTooltip>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {/* Task Group Management Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ml-auto"
-                  >
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    <span>Edit</span>
-                  </DropdownMenuItem>
-                  <ColorMenuItem />
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 focus:text-destructive focus:bg-destructive/10"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                    <span>Delete</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                  {isTasksOpen ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-          </div>
+          <TaskGroupHeader
+            activeTaskGroup={activeTaskGroup}
+            displayName={
+              activeTaskGroupId === 'all' ? 'All Tasks' : activeTaskGroup.name
+            }
+            tooltipContent={tooltipContent}
+            showIconPicker={showIconPicker}
+            onShowIconPickerChange={setShowIconPicker}
+            onUpdateEmoji={handleUpdateEmoji}
+            onEditClick={() => setShowEditDialog(true)}
+            onDeleteClick={() => setShowDeleteDialog(true)}
+            colorMenuItem={<ColorMenuItem />}
+            collapsibleOpen={isTasksOpen}
+          />
         )}
 
-        <CollapsibleContent className="space-y-2">
+        <CollapsibleContent
+          className={cn(
+            'pt-2',
+            'data-[state=open]:animate-[settle-fade-in_var(--dur-3)_var(--ease-settle)]',
+            'data-[state=closed]:animate-[settle-fade-out_var(--dur-2)_var(--ease-out)]'
+          )}
+        >
           {/* Tasks List - Calendar Mode or Default Mode */}
           {calendarMode && groupedTasks ? (
             /* Calendar Mode: Date-grouped display like EventOverview */
             <div className="space-y-4">
               {getDayKeyOrder(Object.keys(groupedTasks)).map((dayKey) => (
                 <div key={dayKey} className="space-y-2">
-                  {/* Day heading with improved styling */}
+                  {/* Day heading — micro role (§2.1): 12px/500/+0.04em uppercase */}
                   <div className="flex items-center gap-2 mb-3">
                     <span
-                      className={`text-xs font-semibold uppercase tracking-wider ${
+                      className={`text-xs font-medium uppercase tracking-[0.04em] ${
                         dayKey === 'Overdue'
                           ? 'text-destructive'
                           : 'text-muted-foreground'
@@ -566,13 +603,16 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     >
                       {dayKey}
                     </span>
-                    <Badge variant="outline" className="text-xs h-5">
+                    <Badge
+                      variant="outline"
+                      className="text-xs h-5 tabular-nums"
+                    >
                       {groupedAllTotals[dayKey] ?? groupedTasks[dayKey].length}
                     </Badge>
                   </div>
 
                   {/* Tasks for this day */}
-                  <div className="space-y-1">
+                  <div>
                     {groupedTasks[dayKey].map((task) => (
                       <TaskItem
                         key={task.id}
@@ -592,8 +632,8 @@ const TaskListComponent: React.FC<TaskListProps> = ({
 
               {/* Show count if there are more tasks */}
               {totalTaskCount > maxTasks && (
-                <div className="text-center pt-3 mt-4 border-t border-sidebar-border/50">
-                  <span className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+                <div className="text-center pt-3 mt-4 border-t border-hairline">
+                  <span className="text-xs font-medium text-ink-muted tracking-wide tabular-nums">
                     +{totalTaskCount - maxTasks} more upcoming tasks
                   </span>
                 </div>
@@ -601,7 +641,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
             </div>
           ) : (
             /* Default Mode: Standard task list */
-            <div className="space-y-1">
+            <div>
               {displayedTasks.map((task) => (
                 <TaskItem
                   key={task.id}

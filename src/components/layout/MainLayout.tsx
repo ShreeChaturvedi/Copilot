@@ -8,6 +8,8 @@ import {
   Suspense,
 } from 'react';
 import { useIsFetching } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
+import { EASE_SETTLE, DUR_3_S } from '@/lib/motion';
 const LeftPane = lazy(async () => ({
   default: (await import('./LeftPane')).LeftPane,
 }));
@@ -114,7 +116,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <div
         className={cn(
           'h-screen w-screen overflow-hidden bg-background flex',
-          currentView === 'task' && 'transition-all duration-500 ease-out',
           dragState?.isDragging && 'select-none'
         )}
         data-view={currentView}
@@ -126,16 +127,35 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           <LeftPane />
         </Suspense>
 
-        {/* MAIN CONTENT - Changes based on view */}
-        {currentView === 'task' ? (
-          <div className="flex-1 min-w-0 transition-all duration-300 ease-out flex flex-col">
-            <Suspense fallback={null}>
-              <TaskFocusPane />
-            </Suspense>
-          </div>
-        ) : (
-          <MainContent children={children} />
-        )}
+        {/* MAIN CONTENT - The View Settle: Calendar⟷Tasks resolves on the
+            shared --ease-settle entrance curve instead of a hard cut. */}
+        <AnimatePresence mode="wait" initial={false}>
+          {currentView === 'task' ? (
+            <motion.div
+              key="task"
+              className="flex-1 min-w-0 flex flex-col"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+            >
+              <Suspense fallback={null}>
+                <TaskFocusPane />
+              </Suspense>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="calendar"
+              className="flex flex-col flex-1 min-w-0"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+            >
+              <MainContent children={children} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Cmd+K command bar */}
         <CommandBar />

@@ -1,6 +1,6 @@
 /**
  * CompactFilePreview - Compact file preview for enhanced task input
- * 
+ *
  * Displays uploaded files in a compact horizontal layout suitable for
  * the enhanced task input interface. Shows file icons, names, and
  * provides remove functionality.
@@ -28,8 +28,6 @@ export interface CompactFilePreviewProps {
   readOnly?: boolean;
 }
 
-
-
 /**
  * Individual compact file item
  */
@@ -40,20 +38,23 @@ interface CompactFileItemProps {
   readOnly?: boolean;
 }
 
-const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({ file, onRemove, disabled, readOnly }) => {
+const CompactFileItemComponent: React.FC<CompactFileItemProps> = ({
+  file,
+  onRemove,
+  disabled,
+  readOnly,
+}) => {
   return (
-    <div className={cn(
-      'flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/50',
-      'hover:bg-muted transition-colors flex-shrink-0',
-      disabled && 'opacity-50'
-    )}>
+    <div
+      className={cn(
+        'flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-surface-2',
+        'hover:bg-surface-hover transition-colors flex-shrink-0',
+        disabled && 'opacity-50'
+      )}
+    >
       {/* Enhanced File Preview */}
       <div className="flex-shrink-0">
-        <FilePreviewProvider
-          file={file.file}
-          size="sm"
-          className="w-6 h-6"
-        />
+        <FilePreviewProvider file={file.file} size="sm" className="w-6 h-6" />
       </div>
 
       {/* File Info */}
@@ -101,7 +102,7 @@ const CompactFilePreviewComponent: React.FC<CompactFilePreviewProps> = ({
   onFileRemove,
   disabled = false,
   className,
-  readOnly = false
+  readOnly = false,
 }) => {
   if (files.length === 0) {
     return null;
@@ -121,25 +122,31 @@ const CompactFilePreviewComponent: React.FC<CompactFilePreviewProps> = ({
           />
         ))}
       </div>
-      
-
     </div>
   );
 };
 
-export const CompactFilePreview = React.memo(CompactFilePreviewComponent, (prev, next) => {
-  if (prev.disabled !== next.disabled || prev.className !== next.className) {
-    return false;
-  }
-  if (prev.files.length !== next.files.length) return false;
-  for (let i = 0; i < prev.files.length; i++) {
-    const a = prev.files[i];
-    const b = next.files[i];
-    if (a.id !== b.id || a.status !== b.status || a.name !== b.name || a.size !== b.size) {
+export const CompactFilePreview = React.memo(
+  CompactFilePreviewComponent,
+  (prev, next) => {
+    if (prev.disabled !== next.disabled || prev.className !== next.className) {
       return false;
     }
+    if (prev.files.length !== next.files.length) return false;
+    for (let i = 0; i < prev.files.length; i++) {
+      const a = prev.files[i];
+      const b = next.files[i];
+      if (
+        a.id !== b.id ||
+        a.status !== b.status ||
+        a.name !== b.name ||
+        a.size !== b.size
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
-  return true;
-});
+);
 
 export default CompactFilePreview;

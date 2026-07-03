@@ -266,13 +266,14 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           'flex flex-col items-center justify-center text-center',
           compact ? 'p-4' : 'p-6',
           !disabled && 'hover:border-primary/50',
-          isDragActive && !isDragReject && 'border-primary bg-primary/5',
-          isDragReject && 'border-destructive bg-destructive/5',
+          isDragActive && !isDragReject && 'border-aqua bg-aqua-film-04',
+          isDragReject && 'border-destructive bg-destructive-film-08',
           disabled && 'opacity-50 cursor-not-allowed',
           files.length >= maxFiles && 'opacity-50 cursor-not-allowed',
-          files.length === 0
-            ? 'border-muted-foreground/25'
-            : 'border-muted-foreground/10'
+          // Etch language (north star): dashed hairline draws the shape of
+          // what would be there. Stronger while genuinely empty, quieter
+          // once files exist -- not raw muted-foreground opacity fractions.
+          files.length === 0 ? 'border-etch-strong' : 'border-etch-line'
         )}
       >
         <input {...getInputProps()} />

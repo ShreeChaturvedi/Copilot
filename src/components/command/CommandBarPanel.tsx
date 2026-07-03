@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Command } from 'cmdk';
-import { CalendarClock, Search } from 'lucide-react';
+import { CalendarClock, Search, SearchX } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCommandBarStore } from '@/stores/commandBarStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -36,10 +36,14 @@ export default function CommandBarPanel() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const { addTask } = useTasks();
   const [query, setQuery] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
 
   // Fresh input every open
   useEffect(() => {
-    if (open) setQuery('');
+    if (open) {
+      setQuery('');
+      setIsPlacing(false);
+    }
   }, [open]);
 
   const close = () => setOpen(false);
@@ -64,12 +68,16 @@ export default function CommandBarPanel() {
   const offer = useMemo(() => parseDateGrammar(query), [query]);
 
   const placeTask = () => {
-    if (!offer) return;
+    if (!offer || isPlacing) return;
+    setIsPlacing(true);
     addTask.mutate(
       { title: offer.title, scheduledDate: offer.when },
       {
         onSuccess: () => {
           toast.success(`Placed on ${offer.display}`);
+        },
+        onSettled: () => {
+          setIsPlacing(false);
         },
       }
     );
@@ -100,6 +108,7 @@ export default function CommandBarPanel() {
             </div>
             <Command.List>
               <Command.Empty>
+                <SearchX className="tf-cmdk-empty-icon" aria-hidden />
                 No matches.
                 <span className="tf-cmdk-empty-hint">
                   Try "Email vendor tomorrow 9am" to place a task.
@@ -107,9 +116,10 @@ export default function CommandBarPanel() {
               </Command.Empty>
 
               {offer && (
-                <Command.Group>
+                <Command.Group heading="Quick add">
                   <Command.Item
                     className="tf-cmdk-place"
+                    data-pending={isPlacing || undefined}
                     value={query}
                     onSelect={placeTask}
                   >
@@ -151,6 +161,18 @@ export default function CommandBarPanel() {
               ))}
             </Command.List>
           </Command>
+          <div className="tf-cmdk-footer">
+            <span className="tf-cmdk-hint">
+              <Keycap>↑</Keycap>
+              <Keycap>↓</Keycap> Navigate
+            </span>
+            <span className="tf-cmdk-hint">
+              <Keycap>↵</Keycap> Select
+            </span>
+            <span className="tf-cmdk-hint">
+              <Keycap>Esc</Keycap> Close
+            </span>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

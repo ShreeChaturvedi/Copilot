@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { CalendarDays } from 'lucide-react';
 import type { Task } from '@shared/types';
 import {
   Dialog,
@@ -53,6 +55,17 @@ export const ScheduleTaskDialog: React.FC<ScheduleTaskDialogProps> = ({
     );
   }, [open, task]);
 
+  // Resolved-value preview (§2B Craft): a one-line mono confirmation of what
+  // "Place" is about to commit, so the user isn't re-reading the calendar's
+  // selected-day highlight to know what they picked.
+  const previewDate = useMemo(() => {
+    if (!selectedDate || !includeTime) return selectedDate ?? null;
+    const [hh, mm] = timeValue.split(':').map((n) => parseInt(n || '0', 10));
+    const next = new Date(selectedDate);
+    next.setHours(hh || 0, mm || 0, 0, 0);
+    return next;
+  }, [selectedDate, includeTime, timeValue]);
+
   const handlePlace = () => {
     if (!task || !selectedDate) return;
     const next = new Date(selectedDate);
@@ -70,7 +83,13 @@ export const ScheduleTaskDialog: React.FC<ScheduleTaskDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[340px]">
         <DialogHeader>
-          <DialogTitle>Schedule task</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarDays
+              className="h-4 w-4 text-ink-muted"
+              aria-hidden="true"
+            />
+            Schedule task
+          </DialogTitle>
           <DialogDescription className="line-clamp-1">
             {task?.title}
           </DialogDescription>
@@ -97,14 +116,31 @@ export const ScheduleTaskDialog: React.FC<ScheduleTaskDialogProps> = ({
                 Time
               </Label>
             </div>
-            {includeTime && (
-              <CustomTimeInput
-                value={timeValue}
-                onChange={(e) => setTimeValue(e.target.value)}
-                className="w-28"
-              />
-            )}
+            {/* Grid-rows collapse (same mechanism as .ti-shell[data-collapsed],
+                task-item.css) instead of a hard conditional mount, so toggling
+                the switch settles rather than pops. */}
+            <div
+              className="grid"
+              style={{
+                gridTemplateRows: includeTime ? '1fr' : '0fr',
+                transition: 'grid-template-rows 200ms var(--ease-settle)',
+              }}
+            >
+              <div className="min-h-0 overflow-hidden" inert={!includeTime}>
+                <CustomTimeInput
+                  value={timeValue}
+                  onChange={(e) => setTimeValue(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+            </div>
           </div>
+          {previewDate && (
+            <div className="w-full px-1 font-mono text-xs text-ink-muted tabular-nums">
+              → {format(previewDate, 'EEE, MMM d')}
+              {includeTime ? ` · ${format(previewDate, 'h:mm a')}` : ''}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

@@ -3,8 +3,7 @@
  * Handles patterns like p1, p2, p3, high, low, urgent, critical, etc.
  */
 
-import { Parser, ParsedTag } from "@shared/types";
-import { v4 as uuidv4 } from 'uuid';
+import { Parser, ParsedTag } from '@shared/types';
 
 export class PriorityParser implements Parser {
   readonly id = 'priority-parser';
@@ -17,26 +16,54 @@ export class PriorityParser implements Parser {
     { pattern: /\bp1\b/gi, level: 'high', confidence: 0.95 },
     { pattern: /\bp2\b/gi, level: 'medium', confidence: 0.95 },
     { pattern: /\bp3\b/gi, level: 'low', confidence: 0.95 },
-    
+
     // High priority keywords
-    { pattern: /\b(urgent|critical|asap|emergency|high priority|important)\b/gi, level: 'high', confidence: 0.85 },
+    {
+      pattern: /\b(urgent|critical|asap|emergency|high priority|important)\b/gi,
+      level: 'high',
+      confidence: 0.85,
+    },
     { pattern: /\bhigh\b/gi, level: 'high', confidence: 0.75 },
-    
+
     // Medium priority keywords
-    { pattern: /\b(medium priority|normal priority|moderate)\b/gi, level: 'medium', confidence: 0.80 },
-    { pattern: /\bmedium\b/gi, level: 'medium', confidence: 0.70 },
-    
+    {
+      pattern: /\b(medium priority|normal priority|moderate)\b/gi,
+      level: 'medium',
+      confidence: 0.8,
+    },
+    { pattern: /\bmedium\b/gi, level: 'medium', confidence: 0.7 },
+
     // Low priority keywords
-    { pattern: /\b(low priority|when possible|someday|maybe|optional)\b/gi, level: 'low', confidence: 0.80 },
+    {
+      pattern: /\b(low priority|when possible|someday|maybe|optional)\b/gi,
+      level: 'low',
+      confidence: 0.8,
+    },
     { pattern: /\blow\b/gi, level: 'low', confidence: 0.65 },
-    
+
     // Alternative priority expressions
-    { pattern: /\b(top priority|highest priority|must do)\b/gi, level: 'high', confidence: 0.90 },
-    { pattern: /\b(least priority|lowest priority|nice to have)\b/gi, level: 'low', confidence: 0.85 },
-    
+    {
+      pattern: /\b(top priority|highest priority|must do)\b/gi,
+      level: 'high',
+      confidence: 0.9,
+    },
+    {
+      pattern: /\b(least priority|lowest priority|nice to have)\b/gi,
+      level: 'low',
+      confidence: 0.85,
+    },
+
     // Urgency indicators
-    { pattern: /\b(due soon|overdue|time sensitive)\b/gi, level: 'high', confidence: 0.80 },
-    { pattern: /\b(no rush|no hurry|later|eventually)\b/gi, level: 'low', confidence: 0.75 },
+    {
+      pattern: /\b(due soon|overdue|time sensitive)\b/gi,
+      level: 'high',
+      confidence: 0.8,
+    },
+    {
+      pattern: /\b(no rush|no hurry|later|eventually)\b/gi,
+      level: 'low',
+      confidence: 0.75,
+    },
   ];
 
   /**
@@ -56,22 +83,26 @@ export class PriorityParser implements Parser {
     for (const { pattern, level, confidence } of this.priorityPatterns) {
       // Reset regex lastIndex to ensure clean matching
       pattern.lastIndex = 0;
-      
+
       let match;
       while ((match = pattern.exec(text)) !== null) {
         const startIndex = match.index;
         const endIndex = match.index + match[0].length;
-        
+
         // Check if this range overlaps with already processed ranges
-        const overlaps = processedRanges.some(range => 
-          (startIndex >= range.start && startIndex < range.end) ||
-          (endIndex > range.start && endIndex <= range.end) ||
-          (startIndex <= range.start && endIndex >= range.end)
+        const overlaps = processedRanges.some(
+          (range) =>
+            (startIndex >= range.start && startIndex < range.end) ||
+            (endIndex > range.start && endIndex <= range.end) ||
+            (startIndex <= range.start && endIndex >= range.end)
         );
 
         if (!overlaps) {
+          // Deterministic id (parser + span): stable across debounced
+          // re-parses of unchanged text so tag identity survives keystrokes
+          // that don't touch this span (unblocks tag-settle motion, §2.6).
           const priorityTag: ParsedTag = {
-            id: uuidv4(),
+            id: `${this.id}:${startIndex}:${endIndex}`,
             type: 'priority',
             value: level,
             displayText: this.formatDisplayText(level, match[0]),
@@ -107,7 +138,11 @@ export class PriorityParser implements Parser {
   /**
    * Adjust confidence based on context
    */
-  private adjustConfidence(baseConfidence: number, matchText: string, fullText: string): number {
+  private adjustConfidence(
+    baseConfidence: number,
+    matchText: string,
+    fullText: string
+  ): number {
     let confidence = baseConfidence;
 
     // Reduce confidence for very short matches in long text
@@ -121,9 +156,10 @@ export class PriorityParser implements Parser {
     }
 
     // Reduce confidence if the match is part of a larger word
-    const beforeChar = fullText[matchText.length > 0 ? fullText.indexOf(matchText) - 1 : -1];
+    const beforeChar =
+      fullText[matchText.length > 0 ? fullText.indexOf(matchText) - 1 : -1];
     const afterChar = fullText[fullText.indexOf(matchText) + matchText.length];
-    
+
     if (beforeChar && /[a-zA-Z0-9]/.test(beforeChar)) {
       confidence *= 0.7;
     }

@@ -35,28 +35,33 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         : 'Not started';
   const Icon =
     status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
-  // Status inks re-based onto tokens (design-brief §2.3): in-progress =
-  // the sanctioned amber --warning, done = --success (the aqua), rest muted.
-  const colorClass =
+  // Status tone re-based onto tokens (design-brief §2.3): quiet-chip film —
+  // same-hue background tint instead of a neutral bordered box, matching
+  // .ti-tag's chip species. in-progress = the sanctioned amber --warning,
+  // done = --success (the aqua, sanctioned "live/done" use per §1.6 rule 3),
+  // rest = neutral surface, nothing to signal. Hover deepens the same hue
+  // rather than swapping to a neutral wash, so feedback stays legible
+  // against the chip's own semantic color.
+  const toneClass =
     status === 'in_progress'
-      ? 'text-warning'
+      ? 'bg-warning/10 text-warning hover:bg-warning/16'
       : status === 'done'
-        ? 'text-success'
-        : 'text-muted-foreground';
+        ? 'bg-success/10 text-success hover:bg-success/16'
+        : 'bg-surface-2 text-muted-foreground hover:bg-surface-active';
 
   // Consistent sizing:
-  // - iconOnly: 20x20 container, 2px inner padding to give breathing room around a 14px icon
+  // - iconOnly: 20x20 container (matches the checkbox/ring footprint), flex-centered
   // - full: md chip spacing with text-xs, aligning with shadcn Badge md size
   const triggerBase = iconOnly
-    ? 'inline-flex items-center justify-center h-5 w-5 p-0.5 rounded-md border border-hairline-strong hover:bg-muted transition-colors'
-    : 'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-hairline-strong hover:bg-muted transition-colors whitespace-nowrap';
+    ? 'inline-flex items-center justify-center h-5 w-5 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
+    : 'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-colors whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1';
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={cn(triggerBase, colorClass, className)}
+          className={cn(triggerBase, toneClass, className)}
           aria-label="Change status"
           onClick={(e) => e.stopPropagation()}
         >

@@ -9,14 +9,18 @@
   position: relative;
   overflow: hidden;
   background: var(--surface-1);
-  border-radius: 8px;
-  /* transparent 1px border keeps box metrics identical when the vacated
-     slot swaps to a dashed etch border */
-  border: 1px solid transparent;
-  box-shadow: var(--edge-machined), var(--shadow-1);
-  padding: 9px 11px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--edge-machined);
+  padding: 10px 12px;
   cursor: grab;
   -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .kanban-card:hover {
+    border-color: var(--hairline-strong);
+  }
 }
 
 .kanban-card:focus-visible {
@@ -52,6 +56,8 @@
   font-weight: 500;
   line-height: 18px;
   color: var(--ink);
+  /* clears the absolutely-positioned 24px menu trigger at top:5/right:5 */
+  padding-right: 18px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -62,6 +68,10 @@
 .kanban-card--done .kanban-card-title {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+
+.kanban-card--done::before {
+  opacity: 0.5;
 }
 
 .kanban-card-footer {
@@ -77,7 +87,8 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
 }
 .kanban-due--today {
@@ -190,7 +201,7 @@
 }
 .kanban-gap-slot {
   border: 1px dashed var(--etch-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 /* ---- Empty column ---- */
@@ -204,7 +215,7 @@
   justify-content: center;
   gap: 6px;
   border: 1px dashed var(--etch-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: transparent;
   font-size: 13px;
   font-weight: 500;
@@ -232,7 +243,7 @@
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--etch-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--aqua-film-04);
 }
 .kanban-drop-target--over {
@@ -242,7 +253,7 @@
 .kanban-drop-target-label {
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--etch-text);
 }
@@ -266,6 +277,7 @@
   font-size: 12px;
   line-height: 1;
   color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 .kanban-col-add {
   margin-left: auto;
@@ -284,6 +296,51 @@
 @media (hover: none) {
   .kanban-col-add {
     opacity: 0.4;
+  }
+}
+
+/* Whole-column drag-over wash (§2.4): the entire target column washes a
+   faint aqua while a card is dragged over any part of it; the specific
+   insertion point (.kanban-drop-target--over / .kanban-gap--open) keeps
+   the stronger aqua-film-08 signal. Column-wide faint, slot-specific
+   strong — reuses the existing two-step film pair, no new token. */
+.kanban-column--target {
+  transition: background-color var(--dur-2) var(--ease-out);
+  border-radius: var(--radius-card);
+}
+.kanban-column--target-over {
+  background: var(--aqua-film-04);
+}
+
+/* ---- Whole-board-empty (all 3 columns empty at once, e.g. a freshly
+   created list): one Scene-pane message replaces the redundant 3x
+   per-column ghost row, desktop only. Mobile's single-column-at-a-time
+   pager has no side-by-side redundancy to solve, so it keeps the
+   existing per-column ghost unchanged. Suppression is pure CSS keyed
+   off the parent's [data-board-empty] attribute. ---- */
+.kanban-board-empty {
+  display: none;
+}
+@media (min-width: 768px) {
+  [data-board-empty] {
+    position: relative;
+  }
+  [data-board-empty] .kanban-ghost-new {
+    visibility: hidden;
+  }
+  .kanban-board-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+    animation: dialog-settle-in var(--dur-3) var(--ease-settle) both;
+  }
+  .kanban-board-empty button {
+    pointer-events: auto;
   }
 }
 
@@ -318,6 +375,9 @@
   }
   .kanban-card--flash::after {
     animation: kanban-rim-flash-static 240ms step-end forwards;
+  }
+  .kanban-board-empty {
+    animation: none;
   }
 }
 

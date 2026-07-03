@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/Button';
+import { AuthLayout, AuthCard, AuthStatus } from '@/components/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
 import { googleSyncApi } from '@/services/api/google';
@@ -98,102 +90,55 @@ export function GoogleCallbackPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-blue-50 via-green-50 to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <Card className="w-full max-w-md mx-auto shadow-2xl border-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm">
-        <CardHeader className="text-center pb-4">
-          <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+    <AuthLayout>
+      <AuthCard>
+        <div className="flex flex-col gap-6">
+          <h1 className="text-xl font-semibold tracking-[-0.01em]">
             {isCalendarConnect ? 'Google Calendar' : 'Google Authentication'}
-          </CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
-            {status === 'loading' &&
-              (isCalendarConnect
-                ? 'Connecting your Google Calendar...'
-                : 'Processing your authentication...')}
-            {status === 'success' &&
-              (isCalendarConnect
-                ? 'Google Calendar connected!'
-                : 'Successfully authenticated!')}
-            {status === 'error' &&
-              (isCalendarConnect
-                ? 'Connection failed'
-                : 'Authentication failed')}
-          </CardDescription>
-        </CardHeader>
+          </h1>
 
-        <CardContent className="flex flex-col items-center space-y-6">
           {status === 'loading' && (
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-emerald-500" />
-              <div className="text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Please wait while we complete your sign-in...
-                </p>
-                <div className="mt-2 flex items-center justify-center space-x-1">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse delay-100" />
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse delay-200" />
-                </div>
-              </div>
-            </div>
+            <AuthStatus
+              variant="loading"
+              title="Connecting..."
+              description={
+                isCalendarConnect
+                  ? 'Connecting your Google Calendar...'
+                  : 'Processing your authentication...'
+              }
+            />
           )}
 
           {status === 'success' && (
-            <div className="flex flex-col items-center space-y-4">
-              <div className="p-3 rounded-full bg-aqua-film-08">
-                <CheckCircle className="h-8 w-8 text-success" />
-              </div>
-              <div className="text-center">
-                <p className="font-medium text-slate-900 dark:text-slate-100">
-                  {isCalendarConnect ? 'Connected!' : 'Welcome!'}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {isCalendarConnect
-                    ? 'Open Settings → Integrations to import your calendar.'
-                    : "You'll be redirected to your dashboard shortly."}
-                </p>
-              </div>
-            </div>
+            <AuthStatus
+              variant="success"
+              title={
+                isCalendarConnect
+                  ? 'Google Calendar connected!'
+                  : 'Successfully authenticated!'
+              }
+              description={
+                isCalendarConnect
+                  ? 'Open Settings → Integrations to import your calendar.'
+                  : "You'll be redirected to your dashboard shortly."
+              }
+            />
           )}
 
           {status === 'error' && (
-            <div className="w-full space-y-4">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="p-3 rounded-full bg-destructive/10">
-                  <AlertCircle className="h-8 w-8 text-destructive" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium text-slate-900 dark:text-slate-100">
-                    Something went wrong
-                  </p>
-                </div>
-              </div>
-
-              <Alert className="border-destructive/40 bg-destructive/10">
-                <AlertDescription className="text-destructive text-sm">
-                  {errorMessage}
-                </AlertDescription>
-              </Alert>
-
-              <Button
-                onClick={handleRetry}
-                className="w-full h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
-              >
-                Try Again
-              </Button>
-            </div>
+            <AuthStatus
+              variant="error"
+              title="Something went wrong"
+              description={errorMessage}
+              action={
+                <Button onClick={handleRetry} className="w-full">
+                  Try Again
+                </Button>
+              }
+            />
           )}
-
-          {/* Progress indicator for loading state */}
-          {status === 'loading' && (
-            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1">
-              <div
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 h-1 rounded-full animate-pulse"
-                style={{ width: '60%' }}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </AuthCard>
+    </AuthLayout>
   );
 }

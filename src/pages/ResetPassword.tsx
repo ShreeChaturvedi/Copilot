@@ -5,6 +5,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AuthCard, AuthStatus } from '@/components/auth';
+import { AlertCircle, Eye, EyeOff, Lock } from 'lucide-react';
 
 function ResetPasswordForm({
   className,
@@ -16,6 +19,8 @@ function ResetPasswordForm({
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -71,6 +76,44 @@ function ResetPasswordForm({
     navigate('/forgot-password');
   };
 
+  if (missingToken) {
+    return (
+      <div className={cn('flex flex-col gap-6', className)} {...props}>
+        <AuthStatus
+          variant="error"
+          title="Link incomplete"
+          description="This password reset link is missing its token. Please request a new reset link."
+          action={
+            <Button type="button" className="w-full" onClick={handleRequestNew}>
+              Request a new link
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className={cn('flex flex-col gap-6', className)} {...props}>
+        <AuthStatus
+          variant="success"
+          title="Password reset"
+          description="Your password has been reset. You can now sign in with your new password."
+          action={
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleBackToLogin}
+            >
+              Go to sign in
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <div className="grid gap-1.5">
@@ -81,93 +124,113 @@ function ResetPasswordForm({
           Enter a new password for your account.
         </p>
       </div>
-      {missingToken ? (
+      <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-5">
-          <p className="text-sm text-destructive" role="alert">
-            This password reset link is missing its token. Please request a new
-            reset link.
-          </p>
-          <Button type="button" className="w-full" onClick={handleRequestNew}>
-            Request a new link
-          </Button>
-        </div>
-      ) : done ? (
-        <div className="flex flex-col gap-5">
-          <p className="text-sm text-muted-foreground" role="status">
-            Your password has been reset. You can now sign in with your new
-            password.
-          </p>
-          <Button type="button" className="w-full" onClick={handleBackToLogin}>
-            Go to sign in
-          </Button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-5">
-            <div className="grid gap-2">
-              <Label htmlFor="password">New password</Label>
+          <div className="grid gap-2">
+            <Label htmlFor="password">New password</Label>
+            <div className="relative group">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 group-focus-within:text-ink-muted"
+                aria-hidden="true"
+              />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
                 required
+                className="pl-9 pr-9"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 rounded-sm active:scale-90"
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">Confirm new password</Label>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="confirmPassword">Confirm new password</Label>
+            <div className="relative group">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 group-focus-within:text-ink-muted"
+                aria-hidden="true"
+              />
               <Input
                 id="confirmPassword"
-                type="password"
+                type={showConfirm ? 'text' : 'password'}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
                 aria-invalid={confirm.length > 0 && !passwordsMatch}
                 required
+                className="pl-9 pr-9"
               />
-              {confirm.length > 0 && (
-                <p
-                  className={cn(
-                    'text-xs',
-                    passwordsMatch ? 'text-success' : 'text-destructive'
-                  )}
-                >
-                  {passwordsMatch
-                    ? 'Passwords match'
-                    : 'Passwords do not match'}
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                aria-pressed={showConfirm}
+                className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 rounded-sm active:scale-90"
+              >
+                {showConfirm ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
             </div>
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
+            {confirm.length > 0 && (
+              <p
+                className={cn(
+                  'text-xs',
+                  passwordsMatch ? 'text-success' : 'text-destructive'
+                )}
+              >
+                {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
               </p>
             )}
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? 'Resetting...' : 'Reset password'}
-            </Button>
           </div>
-          <div className="mt-5 text-center text-sm text-muted-foreground">
-            <a
-              href="/login"
-              onClick={handleBackToLogin}
-              className="text-foreground underline underline-offset-4"
+          {error && (
+            <Alert
+              variant="destructive"
+              className="border-destructive/40 bg-destructive/10 animate-in fade-in slide-in-from-top-1 duration-150"
             >
-              Back to sign in
-            </a>
-          </div>
-        </form>
-      )}
+              <AlertCircle className="size-4" aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? 'Resetting...' : 'Reset password'}
+          </Button>
+        </div>
+        <div className="mt-5 text-center text-sm text-muted-foreground">
+          <a
+            href="/login"
+            onClick={handleBackToLogin}
+            className="text-foreground underline underline-offset-4"
+          >
+            Back to sign in
+          </a>
+        </div>
+      </form>
     </div>
   );
 }
 
 export function ResetPasswordPage() {
   return (
-    <div className="auth-card w-full max-w-[400px] p-8 max-sm:p-6">
+    <AuthCard>
       <ResetPasswordForm />
-    </div>
+    </AuthCard>
   );
 }

@@ -27,17 +27,26 @@
 
 /* --- Row root --- */
 .ti-row {
-  min-height: 36px;
-  padding: 6px 12px;
+  min-height: 40px;
+  padding: 8px 12px;
   border-radius: 6px;
   /* hover: instant on, 150ms off (§5) */
   transition: background-color var(--dur-2) var(--ease-out);
 }
+/* Hairline row separation (Linear-style list rows, not gap-only pills) —
+   scoped to real list siblings only; excluded from kanban's in-card usage
+   via the same [data-in-card] gate the hover/selected rules use. */
+.ti-shell:not(:last-child) .ti-row:not([data-in-card='true']) {
+  border-bottom: 1px solid var(--hairline);
+}
 @media (hover: hover) {
   .ti-row:not([data-in-card='true']):hover {
-    background-color: var(--surface-2);
+    background-color: var(--surface-hover);
     transition-duration: 0s;
   }
+}
+.ti-row:not([data-in-card='true']):active {
+  background-color: var(--surface-active);
 }
 .ti-row:focus-visible {
   outline: var(--focus-ring);
@@ -49,10 +58,10 @@
   box-shadow: inset 2px 0 0 var(--aqua);
 }
 
-/* --- Grid anatomy: [16px ring] 10px [title 1fr] [actions] --- */
+/* --- Grid anatomy: [20px ring track] 10px [title 1fr] [actions] --- */
 .ti-grid {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
+  grid-template-columns: 20px 1fr auto;
   column-gap: 10px;
   align-items: center;
   align-content: center;
@@ -160,6 +169,7 @@
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
+  justify-self: center;
 }
 .ti-ring:focus-visible {
   outline: var(--focus-ring);
@@ -293,6 +303,7 @@
   color: var(--ink-muted);
   background-color: color-mix(in oklab, currentColor 10%, transparent);
   transition: color var(--dur-2) var(--ease-out);
+  font-variant-numeric: tabular-nums;
 }
 .ti-due[data-proximity='today'] {
   color: var(--aqua);
@@ -355,6 +366,7 @@
   color: var(--ink-muted);
   white-space: nowrap;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .ti-due {
   flex-shrink: 0;
@@ -383,6 +395,78 @@
 .ti-chip:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;
+}
+
+/* --- Empty group placeholder (§4.7 Etch, "never had tasks" — no aqua,
+       that's reserved for the caught-up/resolved case elsewhere) ---
+   Three ghost rows echo .ti-ring + .ti-title's own silhouette so the
+   placeholder foreshadows what a real row looks like. */
+.ti-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px 20px;
+  text-align: center;
+}
+.ti-empty-ghost {
+  width: 100%;
+  max-width: 220px;
+  margin-bottom: 12px;
+}
+.ti-empty-ghost-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ti-empty-ghost-ring {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px dashed var(--etch-strong);
+  border-radius: 9999px;
+}
+.ti-empty-ghost-line {
+  flex: 1;
+  height: 8px;
+  border: 1px dashed var(--etch-strong);
+  border-radius: 4px;
+}
+
+/* --- "List cleared" celebration (§1.6 rule 5, the one reserved loud-aqua
+       moment; director-approved) — a scoped, higher-specificity override
+       that only applies when TaskList wraps the caught-up empty state in
+       `.ti-cleared-celebrate` on the exact 1-active-task->0 transition.
+       Targets the shared schedule-empty badge/check by class name only
+       (no edit to the file that defines them): a stronger one-time entrance
+       in place of their normal at-rest appearance. `transform-box: fill-box`
+       is required so the SVG shapes scale from their own visual center,
+       not the viewBox origin. */
+.ti-cleared-celebrate .schedule-empty-badge,
+.ti-cleared-celebrate .schedule-empty-check {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ti-cleared-pop var(--dur-5) var(--ease-settle) both;
+}
+.ti-cleared-celebrate .schedule-empty-check {
+  animation-delay: 60ms;
+}
+@keyframes ti-cleared-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ti-cleared-celebrate .schedule-empty-badge,
+  .ti-cleared-celebrate .schedule-empty-check {
+    animation: none;
+  }
 }
 
 /* --- Mobile (§4.9): rows min 44px under 768px --- */

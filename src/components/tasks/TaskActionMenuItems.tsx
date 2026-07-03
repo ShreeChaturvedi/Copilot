@@ -5,10 +5,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { cn } from '@/lib/utils';
 
 interface TaskActionMenuItemsProps {
   taskId: string;
@@ -47,31 +49,23 @@ export const TaskActionMenuItems: React.FC<TaskActionMenuItemsProps> = ({
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipPrimitive.Portal>
-                  <TooltipPrimitive.Content
-                    side="right"
-                    sideOffset={8}
-                    avoidCollisions={true}
-                    collisionPadding={16}
-                    className={cn(
-                      'w-48 text-xs leading-normal z-[9999] rounded-md px-3 py-2',
-                      'bg-info-popover text-info-popover-foreground border border-border',
-                      'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-                      'data-[side=right]:slide-in-from-left-2'
-                    )}
-                  >
-                    <span className="inline">
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] h-4 px-1.5 mr-1 border-hairline-strong text-ink-muted font-semibold tracking-wide inline-flex items-center align-text-bottom"
-                      >
-                        AI
-                      </Badge>
-                      Schedule this task using extensive knowledge of your
-                      schedule and deep context understanding.
-                    </span>
-                  </TooltipPrimitive.Content>
-                </TooltipPrimitive.Portal>
+                <TooltipContent
+                  side="right"
+                  sideOffset={8}
+                  collisionPadding={16}
+                  className="w-48 leading-normal"
+                >
+                  <span className="inline">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-4 px-1.5 mr-1 border-hairline-strong text-ink-muted font-semibold tracking-wide inline-flex items-center align-text-bottom"
+                    >
+                      AI
+                    </Badge>
+                    Schedule this task using extensive knowledge of your
+                    schedule and deep context understanding.
+                  </span>
+                </TooltipContent>
               </Tooltip>
             </DropdownMenuShortcut>
           )}

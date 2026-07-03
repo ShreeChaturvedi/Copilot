@@ -26,22 +26,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { sanitizeHtml } from '@/utils/validation';
 import { IntegratedActionBar } from './IntegratedActionBar';
+import { RecurrenceScopeDialog } from './RecurrenceScopeDialog';
 import {
   useUpdateEvent,
   useCreateEvent,
   useDeleteEvent,
 } from '@/hooks/useEvents';
 import { toHumanText, clampRRuleUntil } from '@/utils/recurrence';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 import type { CalendarEvent } from '@shared/types';
 import { useCalendars } from '@/hooks/useCalendars';
@@ -118,14 +109,11 @@ function EventDisplayDialogContent({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {calendar && (
             <div
-              className="w-4 h-4 rounded-sm border-2 flex-shrink-0"
-              style={{
-                backgroundColor: calendar.color,
-                borderColor: calendar.color,
-              }}
+              className="w-4 h-4 rounded-sm flex-shrink-0"
+              style={{ backgroundColor: calendar.color }}
             />
           )}
-          <h2 className="text-lg font-semibold leading-tight truncate">
+          <h2 className="text-base font-semibold tracking-[-0.01em] leading-tight truncate">
             {event.title}
           </h2>
         </div>
@@ -138,7 +126,7 @@ function EventDisplayDialogContent({
         </Badge>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {calendar && (
           <div className="flex items-center gap-3">
             <div className="text-muted-foreground flex-shrink-0">
@@ -330,7 +318,7 @@ export function EventDisplayDialog({
       {/* Dialog (center modal) - only open when open=true AND peekMode='center' */}
       <Dialog open={open && !isSheetMode} onOpenChange={onOpenChange}>
         <DialogContent
-          className="sm:max-w-[400px] overflow-hidden"
+          className="sm:max-w-md overflow-hidden"
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">{event.title}</DialogTitle>
@@ -340,135 +328,97 @@ export function EventDisplayDialog({
           <EventDisplayDialogContent event={event} actions={actionButtons} />
         </DialogContent>
         {/* Delete dialog for recurring events */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete event</AlertDialogTitle>
-              <AlertDialogDescription>
-                This is a recurring event. What would you like to delete?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  // Delete this occurrence only
-                  const iso = new Date(
-                    event.occurrenceInstanceStart || event.start
-                  ).toISOString();
-                  const newExceptions = Array.from(
-                    new Set([...(event.exceptions || []), iso])
-                  );
-                  await updateEventMutation.mutateAsync({
-                    id: event.id,
-                    data: { exceptions: newExceptions },
-                  });
-                  setDeleteDialogOpen(false);
-                  handleClose();
-                }}
-              >
-                This event
-              </AlertDialogAction>
-              <AlertDialogAction
-                onClick={async () => {
-                  // This and following events: clamp series UNTIL to just before this instance
-                  const occStart = new Date(
-                    event.occurrenceInstanceStart || event.start
-                  );
-                  const clamped = clampRRuleUntil(event.recurrence!, occStart);
-                  await updateEventMutation.mutateAsync({
-                    id: event.id,
-                    data: { recurrence: clamped },
-                  });
-                  setDeleteDialogOpen(false);
-                  handleClose();
-                }}
-              >
-                This and following
-              </AlertDialogAction>
-              <AlertDialogAction
-                className="bg-destructive hover:bg-destructive/90"
-                onClick={async () => {
-                  await handleDelete();
-                  setDeleteDialogOpen(false);
-                }}
-              >
-                All events
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <RecurrenceScopeDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Delete event"
+          description="This is a recurring event. What would you like to delete?"
+          destructive
+          onThisEvent={async () => {
+            // Delete this occurrence only
+            const iso = new Date(
+              event.occurrenceInstanceStart || event.start
+            ).toISOString();
+            const newExceptions = Array.from(
+              new Set([...(event.exceptions || []), iso])
+            );
+            await updateEventMutation.mutateAsync({
+              id: event.id,
+              data: { exceptions: newExceptions },
+            });
+            setDeleteDialogOpen(false);
+            handleClose();
+          }}
+          onThisAndFollowing={async () => {
+            // This and following events: clamp series UNTIL to just before this instance
+            const occStart = new Date(
+              event.occurrenceInstanceStart || event.start
+            );
+            const clamped = clampRRuleUntil(event.recurrence!, occStart);
+            await updateEventMutation.mutateAsync({
+              id: event.id,
+              data: { recurrence: clamped },
+            });
+            setDeleteDialogOpen(false);
+            handleClose();
+          }}
+          onAllEvents={async () => {
+            await handleDelete();
+            setDeleteDialogOpen(false);
+          }}
+        />
 
         {/* Edit dialog for recurring events */}
-        <AlertDialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Edit event</AlertDialogTitle>
-              <AlertDialogDescription>
-                This is a recurring event. What would you like to edit?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  // Edit this occurrence only (create one-off, exclude from series, then open editor)
-                  const occStart = event.occurrenceInstanceStart || event.start;
-                  const occEnd = event.occurrenceInstanceEnd || event.end;
-                  const iso = new Date(occStart).toISOString();
-                  const newExceptions = Array.from(
-                    new Set([...(event.exceptions || []), iso])
-                  );
-                  await updateEventMutation.mutateAsync({
-                    id: event.id,
-                    data: { exceptions: newExceptions },
-                  });
-                  const oneOff = await createEventMutation.mutateAsync({
-                    title: event.title,
-                    start: occStart,
-                    end: occEnd,
-                    allDay: event.allDay,
-                    description: event.description,
-                    location: event.location,
-                    calendarName: event.calendarName || '',
-                    color: event.color,
-                  });
-                  setEditDialogOpen(false);
-                  onEdit?.({ ...oneOff });
-                  handleClose();
-                }}
-              >
-                This event
-              </AlertDialogAction>
-              <AlertDialogAction
-                onClick={() => {
-                  // This and following: convert series at this point into a split by clamping and creating a new follow-up
-                  const occStart = new Date(
-                    event.occurrenceInstanceStart || event.start
-                  );
-                  const clamped = clampRRuleUntil(event.recurrence!, occStart);
-                  // Update current series to end before this occurrence
-                  updateEventMutation.mutate({
-                    id: event.id,
-                    data: { recurrence: clamped },
-                  });
-                  setEditDialogOpen(false);
-                  handleEdit();
-                }}
-              >
-                This and following
-              </AlertDialogAction>
-              <AlertDialogAction
-                onClick={() => {
-                  setEditDialogOpen(false);
-                  handleEdit();
-                }}
-              >
-                All events
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <RecurrenceScopeDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          title="Edit event"
+          description="This is a recurring event. What would you like to edit?"
+          onThisEvent={async () => {
+            // Edit this occurrence only (create one-off, exclude from series, then open editor)
+            const occStart = event.occurrenceInstanceStart || event.start;
+            const occEnd = event.occurrenceInstanceEnd || event.end;
+            const iso = new Date(occStart).toISOString();
+            const newExceptions = Array.from(
+              new Set([...(event.exceptions || []), iso])
+            );
+            await updateEventMutation.mutateAsync({
+              id: event.id,
+              data: { exceptions: newExceptions },
+            });
+            const oneOff = await createEventMutation.mutateAsync({
+              title: event.title,
+              start: occStart,
+              end: occEnd,
+              allDay: event.allDay,
+              description: event.description,
+              location: event.location,
+              calendarName: event.calendarName || '',
+              color: event.color,
+            });
+            setEditDialogOpen(false);
+            onEdit?.({ ...oneOff });
+            handleClose();
+          }}
+          onThisAndFollowing={() => {
+            // This and following: convert series at this point into a split by clamping and creating a new follow-up
+            const occStart = new Date(
+              event.occurrenceInstanceStart || event.start
+            );
+            const clamped = clampRRuleUntil(event.recurrence!, occStart);
+            // Update current series to end before this occurrence
+            updateEventMutation.mutate({
+              id: event.id,
+              data: { recurrence: clamped },
+            });
+            setEditDialogOpen(false);
+            handleEdit();
+          }}
+          onAllEvents={() => {
+            setEditDialogOpen(false);
+            handleEdit();
+          }}
+        />
       </Dialog>
     </>
   );

@@ -3,16 +3,8 @@
  * Connect / status / primary-calendar import / Sync now / Disconnect.
  */
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +22,9 @@ import {
 import {
   AlertCircle,
   CalendarClock,
+  Cloud,
   Download,
+  Link2,
   Loader2,
   RefreshCw,
   Unplug,
@@ -88,30 +82,49 @@ export function IntegrationsSettings() {
   }
 
   if (!status.connected) {
+    // The area's one earned craft moment (§2.6): an etched "not yet wired
+    // up" motif in place of a plain Card + button, extending "The Etch"
+    // (foundation §4) into the one empty state this area actually owns.
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="h-5 w-5" />
-            Google Calendar
-          </CardTitle>
-          <CardDescription>
-            Connect your Google account to import your calendar and keep it in
-            sync. Events are pulled automatically every 15 minutes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            onClick={() => startConnect.mutate()}
-            disabled={startConnect.isPending}
-          >
-            {startConnect.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Connect Google Calendar
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center px-6 py-12 text-center">
+        <div className="flex items-center justify-center gap-3">
+          <div className="grid size-11 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
+            <CalendarClock className="size-5" />
+          </div>
+          <div
+            className="h-px w-10 border-t border-dashed border-etch-strong"
+            aria-hidden="true"
+          />
+          <div className="grid size-7 place-items-center rounded-full border border-dashed border-etch-strong text-ink-muted">
+            <Link2 className="size-3.5" />
+          </div>
+          <div
+            className="h-px w-10 border-t border-dashed border-etch-strong"
+            aria-hidden="true"
+          />
+          <div className="grid size-11 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
+            <Cloud className="size-5" />
+          </div>
+        </div>
+
+        <p className="mt-5 font-serif text-base leading-[1.3] text-ink">
+          Bring your calendar in.
+        </p>
+        <p className="mt-1 text-[0.8125rem] text-ink-muted max-w-[32ch]">
+          Google Calendar syncs in automatically, every 15 minutes.
+        </p>
+
+        <Button
+          className="mt-5"
+          onClick={() => startConnect.mutate()}
+          disabled={startConnect.isPending}
+        >
+          {startConnect.isPending && (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          )}
+          Connect Google Calendar
+        </Button>
+      </div>
     );
   }
 
@@ -147,61 +160,84 @@ export function IntegrationsSettings() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="h-5 w-5" />
-            Google Calendar
-            <Badge variant="secondary">Connected</Badge>
-          </CardTitle>
-          <CardDescription>
-            {status.email ?? 'Google account'} · last synced{' '}
-            {formatRelativeTime(lastSynced)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div>
+        {/* Connected-state header — flat, no Card. Foundation §1.6 rule 3's
+            named "connected-integration status dot," previously an unclaimed
+            neutral Badge (§1.C). */}
+        <div className="flex items-center gap-2 text-[0.9375rem] font-semibold text-foreground">
+          <CalendarClock className="h-5 w-5 text-ink-muted" />
+          Google Calendar
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-aqua">
+            <span
+              className="size-1.5 rounded-full bg-aqua"
+              aria-hidden="true"
+            />
+            Connected
+          </span>
+        </div>
+        <p className="mt-1 text-[0.8125rem] text-ink-muted">
+          {status.email ?? 'Google account'} · last synced{' '}
+          {formatRelativeTime(lastSynced)}
+        </p>
+
+        <div className="mt-4 space-y-4">
           {/* Calendar list: primary first (M1); more calendars in a later milestone */}
           <div className="space-y-2">
-            <Label className="text-sm">Calendars</Label>
-            {calendars.isLoading && <Skeleton className="h-12 w-full" />}
-            {calendars.data?.map((cal) => (
-              <div
-                key={cal.id}
-                className="flex items-center justify-between gap-3 rounded-md border p-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <span className="truncate">{cal.summary}</span>
-                    {cal.primary && <Badge variant="outline">Primary</Badge>}
-                  </div>
-                  {cal.linked && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      Synced to “
-                      {status.links.find((l) => l.googleCalendarId === cal.id)
-                        ?.appCalendarName ?? 'calendar'}
-                      ”
-                    </p>
-                  )}
-                </div>
-                {cal.linked ? (
-                  <Badge variant="secondary">Imported</Badge>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => linkCalendar.mutate(cal.id)}
-                    disabled={linkCalendar.isPending || status.needsReauth}
+            <Label className="text-sm text-foreground">Calendars</Label>
+            {calendars.isLoading ? (
+              <Skeleton className="h-12 w-full rounded-card" />
+            ) : (
+              <div className="rounded-card border border-hairline divide-y divide-hairline">
+                {calendars.data?.map((cal) => (
+                  <div
+                    key={cal.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5"
                   >
-                    {linkCalendar.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span className="truncate">{cal.summary}</span>
+                        {cal.primary && (
+                          <Badge variant="outline">Primary</Badge>
+                        )}
+                      </div>
+                      {cal.linked && (
+                        <p className="text-xs text-ink-muted truncate">
+                          Synced to “
+                          {status.links.find(
+                            (l) => l.googleCalendarId === cal.id
+                          )?.appCalendarName ?? 'calendar'}
+                          ”
+                        </p>
+                      )}
+                    </div>
+                    {cal.linked ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-aqua shrink-0">
+                        <span
+                          className="size-1.5 rounded-full bg-aqua"
+                          aria-hidden="true"
+                        />
+                        Synced
+                      </span>
                     ) : (
-                      <Download className="mr-2 h-4 w-4" />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => linkCalendar.mutate(cal.id)}
+                        disabled={linkCalendar.isPending || status.needsReauth}
+                        className="shrink-0"
+                      >
+                        {linkCalendar.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Import
+                      </Button>
                     )}
-                    Import
-                  </Button>
-                )}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
             {calendars.isError && (
               <p className="text-xs text-destructive">
                 Could not load the calendar list.
@@ -218,44 +254,44 @@ export function IntegrationsSettings() {
             </Alert>
           )}
 
-          <Separator />
+          <div className="border-t border-hairline pt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => syncNow.mutate()}
+                disabled={
+                  syncNow.isPending ||
+                  status.needsReauth ||
+                  status.links.length === 0
+                }
+              >
+                {syncNow.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Sync now
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDisconnectOpen(true)}
+                disabled={disconnect.isPending}
+              >
+                <Unplug className="mr-2 h-4 w-4" />
+                Disconnect
+              </Button>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => syncNow.mutate()}
-              disabled={
-                syncNow.isPending ||
-                status.needsReauth ||
-                status.links.length === 0
-              }
-            >
-              {syncNow.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Sync now
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setDisconnectOpen(true)}
-              disabled={disconnect.isPending}
-            >
-              <Unplug className="mr-2 h-4 w-4" />
-              Disconnect
-            </Button>
+            <p className="text-xs text-ink-muted">
+              Changes made in Google appear here within 15 minutes (or instantly
+              with Sync now). Editing synced events here does not update Google
+              yet. Recurring events that span daylight-saving changes can differ
+              by an hour between the two calendars.
+            </p>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Changes made in Google appear here within 15 minutes (or instantly
-            with Sync now). Editing synced events here does not update Google
-            yet. Recurring events that span daylight-saving changes can differ
-            by an hour between the two calendars.
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
         <AlertDialogContent>
@@ -266,7 +302,7 @@ export function IntegrationsSettings() {
               unless you choose to remove them.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-center gap-2 py-1">
+          <div className="flex items-center gap-2 py-2">
             <Checkbox
               id="remove-imported-events"
               checked={removeImported}

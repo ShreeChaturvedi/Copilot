@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
@@ -51,22 +52,13 @@ import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useUIStore } from '@/stores/uiStore';
 import { ConditionalDialogHeader } from './ConditionalDialogHeader';
 import { ConflictWarning } from './ConflictWarning';
+import { RecurrenceScopeDialog } from './RecurrenceScopeDialog';
 import type { RecurrenceEditorOptions } from '@/utils/recurrence';
 import { parseRRule, generateRRule, clampRRuleUntil } from '@/utils/recurrence';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
 import { useSettingsStore, type DateDisplayMode } from '@/stores/settingsStore';
 //
 import RecurrenceSection from './RecurrenceSection';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface EventCreationDialogProps {
   open: boolean;
@@ -144,7 +136,7 @@ export function CustomDateInput({
           <button
             type="button"
             onClick={handleIconClick}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors z-10"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors z-10 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1"
           >
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -320,11 +312,8 @@ function EventCreationDialogContent({
       label: calendar.name,
       icon: (
         <div
-          className="w-3 h-3 rounded-sm border"
-          style={{
-            backgroundColor: calendar.color,
-            borderColor: calendar.color,
-          }}
+          className="w-3 h-3 rounded-sm"
+          style={{ backgroundColor: calendar.color }}
         />
       ),
     }));
@@ -702,6 +691,7 @@ function EventCreationDialogContent({
         peekMode={peekMode}
         onPeekModeToggle={togglePeekMode}
         onClose={onClose}
+        title={formData.title || 'Untitled event'}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -709,239 +699,271 @@ function EventCreationDialogContent({
           value="event"
           className={`space-y-6 ${isEditing ? 'mt-0' : 'mt-6'}`}
         >
-          {/* Event Name and Calendar Selection. Stacks below 640px (#46). */}
-          <div className="flex items-end gap-3 min-w-0 max-sm:flex-col max-sm:items-stretch">
-            <div className="flex-1 max-sm:w-full">
-              <Input
-                ref={titleInputRef}
-                id="event-title"
-                placeholder="Event name"
-                value={formData.title}
-                onChange={(e) => updateFormData('title', e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div
-              className={`${calendarSelectWidth} max-w-[50%] max-sm:w-full max-sm:max-w-full`}
-            >
-              <Combobox
-                options={calendarOptions}
-                value={formData.calendarName}
-                onValueChange={(value) => updateFormData('calendarName', value)}
-                placeholder="Select calendar..."
-                searchPlaceholder="Search calendars..."
-                emptyText="No calendars found."
-                className="w-full"
-              />
-            </div>
-          </div>
+          <div className="space-y-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Schedule
+            </p>
 
-          {/* Date and Time Selection. Wraps on narrow viewports (#46). */}
-          <div className="flex items-center gap-3 min-w-0 flex-wrap gap-y-2">
-            <CustomDateInput
-              value={
-                formData.startDate
-                  ? format(formData.startDate, 'yyyy-MM-dd')
-                  : ''
-              }
-              onChange={handleStartDateChange}
-              className="w-auto"
-            />
-            {!formData.allDay && (
-              <>
-                <AtSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <CustomTimeInput
-                  value={formData.startTime}
-                  onChange={handleStartTimeChange}
-                  className="w-auto"
+            {/* Event Name and Calendar Selection. Stacks below 640px (#46). */}
+            <div className="flex items-end gap-3 min-w-0 max-sm:flex-col max-sm:items-stretch">
+              <div className="flex-1 max-sm:w-full">
+                <Input
+                  ref={titleInputRef}
+                  id="event-title"
+                  placeholder="Event name"
+                  value={formData.title}
+                  onChange={(e) => updateFormData('title', e.target.value)}
+                  className="w-full"
                 />
-                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <CustomTimeInput
-                  value={formData.endTime}
-                  onChange={handleEndTimeChange}
-                  className="w-auto"
-                />
-              </>
-            )}
-            {formData.allDay && (
-              <>
-                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <CustomDateInput
-                  value={
-                    formData.endDate
-                      ? format(formData.endDate, 'yyyy-MM-dd')
-                      : ''
+              </div>
+              <div
+                className={`${calendarSelectWidth} max-w-[50%] max-sm:w-full max-sm:max-w-full`}
+              >
+                <Combobox
+                  options={calendarOptions}
+                  value={formData.calendarName}
+                  onValueChange={(value) =>
+                    updateFormData('calendarName', value)
                   }
-                  onChange={handleEndDateChange}
-                  className="w-auto"
+                  placeholder="Select calendar..."
+                  searchPlaceholder="Search calendars..."
+                  emptyText="No calendars found."
+                  className="w-full"
                 />
-              </>
-            )}
-          </div>
-
-          {/* Date Display Mode (affects tag text only across app) */}
-          <div className="flex items-center gap-2">
-            <Label className="text-sm">Display</Label>
-            <Select
-              value={dateDisplayMode}
-              onValueChange={(v) =>
-                useSettingsStore
-                  .getState()
-                  .setDateDisplayMode(v as DateDisplayMode)
-              }
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Relative" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="relative">Relative</SelectItem>
-                <SelectItem value="absolute">Absolute</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* All Day + Repeat + Ends row */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="all-day"
-                checked={formData.allDay}
-                onCheckedChange={handleAllDayChange}
-              />
-              <Label htmlFor="all-day" className="text-sm font-medium">
-                All day
-              </Label>
+              </div>
             </div>
+
+            {/* Date and Time Selection. Wraps on narrow viewports (#46). */}
+            <div className="flex items-center gap-3 min-w-0 flex-wrap gap-y-2">
+              <CustomDateInput
+                value={
+                  formData.startDate
+                    ? format(formData.startDate, 'yyyy-MM-dd')
+                    : ''
+                }
+                onChange={handleStartDateChange}
+                className="w-auto"
+              />
+              {!formData.allDay && (
+                <>
+                  <AtSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <CustomTimeInput
+                    value={formData.startTime}
+                    onChange={handleStartTimeChange}
+                    className="w-auto"
+                  />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <CustomTimeInput
+                    value={formData.endTime}
+                    onChange={handleEndTimeChange}
+                    className="w-auto"
+                  />
+                </>
+              )}
+              {formData.allDay && (
+                <>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <CustomDateInput
+                    value={
+                      formData.endDate
+                        ? format(formData.endDate, 'yyyy-MM-dd')
+                        : ''
+                    }
+                    onChange={handleEndDateChange}
+                    className="w-auto"
+                  />
+                </>
+              )}
+            </div>
+            {!formData.allDay && formData.startTime >= formData.endTime && (
+              <p className="text-xs text-destructive">
+                End time must be after start time.
+              </p>
+            )}
+
+            {/* Date Display Mode: a global preference riding along with
+                per-event fields, not an event property — demoted via the
+                caption so it visibly reads as different in kind. */}
             <div className="flex items-center gap-2">
+              <Label className="text-sm">
+                Display{' '}
+                <span className="text-ink-muted text-[11px] font-normal">
+                  · all events
+                </span>
+              </Label>
               <Select
-                value={currentFrequency}
-                onValueChange={(val) =>
-                  handleFrequencyChange(
-                    val as 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
-                  )
+                value={dateDisplayMode}
+                onValueChange={(v) =>
+                  useSettingsStore
+                    .getState()
+                    .setDateDisplayMode(v as DateDisplayMode)
                 }
               >
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Never repeats" />
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Relative" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Never repeats</SelectItem>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>Frequency</SelectLabel>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
-                  </SelectGroup>
+                  <SelectItem value="relative">Relative</SelectItem>
+                  <SelectItem value="absolute">Absolute</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {currentFrequency !== 'none' && (
+
+            {/* All Day + Repeat + Ends row */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="all-day"
+                  checked={formData.allDay}
+                  onCheckedChange={handleAllDayChange}
+                />
+                <Label htmlFor="all-day" className="text-sm font-medium">
+                  All day
+                </Label>
+              </div>
               <div className="flex items-center gap-2">
                 <Select
-                  value={currentEnds}
+                  value={currentFrequency}
                   onValueChange={(val) =>
-                    handleEndsChangeTopRow(val as 'never' | 'on' | 'after')
+                    handleFrequencyChange(
+                      val as 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+                    )
                   }
                 >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Never ends" />
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Never repeats" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="never">Never ends</SelectItem>
-                    <SelectItem value="on">On date…</SelectItem>
-                    <SelectItem value="after">After N occurrences…</SelectItem>
+                    <SelectItem value="none">Never repeats</SelectItem>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>Frequency</SelectLabel>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
-                {currentEnds === 'on' && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Calendar className="h-4 w-4" />
-                        {(() => {
-                          const parsed = formData.recurrence
-                            ? parseRRule(formData.recurrence)
-                            : null;
-                          return parsed?.until
-                            ? format(parsed.until, 'yyyy-MM-dd')
-                            : 'Pick date';
-                        })()}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={
-                          (formData.recurrence &&
-                            parseRRule(formData.recurrence)?.until) ||
-                          undefined
-                        }
-                        onSelect={(d) => {
-                          if (!formData.recurrence || !d) return;
-                          const parsed = parseRRule(formData.recurrence);
-                          if (!parsed) return;
-                          const startDateTime =
-                            getStartDateTime() || new Date();
-                          const next: RecurrenceEditorOptions = {
-                            ...parsed,
-                            until: d,
-                          };
-                          updateFormData(
-                            'recurrence',
-                            generateRRule(next, startDateTime)
-                          );
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
+              </div>
+              {currentFrequency !== 'none' && (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={currentEnds}
+                    onValueChange={(val) =>
+                      handleEndsChangeTopRow(val as 'never' | 'on' | 'after')
+                    }
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Never ends" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never ends</SelectItem>
+                      <SelectItem value="on">On date…</SelectItem>
+                      <SelectItem value="after">
+                        After N occurrences…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {currentEnds === 'on' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          {(() => {
+                            const parsed = formData.recurrence
+                              ? parseRRule(formData.recurrence)
+                              : null;
+                            return parsed?.until
+                              ? format(parsed.until, 'yyyy-MM-dd')
+                              : 'Pick date';
+                          })()}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarPicker
+                          mode="single"
+                          selected={
+                            (formData.recurrence &&
+                              parseRRule(formData.recurrence)?.until) ||
+                            undefined
+                          }
+                          onSelect={(d) => {
+                            if (!formData.recurrence || !d) return;
+                            const parsed = parseRRule(formData.recurrence);
+                            if (!parsed) return;
+                            const startDateTime =
+                              getStartDateTime() || new Date();
+                            const next: RecurrenceEditorOptions = {
+                              ...parsed,
+                              until: d,
+                            };
+                            updateFormData(
+                              'recurrence',
+                              generateRRule(next, startDateTime)
+                            );
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Advanced Recurrence Options - should appear directly under repeat row */}
+            {currentFrequency !== 'none' && (
+              <div className="animate-in fade-in-0 slide-in-from-top-2 duration-[var(--dur-3)] ease-[var(--ease-settle)]">
+                <RecurrenceSection
+                  startDateTime={getStartDateTime()}
+                  value={formData.recurrence}
+                  onChange={(rrule) =>
+                    updateFormData('recurrence', rrule || undefined)
+                  }
+                  onClearExceptions={() => updateFormData('exceptions', [])}
+                  exceptions={formData.exceptions || []}
+                  showSummary={false}
+                  endsControlled={true}
+                />
               </div>
             )}
           </div>
 
-          {/* Advanced Recurrence Options - should appear directly under repeat row */}
-          {currentFrequency !== 'none' && (
-            <RecurrenceSection
-              startDateTime={getStartDateTime()}
-              value={formData.recurrence}
-              onChange={(rrule) =>
-                updateFormData('recurrence', rrule || undefined)
-              }
-              onClearExceptions={() => updateFormData('exceptions', [])}
-              exceptions={formData.exceptions || []}
-              showSummary={false}
-              endsControlled={true}
-            />
-          )}
+          <div className="border-t border-hairline" />
 
-          {/* Location */}
-          <div className="relative min-w-0">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={formData.location}
-              onChange={(e) => updateFormData('location', e.target.value)}
-              placeholder="Add location"
-              className="pl-10"
-            />
-          </div>
+          <div className="space-y-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Details
+            </p>
 
-          {/* Description (WYSIWYG) - full width, no leading icon */}
-          <div className="min-w-0">
-            <RichTextEditor
-              ariaLabel="Event description"
-              value={formData.description}
-              onChange={(html) => updateFormData('description', html)}
-              placeholder="Add description"
-              minHeight={96}
-              className="text-base md:text-sm"
-            />
+            {/* Location */}
+            <div className="relative min-w-0">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={formData.location}
+                onChange={(e) => updateFormData('location', e.target.value)}
+                placeholder="Add location"
+                className="pl-10"
+              />
+            </div>
+
+            {/* Description (WYSIWYG) - full width, no leading icon */}
+            <div className="min-w-0">
+              <RichTextEditor
+                ariaLabel="Event description"
+                value={formData.description}
+                onChange={(html) => updateFormData('description', html)}
+                placeholder="Add description"
+                minHeight={96}
+                className="text-base md:text-sm"
+              />
+            </div>
           </div>
         </TabsContent>
 
@@ -953,10 +975,14 @@ function EventCreationDialogContent({
         </TabsContent>
       </Tabs>
 
-      {activeTab === 'event' && <ConflictWarning conflicts={conflicts} />}
+      {activeTab === 'event' && conflicts.length > 0 && (
+        <div className="animate-in fade-in-0 slide-in-from-top-2 duration-[var(--dur-3)] ease-[var(--ease-settle)]">
+          <ConflictWarning conflicts={conflicts} />
+        </div>
+      )}
 
       {activeTab === 'event' && (
-        <div className="flex justify-end gap-2 mt-6 border-t border-hairline pt-4 -mx-5 px-5">
+        <DialogFooter className="mt-6">
           <Button
             variant="outline"
             onClick={handleCancel}
@@ -976,113 +1002,91 @@ function EventCreationDialogContent({
                 ? 'Save'
                 : 'Create event'}
           </Button>
-        </div>
+        </DialogFooter>
       )}
 
       {/* Post-save scope dialog for editing recurring events */}
-      <AlertDialog open={scopeDialogOpen} onOpenChange={setScopeDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apply changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              This is a recurring event. Which events should be updated?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!initialEventData?.id || !pendingPayload) return;
-                // This event: exclude the occurrence, create one-off with changes
-                const iso = new Date(
-                  initialEventData.occurrenceInstanceStart ||
-                    initialEventData.start!
-                ).toISOString();
-                const exceptions = Array.from(
-                  new Set([...(initialEventData.exceptions || []), iso])
-                );
-                await updateEventMutation.mutateAsync({
-                  id: initialEventData.id as string,
-                  data: { exceptions },
-                });
-                await createEventMutation.mutateAsync({
-                  title: pendingPayload.data.title,
-                  start: pendingPayload.start,
-                  end: pendingPayload.end,
-                  allDay: pendingPayload.data.allDay,
-                  description: pendingPayload.data.description,
-                  location: pendingPayload.data.location,
-                  calendarName: pendingPayload.data.calendarName,
-                  color: initialEventData.color,
-                });
-                setScopeDialogOpen(false);
-                onClose();
-              }}
-            >
-              This event
-            </AlertDialogAction>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!initialEventData?.id || !pendingPayload) return;
-                // This and following: clamp rule to UNTIL just before this occurrence, then create follow-up updated rule if needed
-                const occStart = new Date(
-                  initialEventData.occurrenceInstanceStart ||
-                    initialEventData.start!
-                );
-                const clamped = clampRRuleUntil(
-                  initialEventData.recurrence!,
-                  occStart
-                );
-                await updateEventMutation.mutateAsync({
-                  id: initialEventData.id as string,
-                  data: { recurrence: clamped },
-                });
-                // Create a new event to represent the updated rule from this point forward if user kept a recurrence.
-                await createEventMutation.mutateAsync({
-                  title: pendingPayload.data.title,
-                  start: pendingPayload.start,
-                  end: pendingPayload.end,
-                  allDay: pendingPayload.data.allDay,
-                  description: pendingPayload.data.description,
-                  location: pendingPayload.data.location,
-                  calendarName: pendingPayload.data.calendarName,
-                  color: initialEventData.color,
-                  recurrence: pendingPayload.data.recurrence,
-                });
-                setScopeDialogOpen(false);
-                onClose();
-              }}
-            >
-              This and following
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={async () => {
-                if (!initialEventData?.id || !pendingPayload) return;
-                // All events: update the master with new values
-                await updateEventMutation.mutateAsync({
-                  id: initialEventData.id as string,
-                  data: {
-                    title: pendingPayload.data.title,
-                    start: pendingPayload.start,
-                    end: pendingPayload.end,
-                    allDay: pendingPayload.data.allDay,
-                    description: pendingPayload.data.description,
-                    location: pendingPayload.data.location,
-                    calendarName: pendingPayload.data.calendarName,
-                    recurrence: pendingPayload.data.recurrence,
-                    exceptions: pendingPayload.data.exceptions,
-                  },
-                });
-                setScopeDialogOpen(false);
-                onClose();
-              }}
-            >
-              All events
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RecurrenceScopeDialog
+        open={scopeDialogOpen}
+        onOpenChange={setScopeDialogOpen}
+        title="Apply changes"
+        description="This is a recurring event. Which events should be updated?"
+        onThisEvent={async () => {
+          if (!initialEventData?.id || !pendingPayload) return;
+          // This event: exclude the occurrence, create one-off with changes
+          const iso = new Date(
+            initialEventData.occurrenceInstanceStart || initialEventData.start!
+          ).toISOString();
+          const exceptions = Array.from(
+            new Set([...(initialEventData.exceptions || []), iso])
+          );
+          await updateEventMutation.mutateAsync({
+            id: initialEventData.id as string,
+            data: { exceptions },
+          });
+          await createEventMutation.mutateAsync({
+            title: pendingPayload.data.title,
+            start: pendingPayload.start,
+            end: pendingPayload.end,
+            allDay: pendingPayload.data.allDay,
+            description: pendingPayload.data.description,
+            location: pendingPayload.data.location,
+            calendarName: pendingPayload.data.calendarName,
+            color: initialEventData.color,
+          });
+          setScopeDialogOpen(false);
+          onClose();
+        }}
+        onThisAndFollowing={async () => {
+          if (!initialEventData?.id || !pendingPayload) return;
+          // This and following: clamp rule to UNTIL just before this occurrence, then create follow-up updated rule if needed
+          const occStart = new Date(
+            initialEventData.occurrenceInstanceStart || initialEventData.start!
+          );
+          const clamped = clampRRuleUntil(
+            initialEventData.recurrence!,
+            occStart
+          );
+          await updateEventMutation.mutateAsync({
+            id: initialEventData.id as string,
+            data: { recurrence: clamped },
+          });
+          // Create a new event to represent the updated rule from this point forward if user kept a recurrence.
+          await createEventMutation.mutateAsync({
+            title: pendingPayload.data.title,
+            start: pendingPayload.start,
+            end: pendingPayload.end,
+            allDay: pendingPayload.data.allDay,
+            description: pendingPayload.data.description,
+            location: pendingPayload.data.location,
+            calendarName: pendingPayload.data.calendarName,
+            color: initialEventData.color,
+            recurrence: pendingPayload.data.recurrence,
+          });
+          setScopeDialogOpen(false);
+          onClose();
+        }}
+        onAllEvents={async () => {
+          if (!initialEventData?.id || !pendingPayload) return;
+          // All events: update the master with new values
+          await updateEventMutation.mutateAsync({
+            id: initialEventData.id as string,
+            data: {
+              title: pendingPayload.data.title,
+              start: pendingPayload.start,
+              end: pendingPayload.end,
+              allDay: pendingPayload.data.allDay,
+              description: pendingPayload.data.description,
+              location: pendingPayload.data.location,
+              calendarName: pendingPayload.data.calendarName,
+              recurrence: pendingPayload.data.recurrence,
+              exceptions: pendingPayload.data.exceptions,
+            },
+          });
+          setScopeDialogOpen(false);
+          onClose();
+        }}
+      />
     </>
   );
 }

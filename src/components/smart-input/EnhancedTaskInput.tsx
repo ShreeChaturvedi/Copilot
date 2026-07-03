@@ -7,7 +7,7 @@
  *
  * Key improvements over SmartTaskInput:
  * - Much larger, more spacious design (120px+ min height)
- * - Card-based container with proper shadows and borders
+ * - Floating-tier container with proper shadow and machined edge
  * - Multi-line textarea that auto-expands
  * - File upload zone with drag-and-drop
  * - Voice input button
@@ -19,6 +19,7 @@ import { ArrowUp } from 'lucide-react';
 //
 
 import { Button } from '@/components/ui/Button';
+import { Keycap } from '@/components/ui/Keycap';
 import { useTextParser } from './hooks/useTextParser';
 import { SmartTaskData } from './SmartTaskInput';
 import { EnhancedTaskInputLayout } from './components/EnhancedTaskInputLayout';
@@ -28,6 +29,7 @@ import { VoiceInputButton } from './components/VoiceInputButton';
 import { FileUploadButton } from './components/FileUploadButton';
 import { CompactFilePreview } from './components/CompactFilePreview';
 import { UploadedFile } from './components/FileUploadZone';
+import { DEFAULT_PRESET_COLOR } from '@/constants/colors';
 type TaskGroup = {
   id: string;
   name: string;
@@ -57,6 +59,11 @@ export interface EnhancedTaskInputProps {
   disabled?: boolean;
   className?: string;
   enableSmartParsing?: boolean;
+  /**
+   * @deprecated The confidence-dot/conflict-banner UI this once gated has
+   * been retired. Kept only so existing callers stay source-compatible; no
+   * longer read.
+   */
   showConfidence?: boolean;
   maxDisplayTags?: number;
   placeholder?: string;
@@ -81,7 +88,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   disabled = false,
   className = '',
   enableSmartParsing = true,
-  showConfidence = false,
   // maxDisplayTags = 5,
   placeholder = 'What would you like to work on?',
   onFilesAdded,
@@ -94,7 +100,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     useState(enableSmartParsing);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [, setIsFocused] = useState(false); // State maintained for potential future focus styling
   const baseTextRef = useRef('');
   const descriptionInputRef = useRef<HTMLInputElement>(null);
   // Track tags the user dismissed (we hide these without modifying the input text)
@@ -111,7 +116,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     error,
     tags: parsedTags,
     confidence,
-    hasConflicts,
     clear,
   } = useTextParser(inputText, {
     // If manual due date is set, suppress date/time detection but allow other tags
@@ -125,7 +129,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#0d97d5',
+    color: DEFAULT_PRESET_COLOR,
     description: 'Default task group',
   };
 
@@ -453,10 +457,14 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     />
   );
 
-  // Left side controls
+  // Left side controls: list picker, then a hairline divider, then the
+  // attach/parse pair -- "which list" and "how you're attaching/parsing"
+  // are two different clusters, not one undifferentiated group.
   const leftControls = (
     <>
       {taskGroupSelector}
+
+      <span className="w-px self-stretch my-1 bg-hairline" aria-hidden="true" />
 
       {/* File Upload Button */}
       {enableFileUpload && (
@@ -483,13 +491,9 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   const rightControls = (
     <>
       {hasContent && (
-        <div className="text-sm text-muted-foreground">
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">
-            ⇧
-          </kbd>
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded ml-0.5">
-            ⏎
-          </kbd>
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Keycap>⇧</Keycap>
+          <Keycap>⏎</Keycap>
           <span className="ml-1">for description</span>
         </div>
       )}
@@ -546,10 +550,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           placeholder={placeholder}
           disabled={disabled}
           onKeyPress={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          confidence={confidence}
-          showConfidence={showConfidence}
           enableSmartParsing={smartParsingEnabled}
           leftControls={leftControls}
           rightControls={rightControls}
@@ -587,16 +587,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
       {error && smartParsingEnabled && (
         <div className="mt-2 px-1">
           <div className="text-sm text-destructive">Parsing error: {error}</div>
-        </div>
-      )}
-
-      {/* Conflicts Warning */}
-      {hasConflicts && smartParsingEnabled && showConfidence && (
-        <div className="mt-2 px-1">
-          <div className="text-sm text-warning flex items-center gap-1">
-            <span className="w-3 h-3 inline-block rounded-full bg-warning" />
-            Some tags may overlap. Using highest confidence matches.
-          </div>
         </div>
       )}
     </div>

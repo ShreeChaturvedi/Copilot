@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/useAuthGuard';
+import { AuthGuardSpinner } from './AuthGuardSpinner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,16 +19,7 @@ export function ProtectedRoute({
     useRequireAuth(redirectTo);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Verifying your session...
-          </p>
-        </div>
-      </div>
-    );
+    return <AuthGuardSpinner label="Verifying your session..." />;
   }
 
   if (shouldRedirect && redirectPath) {

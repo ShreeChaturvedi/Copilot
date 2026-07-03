@@ -1,10 +1,14 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { SharedToggleButton, type ToggleOption } from '@/components/ui/SharedToggleButton';
+import {
+  SharedToggleButton,
+  type ToggleOption,
+} from '@/components/ui/SharedToggleButton';
 import { RangeSlider } from '@/components/ui/RangeSlider';
-import { useCalendarSettingsStore, type TimeRangeMode } from '@/stores/calendarSettingsStore';
+import { SettingsRow } from './SettingsRow';
+import {
+  useCalendarSettingsStore,
+  type TimeRangeMode,
+} from '@/stores/calendarSettingsStore';
 
 const MODE_OPTIONS: ToggleOption<TimeRangeMode>[] = [
   { value: 'default', label: 'Default' },
@@ -32,45 +36,44 @@ export function CalendarSettings() {
   }, [timeRangeMode, customStartHour, customEndHour]);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Calendar Time Range</CardTitle>
-          <CardDescription>
-            Control which hours are visible in the calendar time grid (week and day views).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="space-y-2">
-            <Label className="text-sm">Mode</Label>
-            <SharedToggleButton
-              currentValue={timeRangeMode}
-              options={MODE_OPTIONS}
-              onValueChange={(mode) => setTimeRangeMode(mode as TimeRangeMode)}
-              size="md"
+    <div className="space-y-5">
+      <SettingsRow
+        label="Mode"
+        description="Which hours are visible by default in week and day views"
+        align="start"
+      >
+        <SharedToggleButton
+          currentValue={timeRangeMode}
+          options={MODE_OPTIONS}
+          onValueChange={(mode) => setTimeRangeMode(mode as TimeRangeMode)}
+          size="md"
+        />
+      </SettingsRow>
+
+      {timeRangeMode === 'custom' && (
+        <SettingsRow
+          label="Custom range"
+          description="Drag to set the visible start and end hour"
+          align="start"
+        >
+          <div className="w-64 max-w-[60vw]">
+            <RangeSlider
+              min={0}
+              max={24}
+              step={1}
+              values={[customStartHour, customEndHour]}
+              onChange={([start, end]) => setCustomRange(start, end)}
             />
           </div>
+        </SettingsRow>
+      )}
 
-          {timeRangeMode === 'custom' && (
-            <div className="space-y-2">
-              <Label className="text-sm">Custom Range</Label>
-              <RangeSlider
-                min={0}
-                max={24}
-                step={1}
-                values={[customStartHour, customEndHour]}
-                onChange={([start, end]) => setCustomRange(start, end)}
-              />
-            </div>
-          )}
-
-          <Separator />
-
-          <div className="text-sm text-muted-foreground">
-            Visible Hours: <span className="font-medium text-foreground">{effectiveLabel}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between border-t border-hairline pt-4">
+        <span className="text-sm text-ink-muted">Visible hours</span>
+        <span className="font-mono text-[0.8125rem] tabular-nums text-foreground">
+          {effectiveLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -86,4 +89,3 @@ function formatHour(hour: number): string {
 }
 
 export default CalendarSettings;
-

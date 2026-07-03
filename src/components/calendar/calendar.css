@@ -40,6 +40,21 @@
 }
 
 /* ================================
+   NUMERALS — tabular by law (§2.2): every count/timestamp locks digit
+   width so a live-updating value never jitters the layout around it.
+   ================================ */
+
+.fc-daygrid-day-number,
+.day-header-number,
+.chip-time,
+.dim-note,
+.dim-time,
+.now-chip > span,
+.fc-list-event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================
    TODAY — the brightest surface is now (§4.4)
    Wash on the week-view body column and the month cell only: the all-day
    lane and header stay clean, and Day view gets NO wash (the disc and the
@@ -155,8 +170,13 @@
   font-weight: 500;
 }
 
+/* Quiet gridline hover — one wash strength shared by day cells and time
+   slots, so hover never competes with the today wash / now-line for
+   attention (design-brief §2.4). Inlines the --surface-hover formula
+   directly (4% ink, theme-adaptive since --ink itself flips); becomes a
+   pure var(--surface-hover) swap once that token is the norm app-wide. */
 .fc-daygrid-day:not(.fc-day-today):hover {
-  background-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  background-color: color-mix(in oklab, var(--ink) 4%, transparent);
 }
 
 /* "+2 more" — 11px mono (§4.4) */
@@ -205,7 +225,7 @@
 }
 
 .fc-timegrid-slot:hover {
-  background-color: color-mix(in oklab, var(--accent) 10%, transparent);
+  background-color: color-mix(in oklab, var(--ink) 4%, transparent);
 }
 
 /* Minor (:30) grid lines - hairline at half opacity (§4.4) */
@@ -621,10 +641,10 @@
 }
 
 .fc-list-empty {
-  background: transparent;
-  color: var(--muted-foreground);
-  text-align: center;
-  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem; /* was 2rem; the etched art wants more room than the old text-only message did */
 }
 
 /* ================================
@@ -645,7 +665,7 @@
   background-color: var(--popover);
   border: 1px solid var(--border);
   border-radius: var(--radius-card, 10px);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-popover);
 }
 
 .fc-popover-header {

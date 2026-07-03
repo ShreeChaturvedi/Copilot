@@ -97,6 +97,7 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
     (initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR
   );
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -106,6 +107,7 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
       setIcon(initialIcon ?? copy.defaultIcon);
       setSelectedColor((initialColor as ColorPreset) ?? DEFAULT_PRESET_COLOR);
       setShowIconPicker(false);
+      setNameTouched(false);
     }
   }, [
     open,
@@ -135,7 +137,7 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{titleLabel || copy.title}</DialogTitle>
@@ -175,8 +177,28 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
                   >
                     <Suspense
                       fallback={
-                        <div className="p-4 text-sm text-muted-foreground">
-                          Loading…
+                        <div className="p-4 text-sm text-muted-foreground flex items-center gap-1">
+                          Loading
+                          <span className="flex gap-0.5">
+                            <span
+                              className="animate-pulse"
+                              style={{ animationDelay: '0ms' }}
+                            >
+                              .
+                            </span>
+                            <span
+                              className="animate-pulse"
+                              style={{ animationDelay: '150ms' }}
+                            >
+                              .
+                            </span>
+                            <span
+                              className="animate-pulse"
+                              style={{ animationDelay: '300ms' }}
+                            >
+                              .
+                            </span>
+                          </span>
                         </div>
                       }
                     >
@@ -206,12 +228,17 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
                   name="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onBlur={() => setNameTouched(true)}
                   placeholder={copy.namePlaceholder}
                   className="flex-1"
                   autoFocus
                   required
+                  aria-invalid={nameTouched && !name.trim()}
                 />
               </div>
+              {nameTouched && !name.trim() && (
+                <p className="text-xs text-destructive">Name is required.</p>
+              )}
             </div>
 
             {/* The ten curated 24px swatches (§2.4) */}
@@ -227,7 +254,7 @@ export const CreateCollectionDialog: React.FC<CreateCollectionDialogProps> = ({
                       onClick={() => setSelectedColor(color)}
                       aria-label={COLOR_PRESET_NAMES[color]}
                       aria-pressed={selected}
-                      className="h-6 w-6 rounded-full transition-shadow duration-150 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+                      className="h-6 w-6 rounded-full transition-shadow duration-150 outline-none hover:shadow-[0_0_0_2px_var(--surface-3),0_0_0_3px_var(--hairline-strong)] focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1"
                       style={{
                         backgroundColor: color,
                         boxShadow: selected

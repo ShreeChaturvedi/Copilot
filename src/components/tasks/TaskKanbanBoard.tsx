@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
 import { ScheduleTaskDialog } from './ScheduleTaskDialog';
 import {
@@ -201,9 +202,10 @@ const CardBody: React.FC<CardBodyProps> = ({ task, menu }) => {
 };
 
 export const TaskKanbanBoard: React.FC = () => {
-  const { tasks, activeTaskGroupId, taskGroups } = useTaskManagement({
-    includeTaskOperations: true,
-  });
+  const { tasks, tasksLoading, activeTaskGroupId, taskGroups } =
+    useTaskManagement({
+      includeTaskOperations: true,
+    });
   const { updateTask, deleteTask, scheduleTask } = useTasks();
   const { selectedKanbanTaskListId } = useUIStore();
   const setEnhancedInputVisible = useSettingsStore(
@@ -271,6 +273,11 @@ export const TaskKanbanBoard: React.FC = () => {
     });
     return result;
   }, [tasks, selectedListId, moves]);
+
+  /* All 3 columns empty at once (e.g. a freshly created list): the whole-
+     board Scene message takes over from the 3x redundant per-column
+     ghost (§2.3.6, desktop only — see kanban.css). */
+  const isBoardEmpty = COLUMN_ORDER.every((k) => grouped[k].length === 0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -469,12 +476,17 @@ export const TaskKanbanBoard: React.FC = () => {
     const isEmpty = columnTasks.length === 0;
     const dragging = drag !== null;
     const showGap = drag !== null && !isEmpty && isOver && drag.from !== keyId;
+    // Whole-column drag-over wash (§2.4): faint aqua across the entire
+    // target column, not just the insertion point.
+    const isTarget = drag !== null && drag.from !== keyId;
 
     return (
       <section
         className={cn(
           'kanban-column h-full flex flex-col min-w-[calc(100vw-56px)] md:min-w-0',
-          'snap-start md:snap-align-none'
+          'snap-start md:snap-align-none',
+          isTarget && 'kanban-column--target',
+          isTarget && isOver && 'kanban-column--target-over'
         )}
         aria-label={COLUMN_LABELS[keyId]}
       >
@@ -578,15 +590,60 @@ export const TaskKanbanBoard: React.FC = () => {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
+          data-board-empty={(!tasksLoading && isBoardEmpty) || undefined}
           className={cn(
-            'flex-1 min-h-0 flex overflow-x-auto gap-4 px-4 pt-3',
+            'flex-1 min-h-0 flex overflow-x-auto gap-4 px-4 pt-4',
             'snap-x snap-mandatory',
             'md:grid md:grid-cols-3 md:overflow-x-visible md:snap-none'
           )}
         >
-          <Column keyId="not_started" />
-          <Column keyId="in_progress" />
-          <Column keyId="done" />
+          {tasksLoading ? (
+            COLUMN_ORDER.map((key) => (
+              <div
+                key={key}
+                aria-hidden="true"
+                className="flex-1 flex flex-col gap-2 min-w-0"
+              >
+                <div className="kanban-col-header">
+                  <Skeleton className="h-3.5 w-20" />
+                </div>
+                <Skeleton className="h-14 rounded-card" />
+                <Skeleton className="h-14 rounded-card" />
+              </div>
+            ))
+          ) : (
+            <>
+              <Column keyId="not_started" />
+              <Column keyId="in_progress" />
+              <Column keyId="done" />
+
+              {isBoardEmpty && (
+                <div className="kanban-board-empty">
+                  <div
+                    className="flex items-center gap-2 mb-3"
+                    aria-hidden="true"
+                  >
+                    <span className="h-14 w-10 rounded-md border border-dashed border-etch-strong" />
+                    <span className="h-14 w-10 rounded-md border border-dashed border-etch-strong" />
+                    <span className="h-14 w-10 rounded-md border border-dashed border-etch-strong" />
+                  </div>
+                  <p className="font-serif text-lg leading-[1.3] text-ink">
+                    Nothing on the board yet.
+                  </p>
+                  <p className="text-sm text-ink-muted mt-1">
+                    Add a task to get moving.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-3 gap-1.5"
+                    onClick={handleNewTask}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> New task
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* 3 pager dots, mobile only */}

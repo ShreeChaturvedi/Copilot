@@ -26,6 +26,7 @@ import { expandOccurrences } from '@/utils/recurrence';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useCalendarSettingsStore } from '@/stores/calendarSettingsStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { UpcomingEmptyState } from '@/components/tasks/UpcomingTasksEmpty';
 
 /** Mono chip time, 24h zero-padded per the §3 numeral law ("09:30"). */
 const fmtChipTime = (d: Date): string =>
@@ -642,7 +643,7 @@ export const CalendarView = ({
               setTimeout(updateNowOverlay, 50);
             }}
             themeSystem="standard"
-            dayCellClassNames="hover:bg-accent/50 cursor-pointer transition-colors duration-200"
+            dayCellClassNames="cursor-pointer"
             eventClassNames={(arg) => {
               const classes = ['cursor-pointer'];
               const xp = (
@@ -733,6 +734,12 @@ export const CalendarView = ({
                 </div>
               );
             }}
+            noEventsContent={() => (
+              <UpcomingEmptyState
+                voice="The list is clear."
+                note="No events in this range."
+              />
+            )}
             aspectRatio={isMobile ? 1.0 : undefined}
             handleWindowResize={true}
             contentHeight="100%"

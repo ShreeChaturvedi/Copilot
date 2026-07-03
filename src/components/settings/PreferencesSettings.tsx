@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/Button';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -19,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/Select';
 import { Loader2 } from 'lucide-react';
+import { SettingsRow } from './SettingsRow';
 import { userAPI, type UserPreferences } from '@/services/api/user';
 
 const WEEK_DAYS = [
@@ -33,6 +26,10 @@ export function PreferencesSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // Mirrors ProfileSettings' form.formState.isDirty: this panel buffers
+  // edits locally and only persists on explicit Save, so it needs its own
+  // dirty flag to warn a user who edits and closes without saving (#1.F).
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -61,6 +58,7 @@ export function PreferencesSettings() {
   ) => {
     setPreferences((prev) => (prev ? { ...prev, [key]: value } : prev));
     setSuccess(false);
+    setIsDirty(true);
   };
 
   const handleSave = async () => {
@@ -79,6 +77,7 @@ export function PreferencesSettings() {
       });
       setPreferences(saved);
       setSuccess(true);
+      setIsDirty(false);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       setError(
@@ -89,131 +88,139 @@ export function PreferencesSettings() {
     }
   };
 
+  if (loading) {
+    // Shape-matched skeletons instead of a spinner+text block, matching
+    // IntegrationsSettings' already-correct loading precedent (§1.F).
+    return (
+      <div>
+        <div className="flex items-center justify-between gap-4 py-3.5">
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+          <Skeleton className="h-8 w-40" />
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3.5 border-t border-hairline">
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-3 w-36" />
+          </div>
+          <Skeleton className="h-8 w-40" />
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3.5 border-t border-hairline">
+          <Skeleton className="h-3.5 w-32" />
+          <Skeleton className="h-5 w-9 rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!preferences) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {error ?? 'Could not load preferences.'}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Workspace Preferences</CardTitle>
-          <CardDescription>
-            Defaults applied to your workspace. These are saved to your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading preferences...
-            </div>
-          ) : preferences ? (
-            <>
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="default-view">Default View</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Which view opens when you start the app
-                  </p>
-                </div>
-                <div className="min-w-40">
-                  <Select
-                    value={preferences.defaultView}
-                    onValueChange={(v) =>
-                      update('defaultView', v as UserPreferences['defaultView'])
-                    }
-                  >
-                    <SelectTrigger id="default-view" className="w-full">
-                      <SelectValue placeholder="Select default view" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="calendar">Calendar View</SelectItem>
-                      <SelectItem value="tasks">Task View</SelectItem>
-                      <SelectItem value="last-used">
-                        Remember Last Used
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+    <div>
+      <div className="divide-y divide-hairline">
+        <SettingsRow
+          label="Default View"
+          description="Which view opens when you start the app"
+          htmlFor="default-view"
+        >
+          <Select
+            value={preferences.defaultView}
+            onValueChange={(v) =>
+              update('defaultView', v as UserPreferences['defaultView'])
+            }
+          >
+            <SelectTrigger id="default-view" className="w-44">
+              <SelectValue placeholder="Select default view" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="calendar">Calendar View</SelectItem>
+              <SelectItem value="tasks">Task View</SelectItem>
+              <SelectItem value="last-used">Remember Last Used</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
 
-              <Separator />
+        <SettingsRow
+          label="Week Starts On"
+          description="First day of the week in calendar views"
+          htmlFor="week-start"
+        >
+          <Select
+            value={String(preferences.weekStartsOn)}
+            onValueChange={(v) => update('weekStartsOn', Number(v))}
+          >
+            <SelectTrigger id="week-start" className="w-44">
+              <SelectValue placeholder="Select day" />
+            </SelectTrigger>
+            <SelectContent>
+              {WEEK_DAYS.map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingsRow>
 
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="week-start">Week Starts On</Label>
-                  <p className="text-sm text-muted-foreground">
-                    First day of the week in calendar views
-                  </p>
-                </div>
-                <div className="min-w-40">
-                  <Select
-                    value={String(preferences.weekStartsOn)}
-                    onValueChange={(v) => update('weekStartsOn', Number(v))}
-                  >
-                    <SelectTrigger id="week-start" className="w-full">
-                      <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WEEK_DAYS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>
-                          {d.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+        <SettingsRow
+          label="Desktop Notifications"
+          description="Receive notifications for upcoming events and tasks"
+          htmlFor="notifications"
+        >
+          <Switch
+            id="notifications"
+            checked={preferences.notificationsEnabled}
+            onCheckedChange={(checked) =>
+              update('notificationsEnabled', checked)
+            }
+          />
+        </SettingsRow>
+      </div>
 
-              <Separator />
+      <div className="mt-4 space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notifications">Desktop Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications for upcoming events and tasks
-                  </p>
-                </div>
-                <Switch
-                  id="notifications"
-                  checked={preferences.notificationsEnabled}
-                  onCheckedChange={(checked) =>
-                    update('notificationsEnabled', checked)
-                  }
-                />
-              </div>
+        {success && (
+          <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
+            <AlertDescription>Preferences saved.</AlertDescription>
+          </Alert>
+        )}
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+        <div className="flex items-center justify-between border-t border-hairline pt-4">
+          <span className="text-sm">
+            {isDirty && (
+              <span className="text-warning">You have unsaved changes</span>
+            )}
+          </span>
+          <div className="flex flex-col items-end gap-1">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Preferences'
               )}
-
-              {success && (
-                <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
-                  <AlertDescription>Preferences saved.</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Preferences'
-                  )}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {error ?? 'Could not load preferences.'}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+            </Button>
+            <p className="text-xs text-ink-muted">Saved to your account</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { EASE_SETTLE, DUR_2_S } from '@/lib/motion';
 import { SettingsNav } from './SettingsNav';
 import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
@@ -42,6 +44,7 @@ export function SettingsDialog({
   // Below 768px settings is a list -> detail push (#48): the nav is the
   // first screen, a section choice slides the detail pane in over it.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   // Update active section when defaultSection changes and dialog opens
   useEffect(() => {
@@ -114,8 +117,12 @@ export function SettingsDialog({
           <aside
             className={cn(
               'absolute inset-0 w-full overflow-y-auto p-4 bg-surface-3',
-              'transition-transform duration-[240ms] ease-settle motion-reduce:transition-none',
-              'md:static md:w-64 md:shrink-0 md:translate-x-0 md:border-r md:border-hairline md:bg-surface-2/50',
+              'transition-transform motion-reduce:transition-none',
+              // Close (~70%) is faster than open, never the reverse (§3.1).
+              mobileDetailOpen
+                ? 'duration-[240ms] ease-settle'
+                : 'duration-[160ms] ease-out',
+              'md:static md:w-64 md:shrink-0 md:translate-x-0 md:border-r md:border-hairline md:bg-surface-2',
               mobileDetailOpen && '-translate-x-1/4 md:translate-x-0'
             )}
             aria-hidden={mobileDetailOpen ? true : undefined}
@@ -130,7 +137,11 @@ export function SettingsDialog({
           <section
             className={cn(
               'absolute inset-0 w-full overflow-y-auto bg-surface-3',
-              'transition-transform duration-[240ms] ease-settle motion-reduce:transition-none',
+              'transition-transform motion-reduce:transition-none',
+              // Close (~70%) is faster than open, never the reverse (§3.1).
+              mobileDetailOpen
+                ? 'duration-[240ms] ease-settle'
+                : 'duration-[160ms] ease-out',
               'md:static md:flex-1 md:translate-x-0',
               mobileDetailOpen
                 ? 'translate-x-0 shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.4)] md:shadow-none'
@@ -169,7 +180,17 @@ export function SettingsDialog({
                     'Get help, documentation, and support'}
                 </p>
               </div>
-              {renderContent()}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={activeSection}
+                  initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                  transition={{ duration: DUR_2_S, ease: EASE_SETTLE }}
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </section>
         </div>

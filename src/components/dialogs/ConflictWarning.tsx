@@ -19,15 +19,15 @@ export function ConflictWarning({ conflicts }: ConflictWarningProps) {
   return (
     <div
       role="alert"
-      className="mt-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+      className="mt-4 rounded-card border border-warning/40 bg-warning/10 p-3 text-sm"
     >
       <div className="flex items-center gap-2 font-medium text-foreground">
-        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
         {conflicts.length === 1
           ? 'This time overlaps 1 existing event'
           : `This time overlaps ${conflicts.length} existing events`}
       </div>
-      <ul className="mt-2 space-y-1 text-foreground/90">
+      <ul className="mt-2 space-y-1 text-ink-2">
         {conflicts.map((conflict) => {
           const ev = conflict.conflictingEvent;
           return (
@@ -35,7 +35,7 @@ export function ConflictWarning({ conflicts }: ConflictWarningProps) {
               <span className="font-medium">
                 {ev.title || 'Untitled event'}
               </span>
-              <span className="text-xs opacity-80">
+              <span className="text-xs text-ink-muted">
                 {ev.allDay
                   ? 'All day'
                   : `${format(new Date(ev.start), 'MMM d, h:mm a')} - ${format(

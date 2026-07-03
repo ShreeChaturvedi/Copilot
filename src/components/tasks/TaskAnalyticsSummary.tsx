@@ -4,9 +4,20 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
 import { Circle, PlayCircle, CheckCircle2 } from 'lucide-react';
-import { useThemeStore } from '@/stores/themeStore';
+import {
+  Tooltip as UiTooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { ANALYTICS_STATUS_COLORS } from '@/constants/analyticsColors';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useTaskStats } from '@/hooks/useTaskStats';
 import { useUIStore } from '@/stores/uiStore';
@@ -18,8 +29,6 @@ interface ChartData {
   value: number;
   color: string;
 }
-
-// (removed unused local CustomTooltip in favor of portal-based tooltip)
 
 /**
  * Custom tooltip component for the pie chart
@@ -44,7 +53,7 @@ function CustomPieTooltip({
   const percent = total > 0 ? (value / total) * 100 : 0;
 
   return (
-    <div className="rounded-md border bg-popover text-popover-foreground shadow-md px-2.5 py-2 text-xs pointer-events-none z-50">
+    <div className="rounded-md border border-hairline bg-popover text-popover-foreground [box-shadow:var(--shadow-popover)] px-2.5 py-2 text-xs pointer-events-none z-50">
       <div className="flex items-center gap-2">
         <span
           className="inline-block h-2.5 w-2.5 rounded-sm"
@@ -54,12 +63,15 @@ function CustomPieTooltip({
       </div>
       <div className="mt-1 flex items-center gap-3 text-muted-foreground">
         <span>
-          Count: <span className="text-foreground font-medium">{value}</span>
+          Count:{' '}
+          <span className="text-foreground font-medium tabular-nums">
+            {value}
+          </span>
         </span>
         <span className="opacity-40">|</span>
         <span>
           Percent:{' '}
-          <span className="text-foreground font-medium">
+          <span className="text-foreground font-medium tabular-nums">
             {percent.toFixed(1)}%
           </span>
         </span>
@@ -109,26 +121,31 @@ function TaskAnalyticsSummaryComponent() {
     return 'Selected List';
   }, [scopedListId, taskGroups]);
 
-  // Use actual hex colors - CSS variables don't work in Recharts SVG elements.
-  // Values are the SETTLE tokens (design-brief 2.2/2.3): done = aqua
-  // (success), in progress = warning amber, not started = faint.
-  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  // Shared analytics palette (design-brief §2.2/2.3): done = aqua (success),
+  // in progress = warning amber, not started = faint. These are the same
+  // `var(--token)` strings TaskAnalyticsDialog.tsx already proves resolve
+  // correctly inside Recharts SVG fill/stroke props, so both themes stay in
+  // sync with zero JS branching — no resolvedTheme subscription needed.
   const chartData: ChartData[] = useMemo(
     () =>
       [
         {
           name: 'Done',
           value: stats.done,
-          color: resolvedTheme === 'dark' ? '#1bbeaa' : '#1a7c70',
+          color: ANALYTICS_STATUS_COLORS.done,
         },
-        { name: 'In progress', value: stats.inProgress, color: '#d6a62e' },
+        {
+          name: 'In progress',
+          value: stats.inProgress,
+          color: ANALYTICS_STATUS_COLORS.inProgress,
+        },
         {
           name: 'Not started',
           value: stats.notStarted,
-          color: resolvedTheme === 'dark' ? '#5e6868' : '#94a1a3',
+          color: ANALYTICS_STATUS_COLORS.notStarted,
         },
       ].filter((item) => item.value > 0),
-    [stats.done, stats.inProgress, stats.notStarted, resolvedTheme]
+    [stats.done, stats.inProgress, stats.notStarted]
   );
 
   const totalCount = stats.done + stats.inProgress + stats.notStarted;
@@ -139,7 +156,7 @@ function TaskAnalyticsSummaryComponent() {
       <section
         role="region"
         aria-label="Task analytics summary"
-        className="rounded-md border bg-card text-card-foreground px-3 py-2"
+        className="rounded-card border bg-card text-card-foreground px-3 py-2"
       >
         <div className="flex items-center gap-3">
           <div className="w-[60px] h-[60px] flex-shrink-0 animate-pulse bg-muted rounded-full" />
@@ -152,31 +169,54 @@ function TaskAnalyticsSummaryComponent() {
     );
   }
 
-  // Handle empty state
+  // Handle empty state — etched donut + Sentient voice line (design-brief §4,
+  // one of the six plain-text empty states this redesign closes).
   if (stats.total === 0) {
     return (
       <section
         role="region"
         aria-label="Task analytics summary"
         aria-describedby="analytics-empty-description"
-        className="group rounded-md border bg-card text-card-foreground px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
-        tabIndex={0}
+        className="rounded-card border bg-card text-card-foreground px-3 py-2"
       >
         <div className="flex items-center gap-3">
-          {/* Empty ring chart placeholder */}
+          {/* Etched ring — same 60px footprint/ring geometry as the live
+              donut (innerRadius 18 / outerRadius 28 → center ~23, thickness
+              ~9), so the moment a task exists the literal shape resolves
+              into the real chart (the same etch-resolves-to-real device
+              ScheduleEmptyArt uses for its dashed rows → aqua check). */}
           <div className="w-[60px] h-[60px] flex-shrink-0 flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full border-2 border-muted-foreground/30" />
+            <svg
+              viewBox="0 0 60 60"
+              width="60"
+              height="60"
+              role="img"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle
+                cx="30"
+                cy="30"
+                r="23"
+                fill="none"
+                stroke="var(--etch-strong)"
+                strokeWidth="9"
+                strokeDasharray="3 4"
+              />
+            </svg>
           </div>
 
           {/* Empty state text */}
           <div className="flex-1 min-w-0 space-y-1">
-            <div className="font-semibold text-base text-foreground">
+            <div className="font-semibold text-base text-foreground truncate">
               {contextLabel}
             </div>
-            <div className="text-sm text-muted-foreground">No tasks yet</div>
-            <div className="text-xs text-muted-foreground">
-              Create tasks to see analytics
-            </div>
+            <p className="font-serif text-base leading-[1.3] text-ink">
+              Nothing to chart yet.
+            </p>
+            <p className="text-xs leading-[18px] text-ink-muted">
+              Create a task to see it here.
+            </p>
           </div>
         </div>
 
@@ -194,15 +234,18 @@ function TaskAnalyticsSummaryComponent() {
         role="region"
         aria-label="Task analytics summary"
         aria-describedby="analytics-description"
-        className="group rounded-md border bg-card text-card-foreground px-3 py-2 hover:bg-accent/40 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer hover:shadow-sm"
+        className="rounded-card border bg-card text-card-foreground px-3 py-2 hover:bg-surface-hover transition-colors duration-200 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 cursor-pointer"
         tabIndex={0}
         onClick={() => {
           setAnalyticsDialogOpen(true);
         }}
       >
         <div className="flex items-center gap-3">
-          {/* Left: Donut Chart */}
-          <div className="w-[60px] h-[60px] flex-shrink-0">
+          {/* Left: Donut Chart, with the completion % as its center payoff
+              (design-brief §2.1 stat-tile pairing: the number is the loudest
+              element, plain Inter/mono-numeral, never rendered inside the
+              chart's own hue). */}
+          <div className="relative w-[60px] h-[60px] flex-shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -215,6 +258,9 @@ function TaskAnalyticsSummaryComponent() {
                   outerRadius={28}
                   paddingAngle={1}
                   stroke="none"
+                  isAnimationActive
+                  animationDuration={240}
+                  animationEasing="ease-out"
                 >
                   {chartData.map((entry, index) => (
                     <Cell
@@ -224,13 +270,18 @@ function TaskAnalyticsSummaryComponent() {
                     />
                   ))}
                 </Pie>
-                <Tooltip
+                <RechartsTooltip
                   content={<CustomPieTooltip total={totalCount} />}
                   cursor={{ fill: 'transparent' }}
                   wrapperStyle={{ zIndex: 9999 }}
                 />
               </PieChart>
             </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="font-mono text-[13px] font-semibold text-ink tabular-nums">
+                {stats.completionPct}%
+              </span>
+            </div>
           </div>
 
           {/* Right: Textual Stats */}
@@ -242,60 +293,69 @@ function TaskAnalyticsSummaryComponent() {
 
             {/* Progress section */}
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  <span className="font-mono">
-                    {stats.completed} / {stats.total}
-                  </span>{' '}
-                  completed
-                </span>
-                <span className="text-xs font-medium font-mono text-success">
-                  {stats.completionPct}%
-                </span>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                <span className="font-mono tabular-nums">
+                  {stats.completed} / {stats.total}
+                </span>{' '}
+                completed
+              </span>
               {/* Progress bar - thin, aqua = done (design-brief 2.3) */}
               <div
                 className="relative h-[2px] w-full rounded-full bg-border/60 overflow-hidden"
                 aria-hidden="true"
               >
                 <div
-                  className="absolute left-0 top-0 bottom-0 rounded-full"
-                  style={{
-                    width: `${stats.completionPct}%`,
-                    background: 'var(--aqua)',
-                  }}
+                  className="absolute left-0 top-0 bottom-0 rounded-full bg-aqua"
+                  style={{ width: `${stats.completionPct}%` }}
                 />
               </div>
             </div>
 
-            {/* Breakdown row with status icons */}
+            {/* Breakdown row with status icons — themed Tooltip instead of
+                the native title= attribute (design-brief Craft). */}
             <div className="flex items-center gap-2 text-xs">
               {stats.notStarted > 0 && (
-                <div
-                  className="flex items-center gap-1 text-muted-foreground"
-                  title={`Not started: ${stats.notStarted} tasks`}
-                >
-                  <Circle className="w-3 h-3" />
-                  <span className="font-mono">{stats.notStarted}</span>
-                </div>
+                <UiTooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Circle className="w-3 h-3" />
+                      <span className="font-mono tabular-nums">
+                        {stats.notStarted}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Not started: {stats.notStarted} tasks
+                  </TooltipContent>
+                </UiTooltip>
               )}
               {stats.inProgress > 0 && (
-                <div
-                  className="flex items-center gap-1 text-warning"
-                  title={`In progress: ${stats.inProgress} tasks`}
-                >
-                  <PlayCircle className="w-3 h-3" />
-                  <span className="font-mono">{stats.inProgress}</span>
-                </div>
+                <UiTooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-warning">
+                      <PlayCircle className="w-3 h-3" />
+                      <span className="font-mono tabular-nums">
+                        {stats.inProgress}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    In progress: {stats.inProgress} tasks
+                  </TooltipContent>
+                </UiTooltip>
               )}
               {stats.done > 0 && (
-                <div
-                  className="flex items-center gap-1 text-success"
-                  title={`Done: ${stats.done} tasks`}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span className="font-mono">{stats.done}</span>
-                </div>
+                <UiTooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-success">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span className="font-mono tabular-nums">
+                        {stats.done}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Done: {stats.done} tasks</TooltipContent>
+                </UiTooltip>
               )}
             </div>
           </div>

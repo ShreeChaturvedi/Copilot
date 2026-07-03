@@ -14,8 +14,8 @@
   min-height: 132px;
   padding: 16px 16px 14px;
   background: var(--surface-1);
-  border: 0;
-  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
   box-shadow: var(--edge-machined);
   color: var(--ink);
   font-family: inherit;
@@ -23,8 +23,8 @@
   cursor: pointer;
   appearance: none;
   transition:
-    transform var(--dur-2) var(--ease-out),
-    box-shadow var(--dur-2) var(--ease-out);
+    transform var(--dur-3) var(--ease-settle),
+    border-color var(--dur-2) var(--ease-out);
 }
 
 /* Chip formula's 3px bar on the top edge (§2.4 adapted to §4.2) */
@@ -35,13 +35,15 @@
   left: 0;
   right: 0;
   height: 3px;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: var(--chip-c);
 }
 
-.folder-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--edge-machined), var(--shadow-2);
+@media (hover: hover) {
+  .folder-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--hairline-strong);
+  }
 }
 
 .folder-card:focus-visible {
@@ -193,13 +195,14 @@
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- New-list tile: the etched drawing of a folder card (§2.5) --- */
 
 .folder-card--new {
   background: transparent;
-  border: 1px dashed var(--hairline-strong);
+  border: 1px dashed var(--etch-strong);
   box-shadow: none;
   color: var(--ink-muted);
 }
@@ -210,12 +213,17 @@
 
 .folder-card--new .folder-card-icon {
   background: transparent;
-  border: 1px dashed var(--hairline-strong);
+  border: 1px dashed var(--etch-strong);
   color: var(--ink-muted);
 }
 
 .folder-card--new .folder-card-name {
   color: var(--ink-muted);
+  /* Reserves the height a sibling card's count row occupies, so this
+     tile's name baseline lines up with real folder cards in the same
+     grid row (a real card's footer is name(30) + count(18) = 48px; this
+     tile only renders the name block, so it must borrow the other 18px). */
+  margin-bottom: 18px;
 }
 
 .folder-card--new:hover {
@@ -245,6 +253,32 @@
   display: flex;
   gap: 16px;
   margin-bottom: 20px;
+}
+
+/* Ghost cards arrive into the same grid slots real folder cards would
+   occupy — continuity between the empty state and the populated grid
+   it stands in for. Copy fades in just after (§4). */
+.folder-empty-etch .folder-empty-ghost {
+  animation: folder-ghost-in var(--dur-3) var(--ease-settle) both;
+}
+.folder-empty-etch .folder-empty-ghost:nth-child(1) {
+  animation-delay: 0ms;
+}
+.folder-empty-etch .folder-empty-ghost:nth-child(2) {
+  animation-delay: 60ms;
+}
+.folder-empty-etch .folder-empty-ghost:nth-child(3) {
+  animation-delay: 120ms;
+}
+@keyframes folder-ghost-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .folder-empty-ghost {
@@ -297,6 +331,10 @@
   margin-bottom: 8px;
 }
 
+.folder-empty-copy {
+  animation: settle-fade-in var(--dur-2) var(--ease-out) 160ms both;
+}
+
 /* --- Schedule-empty (§4.7): the sidebar's upcoming tasks / events lists --- */
 
 .schedule-empty {
@@ -306,6 +344,7 @@
   gap: 6px;
   padding: 28px 16px 20px;
   text-align: center;
+  animation: dialog-settle-in var(--dur-3) var(--ease-settle) both;
 }
 
 .schedule-empty-art {
@@ -325,10 +364,17 @@
   fill: var(--etch-strong);
 }
 
+/* Resolved badge draw-on (§4, "a genuine task-completion celebratory
+   beat" — the one signature moment reserved for this component): the
+   container settles in 0-240ms, the badge pops 200-340ms, the check
+   draws 320-480ms. Lands inside the --dur-5 (480ms) signature-moment
+   band. */
 .schedule-empty-badge {
   fill: var(--aqua-film-08);
   stroke: var(--aqua);
   stroke-width: 1.5;
+  transform-origin: 108px 52px;
+  animation: schedule-badge-pop 140ms 200ms var(--ease-out) both;
 }
 
 .schedule-empty-check {
@@ -337,6 +383,27 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* path length of "M101 52 l5 6 l10 -13" */
+  stroke-dasharray: 24.21;
+  stroke-dashoffset: 24.21;
+  animation: schedule-check-draw 160ms 320ms var(--ease-out) forwards;
+}
+
+@keyframes schedule-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes schedule-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .schedule-empty-voice {
@@ -354,6 +421,16 @@
   max-width: 24ch;
 }
 
+/* --- Pane-filtered-empty (TaskPaneContainer, §4): container settle only —
+   the row-glyph and copy inside are plain @theme-inline Tailwind
+   utilities (border-etch-strong / text-ink / text-ink-muted), no bespoke
+   shape classes needed. No aqua badge here: this is a neutral "no
+   matches" state, not a "caught up" state (§1.6's badge-reservation
+   rule). --- */
+.pane-empty {
+  animation: dialog-settle-in var(--dur-3) var(--ease-settle) both;
+}
+
 /* --- Reduced motion (§5): no travel, fades stay but unsequenced --- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -362,7 +439,7 @@
   .folder-card:active,
   .folder-card.is-opening {
     transform: none;
-    transition: box-shadow var(--dur-2) var(--ease-out);
+    transition: border-color var(--dur-2) var(--ease-out);
   }
 
   .folder-card-default,
@@ -372,5 +449,23 @@
   .folder-card:focus-visible .folder-card-default,
   .folder-card:focus-visible .folder-card-preview {
     transition: opacity 120ms var(--ease-out);
+  }
+
+  .folder-empty-etch .folder-empty-ghost,
+  .folder-empty-copy {
+    animation: none;
+  }
+
+  .schedule-empty,
+  .schedule-empty-badge,
+  .schedule-empty-check {
+    animation: none;
+  }
+  .schedule-empty-check {
+    stroke-dashoffset: 0;
+  }
+
+  .pane-empty {
+    animation: none;
   }
 }

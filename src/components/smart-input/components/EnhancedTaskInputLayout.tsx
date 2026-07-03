@@ -24,10 +24,6 @@ export interface EnhancedTaskInputLayoutProps {
   onBlur?: () => void;
   /** Focus handler */
   onFocus?: () => void;
-  /** Parsing confidence (0-1) */
-  confidence?: number;
-  /** Whether to show confidence indicators */
-  showConfidence?: boolean;
   /** Whether smart parsing is enabled */
   enableSmartParsing?: boolean;
   /** Minimum height for the input area */
@@ -76,8 +72,6 @@ export const EnhancedTaskInputLayout: React.FC<
   onKeyPress,
   onBlur,
   onFocus,
-  confidence = 1,
-  showConfidence = false,
   enableSmartParsing = true,
   minHeight = '60px',
   maxHeight = '150px',
@@ -124,11 +118,10 @@ export const EnhancedTaskInputLayout: React.FC<
       className={className}
       minHeight={minHeight}
       disabled={disabled}
-      showFocusStates={true}
     >
       <div className="space-y-2">
         {filePreview && (
-          <div className="border-b border-border/50 pb-2">{filePreview}</div>
+          <div className="border-b border-hairline pb-2">{filePreview}</div>
         )}
         <div className="relative">
           {enableSmartParsing ? (
@@ -144,8 +137,6 @@ export const EnhancedTaskInputLayout: React.FC<
               onKeyDown={onKeyPress}
               onBlur={onBlur}
               onFocus={onFocus}
-              confidence={confidence}
-              showConfidence={showConfidence}
               minHeight={minHeight}
               maxHeight={maxHeight}
               isRecording={isRecording}

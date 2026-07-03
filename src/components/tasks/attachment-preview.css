@@ -1,0 +1,53 @@
+/* attachment-preview.css — the file-type tile: same 12%/24% chip-film formula
+   as .folder-card-icon (new-folder.css), fed by --filetype-* brand tokens via
+   --chip-c. Replaces the skeuomorphic paper-stack. Imported only by
+   AttachmentPreviewDialog.tsx. */
+.afp-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  margin: 0 auto;
+  border-radius: var(--radius-card);
+  background: color-mix(
+    in oklab,
+    var(--chip-c, var(--ink-muted)) 12%,
+    transparent
+  );
+  box-shadow: var(--edge-machined);
+  cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.dark .afp-tile {
+  background: color-mix(
+    in oklab,
+    var(--chip-c, var(--ink-muted)) 24%,
+    transparent
+  );
+}
+.afp-tile:hover,
+.afp-tile:focus-visible {
+  transform: translateY(-2px);
+}
+.afp-tile:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.afp-tile-glyph {
+  width: 40px;
+  height: 40px;
+  color: oklch(from var(--chip-c, var(--ink-muted)) 0.5 c h);
+}
+.dark .afp-tile-glyph {
+  color: oklch(from var(--chip-c, var(--ink-muted)) 0.82 min(c, 0.1) h);
+}
+@media (prefers-reduced-motion: reduce) {
+  .afp-tile {
+    transition: none;
+  }
+  .afp-tile:hover,
+  .afp-tile:focus-visible {
+    transform: none;
+  }
+}

@@ -1,0 +1,45 @@
+/* task-detail-sheet.css — attachment-row delete affordance. Mirrors
+   .ti-actions's reveal pattern (task-item.css): instant on-hover, opacity
+   only, hover-capable pointers only; touch gets a permanently-dimmed
+   equivalent instead of a hidden control (§1C/§2A). Imported only by
+   TaskDetailSheet.tsx. */
+.tds-attachment-row {
+  position: relative;
+}
+.tds-attachment-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .tds-attachment-row:hover .tds-attachment-delete {
+    opacity: 1;
+    transition-duration: 0s;
+  }
+  .tds-attachment-delete:hover {
+    color: var(--destructive);
+    background: var(--destructive-film-08);
+    border-color: var(--destructive-rim);
+  }
+}
+@media (hover: none) {
+  .tds-attachment-delete {
+    opacity: 0.4;
+  }
+}
+.tds-attachment-delete:focus-visible {
+  opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}

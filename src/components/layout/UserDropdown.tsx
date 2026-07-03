@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { User, Settings, HelpCircle, LogOut } from 'lucide-react';
+import {
+  User,
+  Settings,
+  HelpCircle,
+  LogOut,
+  ChevronsUpDown,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Keycap } from '@/components/ui/Keycap';
 import { useAuthStore } from '@/stores/authStore';
 
 interface UserDropdownProps {
@@ -75,36 +82,52 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors">
+        <div
+          className="flex items-center gap-3 p-2 rounded-btn hover:bg-surface-hover active:bg-surface-active
+            focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1
+            cursor-pointer transition-colors duration-150 ease-out"
+        >
           <Avatar className="size-8">
             <AvatarImage src={userInfo.picture} alt={userInfo.name} />
-            <AvatarFallback>{getInitials(userInfo.name)}</AvatarFallback>
+            <AvatarFallback className="text-xs font-semibold text-ink-2 tracking-wide">
+              {getInitials(userInfo.name)}
+            </AvatarFallback>
           </Avatar>
           <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-sm font-medium truncate">
+            <span className="text-sm font-medium text-ink truncate">
               {userInfo.name}
             </span>
-            <span className="text-xs text-muted-foreground truncate">
+            <span className="text-xs text-ink-muted truncate">
               {userInfo.email}
             </span>
           </div>
+          <ChevronsUpDown className="size-3.5 text-ink-muted shrink-0" />
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={handleProfileClick}>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘P</span>
+          <span className="ml-auto flex items-center gap-1">
+            <Keycap>⌘</Keycap>
+            <Keycap>P</Keycap>
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleSettingsClick}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘,</span>
+          <span className="ml-auto flex items-center gap-1">
+            <Keycap>⌘</Keycap>
+            <Keycap>,</Keycap>
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleHelpClick}>
           <HelpCircle className="mr-2 h-4 w-4" />
           <span>Help</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘?</span>
+          <span className="ml-auto flex items-center gap-1">
+            <Keycap>⌘</Keycap>
+            <Keycap>?</Keycap>
+          </span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -114,7 +137,10 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
         >
           <LogOut className="mr-2 h-4 w-4" />
           <span>{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
-          <span className="ml-auto text-xs text-muted-foreground">⌘Q</span>
+          <span className="ml-auto flex items-center gap-1">
+            <Keycap>⌘</Keycap>
+            <Keycap>Q</Keycap>
+          </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

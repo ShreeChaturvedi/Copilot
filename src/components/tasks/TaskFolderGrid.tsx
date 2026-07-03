@@ -8,6 +8,7 @@ import React, {
 import { Folder, Plus } from 'lucide-react';
 import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { TaskFolder, Task } from '@shared/types';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
@@ -152,8 +153,13 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   const { globalShowCompleted, setTaskViewMode, setSelectedKanbanTaskListId } =
     useUIStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const { tasks, taskGroups, handleSelectTaskGroup, handleCreateTaskGroup } =
-    useTaskManagement({ includeTaskOperations: true });
+  const {
+    tasks,
+    tasksLoading,
+    taskGroups,
+    handleSelectTaskGroup,
+    handleCreateTaskGroup,
+  } = useTaskManagement({ includeTaskOperations: true });
   const userId = useAuthStore((s) => s.user?.id ?? s.googleUser?.id ?? '');
 
   const folders = useMemo(
@@ -194,8 +200,27 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
   );
 
   return (
-    <div className={cn('p-6', className)}>
-      {folders.length > 0 ? (
+    <div className={cn('px-4 pt-4 pb-6', className)}>
+      {tasksLoading ? (
+        <div
+          aria-hidden="true"
+          className={cn(
+            'grid gap-6',
+            'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+          )}
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="min-h-[132px] rounded-card border border-hairline bg-surface-1 p-4 flex flex-col justify-end gap-2"
+            >
+              <Skeleton className="h-7 w-7 rounded-md" />
+              <Skeleton className="h-3.5 w-3/4 mt-2" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          ))}
+        </div>
+      ) : folders.length > 0 ? (
         <div
           className={cn(
             'grid gap-6',
@@ -238,11 +263,13 @@ export const TaskFolderGrid: React.FC<TaskFolderGridProps> = ({
               </span>
             ))}
           </div>
-          <p className="folder-empty-voice">Every task wants a list.</p>
-          <p className="folder-empty-action">
+          <p className="folder-empty-voice folder-empty-copy">
+            Every task wants a list.
+          </p>
+          <p className="folder-empty-action folder-empty-copy">
             Create a list to start sorting your tasks.
           </p>
-          <Button onClick={handleAddFolder} className="gap-2">
+          <Button onClick={handleAddFolder} className="gap-2 folder-empty-copy">
             <Plus className="w-4 h-4" />
             Create list
           </Button>

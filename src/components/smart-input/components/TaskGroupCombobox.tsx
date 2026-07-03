@@ -25,6 +25,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { DEFAULT_PRESET_COLOR } from '@/constants/colors';
 type TaskGroup = {
   id: string;
   name: string;
@@ -88,7 +89,7 @@ export const TaskGroupCombobox: React.FC<TaskGroupComboboxProps> = ({
     id: 'default',
     name: 'Tasks',
     emoji: '📋',
-    color: '#0d97d5',
+    color: DEFAULT_PRESET_COLOR,
     description: 'Default task group',
   };
 

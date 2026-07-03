@@ -328,10 +328,11 @@ describe('HighlightedTextareaField - Comprehensive Tests', () => {
       // Check that overlay content includes line breaks
       expect(overlay.innerHTML).toContain('<br>');
 
-      // Check that highlighted spans are present
+      // Check that highlighted spans are present, each carrying its type's
+      // tone (theme tokens in smart-tags.css, not a per-instance hex)
       expect(overlay.innerHTML).toContain('inline-highlight-span');
-      expect(overlay.innerHTML).toContain('background-color: #ef444420');
-      expect(overlay.innerHTML).toContain('background-color: #3b82f620');
+      expect(overlay.innerHTML).toContain('data-tone="high"');
+      expect(overlay.innerHTML).toContain('data-tone="aqua"');
     });
 
     it('handles tags at line boundaries correctly', () => {

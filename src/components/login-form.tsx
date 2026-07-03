@@ -7,6 +7,9 @@ import { googleRedirectUri } from '@/lib/urls';
 import { useAuthStore } from '@/stores/authStore';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { GoogleIcon } from '@/components/auth';
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 
 export function LoginForm({
   className,
@@ -17,6 +20,7 @@ export function LoginForm({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,15 +68,22 @@ export function LoginForm({
         <div className="flex flex-col gap-5">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
+            <div className="relative group">
+              <Mail
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 group-focus-within:text-ink-muted"
+                aria-hidden="true"
+              />
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+                className="pl-9"
+              />
+            </div>
           </div>
           <div className="grid gap-2">
             <div className="flex items-center">
@@ -85,54 +96,64 @@ export function LoginForm({
                 Forgot your password?
               </a>
             </div>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
+            <div className="relative group">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 group-focus-within:text-ink-muted"
+                aria-hidden="true"
+              />
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                className="pl-9 pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-faint transition-colors duration-150 hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 rounded-sm active:scale-90"
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
           {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
+            <Alert
+              variant="destructive"
+              className="border-destructive/40 bg-destructive/10 animate-in fade-in slide-in-from-top-1 duration-150"
+            >
+              <AlertCircle className="size-4" aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
           <div className="flex flex-col gap-3">
             {/* The one aqua primary in the room (design-brief §4.8) */}
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </Button>
+            <div className="relative flex items-center py-1" aria-hidden="true">
+              <div className="h-px flex-1 bg-hairline" />
+              <span className="px-3 text-[0.75rem] font-medium uppercase tracking-[0.04em] text-ink-muted">
+                Or
+              </span>
+              <div className="h-px flex-1 bg-hairline" />
+            </div>
             <Button
               type="button"
               variant="outline"
               className="w-full"
               onClick={handleGoogleLogin}
+              disabled={isSubmitting}
             >
-              {/* Google G icon (SVG) */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 48 48"
-                className="h-4 w-4"
-              >
-                <path
-                  fill="#FFC107"
-                  d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.156 7.96 3.04l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"
-                />
-                <path
-                  fill="#FF3D00"
-                  d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.156 7.96 3.04l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-                />
-                <path
-                  fill="#4CAF50"
-                  d="M24 44c5.166 0 9.86-1.977 13.409-5.196l-6.19-5.238C29.148 35.091 26.689 36 24 36c-5.202 0-9.616-3.317-11.277-7.946l-6.55 5.046C9.488 38.556 16.227 44 24 44z"
-                />
-                <path
-                  fill="#1976D2"
-                  d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.094 5.566.001-.001 6.19 5.238 6.19 5.238C39.441 35.894 44 30.5 44 24c0-1.341-.138-2.651-.389-3.917z"
-                />
-              </svg>
+              <GoogleIcon className="h-4 w-4" />
               Continue with Google
             </Button>
           </div>

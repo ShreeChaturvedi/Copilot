@@ -1,16 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  Filter,
-  X,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
 import type FullCalendar from '@fullcalendar/react';
 import { Button } from '@/components/ui/Button';
+import { Keycap } from '@/components/ui/Keycap';
 import { SmoothSidebarTrigger } from '@/components/layout/SmoothSidebarTrigger';
 import { ViewSwitcher } from '@/components/ui/ViewSwitcher';
 import {
@@ -39,8 +32,6 @@ export interface ConsolidatedCalendarHeaderProps {
   onCreateEvent: () => void;
   className?: string;
   calendarRef?: React.RefObject<FullCalendar | null>;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
 }
 
 // Define view options outside component to avoid recreating on every render.
@@ -85,236 +76,6 @@ const CalendarViewSwitcher: React.FC<CalendarViewSwitcherProps> = ({
       onChange={onViewChange}
       options={VIEW_OPTIONS}
     />
-  );
-};
-
-/**
- * Animated Search Component for Calendar with Keyboard Shortcuts
- */
-interface AnimatedSearchProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Keyboard shortcuts effect
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + F to activate search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        handleSearchClick();
-      }
-    };
-
-    document.addEventListener('keydown', handleGlobalKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleGlobalKeyDown);
-    };
-  }, []);
-
-  const handleSearchClick = () => {
-    setIsExpanded(true);
-    // Focus input after animation completes
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 250);
-  };
-
-  const handleClose = () => {
-    setIsExpanded(false);
-    onChange('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      handleClose();
-    }
-  };
-
-  return (
-    <div className="relative">
-      <motion.div
-        className="flex items-center"
-        layout
-        transition={{ duration: 0.25, ease: 'easeOut' }}
-      >
-        {/* Search Icon/Button */}
-        <motion.div layout>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={isExpanded ? undefined : handleSearchClick}
-            title={isExpanded ? undefined : 'Search events (Ctrl+F)'}
-            aria-label={isExpanded ? undefined : 'Open search input'}
-            aria-expanded={isExpanded}
-          >
-            <Search className="w-3.5 h-3.5" />
-          </Button>
-        </motion.div>
-
-        {/* Expandable Search Input */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: '200px', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="relative overflow-hidden"
-              role="search"
-              aria-label="Event search"
-            >
-              <input
-                ref={inputRef}
-                type="text"
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search events..."
-                className="w-full h-7 px-3 pr-8 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-0 focus:border-border focus-visible:ring-0 focus-visible:outline-none"
-                aria-label="Search events by title or content"
-                aria-describedby="search-help"
-              />
-              {/* Screen reader helper text */}
-              <div id="search-help" className="sr-only">
-                Press Escape to close search, or use Ctrl+F to open
-              </div>
-              {/* Close button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-0.5 h-6 w-6 p-0"
-                onClick={handleClose}
-                title="Close search (Escape)"
-                aria-label="Close search input"
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
-  );
-};
-
-/**
- * CalendarToolbar component with navigation and action buttons
- */
-interface CalendarToolbarProps {
-  onPrevClick: () => void;
-  onNextClick: () => void;
-  onCreateEvent: () => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-}
-
-const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
-  onPrevClick,
-  onNextClick,
-  onCreateEvent,
-  searchValue = '',
-  onSearchChange,
-}) => {
-  return (
-    <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1">
-      {/* Animated Search */}
-      <AnimatedSearch
-        value={searchValue}
-        onChange={onSearchChange || (() => {})}
-      />
-
-      {/* Filter Button (Future Enhancement) */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            disabled // Disabled for now
-          >
-            <Filter className="w-3.5 h-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Filter events</p>
-        </TooltipContent>
-      </Tooltip>
-
-      {/* Back Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onPrevClick}
-            aria-label="Previous period"
-            className="h-7 w-7 p-0"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Previous period</p>
-        </TooltipContent>
-      </Tooltip>
-
-      {/* Forward Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onNextClick}
-            aria-label="Next period"
-            className="h-7 w-7 p-0"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Next period</p>
-        </TooltipContent>
-      </Tooltip>
-
-      {/* New Event Plus Button with glisten effect */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            onClick={onCreateEvent}
-            size="sm"
-            className={cn(
-              'h-7 w-7 p-0 relative overflow-hidden transition-all duration-300 ease-out',
-              // Base secondary color with subtle diagonal gradient
-              'bg-gradient-to-br from-secondary/98 via-secondary to-secondary/95',
-              'text-secondary-foreground shadow-xs border border-border/20',
-              // Hover effects - subtle scaling and enhanced gradient
-              'hover:scale-105 hover:shadow-lg hover:shadow-secondary/20',
-              'hover:from-secondary/95 hover:via-secondary/98 hover:to-secondary/90',
-              // Enhanced shimmer effect for visibility
-              'before:absolute before:inset-0 before:bg-gradient-to-r',
-              'before:from-transparent before:via-black/15 before:to-transparent',
-              'dark:before:via-white/15',
-              'before:translate-x-[-150%] before:skew-x-12 before:transition-transform before:duration-[480ms]',
-              'hover:before:translate-x-[150%]',
-              // Active state
-              'active:scale-[1.02] active:shadow-md'
-            )}
-            aria-label="New event"
-          >
-            <Plus className="h-3.5 w-3.5 relative z-10" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>New event</p>
-        </TooltipContent>
-      </Tooltip>
-    </div>
   );
 };
 
@@ -415,8 +176,6 @@ export const ConsolidatedCalendarHeader: React.FC<
   onCreateEvent,
   className,
   calendarRef,
-  searchValue = '',
-  onSearchChange,
 }) => {
   const [calendarTitle, setCalendarTitle] = useState(() =>
     getCalendarTitle(currentView, calendarRef)
@@ -486,37 +245,79 @@ export const ConsolidatedCalendarHeader: React.FC<
           />
         </div>
 
-        {/* Right Section: Today Button and Toolbar */}
+        {/* Right Section: three legible clusters — Prev·Today·Next, a
+            hairline divider, then the one primary CTA this header earns
+            (design-brief §2.1). */}
         <div className="flex items-center gap-3 flex-shrink-0 justify-self-end">
-          {/* Today chiclet + T keycap (§4.4) */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onTodayClick}
-            disabled={todayDisabled}
-            className={cn(
-              'font-medium transition-all duration-200',
-              todayDisabled && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            Today
-            <kbd
-              className="ml-0.5 hidden h-[18px] min-w-[18px] items-center justify-center rounded-[4px] bg-surface-2 px-1 font-mono text-[11px] leading-none text-muted-foreground sm:inline-flex"
-              style={{ boxShadow: 'var(--edge-machined)' }}
-              aria-hidden="true"
-            >
-              T
-            </kbd>
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onPrevClick}
+                  aria-label="Previous period"
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Previous period</p>
+              </TooltipContent>
+            </Tooltip>
 
-          {/* Calendar Toolbar */}
-          <CalendarToolbar
-            onPrevClick={onPrevClick}
-            onNextClick={onNextClick}
-            onCreateEvent={onCreateEvent}
-            searchValue={searchValue}
-            onSearchChange={onSearchChange}
-          />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onTodayClick}
+              disabled={todayDisabled}
+              className={cn(
+                'font-medium transition-all duration-200',
+                todayDisabled && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              Today
+              <Keycap className="ml-0.5 hidden sm:inline-flex">T</Keycap>
+            </Button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onNextClick}
+                  aria-label="Next period"
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Next period</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="h-4 w-px bg-hairline" aria-hidden="true" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onCreateEvent}
+                aria-label="New event"
+                className="h-7 gap-1.5 px-2.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">New event</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>New event</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 /**
  * Requirements verification tests for HighlightedTextareaField
- * 
+ *
  * This test file specifically verifies all requirements from task 4:
  * - Test HighlightedInputField component with multi-line textarea ✓
  * - Fix any textarea-specific highlighting issues ✓
@@ -12,7 +12,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HighlightedTextareaField } from '../HighlightedTextareaField';
-import { ParsedTag } from "@shared/types";
+import { ParsedTag } from '@shared/types';
 
 describe('HighlightedTextareaField - Requirements Verification', () => {
   beforeEach(() => {
@@ -21,52 +21,51 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       callback();
       return 1;
     });
-    
+
     // Mock DOM properties for textarea
     Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
       configurable: true,
-      get: function() { return this.value.split('\n').length * 20 + 40; }
+      get: function () {
+        return this.value.split('\n').length * 20 + 40;
+      },
     });
   });
 
-  const createTestTags = (text: string): ParsedTag[] => [
-    {
-      id: '1',
-      type: 'priority' as const,
-      value: 'high',
-      displayText: 'high',
-      iconName: 'AlertTriangle',
-      startIndex: text.indexOf('high'),
-      endIndex: text.indexOf('high') + 4,
-      originalText: 'high',
-      confidence: 0.9,
-      source: 'priority-parser',
-      color: '#ef4444'
-    },
-    {
-      id: '2',
-      type: 'date' as const,
-      value: new Date('2024-01-15'),
-      displayText: 'tomorrow',
-      iconName: 'Calendar',
-      startIndex: text.indexOf('tomorrow'),
-      endIndex: text.indexOf('tomorrow') + 8,
-      originalText: 'tomorrow',
-      confidence: 0.8,
-      source: 'date-parser',
-      color: '#3b82f6'
-    }
-  ].filter(tag => tag.startIndex !== -1);
+  const createTestTags = (text: string): ParsedTag[] =>
+    [
+      {
+        id: '1',
+        type: 'priority' as const,
+        value: 'high',
+        displayText: 'high',
+        iconName: 'AlertTriangle',
+        startIndex: text.indexOf('high'),
+        endIndex: text.indexOf('high') + 4,
+        originalText: 'high',
+        confidence: 0.9,
+        source: 'priority-parser',
+        color: '#ef4444',
+      },
+      {
+        id: '2',
+        type: 'date' as const,
+        value: new Date('2024-01-15'),
+        displayText: 'tomorrow',
+        iconName: 'Calendar',
+        startIndex: text.indexOf('tomorrow'),
+        endIndex: text.indexOf('tomorrow') + 8,
+        originalText: 'tomorrow',
+        confidence: 0.8,
+        source: 'date-parser',
+        color: '#3b82f6',
+      },
+    ].filter((tag) => tag.startIndex !== -1);
 
   describe('Requirement 1.1: Real-time highlighting as user types', () => {
     it('highlights tags in real-time without lag or flickering', async () => {
       const onChange = vi.fn();
       const { container, rerender } = render(
-        <HighlightedTextareaField
-          value=""
-          onChange={onChange}
-          tags={[]}
-        />
+        <HighlightedTextareaField value="" onChange={onChange} tags={[]} />
       );
 
       // Start typing
@@ -79,10 +78,11 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
         />
       );
 
-      // Check highlighting appears
+      // Check highlighting appears -- tone is a data attribute keyed off tag
+      // type/value (theme tokens in smart-tags.css), not a per-instance hex.
       const overlay = container.querySelector('[aria-hidden="true"]');
       expect(overlay?.innerHTML).toContain('inline-highlight-span');
-      expect(overlay?.innerHTML).toContain('background-color: #ef444420');
+      expect(overlay?.innerHTML).toContain('data-tone="high"');
 
       // Continue typing
       const text2 = 'high priority task due tomorrow';
@@ -104,7 +104,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     it('updates highlighting dynamically during text input', () => {
       const onChange = vi.fn();
       const initialText = 'Task with high priority';
-      
+
       const { container } = render(
         <HighlightedTextareaField
           value={initialText}
@@ -122,7 +122,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
 
       // Verify onChange was called
       expect(onChange).toHaveBeenCalledWith(newText);
-      
+
       // Verify highlighting structure is maintained
       expect(overlay).toBeInTheDocument();
     });
@@ -132,7 +132,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     it('uses consistent highlighting styles with existing implementation', () => {
       const onChange = vi.fn();
       const text = 'high priority task due tomorrow';
-      
+
       const { container } = render(
         <HighlightedTextareaField
           value={text}
@@ -142,14 +142,11 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const overlay = container.querySelector('[aria-hidden="true"]');
-      
-      // Check for consistent styling classes and properties
+
+      // Check for the shared highlight class + tone attribute; fill/border/
+      // radius/weight now live in smart-tags.css (theme tokens), not inline.
       expect(overlay?.innerHTML).toContain('inline-highlight-span');
-      expect(overlay?.innerHTML).toContain('background-color: #ef444420');
-      expect(overlay?.innerHTML).toContain('border: 1px solid #ef444430');
-      expect(overlay?.innerHTML).toContain('padding: 1px 2px');
-      expect(overlay?.innerHTML).toContain('border-radius: 2px');
-      expect(overlay?.innerHTML).toContain('font-weight: 500');
+      expect(overlay?.innerHTML).toContain('data-tone="high"');
     });
   });
 
@@ -158,7 +155,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       const onChange = vi.fn();
       const text = 'high priority task due tomorrow';
       const tags = createTestTags(text);
-      
+
       const { container } = render(
         <HighlightedTextareaField
           value={text}
@@ -168,13 +165,15 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const overlay = container.querySelector('[aria-hidden="true"]');
-      
-      // Check that different colors are used for different tag types
-      expect(overlay?.innerHTML).toContain('#ef444420'); // Priority tag color
-      expect(overlay?.innerHTML).toContain('#3b82f620'); // Date tag color
-      
-      // Ensure colors are different
-      expect(overlay?.innerHTML).not.toBe(overlay?.innerHTML.replace('#ef444420', '#3b82f620'));
+
+      // Check that different tag types get a different tone
+      expect(overlay?.innerHTML).toContain('data-tone="high"'); // Priority tag tone
+      expect(overlay?.innerHTML).toContain('data-tone="aqua"'); // Date tag tone
+
+      // Ensure tones are different
+      expect(overlay?.innerHTML).not.toBe(
+        overlay?.innerHTML.replace('data-tone="high"', 'data-tone="aqua"')
+      );
     });
   });
 
@@ -182,7 +181,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     it('updates highlighting dynamically when text is edited', async () => {
       const onChange = vi.fn();
       const initialText = 'high priority task';
-      
+
       const { container, rerender } = render(
         <HighlightedTextareaField
           value={initialText}
@@ -205,7 +204,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const updatedHTML = overlay?.innerHTML;
-      
+
       // Highlighting should have changed
       expect(updatedHTML).not.toBe(initialHTML);
       expect(updatedHTML).toContain('tomorrow');
@@ -215,8 +214,9 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
   describe('Multi-line textarea functionality', () => {
     it('works correctly with multi-line text input', () => {
       const onChange = vi.fn();
-      const multiLineText = 'Line 1: high priority task\nLine 2: due tomorrow\nLine 3: final notes';
-      
+      const multiLineText =
+        'Line 1: high priority task\nLine 2: due tomorrow\nLine 3: final notes';
+
       render(
         <HighlightedTextareaField
           value={multiLineText}
@@ -226,7 +226,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
-      
+
       // Verify it's a textarea element
       expect(textarea.tagName).toBe('TEXTAREA');
       expect(textarea.value).toBe(multiLineText);
@@ -235,7 +235,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     it('handles line breaks in highlighting correctly', () => {
       const onChange = vi.fn();
       const multiLineText = 'high priority\ntask due tomorrow';
-      
+
       const { container } = render(
         <HighlightedTextareaField
           value={multiLineText}
@@ -245,7 +245,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const overlay = container.querySelector('[aria-hidden="true"]');
-      
+
       // Check that line breaks are preserved in overlay
       expect(overlay?.innerHTML).toContain('<br>');
       expect(overlay?.innerHTML).toContain('inline-highlight-span');
@@ -255,8 +255,10 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
   describe('Scroll synchronization with larger input area', () => {
     it('synchronizes scroll between textarea and overlay', async () => {
       const onChange = vi.fn();
-      const longText = Array(10).fill('Line with high priority content').join('\n');
-      
+      const longText = Array(10)
+        .fill('Line with high priority content')
+        .join('\n');
+
       const { container } = render(
         <HighlightedTextareaField
           value={longText}
@@ -273,7 +275,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
 
       // Simulate scrolling
       fireEvent.scroll(textarea);
-      
+
       // Verify requestAnimationFrame was called for scroll sync
       await waitFor(() => {
         expect(global.requestAnimationFrame).toHaveBeenCalled();
@@ -283,7 +285,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
     it('maintains scroll synchronization during input events', async () => {
       const onChange = vi.fn();
       const text = 'Initial text with high priority';
-      
+
       render(
         <HighlightedTextareaField
           value={text}
@@ -296,7 +298,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
 
       // Simulate input event
       fireEvent.input(textarea);
-      
+
       // Verify scroll sync is triggered
       await waitFor(() => {
         expect(global.requestAnimationFrame).toHaveBeenCalled();
@@ -307,7 +309,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
   describe('Cursor positioning and text selection', () => {
     it('maintains transparent text with visible cursor', () => {
       const onChange = vi.fn();
-      
+
       render(
         <HighlightedTextareaField
           value="Text with cursor"
@@ -317,10 +319,10 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
-      
+
       // Check text transparency
       expect(textarea.className).toContain('text-transparent');
-      
+
       // Focus should make caret visible
       fireEvent.focus(textarea);
       expect(textarea.style.caretColor).toBe('var(--foreground)');
@@ -328,7 +330,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
 
     it('handles text selection correctly', () => {
       const onChange = vi.fn();
-      
+
       render(
         <HighlightedTextareaField
           value="Selectable text content"
@@ -338,7 +340,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
       );
 
       const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
-      
+
       // Test text selection
       textarea.setSelectionRange(0, 10);
       expect(textarea.selectionStart).toBe(0);
@@ -347,7 +349,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
 
     it('maintains proper layering for interaction', () => {
       const onChange = vi.fn();
-      
+
       const { container } = render(
         <HighlightedTextareaField
           value="Interactive text"
@@ -368,7 +370,7 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
   describe('Auto-resizing functionality', () => {
     it('auto-resizes based on content', async () => {
       const onChange = vi.fn();
-      
+
       const { rerender } = render(
         <HighlightedTextareaField
           value="Single line"

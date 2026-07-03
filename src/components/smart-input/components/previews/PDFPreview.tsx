@@ -291,7 +291,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
         style={{ width, height }}
         title={error || 'Failed to generate PDF preview'}
       >
-        <FileText className="w-4 h-4 text-red-500" />
+        <FileText className="w-4 h-4 text-filetype-pdf" />
       </div>
     );
   }
@@ -314,7 +314,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       />
 
       {/* PDF indicator overlay */}
-      <div className="absolute bottom-0 right-0 bg-red-500 text-white text-xs px-1 rounded-tl">
+      <div className="absolute bottom-0 right-0 bg-filetype-pdf text-white text-xs px-1 rounded-tl">
         PDF
       </div>
     </div>
