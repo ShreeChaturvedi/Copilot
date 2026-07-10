@@ -1,7 +1,10 @@
 ---
 // §6.1 — Hero: Sentient H1, one-sentence sub, Start planning CTA, mono
 // honesty line with the REAL local time, then the week-grid slab where
-// ~20 chips perform THE settle (§5 landing FLIP spec).
+// ~20 chips perform THE settle (v2 "TRUE COURSE": traced fall paths that
+// draw then undraw, staggered in start AND duration, plus draggable
+// chips and a graduating idler). See docs/design-research/specs-v2/
+// hero.md and _synthesis.md (c) Hero for the full spec this implements.
 
 const DAY_START = 8 * 60; // grid runs 08:00-18:00
 const DAY_SPAN = 10 * 60;
@@ -55,11 +58,29 @@ function pos(c: ChipDef) {
   const startMin = h * 60 + m - DAY_START;
   const top = (startMin / DAY_SPAN) * 100;
   const height = (c.dur / DAY_SPAN) * 100;
-  return `--d:${c.day};top:${top.toFixed(3)}%;height:${height.toFixed(3)}%;`;
+  return { top, height };
 }
 
 function hueVar(hue: string) {
   return hue === 'aqua' ? 'var(--aqua)' : `var(--hue-${hue})`;
+}
+
+// data-top/data-h/data-dur-rows (new, v2): exposed purely so the entrance
+// and drag scripts can do arithmetic on already-known numbers instead of
+// parsing the `style` attribute string (hero.md "SVG overlay coordinate
+// strategy" + "Drag math").
+function chipAttrs(c: ChipDef) {
+  const p = pos(c);
+  return {
+    'data-day': c.day,
+    'data-dx': c.scatter[0],
+    'data-dy': c.scatter[1],
+    'data-r': c.scatter[2],
+    'data-top': p.top.toFixed(3),
+    'data-h': p.height.toFixed(3),
+    'data-dur-rows': c.dur / 30,
+    style: `--chip-c:${hueVar(c.hue)};--d:${c.day};top:${p.top.toFixed(3)}%;height:${p.height.toFixed(3)}%;`,
+  };
 }
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
@@ -78,25 +99,17 @@ const hourLabels = [
       a time, and your week fills in.
     </p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="/app/signup">Start planning</a>
-      <p class="mono-line honesty">
-        FREE - SYNCS WITH GOOGLE CALENDAR<span id="hero-clock"></span>
-      </p>
+      <a class="btn btn-primary" href="/app/signup">Start free</a>
     </div>
-
-    <div class="before-strip" aria-hidden="true">
-      <span class="mini-chip" style="--chip-c: var(--hue-violet); transform: rotate(-8deg)">Call mom</span>
-      <span class="mini-chip" style="--chip-c: var(--hue-green); transform: rotate(5deg)">Gym</span>
-      <span class="mini-chip" style="--chip-c: var(--hue-orange); transform: rotate(-4deg)">Groceries</span>
-      <span class="mono-line strip-label">BEFORE THE SETTLE</span>
-    </div>
+    <p class="hero-trust mono-line" aria-hidden="true">FREE. NO CARD REQUIRED.</p>
 
     <div
       class="slab"
       id="hero-slab"
       role="img"
-      aria-label="A week on the Taskflow grid: twenty task chips settled into their time slots, Monday through Friday."
+      aria-label="A week on the Taskflow grid: task chips settled into their time slots across the working week."
     >
+      <span class="drag-hint mono" aria-hidden="true">DRAG A CHIP</span>
       <div class="slab-head">
         <div class="gutter-spacer"></div>
         {
@@ -121,27 +134,13 @@ const hourLabels = [
           <div class="chips">
             {
               chips.map((c) => (
-                <div
-                  class="chip gchip"
-                  data-day={c.day}
-                  data-dx={c.scatter[0]}
-                  data-dy={c.scatter[1]}
-                  data-r={c.scatter[2]}
-                  style={`--chip-c:${hueVar(c.hue)};${pos(c)}`}
-                >
+                <div class="chip gchip flashable" {...chipAttrs(c)}>
                   <span class="c-t mono">{c.start}</span>
                   <span class="c-ti">{c.title}</span>
                 </div>
               ))
             }
-            <div
-              class="chip gchip chip-live flashable"
-              data-day={liveChip.day}
-              data-dx={liveChip.scatter[0]}
-              data-dy={liveChip.scatter[1]}
-              data-r={liveChip.scatter[2]}
-              style={`--chip-c:${hueVar(liveChip.hue)};${pos(liveChip)}`}
-            >
+            <div class="chip gchip chip-live flashable" {...chipAttrs(liveChip)}>
               <span class="c-t mono">{liveChip.start}</span>
               <span class="c-ti">{liveChip.title}</span>
             </div>
@@ -155,54 +154,216 @@ const hourLabels = [
     </div>
     <div class="floor" aria-hidden="true"></div>
 
-    <div class="idler chip" aria-hidden="true" style="--chip-c: var(--hue-violet)">
+    <div
+      class="idler chip flashable"
+      aria-hidden="true"
+      data-dur-rows="2"
+      style="--chip-c: var(--hue-violet)"
+    >
       <span class="c-ti">Plan the trip</span>
     </div>
   </div>
 </section>
 
 <script is:inline>
-  // THE settle (§5): chips are in their final slots; one pass scatters
-  // them, a double-rAF flip releases them back to transform: none on the
-  // brand curve. Slots fire 40ms apart, everything lands by 1.3s, the
-  // aqua chip lands last and rim-flashes.
+  // THE settle ("TRUE COURSE"): chips are in their final slots; one pass
+  // scatters them off-grid, a double-rAF flip WAAPI-animates them back to
+  // rest on the brand curve while a thin traced path (SVG, one per chip)
+  // draws ahead of and undraws behind each chip's own fall — the arc's
+  // bow comes from that chip's own scatter rotation, so the line explains
+  // the fall instead of decorating it. WAAPI + one synchronous bulk
+  // cleanup (never per-chip transitionend listeners) is what keeps this
+  // smooth under CPU throttle: see hero.md "why this cannot jitter".
   (function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var slab = document.getElementById('hero-slab');
-    if (!slab) return;
-    var all = Array.prototype.slice.call(slab.querySelectorAll('.gchip'));
-    // Mobile hides MON/TUE columns: 12 chips settle, not 20 (§9.3).
-    var chips = all.filter(function (c) {
+    var cols = slab && slab.querySelector('.cols');
+    var chipsEl = slab && slab.querySelector('.chips');
+    var idler = document.querySelector('.idler');
+    if (!slab || !cols || !chipsEl) return;
+
+    function enableDrag() {
+      chipsEl.style.pointerEvents = 'auto';
+      if (idler) idler.style.pointerEvents = 'auto';
+    }
+
+    if (window.TF.reducedMotion) {
+      // Hard early return: chips render at their authored resting
+      // position, no scatter, no paths, no drift ever applied. Drag is
+      // still a discrete, user-initiated interaction (not ambient
+      // motion), so enable it immediately — there is no entrance to
+      // wait for.
+      enableDrag();
+      return;
+    }
+
+    var all = Array.prototype.slice.call(chipsEl.querySelectorAll('.gchip'));
+    // Mobile hides MON/TUE columns: 12 chips settle, not 20.
+    var visible = all.filter(function (c) {
       return c.offsetParent !== null;
     });
+    if (visible.length === 0) {
+      enableDrag();
+      return;
+    }
+
     var k = Math.min(1, window.innerWidth / 1200); // shrink travel on small screens
-    chips.forEach(function (c) {
-      c.style.transform =
-        'translate(' +
-        c.dataset.dx * k +
-        'px,' +
-        c.dataset.dy * k +
-        'px) rotate(' +
-        c.dataset.r +
-        'deg)';
+    var mobile = window.innerWidth <= 640;
+    var columnCount = mobile ? 3 : 5;
+    var dshift = mobile ? 2 : 0;
+    var colsRect = cols.getBoundingClientRect(); // the ONE layout read in the whole sequence
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', 'fall-paths');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    cols.insertBefore(svg, chipsEl);
+
+    // control point: bow direction/depth come from the chip's own
+    // rotation, so the line documents THAT chip's fall, not a template.
+    function pathD(x1, y1, x2, y2, rotDeg) {
+      var mx = (x1 + x2) / 2;
+      var my = (y1 + y2) / 2;
+      var px = -(y2 - y1);
+      var py = x2 - x1;
+      var plen = Math.hypot(px, py) || 1;
+      px /= plen;
+      py /= plen;
+      var bow = Math.min(60, Math.max(12, Math.abs(rotDeg) * 2.2));
+      var sign = rotDeg < 0 ? -1 : 1;
+      var cx = mx + px * bow * sign;
+      var cy = my + py * bow * sign;
+      return 'M' + x1 + ',' + y1 + ' Q' + cx + ',' + cy + ' ' + x2 + ',' + y2;
+    }
+
+    // One synchronous pass over all visible chips: batched will-change,
+    // the instant scatter transform, path build + getTotalLength. Zero
+    // layout reads after this point.
+    var jobs = [];
+    var slot = 0;
+    visible.forEach(function (c) {
+      var live = c.classList.contains('chip-live');
+      var dx = +c.dataset.dx * k;
+      var dy = +c.dataset.dy * k;
+      var r = +c.dataset.r;
+      var dist = Math.hypot(+c.dataset.dx, +c.dataset.dy) * k;
+
+      var scatterTransform =
+        'translate3d(' + dx + 'px,' + dy + 'px,0.0001px) rotate(' + r + 'deg)';
       c.style.willChange = 'transform';
+      c.style.transform = scatterTransform;
+
+      var day = +c.dataset.day;
+      var top = +c.dataset.top;
+      var h = +c.dataset.h;
+      var slotX = (colsRect.width * (day - dshift + 0.5)) / columnCount;
+      var slotY = colsRect.height * ((top + h / 2) / 100);
+      var originX = slotX + dx;
+      var originY = slotY + dy;
+
+      var path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('vector-effect', 'non-scaling-stroke');
+      path.setAttribute('stroke', live ? 'var(--line-live)' : 'var(--line-dim)');
+      path.setAttribute('stroke-width', live ? '1.5' : '1.25');
+      path.setAttribute('d', pathD(originX, originY, slotX, slotY, r));
+      svg.appendChild(path);
+      var len = 0;
+      try {
+        len = path.getTotalLength();
+      } catch (e) {}
+      path.style.strokeDasharray = len + ' ' + len;
+      path.style.strokeDashoffset = String(len);
+
+      var delay = live ? 460 : Math.min(360, Math.floor(slot / 2) * 40);
+      if (!live) slot++;
+      var duration = live
+        ? 780
+        : 680 + Math.max(0, Math.min(180, dist * 0.35));
+
+      jobs.push({
+        chip: c,
+        path: path,
+        len: len,
+        delay: delay,
+        duration: duration,
+        live: live,
+        scatterTransform: scatterTransform,
+      });
     });
+
+    var inFlight = true;
+
+    function bulkCleanup() {
+      if (!inFlight) return;
+      inFlight = false;
+      window.removeEventListener('resize', onResizeMidFlight);
+      jobs.forEach(function (j) {
+        if (j.chipAnim) j.chipAnim.cancel();
+        if (j.pathAnim) j.pathAnim.cancel();
+        j.chip.style.willChange = '';
+        j.chip.style.transform = '';
+      });
+      enableDrag();
+    }
+
+    // Edge case: a resize/orientation-change mid-flight cancels the pass
+    // outright and snaps everything to rest — never restart the
+    // choreography (hero.md coordinate-strategy step 5).
+    function onResizeMidFlight() {
+      bulkCleanup();
+      if (svg.parentNode) svg.remove();
+    }
+    window.addEventListener('resize', onResizeMidFlight);
+
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        var slot = 0;
-        chips.forEach(function (c) {
-          var live = c.classList.contains('chip-live');
-          var delay = live ? 400 : Math.floor(slot++ / 2) * 40;
-          c.style.transition =
-            'transform 880ms cubic-bezier(0.16,1,0.3,1) ' + delay + 'ms';
-          c.style.transform = 'none';
-          c.addEventListener('transitionend', function done(e) {
-            if (e.propertyName !== 'transform') return;
-            c.removeEventListener('transitionend', done);
-            c.style.willChange = '';
-            c.style.transition = '';
-            if (live) c.classList.add('is-flash');
-          });
+        if (!inFlight) return;
+        var liveJob = null;
+        jobs.forEach(function (j) {
+          j.chipAnim = j.chip.animate(
+            [
+              { transform: j.scatterTransform },
+              { transform: 'translate3d(0,0,0.0001px) rotate(0)' },
+            ],
+            {
+              duration: j.duration,
+              delay: j.delay,
+              easing: 'cubic-bezier(0.16,1,0.3,1)',
+              fill: 'forwards',
+            }
+          );
+          j.pathAnim = j.path.animate(
+            [
+              { strokeDashoffset: j.len, offset: 0 },
+              { strokeDashoffset: 0, offset: 0.45 },
+              { strokeDashoffset: -j.len, offset: 1 },
+            ],
+            { duration: j.duration, delay: j.delay, easing: 'linear', fill: 'forwards' }
+          );
+          if (j.live) liveJob = j;
+        });
+
+        if (liveJob) {
+          liveJob.chipAnim.finished
+            .then(function () {
+              if (inFlight === false && !liveJob.chip.isConnected) return;
+              liveJob.chip.classList.add('is-flash');
+            })
+            .catch(function () {});
+        }
+
+        Promise.all(
+          jobs.map(function (j) {
+            return j.chipAnim.finished.catch(function () {});
+          })
+        ).then(function () {
+          if (!inFlight) return;
+          bulkCleanup();
+          setTimeout(function () {
+            if (svg.parentNode) svg.remove();
+          }, 100);
         });
       });
     });
@@ -210,12 +371,352 @@ const hourLabels = [
 </script>
 
 <script is:inline>
-  // Honesty instruments: the mono clock states the visitor's real local
-  // time, header dates are this week's real dates, and the now-line sits
-  // at the real time of day (only when today is on the grid and within
-  // its hours). Mono lines never invent facts (§7).
+  // Drag: pointer events on chips + the idler, grid-snap with a capped
+  // same-day collision search, lift material, a dashed drop-candidate
+  // ghost cell, and idler graduation (the hero's one narrative payoff —
+  // an idling chip with nowhere to be, until you give it a place). Fully
+  // disabled until the entrance settle finishes: `.chips`/`.idler` start
+  // `pointer-events:none` in CSS and the entrance script (above) is the
+  // only thing that flips them to `auto`. See hero.md "Interaction spec".
   (function () {
-    var DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    var slab = document.getElementById('hero-slab');
+    var cols = slab && slab.querySelector('.cols');
+    var chipsEl = slab && slab.querySelector('.chips');
+    if (!slab || !cols || !chipsEl) return;
+
+    var ROWS = 20; // 30-min rows spanning 08:00-18:00
+    var EASE = 'cubic-bezier(0.16,1,0.3,1)';
+
+    function isMobile() {
+      return window.innerWidth <= 640;
+    }
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    // live model of every placed chip, for the same-day collision search
+    var state = Array.prototype.slice
+      .call(chipsEl.querySelectorAll('.gchip'))
+      .map(function (el) {
+        return {
+          el: el,
+          day: +el.dataset.day,
+          row: Math.round(+el.dataset.top / 5),
+          dur: +el.dataset.durRows,
+        };
+      });
+
+    var ghost = document.createElement('div');
+    ghost.className = 'drop-ghost';
+    ghost.setAttribute('aria-hidden', 'true');
+    cols.appendChild(ghost);
+
+    function findFreeSlot(day, desiredRow, durRows, self) {
+      var maxRow = ROWS - durRows;
+      var occupied = state
+        .filter(function (s) {
+          return s.el !== self && s.day === day;
+        })
+        .map(function (s) {
+          return [s.row, s.row + s.dur];
+        });
+      function free(row) {
+        if (row < 0 || row > maxRow) return false;
+        return !occupied.some(function (o) {
+          return row < o[1] && row + durRows > o[0];
+        });
+      }
+      if (free(desiredRow)) return desiredRow;
+      for (var r = 1; r <= 6; r++) {
+        // search cap: 3 hours either side
+        if (free(desiredRow - r)) return desiredRow - r;
+        if (free(desiredRow + r)) return desiredRow + r;
+      }
+      return null; // nothing free nearby: spring back
+    }
+
+    // Manual two-number FLIP (current drag-follow rect -> resting rect):
+    // not routed through TF.flipBetween per hero.md — only a translate
+    // delta is involved here, not a full rect comparison.
+    function settle(el, fromRect, toRect, onDone) {
+      var dx = fromRect.left - toRect.left;
+      var dy = fromRect.top - toRect.top;
+      el.style.transition = 'none';
+      el.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0)';
+      void el.offsetWidth;
+      requestAnimationFrame(function () {
+        var duration = window.TF.reducedMotion ? 1 : 320;
+        var anim = el.animate(
+          [
+            { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0)' },
+            { transform: 'none' },
+          ],
+          { duration: duration, easing: EASE, fill: 'forwards' }
+        );
+        anim.finished
+          .then(function () {
+            anim.cancel();
+            el.style.transform = '';
+            el.style.willChange = '';
+            if (onDone) onDone();
+          })
+          .catch(function () {
+            el.style.transform = '';
+            el.style.willChange = '';
+            if (onDone) onDone();
+          });
+      });
+    }
+
+    function flashOnce(el) {
+      el.classList.remove('is-flash');
+      void el.offsetWidth;
+      el.classList.add('is-flash');
+    }
+
+    function attach(el) {
+      var pointerId = null;
+      var activated = false;
+      var isIdler = false;
+      var startX = 0,
+        startY = 0;
+      var dragOffsetX = 0,
+        dragOffsetY = 0;
+      var colsRect = null;
+      var colWidth = 0,
+        rowHeight = 0,
+        columnCount = 5,
+        dshift = 0;
+      var durRows = 1;
+      var longPressTimer = null;
+      var candidateCol = 0,
+        candidateRow = 0;
+      var rafPending = false;
+      var lastX = 0,
+        lastY = 0;
+
+      function beginDrag(clientX, clientY) {
+        isIdler = el.classList.contains('idler');
+        // The idler runs the looping idle-drift CSS animation on transform;
+        // it stays running (is-visible) while dragging inside the hero and
+        // would override the inline drag transform each frame. Kill it for
+        // the grab. A successful drop strips the .idler class so drift can't
+        // resume; the spring-back branch restores the override so a still-
+        // idle chip drifts again.
+        if (isIdler) el.style.animation = 'none';
+        activated = true;
+        try {
+          el.setPointerCapture(pointerId);
+        } catch (e) {}
+        columnCount = isMobile() ? 3 : 5;
+        dshift = isMobile() ? 2 : 0;
+        colsRect = cols.getBoundingClientRect(); // discrete interaction start: this read is fine
+        colWidth = colsRect.width / columnCount;
+        rowHeight = colsRect.height / ROWS;
+        durRows = +el.dataset.durRows || 1;
+        var r = el.getBoundingClientRect();
+        dragOffsetX = clientX - r.left;
+        dragOffsetY = clientY - r.top;
+        el.style.willChange = 'transform';
+        el.classList.add('is-lifted', 'is-dragging');
+        ghost.style.display = 'block';
+        updateGhost(clientX, clientY);
+      }
+
+      function updateGhost(clientX, clientY) {
+        var left = clientX - colsRect.left - dragOffsetX;
+        var top = clientY - colsRect.top - dragOffsetY;
+        candidateCol = clamp(Math.round(left / colWidth), 0, columnCount - 1);
+        candidateRow = clamp(Math.round(top / rowHeight), 0, ROWS - durRows);
+        ghost.style.left = candidateCol * colWidth + 3 + 'px';
+        ghost.style.width = colWidth - 6 + 'px';
+        ghost.style.top = candidateRow * rowHeight + 'px';
+        ghost.style.height = durRows * rowHeight + 'px';
+      }
+
+      function maybeActivate(e) {
+        var dxTot = e.clientX - startX;
+        var dyTot = e.clientY - startY;
+        var absX = Math.abs(dxTot),
+          absY = Math.abs(dyTot);
+        if (e.pointerType === 'mouse') {
+          if (absX > 3 || absY > 3) beginDrag(e.clientX, e.clientY);
+          return;
+        }
+        // touch / pen: horizontal intent activates; vertical intent aborts
+        // and lets the page scroll natively (never preventDefault there).
+        if (absY > 6 && absY > absX) {
+          cleanup();
+          return;
+        }
+        if (absX > 6 && absX > absY) {
+          clearTimeout(longPressTimer);
+          el.style.touchAction = 'none';
+          e.preventDefault();
+          beginDrag(e.clientX, e.clientY);
+        }
+      }
+
+      function onMove(e) {
+        if (pointerId === null || e.pointerId !== pointerId) return;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (!activated) {
+          maybeActivate(e);
+          return;
+        }
+        e.preventDefault();
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(function () {
+          rafPending = false;
+          var fx = lastX - startX;
+          var fy = lastY - startY;
+          el.style.transform =
+            'translate3d(' + fx + 'px,' + fy + 'px,0) scale(1.03) rotate(1.5deg)';
+          updateGhost(lastX, lastY);
+        });
+      }
+
+      function onUp(e) {
+        if (pointerId === null || e.pointerId !== pointerId) return;
+        clearTimeout(longPressTimer);
+        if (!activated) {
+          cleanup();
+          return;
+        }
+        finishDrag(e.clientX, e.clientY);
+      }
+
+      function finishDrag(clientX, clientY) {
+        var fromRect = el.getBoundingClientRect(); // current drag-follow rect
+        var overCols =
+          clientX >= colsRect.left &&
+          clientX <= colsRect.right &&
+          clientY >= colsRect.top &&
+          clientY <= colsRect.bottom;
+
+        var attempt = isIdler ? overCols : true;
+        var resolvedRow = attempt
+          ? findFreeSlot(candidateCol + dshift, candidateRow, durRows, isIdler ? null : el)
+          : null;
+
+        el.classList.remove('is-lifted', 'is-dragging');
+        ghost.style.display = 'none';
+        el.style.touchAction = '';
+
+        if (resolvedRow === null) {
+          el.style.transform = 'none';
+          var restRect = el.getBoundingClientRect();
+          settle(el, fromRect, restRect, function () {
+            // still-idle chip: clear the inline override so idle-drift resumes
+            if (isIdler) el.style.animation = '';
+          });
+          cleanup();
+          return;
+        }
+
+        var day = candidateCol + dshift;
+        var top = resolvedRow * 5;
+        var h = durRows * 5;
+
+        if (isIdler) {
+          el.classList.remove('idler');
+          el.classList.add('gchip');
+          chipsEl.appendChild(el);
+          state.push({ el: el, day: day, row: resolvedRow, dur: durRows });
+        } else {
+          var entry = null;
+          for (var i = 0; i < state.length; i++) {
+            if (state[i].el === el) {
+              entry = state[i];
+              break;
+            }
+          }
+          if (entry) {
+            entry.day = day;
+            entry.row = resolvedRow;
+          }
+        }
+
+        el.dataset.day = String(day);
+        el.dataset.top = String(top);
+        el.dataset.h = String(h);
+        el.style.setProperty('--d', String(day));
+        el.style.transform = 'none';
+        el.style.top = top + '%';
+        el.style.height = h + '%';
+        var toRect = el.getBoundingClientRect();
+
+        var wasIdler = isIdler;
+        settle(el, fromRect, toRect, function () {
+          if (wasIdler) sessionStorage.setItem('tf-idler-placed', '1');
+          flashOnce(el);
+        });
+        cleanup();
+      }
+
+      function cleanup() {
+        // Single owner of teardown for both mouse and touch paths: clear the
+        // long-press timer first, before removing listeners. Without this, a
+        // vertical scroll-abort (which removes onMove/onUp/onCancel) leaves an
+        // orphaned 350ms timer that later fires beginDrag with stale coords
+        // and strands a chip lifted with a dashed ghost and no live listeners.
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        if (pointerId !== null) {
+          try {
+            el.releasePointerCapture(pointerId);
+          } catch (e) {}
+        }
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
+        pointerId = null;
+        activated = false;
+      }
+
+      el.addEventListener('pointerdown', function (e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        pointerId = e.pointerId;
+        startX = e.clientX;
+        startY = e.clientY;
+        activated = false;
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
+        if (e.pointerType !== 'mouse') {
+          longPressTimer = setTimeout(function () {
+            if (!activated) beginDrag(startX, startY);
+          }, 350);
+        }
+      });
+    }
+
+    Array.prototype.slice.call(chipsEl.querySelectorAll('.gchip')).forEach(attach);
+    var idlerEl = document.querySelector('.idler');
+    if (idlerEl) attach(idlerEl);
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var hero = document.getElementById('hero');
+      if (hero && idlerEl) {
+        window.TF.onVisible(
+          hero,
+          function (vis) {
+            idlerEl.classList.toggle('is-visible', vis);
+          },
+          { once: false }
+        );
+      }
+    });
+  })();
+</script>
+
+<script is:inline>
+  // Honesty instruments: the header dates are this week's real dates and
+  // the now-line sits at the real time of day. Mono lines never invent
+  // facts (§7).
+  (function () {
     var pad = function (n) {
       return (n < 10 ? '0' : '') + n;
     };
@@ -233,11 +734,9 @@ const hourLabels = [
 
     var todayCol = dow >= 1 && dow <= 5 ? dow - 1 : -1;
     if (todayCol !== -1) {
-      document
-        .querySelectorAll('#hero-slab .is-today')
-        .forEach(function (el) {
-          el.classList.remove('is-today');
-        });
+      document.querySelectorAll('#hero-slab .is-today').forEach(function (el) {
+        el.classList.remove('is-today');
+      });
       var col = document.querySelector('[data-col="' + todayCol + '"]');
       var hd = document.querySelector('[data-hd="' + todayCol + '"]');
       if (col) col.classList.add('is-today');
@@ -248,10 +747,6 @@ const hourLabels = [
     var lineTime = document.getElementById('nl-time');
     function tick() {
       var t = new Date();
-      var clock = document.getElementById('hero-clock');
-      if (clock)
-        clock.textContent =
-          ' - ' + DAYS[t.getDay()] + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
       if (!line) return;
       var mins = t.getHours() * 60 + t.getMinutes();
       var colEl = document.querySelector('[data-col="' + todayCol + '"]');
@@ -269,19 +764,39 @@ const hourLabels = [
       line.style.left = colBox.left - colsBox.left + 'px';
       line.style.width = colBox.width + 'px';
       line.style.top = ((mins - 480) / 600) * 100 + '%';
-      if (lineTime)
-        lineTime.textContent = pad(t.getHours()) + ':' + pad(t.getMinutes());
+      if (lineTime) lineTime.textContent = pad(t.getHours()) + ':' + pad(t.getMinutes());
     }
+    // Minute-aligned tick: align the first re-tick to the wall-clock
+    // minute boundary so the now-line steps on the minute, then hold a
+    // 60s cadence.
     tick();
-    setInterval(tick, 60000);
-    window.addEventListener('resize', tick);
+    var msToNextMinute = 60000 - (Date.now() % 60000);
+    setTimeout(function () {
+      tick();
+      setInterval(tick, 60000);
+    }, msToNextMinute);
+    // rAF-coalesce like the section's other resize consumers (Keys, ThreePlaces
+    // debounce; hero entrance is one-shot): tick() interleaves two rect reads
+    // with three style writes, so run it at most once per frame instead of once
+    // per raw resize event to avoid forced-synchronous-layout thrash on drag.
+    var resizePending = false;
+    window.addEventListener('resize', function () {
+      if (resizePending) return;
+      resizePending = true;
+      requestAnimationFrame(function () {
+        resizePending = false;
+        tick();
+      });
+    });
   })();
 </script>
 
 <style>
   .hero {
     overflow: hidden;
-    padding-top: 72px;
+    /* clear the floating nav capsule (bottom ~76px) with real breathing
+       room below it before the H1 */
+    padding-top: 132px;
   }
 
   .hero .container {
@@ -306,8 +821,47 @@ const hourLabels = [
     flex-wrap: wrap;
   }
 
-  .honesty {
-    margin: 0;
+  /* free/no-card trust cue at the moment of highest intent — mirrors the
+     closing's honesty-line voice (Closing.astro NO CARD REQUIRED) */
+  .hero-trust {
+    margin-top: 14px;
+  }
+
+  /* discoverability hint for the drag interaction: pointer-only, revealed
+     on slab hover, degrades to nothing on touch and reduced motion */
+  .drag-hint {
+    position: absolute;
+    top: -22px;
+    right: 2px;
+    z-index: 4;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--ink-muted);
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+  }
+
+  @media (hover: hover) {
+    .drag-hint {
+      display: block;
+      transform: translateY(-4px);
+      transition:
+        opacity 220ms var(--ease-settle),
+        transform 220ms var(--ease-settle);
+    }
+
+    .slab:hover .drag-hint {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drag-hint {
+      transition: none;
+      transform: none;
+    }
   }
 
   /* --- the slab: machined surface holding the week (§2.6) --- */
@@ -424,9 +978,23 @@ const hourLabels = [
     box-shadow: inset -1px 0 0 var(--aqua-rim);
   }
 
+  /* v2: transient fall-path overlay (JS-created/removed); chips paint
+     over their own trailing line regardless of DOM order */
+  .fall-paths {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   .chips {
     position: absolute;
     inset: 0;
+    z-index: 2;
+    /* v2: drag is a discrete enhancement, gated off until the entrance
+       settle's bulk cleanup flips this to auto (see entrance script) */
+    pointer-events: none;
   }
 
   .gchip {
@@ -440,6 +1008,49 @@ const hourLabels = [
     min-height: 18px;
     overflow: hidden;
     white-space: nowrap;
+  }
+
+  /* v2: draggable chips + the idler share one grab affordance */
+  .gchip,
+  .idler {
+    cursor: grab;
+    user-select: none;
+  }
+
+  .gchip.is-dragging,
+  .idler.is-dragging {
+    cursor: grabbing;
+    z-index: 5;
+  }
+
+  /* v2: lift state (direction §4.1 pick-up spec) — a discrete, one-shot,
+     user-initiated state change, not a forever loop, so a plain
+     transition on the material properties is the sanctioned pattern here
+     (unlike the page's looping lit/pressed states elsewhere). */
+  .is-lifted {
+    transition:
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out);
+  }
+
+  .gchip.is-lifted,
+  .idler.is-lifted {
+    background: var(--chip-c);
+    color: #fff;
+    box-shadow: var(--shadow-penumbra);
+  }
+
+  /* v2: drop-candidate ghost cell — dashed + dim, never solid aqua (a
+     candidate is not yet a live/placed fact) */
+  .drop-ghost {
+    display: none;
+    position: absolute;
+    border: 1px dashed var(--line-dim);
+    background: var(--aqua-film-04);
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .c-t {
@@ -498,7 +1109,9 @@ const hourLabels = [
     );
   }
 
-  /* one unplaced chip idles in the margin, waiting (§6.1) */
+  /* one unplaced chip idles in the margin: it is the drag tutor and the
+     narrative tension. Drag it onto the grid and it settles exactly the
+     way the other twenty did, rim flash included (§6.1, v2). */
   .idler {
     position: absolute;
     right: -128px;
@@ -507,6 +1120,13 @@ const hourLabels = [
     font-size: 12px;
     font-weight: 500;
     animation: idle-drift 7s ease-in-out infinite alternate;
+    animation-play-state: paused;
+    /* gated the same way as .chips until the entrance settle completes */
+    pointer-events: none;
+  }
+
+  .idler.is-visible {
+    animation-play-state: running;
   }
 
   @keyframes idle-drift {
@@ -524,33 +1144,8 @@ const hourLabels = [
     }
   }
 
-  /* reduced motion: pre-settled grid + the static "before" strip (§5) */
-  .before-strip {
-    display: none;
-    align-items: center;
-    gap: 14px;
-    margin-top: 40px;
-  }
-
-  .mini-chip {
-    display: inline-block;
-    padding: 4px 10px;
-    font-size: 12px;
-    font-weight: 500;
-    background: color-mix(in oklab, var(--chip-c) 24%, transparent);
-    box-shadow: inset 0 0 0 0.5px var(--chip-c);
-    color: oklch(from var(--chip-c) 0.82 min(c, 0.1) h);
-    border-radius: 6px;
-  }
-
-  .strip-label {
-    margin-left: 6px;
-  }
-
+  /* reduced motion: the grid renders pre-settled; the idler holds still */
   @media (prefers-reduced-motion: reduce) {
-    .before-strip {
-      display: flex;
-    }
     .idler {
       animation: none;
     }
@@ -558,7 +1153,11 @@ const hourLabels = [
 
   @media (max-width: 640px) {
     .hero {
-      padding-top: 48px;
+      /* matches the foundation's .section scroll-margin-top:96px so the
+         H1's first line always clears the fixed nav capsule (bottom
+         edge ~76px) instead of rendering tucked under it (defect: 48px
+         left a 28px overlap at 390px) */
+      padding-top: 96px;
     }
 
     .slab {

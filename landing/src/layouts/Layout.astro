@@ -9,6 +9,25 @@ interface Props {
 const { title, description } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = new URL('/og.png', Astro.site);
+const imageAlt =
+  'Taskflow: a week grid with task chips settled into their time slots under the headline Everything has a time.';
+
+// SoftwareApplication node so crawlers get an unambiguous app + free-pricing
+// signal. Built here so it stays in sync with the title/description props.
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Taskflow',
+  applicationCategory: 'ProductivityApplication',
+  operatingSystem: 'Web',
+  url: canonical.href,
+  description,
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+};
 ---
 
 <!doctype html>
@@ -32,18 +51,25 @@ const ogImage = new URL('/og.png', Astro.site);
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="Taskflow: a week grid with task chips settled into their time slots under the headline Everything has a time."
-    />
+    <meta property="og:image:alt" content={imageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(schema)} />
 
     <link
       rel="preload"
       href="/fonts/sentient-300.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/sentient-400.woff2"
       as="font"
       type="font/woff2"
       crossorigin
@@ -67,6 +93,48 @@ const ogImage = new URL('/og.png', Astro.site);
       // Gate for enhancement-only styles (scroll reveals). Without JS the
       // page renders complete and settled.
       document.documentElement.classList.add('js');
+    </script>
+
+    <script is:inline>
+      // TF seed — runs synchronously in <head>, before the <body> (and
+      // therefore before any component markup or component script) is
+      // parsed. Component scripts are `is:inline` and execute during
+      // parsing, so only symbols seeded here are safe to read at their
+      // top level. `motion.js` below is a deferred module: it extends
+      // this same object once the document is fully parsed (see the
+      // ordering note next to that <script> tag and the JSDoc header in
+      // src/scripts/motion.js). Never reassign `window.TF` — only
+      // Object.assign onto it.
+      window.TF = {
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        fmtClock: function (d) {
+          d = d || new Date();
+          var p = function (n) {
+            return (n < 10 ? '0' : '') + n;
+          };
+          return (
+            ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()] +
+            ' ' +
+            p(d.getHours()) +
+            ':' +
+            p(d.getMinutes())
+          );
+        },
+      };
+    </script>
+    <!--
+      motion.js extends window.TF with onVisible/drawPath/flipBetween/ticker.
+      A non-`is:inline` <script> containing an `import` is Astro's local-
+      script pattern: it gets bundled via Vite and injected as a deferred
+      ES module, so it always finishes running before `DOMContentLoaded`
+      fires but AFTER every section's own `is:inline` body script has
+      already run (those execute synchronously during parsing). Section
+      scripts must therefore call TF.onVisible/drawPath/flipBetween/ticker
+      from inside a DOMContentLoaded (or later) callback, never at their
+      own top level.
+    -->
+    <script>
+      import '../scripts/motion.js';
     </script>
   </head>
   <body>

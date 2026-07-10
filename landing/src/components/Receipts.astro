@@ -1,55 +1,182 @@
 ---
-// §6.6 — the receipts ticker: only shipped facts, all verified at merge
-// time. 4 views = CalendarView.tsx:25; natural dates = ChronoDateParser;
-// RRULE = src/utils/recurrence.ts; Google sync = api/google/*; keyboard
-// first = useGlobalShortcuts.ts.
+// §4.6 / closing.md — the icon marquee: only shipped facts, all verified at
+// merge time, drawn glyphs instead of text (owner MUST — no scrolling text).
+// week grid = CalendarView.tsx:25; natural dates = ChronoDateParser;
+// recurrence = src/utils/recurrence.ts; Google sync = api/google/*;
+// keyboard first = useGlobalShortcuts.ts; command bar = Cmd+K palette;
+// list/board/month = the three views beyond week; now line = the live
+// today-column tick.
+import Glyphs from './icons/Glyphs.astro';
+
 const facts = [
-  '4 CALENDAR VIEWS',
-  'NATURAL DATES',
-  'RRULE RECURRENCE',
-  'GOOGLE SYNC',
-  'KEYBOARD FIRST',
+  { id: 'g-week', caption: 'WEEK GRID' },
+  { id: 'g-dates', caption: 'NATURAL DATES' },
+  { id: 'g-loop', caption: 'RECURRENCE' },
+  { id: 'g-sync', caption: 'GOOGLE SYNC' },
+  { id: 'g-key', caption: 'KEYBOARD FIRST' },
+  { id: 'g-cmd', caption: 'COMMAND BAR' },
+  { id: 'g-list', caption: 'LIST' },
+  { id: 'g-board', caption: 'BOARD' },
+  { id: 'g-month', caption: 'MONTH' },
+  { id: 'g-now', caption: 'NOW LINE' },
 ];
-const line = facts.join(' - ') + ' - ';
+// track holds two passes back to back so translating -50% loops seamlessly
+const track = [...facts, ...facts];
 ---
+
+<Glyphs />
 
 <aside class="receipts" aria-label="What ships today">
   <p class="sr-only">
-    Shipped today: four calendar views, natural language dates, RRULE
-    recurrence, Google Calendar sync, keyboard-first control.
+    Shipped today: the week grid, natural language dates, recurrence, Google
+    Calendar sync, keyboard-first control, the command bar, list, board, and
+    month views, and the live now line.
   </p>
-  <div class="band" aria-hidden="true">
+  <div class="band mask-fade-x" aria-hidden="true">
     <div class="track">
-      <span class="mono run">{line}</span>
-      <span class="mono run">{line}</span>
+      {
+        track.map((f) => (
+          <div class="item">
+            <svg class="g-icon" width="32" height="32">
+              <use href={`#${f.id}`} />
+            </svg>
+            <span class="g-caption">{f.caption}</span>
+          </div>
+        ))
+      }
     </div>
   </div>
 </aside>
+
+<script is:inline>
+  (function () {
+    var band = document.querySelector('.receipts .band');
+    var trackEl = document.querySelector('.receipts .track');
+    if (!band || !trackEl) return;
+
+    var uses = trackEl.querySelectorAll('use');
+    var lens = {};
+
+    function lenFor(id) {
+      if (lens[id] !== undefined) return lens[id];
+      var p = document.querySelector('#' + id + ' path');
+      var l = 0;
+      try {
+        l = p ? p.getTotalLength() : 0;
+      } catch (e) {
+        l = 0;
+      }
+      lens[id] = l;
+      return l;
+    }
+
+    function idOf(use) {
+      var href = use.getAttribute('href') || use.getAttribute('xlink:href') || '';
+      return href.replace('#', '');
+    }
+
+    var reduced = window.TF.reducedMotion;
+
+    // Every <use> starts fully undrawn (dasharray/dashoffset = its glyph's
+    // real length, read off the real <path> in the sprite — <use> itself
+    // cannot call getTotalLength()); reduced motion sets them straight to
+    // drawn instead and never wires the observers below.
+    for (var i = 0; i < uses.length; i++) {
+      var L = lenFor(idOf(uses[i]));
+      if (!L) continue;
+      uses[i].style.strokeDasharray = String(L);
+      uses[i].style.strokeDashoffset = reduced ? '0' : String(L);
+    }
+
+    if (reduced) return;
+
+    function wire() {
+      // Draw every glyph in once, staggered, the first time the band enters
+      // the viewport — one shared observer instead of one per item, for a
+      // purely decorative one-shot stroke-draw.
+      var drewIn = false;
+      function drawAllIn() {
+        if (drewIn) return;
+        drewIn = true;
+        var items = trackEl.querySelectorAll('.item');
+        items.forEach(function (item, i) {
+          var use = item.querySelector('use');
+          if (!use) return;
+          var L = lenFor(idOf(use));
+          if (!L) return;
+          use.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], {
+            duration: 500,
+            delay: i * 40,
+            easing: 'cubic-bezier(0.16,1,0.3,1)',
+            fill: 'forwards',
+          });
+        });
+      }
+
+      // Ambient marquee: pause the instant .band leaves the viewport in
+      // either direction (continuous enter/exit, never a one-shot).
+      // will-change is scoped to exactly when the track is moving (promote
+      // the compositor layer on enter, release the GPU texture on exit)
+      // rather than pinned permanently in CSS.
+      window.TF.onVisible(
+        band,
+        function (visible) {
+          trackEl.style.animationPlayState = visible ? 'running' : 'paused';
+          trackEl.style.willChange = visible ? 'transform' : '';
+          if (visible) drawAllIn();
+        },
+        { once: false, threshold: 0 }
+      );
+    }
+
+    document.addEventListener('DOMContentLoaded', wire);
+  })();
+</script>
 
 <style>
   .receipts {
     border-top: 1px solid var(--hairline);
     border-bottom: 1px solid var(--hairline);
-    padding-block: 18px;
+    padding-block: 28px;
   }
 
   .band {
     overflow: hidden;
-    white-space: nowrap;
   }
 
   .track {
-    display: inline-flex;
-    animation: tick 45s linear infinite;
-    will-change: transform;
+    display: flex;
+    align-items: flex-start;
+    gap: 56px;
+    width: max-content;
+    animation: tick 50s linear infinite;
+    animation-play-state: paused;
+    /* will-change is toggled in JS around the active-drift window (set on
+       band-enter, cleared on band-exit) so the compositor layer isn't
+       pinned for the page lifetime while the marquee is parked off-screen. */
   }
 
-  .run {
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    color: var(--ink-muted);
+  .item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     flex: none;
-    white-space: pre;
+    width: 88px;
+  }
+
+  .g-icon {
+    flex: none;
+    color: var(--line-dim);
+  }
+
+  .g-caption {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+    text-align: center;
+    text-transform: uppercase;
   }
 
   @keyframes tick {
@@ -58,19 +185,17 @@ const line = facts.join(' - ') + ' - ';
     }
   }
 
-  /* reduced motion: the band holds still and wraps, nothing is clipped */
+  /* reduced motion: the band holds still, the duplicate pass is hidden,
+     the single row wraps, every glyph renders fully drawn (handled in JS
+     above, which never attaches the observers in this branch). */
   @media (prefers-reduced-motion: reduce) {
     .track {
       animation: none;
+      flex-wrap: wrap;
+      width: auto;
     }
 
-    .band,
-    .track,
-    .track .run {
-      white-space: normal;
-    }
-
-    .track :last-child {
+    .track > .item:nth-child(n + 11) {
       display: none;
     }
   }

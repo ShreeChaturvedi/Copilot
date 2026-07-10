@@ -1,10 +1,21 @@
 ---
-// §6.8 — hairline, mono 11px, builder credit + GitHub. Nothing else.
+// §6.8 / §4.8 — hairline, mono 11px, builder credit + GitHub, plus the
+// drawn-glyph mark (closing.md "Footer glyph"): reuses the shared WEEK
+// GRID symbol, the most "brand" glyph, static — a footer credit line is
+// not a reveal moment.
+import Glyphs from './icons/Glyphs.astro';
 ---
+
+<Glyphs />
 
 <footer class="footer">
   <div class="container foot-row">
-    <span class="mono foot-text">BUILT BY SHREE CHATURVEDI</span>
+    <div class="foot-brand">
+      <svg width="12" height="12" viewBox="0 0 32 32" aria-hidden="true" class="foot-mark"
+        ><use href="#g-week"></use></svg
+      >
+      <span class="mono foot-text">BUILT BY SHREE CHATURVEDI</span>
+    </div>
     <a
       class="mono foot-text foot-link"
       href="https://github.com/ShreeChaturvedi/taskflow-calendar"
@@ -27,6 +38,17 @@
     gap: 16px;
   }
 
+  .foot-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .foot-mark {
+    flex: none;
+    color: var(--ink-muted);
+  }
+
   .foot-text {
     font-size: 11px;
     letter-spacing: 0.08em;
@@ -34,6 +56,11 @@
   }
 
   .foot-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 4px;
+    margin-block: -14px;
     text-decoration: none;
     transition: color var(--dur-2) var(--ease-out);
   }

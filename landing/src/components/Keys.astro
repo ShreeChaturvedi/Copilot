@@ -1,17 +1,62 @@
 ---
-// §6.4 — "Plan without leaving the keys." Every keycap here is a real
-// shipped shortcut (src/hooks/useGlobalShortcuts.ts): Cmd/Ctrl+K command
-// bar, T today, D/W/M/L views, N new task. Keycaps press themselves once,
-// IO-gated.
+// "Plan without leaving the keys." — spec keys.md + synthesis (c) Keys.
+// D is CUT per synthesis: rail = Cmd+K, T, W, M, L, N (six keys). D/W/M/L
+// remain real, shipped shortcuts and still appear in the Cmd+K panel's own
+// "Switch view" row. Press times self-derive from measured key geometry
+// (see script below) — nothing here is a hardcoded schedule.
 const keys = [
-  { cap: '⌘K', label: 'Command bar', wide: true },
-  { cap: 'T', label: 'Today' },
-  { cap: 'D', label: 'Day' },
-  { cap: 'W', label: 'Week' },
-  { cap: 'M', label: 'Month' },
-  { cap: 'L', label: 'List' },
-  { cap: 'N', label: 'New task' },
+  { id: 'cmdk', cap: '⌘K', label: 'Command bar', wide: true },
+  { id: 't', cap: 'T', label: 'Today' },
+  { id: 'w', cap: 'W', label: 'Week' },
+  { id: 'm', cap: 'M', label: 'Month' },
+  { id: 'l', cap: 'L', label: 'List' },
+  { id: 'n', cap: 'N', label: 'New task' },
 ];
+
+// Task set: 5 persistent chips, real DOM nodes reused via FLIP across every
+// view, never re-created. "Today" for the Day view is chip #2 (Ship v2),
+// arbitrary but fixed. The 6th (N-spawned) chip is the hero's own live
+// chip title, a deliberate callback.
+const chips = [
+  { title: 'Standup', dow: 0, start: 9 * 60, dur: 30, hue: 'blue' },
+  { title: 'Design review', dow: 1, start: 11 * 60, dur: 60, hue: 'violet' },
+  { title: 'Ship v2', dow: 2, start: 14 * 60, dur: 90, hue: 'indigo' },
+  { title: 'Gym', dow: 3, start: 8 * 60 + 30, dur: 45, hue: 'green' },
+  { title: 'Budget pass', dow: 4, start: 16 * 60, dur: 30, hue: 'orange' },
+];
+const DOW_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+
+// Week-view grid math (also reused verbatim by the client script — see the
+// RANGE_START/RANGE_TOTAL/HEADER_H/GUTTER_W constants there). Computed here
+// once so the SSR/no-JS/reduced-motion baseline renders pixel-identical to
+// the JS-driven week layout, per the "one static rendering" contract.
+const RANGE_START = 8 * 60;
+const RANGE_TOTAL = 9 * 60;
+const HEADER_H = 14;
+const GUTTER_W = 7;
+const COL_W = (100 - GUTTER_W) / 5;
+function gridPct(min: number) {
+  return ((min - RANGE_START) / RANGE_TOTAL) * (100 - HEADER_H);
+}
+const weekRects = chips.map((c) => {
+  const top = HEADER_H + gridPct(c.start);
+  const height = Math.max(gridPct(c.start + c.dur) - gridPct(c.start), 5);
+  return {
+    top,
+    height,
+    left: GUTTER_W + c.dow * COL_W + 0.6,
+    width: COL_W - 1.2,
+    time: `${String(Math.floor(c.start / 60)).padStart(2, '0')}:${String(c.start % 60).padStart(2, '0')}`,
+  };
+});
+const hourMarks = [9 * 60, 12 * 60, 15 * 60].map((m) => ({
+  label: String(m / 60 === 12 ? 12 : m / 60),
+  top: HEADER_H + gridPct(m),
+}));
+const monthCells = Array.from({ length: 21 }, (_, i) => ({
+  row: Math.floor(i / 7),
+  col: i % 7,
+}));
 ---
 
 <section class="section" id="keys">
@@ -23,42 +68,699 @@ const keys = [
         start a task, or open the command bar and type where it should go.
       </p>
     </div>
-    <ul class="cluster" id="keycluster" data-reveal>
-      {
-        keys.map((k) => (
-          <li class="keyunit">
-            <kbd class:list={['keycap', 'mono', { wide: k.wide }]}>{k.cap}</kbd>
-            <span class="keylabel">{k.label}</span>
-          </li>
-        ))
-      }
-    </ul>
+
+    <div class="keys-layout" id="keys-layout" data-reveal>
+      <div
+        class="rail"
+        id="keys-rail"
+        role="img"
+        aria-label="Six keyboard shortcuts: Command bar, Today, Week, Month, List, New task."
+      >
+        <div class="rail-viewport mask-fade-x" id="rail-viewport">
+          <span class="rail-bracket rail-bracket-t" aria-hidden="true"></span>
+          <span class="rail-bracket rail-bracket-b" aria-hidden="true"></span>
+          <ul class="track" id="keys-track">
+            {
+              keys.map((k) => (
+                <li class="keyunit" data-key={k.id}>
+                  <kbd
+                    class:list={['keycap-xl', 'mono', { 'keycap-xl--wide': k.wide }]}
+                    aria-hidden="true"
+                  >
+                    <span class="cap-face"></span>
+                    <span class="cap-legend">{k.cap}</span>
+                  </kbd>
+                  <span class="keylabel">{k.label}</span>
+                </li>
+              ))
+            }
+            {
+              keys.map((k) => (
+                <li class="keyunit keyunit--dup" aria-hidden="true">
+                  <kbd
+                    class:list={['keycap-xl', 'mono', { 'keycap-xl--wide': k.wide }]}
+                  >
+                    <span class="cap-face"></span>
+                    <span class="cap-legend">{k.cap}</span>
+                  </kbd>
+                  <span class="keylabel">{k.label}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+
+      <div
+        class="app-stage"
+        id="keys-stage"
+        role="img"
+        aria-label="A mock of the Taskflow app answering each shortcut: Today opens the day view, Week shows the five-day grid, Month shows the month, List shows the task list, New task adds a row, and Cmd+K opens the command bar."
+      >
+        <div class="stage-card">
+          <div class="stage-header">
+            <span class="stage-view mono" id="stage-view-label">WEEK</span>
+            <span class="stage-date mono" id="stage-date-label"></span>
+          </div>
+          <div class="stage-canvas" id="stage-canvas">
+            <div class="chrome-week" id="chrome-week">
+              <div class="week-head">
+                {DOW_LABELS.map((d) => <span class="wd">{d}</span>)}
+              </div>
+              <div class="week-gutter">
+                {hourMarks.map((h) => (
+                  <span class="hr mono" style={`top:${h.top}%`}>{h.label}</span>
+                ))}
+              </div>
+              <div class="week-gridlines"></div>
+            </div>
+
+            <div class="chrome-day" id="chrome-day">
+              <div class="day-head">
+                <span class="day-dow mono"></span>
+                <span class="day-disc flashable" id="day-disc">
+                  <span class="day-disc-num mono"></span>
+                </span>
+              </div>
+            </div>
+
+            <div class="chrome-month" id="chrome-month">
+              <div class="month-grid">
+                {
+                  monthCells.map((c) => (
+                    <div class="month-cell" data-monthcell={`${c.row}-${c.col}`}>
+                      <span class="month-num mono"></span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {
+              chips.map((c, i) => (
+                <div
+                  class="chip mock-chip"
+                  data-view="week"
+                  style={`--chip-c: var(--hue-${c.hue}); top:${weekRects[i].top}%; left:${weekRects[i].left}%; width:${weekRects[i].width}%; height:${weekRects[i].height}%`}
+                >
+                  <span class="c-ring" aria-hidden="true"></span>
+                  <span class="c-t mono">{weekRects[i].time}</span>
+                  <span class="c-ti">{c.title}</span>
+                </div>
+              ))
+            }
+            <div
+              class="chip mock-chip is-spawn flashable"
+              data-view="list"
+              style="--chip-c: var(--aqua); top:0%; left:2%; width:96%; height:13.9%"
+              hidden
+            >
+              <span class="c-ring" aria-hidden="true"></span>
+              <span class="c-t mono"></span>
+              <span class="c-ti">Email vendor</span>
+            </div>
+
+            <div class="cmdk-overlay" id="cmdk-overlay" hidden>
+              <div class="cmdk-scrim"></div>
+              <div class="cmdk-panel">
+                <div class="cmdk-input mono">
+                  <span class="cmdk-caret" aria-hidden="true"></span>
+                </div>
+                <ul class="cmdk-rows">
+                  <li>
+                    <span>Go to today</span>
+                    <kbd class="mini-key mono">T</kbd>
+                  </li>
+                  <li>
+                    <span>New task</span>
+                    <kbd class="mini-key mono">N</kbd>
+                  </li>
+                  <li>
+                    <span>Switch view</span>
+                    <span class="mini-key-group">
+                      <kbd class="mini-key mono">D</kbd>
+                      <kbd class="mini-key mono">W</kbd>
+                      <kbd class="mini-key mono">M</kbd>
+                      <kbd class="mini-key mono">L</kbd>
+                    </span>
+                  </li>
+                  <li>
+                    <span>Toggle theme</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
 <script is:inline>
-  // One pass of self-presses, IO-gated, 160ms down per key.
   (function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var cluster = document.getElementById('keycluster');
-    if (!cluster || !('IntersectionObserver' in window)) return;
-    var caps = cluster.querySelectorAll('.keycap');
-    var io = new IntersectionObserver(
-      function (entries) {
-        if (!entries.some(function (e) { return e.isIntersecting; })) return;
-        io.disconnect();
-        caps.forEach(function (cap, i) {
-          setTimeout(function () {
-            cap.classList.add('pressed');
-            setTimeout(function () {
-              cap.classList.remove('pressed');
-            }, 160);
-          }, 300 + i * 190);
+    var EASE_OUT = 'cubic-bezier(0.25,1,0.5,1)';
+    var EASE_SETTLE = 'cubic-bezier(0.16,1,0.3,1)';
+    var EASE_BACK = 'cubic-bezier(0,0,.85,1.25)';
+    var SPEED = 34.1; // px/s — the design's "typewriter drift" pace, held
+    // constant across breakpoints; lap distance and duration re-derive from
+    // real measured geometry at every width, never hardcoded.
+    var RANGE_START = 8 * 60;
+    var RANGE_TOTAL = 9 * 60;
+    var HEADER_H = 14;
+    var GUTTER_W = 7;
+    var COL_W = (100 - GUTTER_W) / 5;
+
+    var CHIPS = [
+      { title: 'Standup', dow: 0, start: 9 * 60, dur: 30 },
+      { title: 'Design review', dow: 1, start: 11 * 60, dur: 60 },
+      { title: 'Ship v2', dow: 2, start: 14 * 60, dur: 90 },
+      { title: 'Gym', dow: 3, start: 8 * 60 + 30, dur: 45 },
+      { title: 'Budget pass', dow: 4, start: 16 * 60, dur: 30 },
+    ];
+    var DOWS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    var MONTHS = [
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    ];
+
+    function pad(n) {
+      return (n < 10 ? '0' : '') + n;
+    }
+    function fmtTime(min) {
+      return pad(Math.floor(min / 60)) + ':' + pad(min % 60);
+    }
+    function gridPct(min) {
+      return ((min - RANGE_START) / RANGE_TOTAL) * (100 - HEADER_H);
+    }
+
+    // ---- honesty: real dates, fictional demo tasks (Hero.astro's own
+    // precedent) ----
+    var now = new Date();
+    var monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    function dateAt(offsetDays) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + offsetDays);
+      return d;
+    }
+    function weekRangeText() {
+      var mon = dateAt(0);
+      var fri = dateAt(4);
+      if (mon.getMonth() === fri.getMonth()) {
+        return MONTHS[mon.getMonth()] + ' ' + mon.getDate() + ' - ' + fri.getDate();
+      }
+      return (
+        MONTHS[mon.getMonth()] + ' ' + mon.getDate() +
+        ' - ' + MONTHS[fri.getMonth()] + ' ' + fri.getDate()
+      );
+    }
+    function todayText() {
+      return DOWS[now.getDay()] + ' ' + MONTHS[now.getMonth()] + ' ' + now.getDate();
+    }
+    function monthYearText() {
+      return MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+    }
+
+    // ---- DOM ----
+    var keysLayout = document.getElementById('keys-layout');
+    var railViewport = document.getElementById('rail-viewport');
+    var track = document.getElementById('keys-track');
+    var stageCanvas = document.getElementById('stage-canvas');
+    var stageViewLabel = document.getElementById('stage-view-label');
+    var stageDateLabel = document.getElementById('stage-date-label');
+    var chromeWeek = document.getElementById('chrome-week');
+    var chromeDay = document.getElementById('chrome-day');
+    var chromeMonth = document.getElementById('chrome-month');
+    var dayDisc = document.getElementById('day-disc');
+    var cmdkOverlay = document.getElementById('cmdk-overlay');
+    var cmdkScrim = cmdkOverlay ? cmdkOverlay.querySelector('.cmdk-scrim') : null;
+    var cmdkPanel = cmdkOverlay ? cmdkOverlay.querySelector('.cmdk-panel') : null;
+    var chipEls = stageCanvas
+      ? Array.prototype.slice.call(stageCanvas.querySelectorAll('.mock-chip'))
+      : [];
+
+    if (!keysLayout || !railViewport || !track || !stageCanvas || chipEls.length < 6) return;
+
+    // Fill real dates + real month/day numbers once, regardless of reduced
+    // motion (the built-in Astro markup ships these fields empty, same
+    // convention as Hero.astro's data-date spans — no build-time staleness).
+    chromeWeek.querySelectorAll('.wd').forEach(function () {});
+    stageDateLabel.textContent = weekRangeText();
+    var dowEl = chromeDay.querySelector('.day-dow');
+    var discNumEl = chromeDay.querySelector('.day-disc-num');
+    if (dowEl) dowEl.textContent = DOWS[now.getDay()];
+    if (discNumEl) discNumEl.textContent = String(now.getDate());
+    Array.prototype.slice.call(chromeMonth.querySelectorAll('.month-cell')).forEach(function (cell) {
+      var key = cell.getAttribute('data-monthcell');
+      var parts = key.split('-');
+      var row = parseInt(parts[0], 10);
+      var col = parseInt(parts[1], 10);
+      var d = dateAt((row - 1) * 7 + col);
+      var num = cell.querySelector('.month-num');
+      if (num) num.textContent = String(d.getDate());
+    });
+
+    if (window.TF && window.TF.reducedMotion) return; // static SSR week view stands as-is
+
+    var taskCount = 5;
+    var currentChromeView = 'week';
+    var spawnExists = false;
+    var prevLabel = 'WEEK';
+    var prevDate = '';
+    var timeouts = [];
+    var driftAnim = null;
+    var lapDurationMs = 0;
+    var events = [];
+    var armed = false;
+
+    function clearAll() {
+      timeouts.forEach(function (id) {
+        clearTimeout(id);
+      });
+      timeouts = [];
+    }
+
+    function flash(el) {
+      if (!el) return;
+      el.classList.remove('is-flash');
+      void el.offsetWidth;
+      el.classList.add('is-flash');
+    }
+
+    function animateFade(els, from, to, dur) {
+      var anims = els.filter(Boolean).map(function (el) {
+        return el
+          .animate([{ opacity: from }, { opacity: to }], {
+            duration: dur,
+            easing: EASE_OUT,
+            fill: 'forwards',
+          })
+          .finished.catch(function () {});
+      });
+      return Promise.all(anims);
+    }
+
+    function chromeElFor(view) {
+      if (view === 'week') return chromeWeek;
+      if (view === 'day') return chromeDay;
+      if (view === 'month') return chromeMonth;
+      return null;
+    }
+
+    function labelFor(view) {
+      return view === 'week' ? 'WEEK' : view === 'day' ? 'DAY' : view === 'month' ? 'MONTH' : 'LIST';
+    }
+
+    function dateTextFor(view) {
+      if (view === 'week') return weekRangeText();
+      if (view === 'day') return todayText();
+      if (view === 'month') return monthYearText();
+      return taskCount + ' TASKS';
+    }
+
+    function applyRect(el, rect) {
+      el.style.top = rect.top + '%';
+      el.style.left = rect.left + '%';
+      el.style.width = rect.width + '%';
+      el.style.height = rect.height + '%';
+      el.dataset.view = rect.view;
+      if (rect.time !== undefined) {
+        var t = el.querySelector('.c-t');
+        if (t) {
+          t.textContent = rect.time;
+          t.style.display = rect.time ? '' : 'none';
+        }
+      }
+      var ti = el.querySelector('.c-ti');
+      if (ti) ti.style.display = rect.noText ? 'none' : '';
+    }
+
+    function computeLayout(view, includeSpawn) {
+      var rects = {};
+      if (view === 'week') {
+        CHIPS.forEach(function (c, i) {
+          var top = HEADER_H + gridPct(c.start);
+          var height = Math.max(gridPct(c.start + c.dur) - gridPct(c.start), 5);
+          rects[i] = {
+            view: 'week', top: top, height: height,
+            left: GUTTER_W + c.dow * COL_W + 0.6, width: COL_W - 1.2,
+            time: fmtTime(c.start),
+          };
         });
-      },
-      { threshold: 0.6 }
+      } else if (view === 'day') {
+        var k = 0;
+        CHIPS.forEach(function (c, i) {
+          if (i === 2) {
+            var top = HEADER_H + gridPct(c.start);
+            var height = gridPct(c.start + c.dur) - gridPct(c.start);
+            rects[i] = { view: 'day', top: top, height: height, left: 7, width: 81, time: fmtTime(c.start) };
+          } else {
+            rects[i] = { view: 'day', top: 3 + k * 9, height: 5.5, left: 90, width: 8.5, time: '', noText: true };
+            k++;
+          }
+        });
+      } else if (view === 'month') {
+        var canvasRect = stageCanvas.getBoundingClientRect();
+        CHIPS.forEach(function (c, i) {
+          var cell = document.querySelector('[data-monthcell="1-' + c.dow + '"]');
+          if (!cell) return;
+          var cr = cell.getBoundingClientRect();
+          rects[i] = {
+            view: 'month',
+            left: ((cr.left - canvasRect.left + cr.width * 0.12) / canvasRect.width) * 100,
+            width: ((cr.width * 0.76) / canvasRect.width) * 100,
+            top: ((cr.bottom - canvasRect.top - cr.height * 0.14) / canvasRect.height) * 100,
+            height: (4 / canvasRect.height) * 100,
+            time: '',
+            noText: true,
+          };
+        });
+      } else if (view === 'list') {
+        var rowH = 13.9, gap = 2.1, step = rowH + gap;
+        var order = includeSpawn ? [5, 0, 1, 2, 3, 4] : [0, 1, 2, 3, 4];
+        order.forEach(function (chipIdx, slot) {
+          var isSpawn = chipIdx === 5;
+          var c = isSpawn ? null : CHIPS[chipIdx];
+          rects[chipIdx] = {
+            view: 'list', top: slot * step, left: 2, width: 96, height: rowH,
+            time: isSpawn ? '' : DOWS[[1, 2, 3, 4, 5][c.dow]] + ' ' + fmtTime(c.start) + ' · ' + c.dur + ' MIN',
+          };
+        });
+      }
+      return rects;
+    }
+
+    function runFlip(view) {
+      // Once N has spawned the 6th ("Email vendor") row it is a permanent
+      // list member — it has no assigned day/time, so it has no honest
+      // place on the week/day/month grids and simply fades out there,
+      // fading back in (via its own FLIP) whenever list returns. Without
+      // this, it would stay frozen at its last list rect forever, bleeding
+      // through every other view.
+      var includeSpawn = spawnExists && view === 'list';
+      var rects = computeLayout(view, includeSpawn);
+      var indices = [0, 1, 2, 3, 4];
+      if (includeSpawn) indices.push(5);
+      var before = {};
+      indices.forEach(function (i) {
+        before[i] = chipEls[i].getBoundingClientRect();
+      });
+      indices.forEach(function (i) {
+        applyRect(chipEls[i], rects[i]);
+      });
+      // One batched FLIP: apply every invert, flush layout ONCE, then start
+      // all the animations — instead of flipBetween's per-chip forced layout
+      // (5-6 synchronous layouts per view switch).
+      window.TF.flipBatch(
+        indices.map(function (i) {
+          return {
+            el: chipEls[i],
+            fromRect: before[i],
+            toRect: chipEls[i].getBoundingClientRect(),
+            opts: { duration: 480, delay: i * 20 },
+          };
+        })
+      );
+      if (spawnExists) {
+        var spawn = chipEls[5];
+        var target = view === 'list' ? 1 : 0;
+        spawn.animate(
+          [{ opacity: getComputedStyle(spawn).opacity }, { opacity: target }],
+          { duration: 200, easing: EASE_OUT, fill: 'forwards' }
+        );
+      }
+    }
+
+    function crossfadeChrome(view) {
+      var oldChrome = chromeElFor(currentChromeView);
+      animateFade([stageViewLabel, stageDateLabel, oldChrome], 1, 0, 100).then(function () {
+        var newChrome = chromeElFor(view);
+        stageViewLabel.textContent = labelFor(view);
+        stageDateLabel.textContent = dateTextFor(view);
+        currentChromeView = view;
+        animateFade([stageViewLabel, stageDateLabel, newChrome], 0, 1, 100);
+      });
+    }
+
+    function spawnRow() {
+      spawnExists = true;
+      var indices = [0, 1, 2, 3, 4];
+      var before = {};
+      indices.forEach(function (i) {
+        before[i] = chipEls[i].getBoundingClientRect();
+      });
+      var rects = computeLayout('list', true);
+      indices.forEach(function (i) {
+        applyRect(chipEls[i], rects[i]);
+      });
+      window.TF.flipBatch(
+        indices.map(function (i) {
+          return {
+            el: chipEls[i],
+            fromRect: before[i],
+            toRect: chipEls[i].getBoundingClientRect(),
+            opts: { duration: 480, delay: i * 20 },
+          };
+        })
+      );
+      var spawn = chipEls[5];
+      spawn.hidden = false;
+      applyRect(spawn, rects[5]);
+      spawn.animate(
+        [
+          { transform: 'scale(0.97)', opacity: 0 },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 200, easing: EASE_OUT, fill: 'forwards' }
+      );
+      taskCount = 6;
+      if (currentChromeView === 'list') {
+        animateFade([stageDateLabel], 1, 0, 100).then(function () {
+          stageDateLabel.textContent = dateTextFor('list');
+          animateFade([stageDateLabel], 0, 1, 100);
+        });
+      }
+      timeouts.push(
+        setTimeout(function () {
+          flash(spawn);
+        }, 240)
+      );
+    }
+
+    function openCmdK() {
+      prevLabel = stageViewLabel.textContent;
+      prevDate = stageDateLabel.textContent;
+      cmdkOverlay.hidden = false;
+      cmdkScrim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE_OUT, fill: 'forwards' });
+      cmdkPanel.animate(
+        [
+          { transform: 'translateY(-4px) scale(0.98)', opacity: 0 },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 200, delay: 60, easing: EASE_SETTLE, fill: 'forwards' }
+      );
+      animateFade([stageViewLabel, stageDateLabel], 1, 0, 100).then(function () {
+        stageViewLabel.textContent = '⌘K';
+        stageDateLabel.textContent = '';
+        animateFade([stageViewLabel, stageDateLabel], 0, 1, 100);
+      });
+    }
+
+    function closeCmdK() {
+      var a1 = cmdkScrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: EASE_OUT, fill: 'forwards' });
+      var a2 = cmdkPanel.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: EASE_OUT, fill: 'forwards' });
+      Promise.all([a1.finished.catch(function () {}), a2.finished.catch(function () {})]).then(function () {
+        cmdkOverlay.hidden = true;
+      });
+      animateFade([stageViewLabel, stageDateLabel], 1, 0, 100).then(function () {
+        stageViewLabel.textContent = prevLabel;
+        stageDateLabel.textContent = prevDate;
+        animateFade([stageViewLabel, stageDateLabel], 0, 1, 100);
+      });
+    }
+
+    function pressIn(keyEl) {
+      var face = keyEl.querySelector('.cap-face');
+      keyEl.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(2px)' }], {
+        duration: 90, easing: EASE_OUT, fill: 'forwards',
+      });
+      if (face) {
+        face.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 90, easing: EASE_OUT, fill: 'forwards' });
+      }
+    }
+    function pressOut(keyEl) {
+      var face = keyEl.querySelector('.cap-face');
+      keyEl.animate([{ transform: 'translateY(2px)' }, { transform: 'translateY(0)' }], {
+        duration: 220, easing: EASE_BACK, fill: 'forwards',
+      });
+      if (face) {
+        face.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE_OUT, fill: 'forwards' });
+      }
+    }
+
+    function fireAction(id) {
+      if (id === 'cmdk') {
+        openCmdK();
+        return;
+      }
+      if (id === 'n') {
+        // N spawns the row once, ever (the "6 TASKS" count is permanent
+        // once true, per the honesty rule); subsequent laps still press
+        // the key for keyboard-realism, but the demo does not insert a
+        // second row.
+        if (!spawnExists) spawnRow();
+        return;
+      }
+      var view = id === 't' ? 'day' : id === 'w' ? 'week' : id === 'm' ? 'month' : id === 'l' ? 'list' : null;
+      if (!view) return;
+      runFlip(view);
+      timeouts.push(
+        setTimeout(function () {
+          crossfadeChrome(view);
+        }, 20)
+      );
+      if (id === 't') {
+        timeouts.push(
+          setTimeout(function () {
+            flash(dayDisc);
+          }, 0)
+        );
+      }
+    }
+
+    var keyPrimaryEls = Array.prototype.slice.call(
+      track.querySelectorAll('.keyunit:not(.keyunit--dup)')
     );
-    io.observe(cluster);
+    var keyEls = keyPrimaryEls.map(function (li) {
+      return li.querySelector('.keycap-xl');
+    });
+    var keyIds = keyPrimaryEls.map(function (li) {
+      return li.getAttribute('data-key');
+    });
+
+    function pressKey(idx) {
+      var keyEl = keyEls[idx];
+      pressIn(keyEl);
+      timeouts.push(
+        setTimeout(function () {
+          fireAction(keyIds[idx]);
+        }, 100)
+      );
+      timeouts.push(
+        setTimeout(function () {
+          pressOut(keyEl);
+        }, 160)
+      );
+    }
+
+    function buildEvents(pressTimes) {
+      var evts = [];
+      for (var i = 0; i < keyEls.length; i++) {
+        (function (i) {
+          evts.push({ time: Math.max(0, pressTimes[i] - 0.1), run: function () { pressKey(i); } });
+        })(i);
+      }
+      evts.push({ time: pressTimes[0] + 3.2, run: closeCmdK });
+      evts.sort(function (a, b) {
+        return a.time - b.time;
+      });
+      events = evts;
+    }
+
+    function scheduleFrom(elapsedMs) {
+      clearAll();
+      events.forEach(function (ev) {
+        var t = ev.time * 1000;
+        if (t >= elapsedMs) {
+          timeouts.push(setTimeout(ev.run, t - elapsedMs));
+        }
+      });
+      timeouts.push(
+        setTimeout(function () {
+          scheduleFrom(0);
+        }, Math.max(0, lapDurationMs - elapsedMs))
+      );
+    }
+
+    function measureAndArm() {
+      var dupEls = Array.prototype.slice.call(track.querySelectorAll('.keyunit--dup'));
+      if (!dupEls.length) return;
+      var pressZoneX = railViewport.clientWidth / 2;
+      var centers = keyPrimaryEls.map(function (li) {
+        var cap = li.querySelector('.keycap-xl');
+        return li.offsetLeft + cap.offsetWidth / 2;
+      });
+      var firstDupCap = dupEls[0].querySelector('.keycap-xl');
+      var dupFirstCenter = dupEls[0].offsetLeft + firstDupCap.offsetWidth / 2;
+      var lapDistance = dupFirstCenter - centers[0];
+      lapDurationMs = (lapDistance / SPEED) * 1000;
+      var pressTimes = centers.map(function (c) {
+        return (c - centers[0]) / SPEED;
+      });
+      var offset0 = pressZoneX - centers[0];
+
+      if (driftAnim) driftAnim.cancel();
+      track.style.willChange = 'transform';
+      driftAnim = track.animate(
+        [
+          { transform: 'translateX(' + offset0 + 'px)' },
+          { transform: 'translateX(' + (offset0 - lapDistance) + 'px)' },
+        ],
+        { duration: lapDurationMs, iterations: Infinity, easing: 'linear' }
+      );
+      buildEvents(pressTimes);
+      scheduleFrom(0);
+    }
+
+    function pause() {
+      if (driftAnim) driftAnim.pause();
+      track.style.willChange = '';
+      clearAll();
+    }
+    function resume() {
+      if (!driftAnim) return;
+      track.style.willChange = 'transform';
+      driftAnim.play();
+      var elapsed = driftAnim.currentTime % lapDurationMs;
+      scheduleFrom(elapsed);
+    }
+
+    function handleVisible(isVisible) {
+      if (isVisible) {
+        if (!armed) {
+          armed = true;
+          measureAndArm();
+        } else {
+          resume();
+        }
+      } else if (armed) {
+        pause();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.TF.onVisible) {
+        window.TF.onVisible(keysLayout, handleVisible, { once: false, threshold: 0.3 });
+      } else {
+        handleVisible(true);
+      }
+      if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+        keysLayout.addEventListener('mouseenter', function () {
+          if (armed) pause();
+        });
+        keysLayout.addEventListener('mouseleave', function () {
+          if (armed) resume();
+        });
+      }
+      var resizeTimer;
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          if (armed) measureAndArm();
+        }, 200);
+      });
+    });
   })();
 </script>
 
@@ -68,13 +770,56 @@ const keys = [
     max-width: 52ch;
   }
 
-  .cluster {
+  .keys-layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 48px;
+    align-items: center;
+    margin-top: 48px;
+  }
+
+  /* ---------------- rail ---------------- */
+
+  .rail {
+    position: relative;
+    height: 160px;
+  }
+
+  .rail-viewport {
+    --fade-inset: 64px;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  .rail-bracket {
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    height: 12px;
+    background: var(--line-dim);
+    z-index: 1;
+  }
+  .rail-bracket-t {
+    top: 0;
+  }
+  .rail-bracket-b {
+    bottom: 0;
+  }
+
+  .track {
+    position: absolute;
+    top: 24px;
+    left: 0;
     display: flex;
-    flex-wrap: wrap;
-    gap: 28px;
-    margin: 48px 0 0;
-    padding: 0;
+    align-items: flex-start;
+    gap: 32px;
     list-style: none;
+    margin: 0;
+    padding: 0;
+    /* will-change is toggled in JS around the active-drift window
+       (measureAndArm/resume set it, pause clears it) so the compositor
+       layer isn't pinned while the rail is paused off-screen. */
   }
 
   .keyunit {
@@ -82,51 +827,469 @@ const keys = [
     flex-direction: column;
     align-items: center;
     gap: 10px;
-  }
-
-  /* machined keycap (§2.6): one implied light source, real key travel */
-  .keycap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 52px;
-    height: 52px;
-    padding: 0 14px;
-    border-radius: 8px;
-    background: var(--surface-2);
-    box-shadow:
-      var(--edge-machined),
-      inset 0 -2px 0 rgb(0 0 0 / 0.35),
-      var(--shadow-2);
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--ink);
-    transition:
-      transform var(--dur-1) var(--ease-out),
-      box-shadow var(--dur-1) var(--ease-out);
-  }
-
-  .keycap.pressed {
-    transform: translateY(2px);
-    box-shadow:
-      var(--edge-machined),
-      inset 0 -1px 0 rgb(0 0 0 / 0.35);
+    flex: none;
   }
 
   .keylabel {
     font-size: 12px;
     color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  /* ---------------- the keycap: pure graphite/charcoal, no aqua ---------------- */
+
+  .keycap-xl {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 11px;
+    isolation: isolate;
+    background:
+      radial-gradient(120% 140% at 30% 18%, rgb(246 248 248 / 0.1), transparent 55%),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--surface-2) 100%, white 9%) 0%,
+        var(--surface-2) 42%,
+        color-mix(in oklab, var(--surface-2) 100%, black 22%) 100%
+      );
+    box-shadow:
+      var(--edge-machined),
+      inset 0 1.5px 0 rgb(246 248 248 / 0.2),
+      inset 0 -4px 0 rgb(0 0 0 / 0.6),
+      inset 1.5px 0 0 rgb(246 248 248 / 0.07),
+      inset -1.5px 0 0 rgb(0 0 0 / 0.4),
+      var(--shadow-penumbra);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .keycap-xl--wide {
+    width: 132px;
+    font-size: 18px;
+  }
+
+  /* recessed socket the key travels into — static, never animated */
+  .keycap-xl::before {
+    content: '';
+    position: absolute;
+    inset: 2px -2px -7px -2px;
+    background: var(--surface-1);
+    border-radius: inherit;
+    z-index: -1;
+    box-shadow: inset 0 -2px 4px rgb(0 0 0 / 0.5);
+  }
+
+  /* pre-rendered pressed face, crossfaded via opacity only — the loop
+     never transitions background/box-shadow directly (synthesis (c) Keys#2) */
+  .cap-face {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--surface-2) 88%, black) 0%,
+      color-mix(in oklab, var(--surface-2) 78%, black) 100%
+    );
+    box-shadow:
+      var(--edge-machined),
+      inset 0 1px 0 rgb(246 248 248 / 0.08),
+      inset 0 -1px 0 rgb(0 0 0 / 0.65),
+      0 0.5px 1px -0.5px rgb(0 0 0 / 0.4);
+  }
+
+  .cap-legend {
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-resolution: 1.5dppx) {
+    .keycap-xl {
+      box-shadow:
+        var(--edge-machined),
+        inset 0 1px 0 rgb(246 248 248 / 0.1),
+        inset 0 -4px 0 rgb(0 0 0 / 0.45),
+        inset 1px 0 0 rgb(246 248 248 / 0.03),
+        inset -1px 0 0 rgb(0 0 0 / 0.25),
+        var(--shadow-penumbra);
+    }
+    .cap-face {
+      box-shadow:
+        var(--edge-machined),
+        inset 0 1px 0 rgb(246 248 248 / 0.05),
+        inset 0 -2px 0 rgb(0 0 0 / 0.5),
+        0 0.5px 1px -0.5px rgb(0 0 0 / 0.4);
+    }
+  }
+
+  /* ---------------- app stage ---------------- */
+
+  .app-stage {
+    min-width: 0;
+  }
+
+  .stage-card {
+    background: var(--surface-1);
+    border-radius: 12px;
+    box-shadow: var(--edge-machined), var(--shadow-penumbra);
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stage-header {
+    height: 40px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .stage-view {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+  .stage-date {
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .stage-canvas {
+    position: relative;
+    flex: 1;
+    margin: 16px;
+    overflow: hidden;
+  }
+
+  /* Chrome partials always stay in normal layout flow (never [hidden]/
+     display:none) so month-cell geometry is measurable via
+     getBoundingClientRect at any moment, including the instant a view
+     switch's FLIP starts (before its own crossfade has unhidden it).
+     Only week is visible at rest — this is also the SSR/no-JS/reduced-
+     motion baseline. */
+  .chrome-week,
+  .chrome-day,
+  .chrome-month {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .chrome-day,
+  .chrome-month {
+    opacity: 0;
+  }
+
+  .week-head {
+    position: absolute;
+    top: 0;
+    left: 7%;
+    right: 0;
+    height: 14%;
+    display: flex;
+  }
+  .week-head .wd {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+  .week-gutter {
+    position: absolute;
+    top: 14%;
+    left: 0;
+    width: 7%;
+    bottom: 0;
+  }
+  .week-gutter .hr {
+    position: absolute;
+    left: 0;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--ink-muted);
+  }
+  .week-gridlines {
+    position: absolute;
+    top: 14%;
+    left: 7%;
+    right: 0;
+    bottom: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(20% - 1px),
+      var(--hairline) calc(20% - 1px),
+      var(--hairline) 20%
+    );
+  }
+
+  /* day chrome */
+  .day-head {
+    position: absolute;
+    top: 0;
+    left: 7%;
+    height: 14%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .day-dow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+  .day-disc {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--aqua);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .day-disc-num {
+    font-size: 12px;
+    color: var(--aqua-ink);
+  }
+
+  /* month chrome */
+  .month-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--hairline);
+  }
+  .month-cell {
+    position: relative;
+    background: var(--surface-1);
+    opacity: 0.45;
+  }
+  .month-cell[data-monthcell^='1-'] {
+    opacity: 1;
+  }
+  .month-num {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 10px;
+    color: var(--ink-muted);
+  }
+
+  /* ---------------- mock chip: same object grammar (§2.4), reused via FLIP ---------------- */
+
+  .mock-chip {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .mock-chip[hidden] {
+    display: none;
+  }
+
+  .mock-chip .c-ring {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 999px;
+    border: 1.5px solid var(--chip-c);
+    opacity: 0;
+    order: 0;
+  }
+  .mock-chip .c-t {
+    font-size: 11px;
+    order: 0;
+  }
+  .mock-chip .c-ti {
+    font-size: 12px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    order: 1;
+  }
+
+  .mock-chip[data-view='list'] {
+    padding: 8px 12px;
+    gap: 10px;
+  }
+  .mock-chip[data-view='list'] .c-ring {
+    opacity: 1;
+  }
+  .mock-chip[data-view='list'] .c-ti {
+    order: 1;
+    flex: 1;
+  }
+  .mock-chip[data-view='list'] .c-t {
+    order: 2;
+    margin-left: auto;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--chip-c) 20%, transparent);
+    flex: none;
+  }
+
+  /* ---------------- Cmd+K overlay (design-brief §4.6) ---------------- */
+
+  .cmdk-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+  }
+  .cmdk-scrim {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklab, var(--void) 60%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+  }
+  .cmdk-panel {
+    position: absolute;
+    top: 10%;
+    left: 8%;
+    right: 8%;
+    background: var(--surface-3);
+    border-radius: 12px;
+    box-shadow: var(--edge-machined), 0 0 0 1px var(--aqua-rim), var(--shadow-penumbra);
+    padding: 12px;
+    opacity: 0;
+  }
+  .cmdk-input {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    margin-bottom: 8px;
+  }
+  .cmdk-caret {
+    width: 1.5px;
+    height: 12px;
+    background: var(--aqua);
+    animation: cmdk-blink 1.1s steps(1) infinite;
+  }
+  @keyframes cmdk-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  .cmdk-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cmdk-rows li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 22px;
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+  .mini-key-group {
+    display: flex;
+    gap: 3px;
+  }
+  .mini-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    box-shadow: var(--edge-machined);
+    font-size: 9px;
+    color: var(--ink-2);
+  }
+
+  /* ---------------- breakpoints ---------------- */
+
+  @media (max-width: 1023px) {
+    .keys-layout {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
   }
 
   @media (max-width: 640px) {
-    .cluster {
-      gap: 18px;
+    .rail {
+      height: 120px;
     }
+    .rail-viewport {
+      --fade-inset: 24px;
+    }
+    .track {
+      gap: 24px;
+      top: 16px;
+    }
+    .keycap-xl {
+      width: 56px;
+      height: 56px;
+      font-size: 16px;
+    }
+    .keycap-xl--wide {
+      width: 92px;
+      font-size: 13px;
+    }
+    .stage-card {
+      height: 300px;
+    }
+  }
 
-    .keycap {
-      min-width: 46px;
-      height: 46px;
-      font-size: 14px;
+  /* ---------------- reduced motion: static row + static week view ---------------- */
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail {
+      height: auto;
+    }
+    .rail-viewport {
+      overflow: visible;
+      height: auto;
+      mask-image: none;
+      -webkit-mask-image: none;
+    }
+    .track {
+      position: static;
+      top: auto;
+      flex-wrap: wrap;
+    }
+    .keyunit--dup {
+      display: none;
+    }
+    .rail-bracket {
+      display: none;
+    }
+    .cap-face {
+      display: none;
     }
   }
 </style>

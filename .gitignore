@@ -88,3 +88,6 @@ landing/.astro/
 # Stray screenshots dropped at repo root during manual QA (tracked assets
 # all live under docs/ or landing/public/, never at bare root)
 /*.png
+
+# Local landing design research (competitor scrapes, QA screenshots) — not shipped
+landing/research/

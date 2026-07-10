@@ -1,8 +1,20 @@
 ---
-// §6.3 — "One task, three places": the list row, the board card, and the
-// calendar chip are visibly the same object. On entry, one chip FLIPs
-// list -> board -> grid in 320ms hops with the |-- 90 MIN --| dimension
-// annotation riding along.
+// "One task, three places." — specs-v2/threeplaces.md + _synthesis.md (c) ThreePlaces
+// amendments. Three real panels (list/board/week) render dim; a single
+// magenta traveler performs list -> board -> week, each stop spotlit while
+// the drawn hop-path traces the move and burns away behind it. On the
+// final land the traveler dissolves into the real week chip and a
+// measurement bracket draws itself under all three panels and HOLDS — the
+// owner's required end state, not a vanish.
+//
+// Synthesis amendments applied:
+// 1. Bracket label is `SAME OBJECT - SAME TIME` (spaced hyphen, no em dash).
+// 2. `.tp-surface.is-active` never transitions box-shadow: the bright edge
+//    is a pre-rendered `::after` layer crossfaded via opacity.
+// 3. Replay-on-reentry uses `TF.onVisible(stage, cb, {once:false, threshold:0.2})`.
+// 4. `TF.drawPath`'s undraw phase (own delay/duration) drives both hop
+//    paths and the bracket line.
+// 5. Stage aria-label is the synthesis (f) #21 text verbatim.
 ---
 
 <section class="section" id="places">
@@ -11,36 +23,68 @@
       <h2 class="display-section">One task, three places.</h2>
       <p class="body-copy">
         Schedule a task once. The list row, the board card, and the calendar
-        chip stay one object: same color, same radius, same mono time.
+        chip stay one object: same color, same time, same task.
       </p>
     </div>
+
     <div
       class="stage"
       id="places-stage"
       role="img"
-      aria-label="The task Interview loop, Thursday 10:30, 90 minutes, shown three ways: as a list row, as a board card, and as a chip on the week grid. All three share the same magenta color and the same time."
+      aria-label="The task Interview loop, Thursday 10:30, 90 minutes, shown three ways: as a list row alongside two other tasks, as a board card in a two-column board, and as a chip on the week grid. All three share the same magenta color, radius, and time. A drawn line traces the task hopping from list to board to week, then a measurement bracket beneath all three confirms it: same object, same time."
       data-reveal
     >
-      <div class="panel">
+      <svg class="hop-paths" aria-hidden="true">
+        <path class="hop-path" id="hop-1" d=""></path>
+        <path class="hop-path" id="hop-2" d=""></path>
+      </svg>
+
+      <div class="panel" id="tp-panel-list">
         <span class="panel-label">LIST</span>
-        <div class="obj-list" id="tp-list">
-          <span class="ring" style="--chip-c: var(--hue-magenta)"></span>
-          <span class="row-title">Interview loop</span>
-          <span class="due chip mono" style="--chip-c: var(--hue-magenta)"
-            >THU 10:30 &middot; 90 MIN</span
-          >
+        <div class="tp-surface obj-list-panel" id="tp-list-panel">
+          <div class="obj-list-row" id="tp-list">
+            <span class="ring" style="--chip-c: var(--hue-magenta)"></span>
+            <span class="row-title">Interview loop</span>
+            <span class="due chip mono" style="--chip-c: var(--hue-magenta)"
+              >THU 10:30 &middot; 90 MIN</span
+            >
+          </div>
+          <div class="obj-list-row is-muted">
+            <span class="ring is-muted"></span>
+            <span class="row-title is-muted">Design review</span>
+            <span class="due-plain mono">9:00 AM</span>
+          </div>
+          <div class="obj-list-row is-muted">
+            <span class="ring is-muted"></span>
+            <span class="row-title is-muted">Grocery run</span>
+            <span class="due-plain mono">2:00 PM</span>
+          </div>
         </div>
       </div>
-      <div class="panel">
+
+      <div class="panel" id="tp-panel-board">
         <span class="panel-label">BOARD</span>
-        <div class="obj-card" id="tp-board" style="--chip-c: var(--hue-magenta)">
-          <span class="card-title">Interview loop</span>
-          <span class="card-meta mono">THU 10:30 &middot; 90 MIN</span>
+        <div class="tp-surface obj-board-panel" id="tp-board-panel">
+          <div class="board-well">
+            <span class="col-label">TODO</span>
+            <div class="obj-card" id="tp-board" style="--chip-c: var(--hue-magenta)">
+              <span class="card-title">Interview loop</span>
+              <span class="card-meta mono">THU 10:30 &middot; 90 MIN</span>
+            </div>
+          </div>
+          <div class="board-well">
+            <span class="col-label">DOING</span>
+            <div class="obj-card-muted">
+              <span class="card-title is-muted">Grocery run</span>
+              <span class="due-plain mono">2:00 PM</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="panel">
+
+      <div class="panel" id="tp-panel-week">
         <span class="panel-label">WEEK</span>
-        <div class="obj-grid">
+        <div class="tp-surface obj-grid" id="tp-week-panel">
           <div class="g-head"><span class="panel-label today">THU</span></div>
           <div class="g-body">
             <span class="g-hour mono" style="top:16.6%">10 AM</span>
@@ -54,74 +98,303 @@
               <span class="c-t mono">10:30</span>
               <span class="c-ti">Interview loop</span>
             </div>
+            <span class="dim mono" id="tp-dim-rest" aria-hidden="true">
+              <span class="dim-line"></span>90 MIN<span class="dim-line"></span>
+            </span>
           </div>
         </div>
       </div>
-      <div class="traveler chip flashable" id="tp-traveler" aria-hidden="true" style="--chip-c: var(--hue-magenta)">
+
+      <div
+        class="traveler chip flashable"
+        id="tp-traveler"
+        aria-hidden="true"
+        style="--chip-c: var(--hue-magenta)"
+      >
         <span class="c-t mono">10:30</span>
         <span class="c-ti">Interview loop</span>
-        <span class="dim mono" id="tp-dim">
+        <span class="dim mono" id="tp-dim" aria-hidden="true">
           <span class="dim-line"></span>90 MIN<span class="dim-line"></span>
         </span>
       </div>
+    </div>
+
+    <div class="bind-wrap" id="tp-bind-wrap">
+      <svg class="bind-bracket" id="tp-bracket" aria-hidden="true">
+        <path class="bind-line" id="bind-line" d=""></path>
+        <path class="bind-tick" id="tick-a" d=""></path>
+        <path class="bind-tick" id="tick-list" d=""></path>
+        <path class="bind-tick" id="tick-board" d=""></path>
+        <path class="bind-tick" id="tick-week" d=""></path>
+        <path class="bind-tick" id="tick-b" d=""></path>
+      </svg>
+      <span class="bind-label mono" id="tp-bind-label">SAME OBJECT - SAME TIME</span>
     </div>
   </div>
 </section>
 
 <script is:inline>
-  // The hop: one traveling chip FLIPs across the three anchors, 320ms per
-  // hop on the brand curve, dimension annotation visible mid-flight,
-  // rim flash on the final land. Runs once, IO-gated, transform-only.
+  // "The Relay": traveler performs list -> board -> week once per IO
+  // entry, then dissolves into the real week chip while a bracket draws
+  // and holds as the permanent end state. Geometry (bracket ticks, hop
+  // arcs) is always measured live via getBoundingClientRect, never
+  // hardcoded, so it cannot stretch or misalign at any viewport.
   (function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var stage = document.getElementById('places-stage');
     var traveler = document.getElementById('tp-traveler');
+    if (!stage || !traveler) return;
+
+    var panelListWrap = document.getElementById('tp-panel-list');
+    var panelBoardWrap = document.getElementById('tp-panel-board');
+    var panelWeekWrap = document.getElementById('tp-panel-week');
+    var panelList = document.getElementById('tp-list-panel');
+    var panelBoard = document.getElementById('tp-board-panel');
+    var panelWeek = document.getElementById('tp-week-panel');
+    var listAnchor = document.getElementById('tp-list');
+    var boardAnchor = document.getElementById('tp-board');
+    var weekAnchor = document.getElementById('tp-grid');
     var dim = document.getElementById('tp-dim');
-    if (!stage || !traveler || !('IntersectionObserver' in window)) return;
+    var hop1 = document.getElementById('hop-1');
+    var hop2 = document.getElementById('hop-2');
+    var bindWrap = document.getElementById('tp-bind-wrap');
+    var bindLine = document.getElementById('bind-line');
+    var tickA = document.getElementById('tick-a');
+    var tickList = document.getElementById('tick-list');
+    var tickBoard = document.getElementById('tick-board');
+    var tickWeek = document.getElementById('tick-week');
+    var tickB = document.getElementById('tick-b');
+    var bindLabel = document.getElementById('tp-bind-label');
+    var ticks = [tickA, tickList, tickBoard, tickWeek, tickB];
 
-    function centerOn(el) {
-      var s = stage.getBoundingClientRect();
+    function debounce(fn, ms) {
+      var t;
+      return function () {
+        clearTimeout(t);
+        t = setTimeout(fn, ms);
+      };
+    }
+
+    function rectCenterX(el, ref) {
       var r = el.getBoundingClientRect();
-      var t = traveler.getBoundingClientRect();
-      var x = r.left - s.left + r.width / 2 - t.width / 2;
-      var y = r.top - s.top + r.height / 2 - t.height / 2;
-      return 'translate(' + x + 'px,' + y + 'px)';
+      return r.left - ref.left + r.width / 2;
     }
 
-    function run() {
-      var list = document.getElementById('tp-list');
-      var board = document.getElementById('tp-board');
-      var grid = document.getElementById('tp-grid');
-      traveler.style.transform = centerOn(list);
-      traveler.classList.add('is-live');
-      setTimeout(function () {
-        traveler.style.transition =
-          'transform 320ms cubic-bezier(0.16,1,0.3,1)';
-        dim.classList.add('on');
-        traveler.style.transform = centerOn(board);
-      }, 450);
-      setTimeout(function () {
-        traveler.style.transform = centerOn(grid);
-      }, 1220);
-      setTimeout(function () {
+    function layoutBracket() {
+      var ref = bindWrap.getBoundingClientRect();
+      var totalW = ref.width;
+      bindLine.setAttribute('d', 'M 0 8 H ' + totalW);
+      tickA.setAttribute('d', 'M 0 2 V 14');
+      tickList.setAttribute('d', 'M ' + rectCenterX(panelListWrap, ref) + ' 2 V 14');
+      tickBoard.setAttribute('d', 'M ' + rectCenterX(panelBoardWrap, ref) + ' 2 V 14');
+      tickWeek.setAttribute('d', 'M ' + rectCenterX(panelWeekWrap, ref) + ' 2 V 14');
+      tickB.setAttribute('d', 'M ' + totalW + ' 2 V 14');
+    }
+
+    // Geometry is correct from first paint whether or not motion runs at
+    // all (no-JS-equivalent / reduced-motion resting picture).
+    layoutBracket();
+    window.addEventListener('resize', debounce(layoutBracket, 150));
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(layoutBracket).catch(function () {});
+    }
+
+    if (window.TF && window.TF.reducedMotion) return;
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window.TF || !window.TF.onVisible || !window.TF.drawPath) return;
+
+      document.documentElement.classList.add('tp-armed');
+      layoutBracket();
+
+      var timeouts = [];
+      var isPlaying = false;
+
+      function clearAll() {
+        timeouts.forEach(clearTimeout);
+        timeouts = [];
+      }
+
+      function after(ms, fn) {
+        timeouts.push(setTimeout(fn, ms));
+      }
+
+      function centerOn(el) {
+        var s = stage.getBoundingClientRect();
+        var r = el.getBoundingClientRect();
+        var t = traveler.getBoundingClientRect();
+        var cx = r.left - s.left + r.width / 2;
+        var cy = r.top - s.top + r.height / 2;
+        return { x: cx - t.width / 2, y: cy - t.height / 2, cx: cx, cy: cy };
+      }
+
+      function place(p) {
+        return 'translate(' + p.x + 'px,' + p.y + 'px)';
+      }
+
+      function setHopPath(pathEl, from, to) {
+        var midX = (from.cx + to.cx) / 2;
+        var midY = Math.min(from.cy, to.cy) - 40;
+        pathEl.setAttribute(
+          'd',
+          'M ' + from.cx + ' ' + from.cy + ' Q ' + midX + ' ' + midY + ' ' + to.cx + ' ' + to.cy
+        );
+      }
+
+      function resetState() {
+        clearAll();
+
+        traveler.style.transition = 'none';
+        traveler.style.opacity = '0';
+        traveler.classList.remove('is-flash');
         dim.classList.remove('on');
-        traveler.classList.add('is-flash');
-      }, 1560);
-      setTimeout(function () {
-        traveler.classList.remove('is-live');
-      }, 2100);
-    }
 
-    var io = new IntersectionObserver(
-      function (entries) {
-        if (entries.some(function (e) { return e.isIntersecting; })) {
-          io.disconnect();
-          run();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    io.observe(stage);
+        panelList.classList.remove('is-active');
+        panelBoard.classList.remove('is-active');
+        panelWeek.classList.remove('is-active');
+
+        [hop1, hop2].forEach(function (p) {
+          p.style.transition = 'none';
+          var L = 0;
+          try {
+            L = p.getTotalLength();
+          } catch (e) {}
+          p.style.strokeDasharray = String(L);
+          p.style.strokeDashoffset = String(L);
+        });
+
+        var bL = 0;
+        try {
+          bL = bindLine.getTotalLength();
+        } catch (e) {}
+        bindLine.style.transition = 'none';
+        bindLine.style.strokeDasharray = String(bL);
+        bindLine.style.strokeDashoffset = String(bL);
+
+        ticks.forEach(function (t) {
+          t.style.transition = 'none';
+          t.style.opacity = '0';
+          t.style.transform = 'scale(0.5)';
+        });
+
+        bindLabel.style.transition = 'none';
+        bindLabel.style.opacity = '0';
+        bindLabel.style.transform = 'translateY(6px)';
+
+        void stage.offsetWidth; // flush so the next style change can transition
+
+        traveler.style.transition = '';
+        hop1.style.transition = '';
+        hop2.style.transition = '';
+        bindLine.style.transition = '';
+        ticks.forEach(function (t) {
+          t.style.transition = '';
+        });
+        bindLabel.style.transition = '';
+      }
+
+      function popTick(el) {
+        el.style.transition = 'opacity 120ms var(--ease-out), transform 120ms var(--ease-out)';
+        el.style.opacity = '1';
+        el.style.transform = 'scale(1)';
+      }
+
+      function run() {
+        if (isPlaying) return;
+        isPlaying = true;
+        resetState();
+        layoutBracket();
+
+        var listC = centerOn(listAnchor);
+        traveler.style.transform = place(listC);
+
+        after(0, function () {
+          traveler.style.transition = 'opacity 200ms var(--ease-out)';
+          traveler.style.opacity = '1';
+          panelList.classList.add('is-active');
+        });
+
+        after(700, function () {
+          panelList.classList.remove('is-active');
+          panelBoard.classList.add('is-active');
+          var from = centerOn(listAnchor);
+          var to = centerOn(boardAnchor);
+          setHopPath(hop1, from, to);
+          TF.drawPath(hop1, { duration: 480, undraw: { delay: 0, duration: 240 } });
+          traveler.style.transition = 'transform 480ms var(--ease-settle)';
+          traveler.style.transform = place(to);
+        });
+
+        after(780, function () {
+          dim.classList.add('on');
+        });
+
+        after(1180, function () {
+          traveler.classList.add('is-flash');
+        });
+
+        after(1420, function () {
+          traveler.classList.remove('is-flash');
+        });
+
+        after(1880, function () {
+          panelBoard.classList.remove('is-active');
+          panelWeek.classList.add('is-active');
+          var from = centerOn(boardAnchor);
+          var to = centerOn(weekAnchor);
+          setHopPath(hop2, from, to);
+          TF.drawPath(hop2, { duration: 480, undraw: { delay: 0, duration: 240 } });
+          traveler.style.transition = 'transform 480ms var(--ease-settle)';
+          traveler.style.transform = place(to);
+        });
+
+        after(2360, function () {
+          traveler.classList.add('is-flash');
+        });
+
+        after(2600, function () {
+          traveler.classList.remove('is-flash');
+          dim.classList.remove('on');
+          traveler.style.transition = 'opacity 200ms var(--ease-out)';
+          traveler.style.opacity = '0';
+        });
+
+        after(3000, function () {
+          layoutBracket();
+          TF.drawPath(bindLine, { duration: 700 });
+        });
+
+        after(3080, function () {
+          popTick(tickList);
+        });
+        after(3350, function () {
+          popTick(tickBoard);
+        });
+        after(3620, function () {
+          popTick(tickWeek);
+          bindLabel.style.transition =
+            'opacity 240ms var(--ease-out), transform 240ms var(--ease-out)';
+          bindLabel.style.opacity = '1';
+          bindLabel.style.transform = 'translateY(0)';
+        });
+
+        after(3860, function () {
+          isPlaying = false;
+        });
+      }
+
+      TF.onVisible(
+        stage,
+        function (isVisible) {
+          if (isVisible) {
+            run();
+          } else {
+            isPlaying = false;
+            resetState();
+          }
+        },
+        { once: false, threshold: 0.2 }
+      );
+    });
   })();
 </script>
 
@@ -135,15 +408,18 @@
     position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+    gap: 32px;
     margin-top: 48px;
-    align-items: end;
+    align-items: start;
+    --edge-machined-bright: inset 0 0.5px 0 rgb(246 248 248 / 0.16),
+      0 0 0 0.5px rgb(0 0 0 / 0.5);
   }
 
   .panel {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
   }
 
   .panel-label {
@@ -151,22 +427,85 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     color: var(--ink-muted);
+    text-transform: uppercase;
   }
 
   .panel-label.today {
     color: var(--aqua);
   }
 
-  /* list row (§4.1 anatomy, at rest) */
-  .obj-list {
+  /* hop-path overlay: drawn instrument lines tracing each hop */
+  .hop-paths {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+
+  .hop-path {
+    fill: none;
+    stroke: var(--line-dim);
+    stroke-width: 1.25px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* shared panel surface (spec: dim 0.6 <-> active 1, edge brightens).
+     Box-shadow itself never transitions: the bright edge is a
+     pre-rendered ::after layer crossfaded via opacity only. */
+  .tp-surface {
+    position: relative;
+    background: var(--surface-1);
+    border-radius: 10px;
+    box-shadow: var(--edge-machined);
+    opacity: 1;
+    transition: opacity 300ms var(--ease-out);
+  }
+
+  .tp-surface::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: var(--edge-machined-bright), var(--shadow-penumbra);
+    opacity: 1;
+    transition: opacity 300ms var(--ease-out);
+    pointer-events: none;
+  }
+
+  html.tp-armed .tp-surface {
+    opacity: 0.6;
+  }
+  html.tp-armed .tp-surface::after {
+    opacity: 0;
+  }
+  html.tp-armed .tp-surface.is-active {
+    opacity: 1;
+  }
+  html.tp-armed .tp-surface.is-active::after {
+    opacity: 1;
+  }
+
+  /* LIST panel: active row + two muted siblings, real rows not a specimen */
+  .obj-list-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 14px;
+  }
+
+  .obj-list-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 44px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--surface-1);
-    box-shadow: var(--edge-machined);
+    height: 44px;
+    border-radius: 6px;
+  }
+
+  .obj-list-row.is-muted {
+    height: 40px;
   }
 
   .ring {
@@ -175,6 +514,10 @@
     flex: none;
     border-radius: 999px;
     border: 1.5px solid var(--chip-c);
+  }
+
+  .ring.is-muted {
+    border-color: var(--hairline-strong);
   }
 
   .row-title {
@@ -187,14 +530,51 @@
     white-space: nowrap;
   }
 
+  .row-title.is-muted {
+    color: var(--ink-2);
+  }
+
   .due {
     font-size: 11px;
     padding: 3px 8px;
     border-radius: 999px;
     white-space: nowrap;
+    flex: none;
   }
 
-  /* board card (§4.3): same object, 3px bar */
+  .due-plain {
+    font-size: 11px;
+    color: var(--ink-muted);
+    white-space: nowrap;
+    flex: none;
+  }
+
+  /* BOARD panel: two column wells, card is the same object as List/Week */
+  .obj-board-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .board-well {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 8px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .col-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+  }
+
   .obj-card {
     background: var(--surface-1);
     border-radius: 8px;
@@ -206,9 +586,21 @@
     gap: 8px;
   }
 
+  .obj-card-muted {
+    border-left: 3px solid var(--hairline-strong);
+    padding: 10px 12px 10px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .card-title {
     font-size: 13px;
     font-weight: 500;
+  }
+
+  .card-title.is-muted {
+    color: var(--ink-2);
   }
 
   .card-meta {
@@ -216,11 +608,9 @@
     color: var(--ink-muted);
   }
 
-  /* week fragment: same object, placed */
+  /* WEEK panel: baseline structure, body height bumped for parity */
   .obj-grid {
-    background: var(--surface-1);
-    border-radius: 10px;
-    box-shadow: var(--edge-machined), var(--shadow-1);
+    overflow: hidden;
   }
 
   .g-head {
@@ -233,7 +623,7 @@
 
   .g-body {
     position: relative;
-    height: 150px;
+    height: 176px;
     background-image: repeating-linear-gradient(
       to bottom,
       transparent 0,
@@ -275,42 +665,14 @@
     line-height: 1.2;
   }
 
-  /* the traveler: hidden until the IO timeline arms it */
-  .traveler {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    padding: 4px 9px;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 5;
-  }
-
-  .traveler.is-live {
-    opacity: 1;
-    transition: opacity 200ms var(--ease-out);
-  }
-
-  /* dimension annotation (§4.4): the data model drawn under the chip */
+  /* dimension annotation: shared look, two roles (static rest + riding) */
   .dim {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: calc(100% + 8px);
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 11px;
     color: var(--aqua);
-    opacity: 0;
-    transition: opacity 160ms var(--ease-out);
-  }
-
-  .dim.on {
-    opacity: 1;
+    pointer-events: none;
   }
 
   .dim-line {
@@ -320,7 +682,6 @@
     position: relative;
   }
 
-  /* end ticks: |-- on the left line, --| on the right line */
   .dim-line::before {
     content: '';
     position: absolute;
@@ -338,11 +699,125 @@
     right: 0;
   }
 
+  /* static resting annotation, parked under the real WEEK chip — the
+     no-JS/reduced-motion fact. Motion-enabled runs hide this and use the
+     traveling one instead (below). */
+  #tp-dim-rest {
+    position: absolute;
+    left: 48px;
+    right: 8px;
+    top: calc(75% + 6px);
+    opacity: 1;
+    transition: opacity 200ms var(--ease-out);
+  }
+
+  html.tp-armed #tp-dim-rest {
+    opacity: 0;
+  }
+
+  /* the traveler: hidden until JS arms the sequence */
+  .traveler {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    gap: 5px;
+    align-items: center;
+    padding: 4px 9px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
+  }
+
+  html.tp-armed .traveler {
+    display: flex;
+  }
+
+  /* the animated dim rides along under the traveler for free (nested,
+     inherits its parent's transform) */
+  #tp-dim {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    opacity: 0;
+    transition: opacity 200ms var(--ease-out);
+  }
+
+  #tp-dim.on {
+    opacity: 1;
+  }
+
+  /* end-state instrument bracket: the permanent proof, holds after the
+     traveler dissolves. Same tick-and-hairline grammar as the dim
+     annotation, full-strength aqua. */
+  .bind-wrap {
+    position: relative;
+    margin-top: 28px;
+    height: 40px;
+  }
+
+  .bind-bracket {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .bind-line {
+    fill: none;
+    stroke: var(--aqua);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .bind-tick {
+    fill: none;
+    stroke: var(--aqua);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 1;
+  }
+
+  .bind-label {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--aqua);
+    letter-spacing: 0.05em;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   @media (max-width: 860px) {
     .stage {
       grid-template-columns: 1fr;
       max-width: 380px;
-      align-items: stretch;
+    }
+
+    .bind-wrap {
+      max-width: 380px;
+    }
+
+    /* Stacked layout: the three panels share one horizontal center, so the
+       interior proof ticks would pile up in the middle of the bracket
+       (reading as one thick central tick). Hide them; the two endpoint
+       ticks + hairline + label still render, and the sr-only list carries
+       the "same object across three places" meaning. popTick() only sets
+       opacity on these nodes, which display:none overrides — harmless. */
+    #tick-list,
+    #tick-board,
+    #tick-week {
+      display: none;
     }
   }
 </style>

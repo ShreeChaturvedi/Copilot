@@ -1,130 +1,215 @@
 ---
-// §6.0 — 64px nav: wordmark Inter 600 14, muted 13px links, ghost Sign in,
-// aqua Start free. Progressive blur ladder hangs under the sticky bar.
+// Nav — "The Instrument Capsule" (docs/design-research/specs-v2/nav.md, v2).
+// One machined glass capsule floating above the void; the logo is a single
+// vectorized SVG lockup (week-grid mark fused with the Sentient 400
+// wordmark), not an icon beside plain text. Per synthesis (c) Nav #1: the
+// logo's one-shot rim-flash is CUT — the logo renders fully static.
+//
+// The wordmark `d` attribute below is pre-vectorized (opentype.js, Sentient
+// Regular, "Taskflow" @ 24px em, tracking -0.01em) per the spec's own
+// generation recipe. Stored as one unbroken string per Risk #3 — never
+// hand-edit or reflow it.
+const WORDMARK_D =
+  'M11.09-0.65L11.09 0L4.27 0L4.27-0.65L5.35-1.08Q5.98-1.34 6.20-1.61Q6.43-1.87 6.43-2.35L6.43-2.35L6.43-15.22L4.30-15.22Q3.46-15.22 3.01-14.87Q2.57-14.52 1.94-13.42L1.94-13.42L1.18-12.02L0.53-12.02L0.86-16.44L14.50-16.44L14.83-12.02L14.18-12.02L13.42-13.42Q12.79-14.52 12.35-14.87Q11.90-15.22 11.06-15.22L11.06-15.22L8.95-15.22L8.95-2.35Q8.95-1.85 9.16-1.60Q9.36-1.34 10.01-1.08L10.01-1.08L11.09-0.65ZM19.92 0.24L19.92 0.24Q18.24 0.24 17.22-0.67Q16.20-1.58 16.20-3.10L16.20-3.10Q16.20-5.54 19.18-6.55L19.18-6.55Q20.81-7.10 23.30-7.22L23.30-7.22L23.30-7.92Q23.30-11.11 21.05-11.11L21.05-11.11Q20.02-11.11 19.34-10.68L19.34-10.68Q18.77-10.30 18.17-8.57L18.17-8.57L17.30-8.57L16.58-10.70Q18.94-12.29 21.34-12.29L21.34-12.29Q23.59-12.29 24.62-11.26Q25.66-10.22 25.66-7.87L25.66-7.87L25.66-2.93Q25.66-2.30 25.86-2.04Q26.06-1.78 26.66-1.70L26.66-1.70L27.53-1.61L27.65-0.98L24.53 0.24L24 0.24L23.40-1.54Q22.78-0.72 21.83-0.24Q20.88 0.24 19.92 0.24ZM20.83-1.44L20.83-1.44Q22.22-1.44 23.30-2.64L23.30-2.64L23.30-6.24Q21.74-6.17 20.74-5.88L20.74-5.88Q18.65-5.30 18.65-3.48L18.65-3.48Q18.65-2.54 19.25-1.99Q19.85-1.44 20.83-1.44ZM33.29 0.24L33.29 0.24Q30.72 0.24 28.97-1.03L28.97-1.03L29.26-3.82L29.90-3.82L30.46-2.69Q31.44-0.89 33.41-0.89L33.41-0.89Q34.49-0.89 35.14-1.40Q35.78-1.92 35.78-2.78L35.78-2.78Q35.78-3.55 35.14-4.14Q34.49-4.73 32.71-5.42L32.71-5.42Q29.21-6.79 29.21-9.05L29.21-9.05Q29.21-10.51 30.38-11.40Q31.56-12.29 33.48-12.29L33.48-12.29Q35.59-12.29 37.44-11.45L37.44-11.45L37.18-8.86L36.53-8.86Q36.07-9.70 35.59-10.25L35.59-10.25Q34.80-11.16 33.50-11.16L33.50-11.16Q32.52-11.16 31.93-10.74Q31.34-10.32 31.34-9.65Q31.34-8.98 31.98-8.45Q32.62-7.92 34.42-7.15L34.42-7.15Q36.31-6.34 37.14-5.45Q37.97-4.56 37.97-3.41L37.97-3.41Q37.97-1.78 36.67-0.77Q35.38 0.24 33.29 0.24ZM45.67-0.62L45.67 0L39.60 0L39.60-0.62L40.56-0.98Q41.09-1.20 41.28-1.48Q41.47-1.75 41.47-2.33L41.47-2.33L41.47-14.33Q41.47-15.05 41.26-15.36Q41.04-15.67 40.54-15.79L40.54-15.79L39.65-15.98L39.65-16.61L43.25-18L43.82-17.66L43.82-7.34L44.98-7.34Q45.89-7.34 46.61-8.21L46.61-8.21L48.07-9.94Q48.55-10.49 48.55-10.75L48.55-10.75Q48.55-10.99 48-11.18L48-11.18L47.18-11.42L47.18-12.05L52.39-12.05L52.39-11.42L51.34-11.09Q50.69-10.87 50.38-10.63Q50.06-10.39 49.42-9.67L49.42-9.67L47.35-7.32L50.69-2.11Q51.26-1.22 51.91-1.01L51.91-1.01L53.04-0.62L53.04 0L49.27 0L45.38-6.22L43.82-6.22L43.82-2.33Q43.82-1.73 44.00-1.46Q44.18-1.20 44.71-0.98L44.71-0.98L45.67-0.62ZM60.26-0.62L60.26 0L53.71 0L53.71-0.62L54.67-0.98Q55.20-1.20 55.39-1.48Q55.58-1.75 55.58-2.33L55.58-2.33L55.58-10.75L53.52-10.75L53.52-11.76L55.51-12.10Q55.37-13.49 55.37-13.94L55.37-13.94Q55.37-15.86 56.45-16.93Q57.53-18 59.50-18L59.50-18Q61.10-18 62.71-17.33L62.71-17.33L62.47-14.95L61.87-14.95Q60.70-16.87 59.52-16.87L59.52-16.87Q57.84-16.87 57.84-14.40L57.84-14.40Q57.84-13.01 57.91-12.05L57.91-12.05L61.10-12.05L61.10-10.75L57.94-10.75L57.94-2.33Q57.94-1.78 58.18-1.52Q58.42-1.27 59.23-0.98L59.23-0.98L60.26-0.62ZM68.21-0.62L68.21 0L62.14 0L62.14-0.62L63.10-0.98Q63.62-1.20 63.82-1.48Q64.01-1.75 64.01-2.33L64.01-2.33L64.01-14.33Q64.01-15.05 63.79-15.36Q63.58-15.67 63.07-15.79L63.07-15.79L62.18-15.98L62.18-16.61L65.78-18L66.36-17.66L66.36-2.33Q66.36-1.73 66.54-1.46Q66.72-1.20 67.25-0.98L67.25-0.98L68.21-0.62ZM75.84 0.24L75.84 0.24Q73.15 0.24 71.51-1.48Q69.86-3.19 69.86-6.02L69.86-6.02Q69.86-8.76 71.56-10.52Q73.25-12.29 75.84-12.29L75.84-12.29Q78.53-12.29 80.16-10.56Q81.79-8.83 81.79-6L81.79-6Q81.79-3.26 80.11-1.51Q78.43 0.24 75.84 0.24ZM73.36-2.27Q74.28-0.89 75.84-0.89Q77.40-0.89 78.31-2.26Q79.22-3.62 79.22-6L79.22-6Q79.22-8.40 78.31-9.78Q77.40-11.16 75.84-11.16Q74.28-11.16 73.36-9.78Q72.43-8.40 72.43-6.02Q72.43-3.65 73.36-2.27ZM92.64-8.64L89.47-0.36L88.15 0.24L84.46-9.77Q84.24-10.34 84.02-10.60Q83.81-10.85 83.33-11.09L83.33-11.09L82.66-11.42L82.66-12.05L88.54-12.05L88.54-11.42L87.84-11.21Q86.93-10.94 86.93-10.42L86.93-10.42Q86.93-10.13 87.05-9.79L87.05-9.79L89.33-3.24L92.45-11.59L93.79-12.05L97.18-3.34L99.48-9.79Q99.62-10.18 99.62-10.42L99.62-10.42Q99.62-10.94 98.71-11.21L98.71-11.21L98.02-11.42L98.02-12.05L102.67-12.05L102.67-11.42L101.90-11.04Q101.45-10.82 101.23-10.57Q101.02-10.32 100.82-9.79L100.82-9.79L97.39-0.36L96.14 0.24L92.64-8.64Z';
 ---
 
-<header class="nav">
-  <nav class="container nav-row" aria-label="Main">
-    <a class="wordmark" href="/">
+<header class="nav" data-nav>
+  <nav class="nav-capsule" aria-label="Main" data-nav-capsule>
+    <a class="nav-logo" href="/" aria-label="Taskflow, home">
       <svg
-        class="mark"
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
+        class="nav-logo__svg"
+        viewBox="-20 -19 123.67 20.24"
+        width="122"
+        height="20"
         aria-hidden="true"
       >
-        <rect x="0.5" y="0.5" width="15" height="15" rx="4" fill="var(--surface-2)" stroke="var(--hairline-strong)"></rect>
-        <rect x="3" y="7" width="10" height="4" rx="1.5" fill="var(--aqua)"></rect>
-        <rect x="3" y="3.5" width="6" height="2" rx="1" fill="var(--ink-muted)"></rect>
+        <line x1="-19" y1="-16.44" x2="-5" y2="-16.44" class="nav-logo__rule" />
+        <line x1="-12" y1="-16.44" x2="-12" y2="0" class="nav-logo__rule" />
+        <rect x="-11.2" y="-10.2" width="5.6" height="4" rx="1.3" class="nav-logo__chip" />
+        <path d={WORDMARK_D} class="nav-logo__word" />
       </svg>
-      Taskflow
     </a>
+
     <div class="nav-links">
       <a href="#type-it">How it works</a>
       <a href="#keys">Shortcuts</a>
     </div>
-    <div class="nav-actions">
-      <a class="btn btn-ghost" href="/app/login">Sign in</a>
-      <a class="btn btn-primary btn-sm" href="/app/signup">Start free</a>
+
+    <div class="nav-cluster">
+      <p class="nav-clock" aria-hidden="true">
+        <span class="nav-clock__dot"></span>
+        <span id="nav-clock-time"></span>
+      </p>
+      <span class="nav-divider" aria-hidden="true"></span>
+      <a class="nav-signin" href="/app/login">Sign in</a>
+      <a class="btn nav-cta" href="/app/signup">Start free</a>
+      <button
+        class="nav-burger"
+        type="button"
+        aria-expanded="false"
+        aria-controls="nav-mobile-menu"
+        aria-label="Open menu"
+        data-nav-burger
+      >
+        <span class="nav-burger__l1"></span>
+        <span class="nav-burger__l2"></span>
+      </button>
     </div>
   </nav>
-  <div class="blur-ladder" aria-hidden="true">
-    <span></span><span></span><span></span>
+
+  <div class="nav-mobile-menu" id="nav-mobile-menu" hidden data-nav-menu>
+    <a href="#type-it">How it works</a>
+    <a href="#keys">Shortcuts</a>
+    <hr />
+    <a href="/app/login">Sign in</a>
   </div>
 </header>
 
+<noscript>
+  <style>
+    .nav-clock {
+      display: none;
+    }
+  </style>
+</noscript>
+
 <style>
+  /* ============ capsule ============ */
   .nav {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: color-mix(in oklab, var(--void) 78%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    z-index: 100;
   }
 
-  .nav-row {
-    height: 64px;
+  .nav-capsule {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: calc(20px + env(safe-area-inset-left, 0px));
+    right: calc(20px + env(safe-area-inset-right, 0px));
+    max-width: 1220px;
+    margin-inline: auto;
+    height: 60px;
     display: flex;
     align-items: center;
-    gap: 28px;
+    border-radius: 12px;
+    padding-inline: 20px;
+    z-index: 100;
+    /* never :hidden — a focus ring on a link near the rounded corner would
+       otherwise be clipped by the capsule's own clip box (spec Risk #1). */
+    overflow: visible;
+    background: color-mix(in oklab, var(--void) 55%, transparent);
+    backdrop-filter: blur(10px) saturate(1.1);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    border: 1px solid color-mix(in oklab, var(--ink) 8%, transparent);
+    /* resting: inset top-highlight only, no cast shadow — nothing is under
+       the capsule yet at the top of the page. This box-shadow never
+       transitions (see .nav-capsule::after below); it stays constant on
+       the base element in both scroll states. */
+    box-shadow: inset 0 1px 0 rgb(246 248 248 / 0.1);
   }
 
-  /* the ladder: content melts under the bar instead of hitting a hard edge */
-  .blur-ladder {
+  /* Scrolled state is pre-rendered on a ::after pseudo-element and
+     crossfaded via opacity only — box-shadow itself is never transitioned
+     (synthesis (c) Nav #2). The brighter border + penumbra both live here,
+     stacked exactly over the base capsule box. */
+  .nav-capsule::after {
+    content: '';
     position: absolute;
-    inset: 64px 0 auto 0;
-    height: 36px;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1px solid color-mix(in oklab, var(--ink) 14%, transparent);
+    box-shadow: var(
+      --shadow-penumbra,
+      0 0.6px 1.6px -1.5px rgb(0 0 0 / 0.5),
+      0 2.3px 6px -3px rgb(0 0 0 / 0.4),
+      0 10px 26px -4.5px rgb(0 0 0 / 0.28)
+    );
+    opacity: 0;
     pointer-events: none;
+    transition: opacity 200ms var(--ease-out);
   }
 
-  .blur-ladder span {
-    position: absolute;
-    left: 0;
-    right: 0;
+  .nav-capsule.is-scrolled::after {
+    opacity: 1;
   }
 
-  .blur-ladder span:nth-child(1) {
-    top: 0;
-    height: 12px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    mask-image: linear-gradient(to bottom, black, transparent);
+  @media (max-width: 720px) {
+    .nav-capsule {
+      padding-inline: 16px;
+    }
   }
 
-  .blur-ladder span:nth-child(2) {
-    top: 12px;
-    height: 12px;
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-    mask-image: linear-gradient(to bottom, black, transparent);
-  }
-
-  .blur-ladder span:nth-child(3) {
-    top: 24px;
-    height: 12px;
-    backdrop-filter: blur(1.5px);
-    -webkit-backdrop-filter: blur(1.5px);
-    mask-image: linear-gradient(to bottom, black, transparent);
-  }
-
-  .wordmark {
+  /* ============ logo — the single-SVG lockup ============ */
+  /* Structural guard (spec Risk #1): no plate, no background rect, no
+     border around the mark. This IS the fix for "reads as a button" — do
+     not add a container with padding/radius/background around the <svg>. */
+  .nav-logo {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
+    flex: none;
+    margin-right: 28px;
     color: var(--ink);
     text-decoration: none;
-    margin-right: auto;
+    transition: opacity 100ms var(--ease-out);
   }
 
+  .nav-logo:active {
+    opacity: 0.8;
+  }
+
+  .nav-logo__svg {
+    display: block;
+  }
+
+  .nav-logo__rule {
+    stroke: var(
+      --line-dim,
+      color-mix(in oklab, oklch(0.8 0.09 190) 30%, transparent)
+    );
+    stroke-width: 1.2;
+    fill: none;
+    stroke-linecap: butt;
+  }
+
+  .nav-logo__chip {
+    /* the ONE aqua pixel in the whole logo — a cell with a task placed in
+       it, the same idea the whole product sells. Static; no rim-flash
+       (synthesis (c) Nav #1 cuts the one-shot). */
+    fill: var(--aqua);
+  }
+
+  .nav-logo__word {
+    fill: var(--ink);
+  }
+
+  /* ============ nav links ============ */
   .nav-links {
     display: flex;
-    gap: 20px;
-  }
-
-  .nav-links a {
-    font-size: 13px;
-    color: var(--ink-muted);
-    text-decoration: none;
-    transition: color var(--dur-2) var(--ease-out);
-  }
-
-  .nav-links a:hover {
-    color: var(--ink);
-  }
-
-  .nav-actions {
-    display: flex;
-    align-items: center;
     gap: 4px;
   }
 
-  .btn-sm {
-    padding: 9px 14px;
-    font-size: 13px;
+  .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font: 400 13px/1 var(--font-sans);
+    color: var(--ink-muted);
+    text-decoration: none;
+    background: transparent;
+    transition:
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+
+  @media (hover: hover) {
+    .nav-links a:hover {
+      color: var(--ink);
+      background: color-mix(in oklab, var(--ink) 7%, transparent);
+    }
+  }
+
+  .nav-links a:active {
+    opacity: 0.8;
   }
 
   @media (max-width: 720px) {
@@ -132,4 +217,292 @@
       display: none;
     }
   }
+
+  /* ============ right cluster: clock, divider, sign-in, CTA ============ */
+  .nav-cluster {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-left: 32px;
+  }
+
+  .nav-clock {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--ink-muted);
+    /* Static dot — the two-tempo ambient budget for this fold already
+       belongs to the hero (idler drift / now-line). See spec Risk #6. */
+  }
+
+  .nav-clock__dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--aqua);
+    flex: none;
+  }
+
+  .nav-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--hairline-strong);
+  }
+
+  .nav-signin {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font: 500 13px/1 var(--font-sans);
+    color: var(--ink-2);
+    text-decoration: none;
+    transition:
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+
+  @media (hover: hover) {
+    .nav-signin:hover {
+      color: var(--ink);
+      background: color-mix(in oklab, var(--ink) 7%, transparent);
+    }
+  }
+
+  .nav-signin:active {
+    opacity: 0.8;
+  }
+
+  @media (max-width: 720px) {
+    .nav-clock,
+    .nav-divider,
+    .nav-signin {
+      display: none;
+    }
+  }
+
+  /* ============ CTA — de-glowed, local override (spec Risk #2) ============ */
+  /* Overrides `.btn`/`.btn-primary` locally regardless of the shared
+     global.css state, so this component is correct on its own. No outer
+     aqua bloom anywhere — reads as a lit instrument key, not a sign. */
+  .nav-cta {
+    padding: 9px 16px;
+    border-radius: 8px;
+    font: 500 13px/1 var(--font-sans);
+    white-space: nowrap;
+    flex: none;
+    background: var(--aqua);
+    color: var(--aqua-ink);
+    box-shadow:
+      var(--edge-machined),
+      var(
+        --shadow-penumbra,
+        0 0.6px 1.6px -1.5px rgb(0 0 0 / 0.5),
+        0 2.3px 6px -3px rgb(0 0 0 / 0.4),
+        0 10px 26px -4.5px rgb(0 0 0 / 0.28)
+      );
+    transition:
+      background-color 150ms var(--ease-out),
+      transform 100ms var(--ease-out);
+  }
+
+  .nav-cta:hover {
+    background: var(--aqua-hover);
+  }
+
+  .nav-cta:active {
+    transform: scale(0.97);
+  }
+
+  @media (max-width: 720px) {
+    .nav-cta {
+      padding: 9px 14px;
+    }
+  }
+
+  /* ============ mobile hamburger + menu ============ */
+  .nav-burger {
+    display: none;
+    position: relative;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    padding: 0;
+    flex: none;
+  }
+
+  @media (max-width: 720px) {
+    .nav-burger {
+      display: flex;
+    }
+  }
+
+  .nav-burger__l1,
+  .nav-burger__l2 {
+    position: absolute;
+    width: 20px;
+    height: 1.6px;
+    background: var(--ink);
+    border-radius: 1px;
+    transition: transform 200ms var(--ease-settle);
+  }
+
+  .nav-burger__l1 {
+    transform: translateY(-4px);
+  }
+
+  .nav-burger__l2 {
+    transform: translateY(4px);
+  }
+
+  .nav-burger.is-open .nav-burger__l1 {
+    transform: translateY(0) rotate(45deg);
+  }
+
+  .nav-burger.is-open .nav-burger__l2 {
+    transform: translateY(0) rotate(-45deg);
+  }
+
+  .nav-mobile-menu {
+    position: fixed;
+    top: calc(16px + 60px + 8px + env(safe-area-inset-top, 0px));
+    left: calc(20px + env(safe-area-inset-left, 0px));
+    right: calc(20px + env(safe-area-inset-right, 0px));
+    background: var(--surface-3);
+    border-radius: 12px;
+    box-shadow: var(--edge-machined), var(--shadow-2);
+    padding: 8px;
+    z-index: 99;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      opacity 180ms var(--ease-settle),
+      transform 180ms var(--ease-settle);
+  }
+
+  .nav-mobile-menu[data-open] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .nav-mobile-menu a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 12px;
+    border-radius: 8px;
+    font: 500 15px/1.2 var(--font-sans);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .nav-mobile-menu a:active {
+    background: color-mix(in oklab, var(--ink) 7%, transparent);
+  }
+
+  .nav-mobile-menu hr {
+    border: 0;
+    height: 1px;
+    background: var(--hairline);
+    margin: 6px 4px;
+  }
+
+  @media (min-width: 721px) {
+    .nav-mobile-menu,
+    .nav-burger {
+      display: none;
+    }
+  }
 </style>
+
+<script is:inline>
+  (function () {
+    // Scroll state: pre-rendered penumbra crossfade, 8px threshold.
+    var capsule = document.querySelector('[data-nav-capsule]');
+    function onScroll() {
+      if (window.scrollY > 8) capsule.classList.add('is-scrolled');
+      else capsule.classList.remove('is-scrolled');
+    }
+    if (capsule) {
+      onScroll();
+      window.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    // Live clock — window.TF.fmtClock is seeded synchronously in
+    // Layout.astro's <head>, before this body script runs, so it is always
+    // safe to call here at top level (foundation contract, synthesis (d)).
+    var clockEl = document.getElementById('nav-clock-time');
+    function updateClock() {
+      if (clockEl && window.TF && typeof window.TF.fmtClock === 'function') {
+        clockEl.textContent = window.TF.fmtClock(new Date());
+      }
+    }
+    if (clockEl) {
+      updateClock();
+      var msToNextMinute = 60000 - (Date.now() % 60000);
+      setTimeout(function () {
+        updateClock();
+        setInterval(updateClock, 60000);
+      }, msToNextMinute);
+    }
+
+    // Mobile menu — disclosure pattern, no focus trap.
+    var burger = document.querySelector('[data-nav-burger]');
+    var menu = document.querySelector('[data-nav-menu]');
+    var closeTimer = null;
+
+    function isOpen() {
+      return burger.getAttribute('aria-expanded') === 'true';
+    }
+
+    function openMenu() {
+      if (closeTimer) {
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+      menu.hidden = false;
+      burger.setAttribute('aria-expanded', 'true');
+      burger.setAttribute('aria-label', 'Close menu');
+      burger.classList.add('is-open');
+      requestAnimationFrame(function () {
+        menu.setAttribute('data-open', '');
+      });
+      var firstLink = menu.querySelector('a');
+      if (firstLink) firstLink.focus();
+    }
+
+    function closeMenu(returnFocus) {
+      menu.removeAttribute('data-open');
+      burger.setAttribute('aria-expanded', 'false');
+      burger.setAttribute('aria-label', 'Open menu');
+      burger.classList.remove('is-open');
+      if (returnFocus) burger.focus();
+      var delay = window.TF && window.TF.reducedMotion ? 0 : 180;
+      closeTimer = setTimeout(function () {
+        menu.hidden = true;
+      }, delay);
+    }
+
+    if (burger && menu) {
+      burger.addEventListener('click', function () {
+        if (isOpen()) closeMenu(false);
+        else openMenu();
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen()) closeMenu(true);
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!isOpen()) return;
+        if (menu.contains(e.target) || burger.contains(e.target)) return;
+        closeMenu(false);
+      });
+    }
+  })();
+</script>

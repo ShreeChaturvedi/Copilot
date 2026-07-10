@@ -1,0 +1,825 @@
+---
+// "It comes back around." — the recurrence clock (direction §4.5, spec
+// clock.md, synthesis §c "Clock"). REPLACES the cut "Thursday, as a
+// program" light-mode inversion. This is the page's ONE full-color
+// moment: a drawn instrument dial with a single hairline hand sweeping
+// once every 24s, dragging an OKLCH rainbow bloom locked to its own
+// rotation angle. Chrome stays monochrome; only the light is colored.
+//
+// Copy is FINAL per _synthesis.md (f) rows 10-14 — verbatim, do not edit.
+
+const CX = 220;
+const CY = 220;
+const RING_R = 170;
+
+function polar(angleDeg: number, r: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    x: +(CX + r * Math.sin(rad)).toFixed(2),
+    y: +(CY - r * Math.cos(rad)).toFixed(2),
+  };
+}
+
+// 60 minute ticks, 6° apart, r 164→170. Static markup, zero JS.
+const minorTicks = Array.from({ length: 60 }, (_, i) => {
+  const angle = i * 6;
+  const inner = polar(angle, 164);
+  const outer = polar(angle, RING_R);
+  return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+});
+
+// 12 hour ticks, 30° apart, r 152→170 (brighter — the "named" positions).
+const majorTicks = Array.from({ length: 12 }, (_, i) => {
+  const angle = i * 30;
+  const inner = polar(angle, 152);
+  const outer = polar(angle, RING_R);
+  return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+});
+
+// Four real recurring tasks at their literal scheduled hour (mod 12).
+// Copy verbatim per synthesis (f) row 13.
+const chips = [
+  { pos: 'top', angle: 0, title: 'Rent', meta: '1ST · MONTHLY', hue: 'orange' },
+  { pos: 'right', angle: 90, title: '1:1 with Sam', meta: 'FRI 15:00 · WEEKLY', hue: 'violet' },
+  { pos: 'bottom', angle: 180, title: 'Gym', meta: 'EVERY OTHER DAY', hue: 'green' },
+  { pos: 'left', angle: 270, title: 'Standup', meta: 'MON 09:00 · WEEKLY', hue: 'blue' },
+];
+---
+
+<section class="section clock" id="clock" aria-labelledby="clock-h2">
+  <div class="container">
+    <div class="copy" data-reveal>
+      <h2 id="clock-h2" class="display-section">It comes back around.</h2>
+      <p class="body-copy">
+        Repeat a task weekly, monthly, or on your own rule. When its time
+        comes around, Taskflow puts it back on the grid.
+      </p>
+      <p class="mono-line">RRULE - WEEKLY - MONTHLY - CUSTOM</p>
+    </div>
+
+    <div class="dial-stage" data-clock-root aria-hidden="true">
+      <!-- dial-square isolates the dial's own aspect-ratio:1 box from the
+           chips: at <=640px the chips leave the dial-stage's positioned
+           overlay and flow in-document below it (see mobile block), so the
+           stage's outer box must no longer be the thing forced square —
+           only this inner wrapper is. Percent-based insets on the bloom/
+           svg/labels below are unchanged: they still resolve against a box
+           that is exactly the dial square at every breakpoint. -->
+      <div class="dial-square">
+        <div class="dial-bloom-trail"></div>
+        <div class="dial-bloom-core"></div>
+
+        <svg class="dial-svg" viewBox="0 0 440 440">
+          <circle class="dial-ring" cx="220" cy="220" r="170"></circle>
+          <g class="dial-ticks-minor">
+            {minorTicks.map((t) => (
+              <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}></line>
+            ))}
+          </g>
+          <g class="dial-ticks-major">
+            {majorTicks.map((t) => (
+              <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}></line>
+            ))}
+          </g>
+          <circle class="dial-hub" cx="220" cy="220" r="5"></circle>
+          <g class="dial-hand">
+            <line class="hand-shaft" x1="220" y1="220" x2="220" y2="34"></line>
+            <circle class="hand-tip" cx="220" cy="34" r="4"></circle>
+          </g>
+        </svg>
+
+        <div class="dial-labels">
+          <span class="mono dial-label" data-pos="top">12</span>
+          <span class="mono dial-label" data-pos="right">3</span>
+          <span class="mono dial-label" data-pos="bottom">6</span>
+          <span class="mono dial-label" data-pos="left">9</span>
+        </div>
+      </div>
+
+      <div class="dial-chips">
+        {chips.map((c) => (
+          <div
+            class="dial-chip flashable"
+            data-pos={c.pos}
+            data-angle={c.angle}
+            style={`--chip-c: var(--hue-${c.hue})`}
+          >
+            <div class="dial-chip-leader" data-pos={c.pos}></div>
+            <div class="dial-chip-body">
+              <div class="dial-chip-face dial-chip-face--dim">
+                <span class="dial-chip-title">{c.title}</span>
+                <span class="dial-chip-meta mono">{c.meta}</span>
+              </div>
+              <div class="dial-chip-face dial-chip-face--lit">
+                <span class="dial-chip-title">{c.title}</span>
+                <span class="dial-chip-meta mono">{c.meta}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="sr-only">
+      <p>Taskflow repeats tasks on the schedule you set.</p>
+      <ul>
+        <li>Standup repeats every Monday at 9:00 AM.</li>
+        <li>1:1 with Sam repeats every Friday at 3:00 PM.</li>
+        <li>Gym repeats every other day.</li>
+        <li>Rent repeats on the 1st of every month.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // Recurrence clock: one hairline hand sweeps 360°/24s, linear (a clock
+  // hand does not ease). The same frame that writes the hand's rotation
+  // writes the bloom's hue — one rAF loop, one elapsed-time source, so
+  // the two can never drift out of lockstep (spec risk #3).
+  (function () {
+    var root = document.querySelector('#clock [data-clock-root]');
+    if (!root) return;
+
+    var reduced = !!(window.TF && window.TF.reducedMotion);
+
+    var ring = root.querySelector('.dial-ring');
+    var ticksMinor = root.querySelector('.dial-ticks-minor');
+    var ticksMajor = root.querySelector('.dial-ticks-major');
+    var labelEls = Array.prototype.slice.call(root.querySelectorAll('.dial-label'));
+    var hub = root.querySelector('.dial-hub');
+    var hand = root.querySelector('.dial-hand');
+    var chipEls = Array.prototype.slice.call(root.querySelectorAll('.dial-chip'));
+    var bloomTrail = root.querySelector('.dial-bloom-trail');
+    var bloomCore = root.querySelector('.dial-bloom-core');
+
+    var EASE_SETTLE = 'cubic-bezier(0.16,1,0.3,1)';
+    var EASE_OUT = 'cubic-bezier(0.25,1,0.5,1)';
+
+    var RING_C = 2 * Math.PI * 170; // circle circumference, radius 170
+    var PERIOD = 24000; // ms per revolution
+    var MARKS = [0, 90, 180, 270]; // chipEls[i] sits at MARKS[i]
+
+    var elapsed = 0; // ms of visible playback time — never wall-clock
+    var prevPos = -1; // last frame's angle in [0,360); -1 = never run
+    var running = false;
+    var entered = false;
+
+    // Loop-adjacency guard (integration QA #80/#seam-clock-receipts): this
+    // file owns only the clock, so it cannot change Keys' or Receipts' own
+    // gating. Instead the clock defers to them — it observes their existing
+    // sections and refuses to run its own ambient loop while either is
+    // itself running its loop, closing the "two ambient loops in one
+    // viewport" window from this side. Thresholds mirror what each neighbor
+    // already uses to gate ITSELF (Keys.astro: #keys-layout at 0.3;
+    // Receipts.astro: .receipts .band at 0), so `*Active` below is true
+    // exactly when that neighbor's own loop is actually playing.
+    var dialVisible = false;
+    var keysActive = false;
+    var receiptsActive = false;
+
+    function canRunAmbient() {
+      return !reduced && dialVisible && !keysActive && !receiptsActive;
+    }
+
+    // Single gated entry point: every place that used to call
+    // startAmbient()/stopAmbient() directly now goes through here so the
+    // neighbor flags are always consulted before the rAF is (re)started.
+    function syncAmbient() {
+      if (canRunAmbient()) startAmbient();
+      else stopAmbient();
+    }
+
+    // Writes --clock-angle and --clock-hue in the SAME call from the SAME
+    // `pos` value (numerically identical, per direction §4.5) so the hand
+    // and the bloom hue can never read different frames of truth.
+    function setAngle(pos) {
+      root.style.setProperty('--clock-angle', pos.toFixed(2) + 'deg');
+      root.style.setProperty('--clock-hue', pos.toFixed(2));
+      var rad = (pos * Math.PI) / 180;
+      var tipX = 50 + 39 * Math.sin(rad);
+      var tipY = 50 - 39 * Math.cos(rad);
+      root.style.setProperty('--tip-x', tipX.toFixed(2) + '%');
+      root.style.setProperty('--tip-y', tipY.toFixed(2) + '%');
+    }
+
+    // Relight: pre-rendered lit overlay crossfades in (never a background/
+    // box-shadow transition — this loops forever while the section is in
+    // view, so the loop must stay compositor-only). Envelope: brighten
+    // 220ms, hold 700ms, decay 480ms (~1.4s), plus the shared rim flash.
+    function lightChip(chip) {
+      var overlay = chip.querySelector('.dial-chip-face--lit');
+      if (overlay) {
+        overlay.getAnimations().forEach(function (a) {
+          a.cancel();
+        });
+        var brighten = overlay.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 220,
+          easing: EASE_OUT,
+          fill: 'forwards',
+        });
+        setTimeout(function () {
+          brighten.cancel(); // superseded by decay below; see note past decay
+          var decay = overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 480,
+            easing: EASE_SETTLE,
+            fill: 'forwards',
+          });
+          // Cancel once finished (rather than leaving fill:forwards
+          // permanently pinning opacity:0 via the animation cascade
+          // origin — a higher-priority origin than author stylesheets)
+          // so the CSS :hover preview rule on this same property can
+          // take effect again. The reverted value is identical (0), so
+          // this is visually silent. Cancelling `brighten` above matters
+          // for the same reason: left un-cancelled, its finished
+          // fill:forwards effect (opacity:1) would reassert itself the
+          // instant `decay` is cancelled, since nothing else would still
+          // be holding the property.
+          decay.finished
+            .then(function () {
+              decay.cancel();
+            })
+            .catch(function () {});
+        }, 220 + 700);
+      }
+      chip.classList.remove('is-flash');
+      void chip.offsetWidth; // restart the rim-flash keyframe
+      chip.classList.add('is-flash');
+    }
+
+    // Exact crossing detection (not a tolerance window, spec risk #4):
+    // a mark relights only the frame the sweep passes through it.
+    function checkCrossing(pos) {
+      for (var i = 0; i < MARKS.length; i++) {
+        var mark = MARKS[i];
+        var crossed =
+          pos >= prevPos ? mark > prevPos && mark <= pos : mark > prevPos || mark <= pos;
+        if (crossed) lightChip(chipEls[i]);
+      }
+      prevPos = pos;
+    }
+
+    // The bloom's blurred, screen-blended gradients are the page's heaviest
+    // recurring paint. The sweep is only 15 deg/s, so sampling the visual at
+    // ~30fps is indistinguishable over a 24s revolution while halving the
+    // bloom repaint rate. `elapsed` still accumulates every frame (exact
+    // timing/crossing logic), only setAngle/checkCrossing are throttled.
+    var SAMPLE_MS = 33;
+    var sinceSample = SAMPLE_MS; // fire on the very first frame after (re)start
+    function frame(now, dt) {
+      elapsed += dt;
+      sinceSample += dt;
+      if (sinceSample < SAMPLE_MS) return;
+      sinceSample = 0;
+      var pos = ((elapsed % PERIOD) + PERIOD) % PERIOD / PERIOD * 360;
+      setAngle(pos);
+      checkCrossing(pos);
+    }
+
+    function startAmbient() {
+      if (reduced || running) return;
+      running = true;
+      if (window.TF && window.TF.ticker) window.TF.ticker.add(frame);
+    }
+
+    // Off-screen: cancel the rAF entirely (don't just freeze via CSS) so
+    // there is zero work while scrolled past. `elapsed` is untouched, so
+    // resuming continues from the same visible-time position, never a
+    // wall-clock jump.
+    function stopAmbient() {
+      if (!running) return;
+      running = false;
+      if (window.TF && window.TF.ticker) window.TF.ticker.remove(frame);
+    }
+
+    function fade(el, from, to, duration, delay, easing, extra) {
+      if (!el) return;
+      el.style.opacity = String(from);
+      var kf0 = { opacity: from };
+      var kf1 = { opacity: to };
+      if (extra) {
+        for (var k in extra.from) kf0[k] = extra.from[k];
+        for (var k2 in extra.to) kf1[k2] = extra.to[k2];
+      }
+      el.animate([kf0, kf1], { duration: duration, delay: delay, easing: easing, fill: 'forwards' });
+    }
+
+    // Entrance (plays once per page load, IO-gated at 0.4). Every element
+    // here has no baked "opacity:0" in the stylesheet — this function is
+    // what hides them (synchronously, before first paint) then reveals
+    // them on the timeline below. If JS never runs at all, the dial
+    // simply renders fully drawn and settled (no-JS fallback).
+    function playEntrance() {
+      ring.style.strokeDasharray = String(RING_C);
+      ring.style.strokeDashoffset = String(RING_C);
+      ring.animate([{ strokeDashoffset: RING_C }, { strokeDashoffset: 0 }], {
+        duration: 900,
+        delay: 80,
+        easing: EASE_SETTLE,
+        fill: 'forwards',
+      });
+
+      fade(ticksMajor, 0, 1, 400, 260, EASE_SETTLE, {
+        from: { transform: 'scale(0.9)' },
+        to: { transform: 'scale(1)' },
+      });
+      fade(ticksMinor, 0, 1, 400, 340, EASE_OUT);
+
+      labelEls.forEach(function (el, i) {
+        fade(el, 0, 1, 300, 420 + i * 40, EASE_OUT, {
+          from: { transform: 'translate(-50%,-50%) translateY(6px)' },
+          to: { transform: 'translate(-50%,-50%)' },
+        });
+      });
+
+      setAngle(0); // hand pre-set resting, pointing to Rent/top
+      fade(hub, 0, 1, 300, 500, EASE_OUT);
+      fade(hand, 0, 1, 300, 500, EASE_OUT);
+
+      chipEls.forEach(function (chip, i) {
+        fade(chip, 0, 1, 400, 700 + i * 60, EASE_OUT);
+        var leader = chip.querySelector('.dial-chip-leader');
+        if (leader) {
+          var pos = leader.getAttribute('data-pos');
+          var vertical = pos === 'top' || pos === 'bottom';
+          var base = vertical ? 'translateX(-50%)' : 'translateY(-50%)';
+          var axis = vertical ? 'Y' : 'X';
+          leader.style.transform = base + ' scale' + axis + '(0)';
+          leader.animate(
+            [
+              { transform: base + ' scale' + axis + '(0)' },
+              { transform: base + ' scale' + axis + '(1)' },
+            ],
+            { duration: 400, delay: 700 + i * 60, easing: EASE_OUT, fill: 'forwards' }
+          );
+        }
+      });
+
+      fade(bloomTrail, 0, 1, 400, 900, EASE_OUT);
+      fade(bloomCore, 0, 1, 400, 900, EASE_OUT);
+
+      // prevAngle stays -1 so the Rent chip (0°) relights the instant the
+      // sweep begins — the entrance's payoff. Routed through syncAmbient
+      // (not startAmbient directly) so a neighbor section that's still
+      // visible at this exact moment correctly defers the sweep's start.
+      setTimeout(syncAmbient, 900);
+    }
+
+    // Reduced motion: rAF never starts. Hand parks at a deliberately
+    // pleasant "10:30" position; the bloom hue ties back to the page's
+    // own aqua rather than an arbitrary rainbow value; all four chips
+    // render permanently lit (direction's explicit reduced-motion ask).
+    function applyReducedState() {
+      root.style.setProperty('--clock-angle', '315deg');
+      root.style.setProperty('--clock-hue', '182');
+      var rad = (315 * Math.PI) / 180;
+      root.style.setProperty('--tip-x', (50 + 39 * Math.sin(rad)).toFixed(2) + '%');
+      root.style.setProperty('--tip-y', (50 - 39 * Math.cos(rad)).toFixed(2) + '%');
+      if (bloomCore) bloomCore.style.opacity = '0.5';
+      if (bloomTrail) bloomTrail.style.opacity = '0.3';
+      chipEls.forEach(function (chip) {
+        var overlay = chip.querySelector('.dial-chip-face--lit');
+        if (overlay) overlay.style.opacity = '1';
+      });
+    }
+
+    // Wires a neighbor section's own visibility into one of the *Active
+    // flags above, re-syncing the ambient loop on every crossing. Silently
+    // no-ops if the neighbor element isn't found (e.g. markup changes
+    // upstream) so a missing selector degrades to "no extra gating" rather
+    // than a thrown error.
+    function watchNeighbor(el, threshold, setActive) {
+      if (!el || !window.TF || typeof window.TF.onVisible !== 'function') return;
+      window.TF.onVisible(
+        el,
+        function (visible) {
+          setActive(visible);
+          syncAmbient();
+        },
+        { once: false, threshold: threshold }
+      );
+    }
+
+    function init() {
+      if (reduced) {
+        applyReducedState();
+        return;
+      }
+      if (!window.TF || typeof window.TF.onVisible !== 'function') {
+        dialVisible = true;
+        entered = true;
+        playEntrance();
+        return;
+      }
+      // TF.onVisible is attached by the deferred motion.js module — safe
+      // only from DOMContentLoaded onward (see motion.js load-order note).
+      window.TF.onVisible(
+        root,
+        function (visible) {
+          dialVisible = visible;
+          if (visible && !entered) {
+            entered = true;
+            playEntrance(); // its own tail calls syncAmbient once settled
+          } else {
+            syncAmbient();
+          }
+        },
+        { once: false, threshold: 0.4 }
+      );
+
+      // Keys' rail loop (Keys.astro: #keys-layout, threshold 0.3) and the
+      // Receipts icon marquee (Receipts.astro: .receipts .band, threshold
+      // 0) are this section's two neighbors. Mirroring their own thresholds
+      // means keysActive/receiptsActive track exactly when each neighbor's
+      // loop is actually playing, not an approximation.
+      watchNeighbor(document.getElementById('keys-layout'), 0.3, function (v) {
+        keysActive = v;
+      });
+      watchNeighbor(document.querySelector('.receipts .band'), 0, function (v) {
+        receiptsActive = v;
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
+
+<style>
+  .copy .body-copy {
+    margin-top: 16px;
+    max-width: 56ch;
+  }
+
+  .copy .mono-line {
+    margin-top: 16px;
+  }
+
+  /* This is the one section that breaks from the page's left-weighted
+     flow on purpose: the artifact is bilaterally symmetric, so it centers
+     below the copy block rather than aligning to the container edge. */
+  .dial-stage {
+    position: relative;
+    width: clamp(320px, 42vw, 620px);
+    aspect-ratio: 1;
+    margin: 64px auto 0;
+    --clock-angle: 0deg;
+    --clock-hue: 0;
+  }
+
+  /* The square that the bloom/svg/labels position themselves against.
+     Fills .dial-stage exactly at every breakpoint (desktop: absolute+inset:0
+     == same box as .dial-stage; mobile: relative+aspect-ratio:1 at 100%
+     width == same box .dial-stage used to force on itself). */
+  .dial-square {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* ---- bloom (behind the dial, screen-blended — chrome stays mono) ---- */
+
+  .dial-bloom-trail,
+  .dial-bloom-core {
+    position: absolute;
+    inset: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  /* The sweep is driven by rotating a STATIC conic gradient rather than
+     re-baking --clock-angle into the gradient's `from` (which repaints the
+     36px blur every frame). transform: rotate composites the pre-blurred
+     layer instead — visually identical, but the angle sweep no longer
+     repaints. `from -130deg` + rotate(a) == the old `from calc(a - 130deg)`.
+     Only --clock-hue still repaints (the rainbow requires it). */
+  .dial-bloom-trail {
+    background: conic-gradient(
+      from -130deg at 50% 50%,
+      transparent 0deg,
+      oklch(0.64 0.15 var(--clock-hue, 0) / 0.55) 96deg,
+      oklch(0.64 0.15 var(--clock-hue, 0) / 0.18) 120deg,
+      transparent 134deg,
+      transparent 360deg
+    );
+    filter: blur(36px);
+    transform: rotate(var(--clock-angle, 0deg));
+    transform-origin: 50% 50%;
+    will-change: transform;
+  }
+
+  .dial-bloom-core {
+    background: radial-gradient(
+      circle at var(--tip-x, 50%) var(--tip-y, 11%),
+      oklch(0.64 0.15 var(--clock-hue, 0) / 0.85) 0%,
+      oklch(0.64 0.15 var(--clock-hue, 0) / 0.3) 20%,
+      transparent 50%
+    );
+    filter: blur(18px);
+  }
+
+  /* ---- dial (drawn instrument lines, per direction §2.1) ---- */
+
+  .dial-svg {
+    position: absolute;
+    inset: 14.5161%; /* 90px of 620px reference — dial diameter = stage − 180px */
+    fill: none;
+    overflow: visible;
+  }
+
+  .dial-ring {
+    stroke: var(--line-dim);
+    stroke-width: 1.5px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dial-ticks-minor line {
+    stroke: var(--line-dim);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dial-ticks-major {
+    transform-origin: 220px 220px;
+  }
+
+  .dial-ticks-major line {
+    stroke: var(--ink-2);
+    stroke-width: 1.25px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dial-hub {
+    fill: var(--surface-2);
+    stroke: var(--line-dim);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dial-hand {
+    transform-origin: 220px 220px;
+    transform: rotate(var(--clock-angle, 0deg));
+  }
+
+  .hand-shaft {
+    stroke: var(--ink-2);
+    stroke-width: 1.5px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* the section's one deliberate aqua touch on chrome — "now," the same
+     meaning as the app's now-line dot */
+  .hand-tip {
+    fill: var(--aqua);
+    filter: drop-shadow(0 0 6px var(--aqua));
+  }
+
+  /* ---- cardinal numerals (HTML overlay, crisp mono type) ---- */
+
+  .dial-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .dial-label {
+    position: absolute;
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .dial-label[data-pos='top'] {
+    top: 28.7097%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .dial-label[data-pos='right'] {
+    top: 50%;
+    left: 71.2903%;
+    transform: translate(-50%, -50%);
+  }
+
+  .dial-label[data-pos='bottom'] {
+    top: 71.2903%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .dial-label[data-pos='left'] {
+    top: 50%;
+    left: 28.7097%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ---- chips ---- */
+
+  .dial-chips {
+    position: absolute;
+    inset: 0;
+  }
+
+  .dial-chip {
+    position: absolute;
+    pointer-events: none; /* re-enabled only for hover-capable pointers, below */
+  }
+
+  .dial-chip[data-pos='top'] {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .dial-chip[data-pos='bottom'] {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .dial-chip[data-pos='left'] {
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .dial-chip[data-pos='right'] {
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .dial-chip-leader {
+    position: absolute;
+    width: 1px;
+  }
+
+  .dial-chip-leader[data-pos='top'] {
+    left: 50%;
+    bottom: -38px;
+    height: 38px;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom, var(--line-dim), transparent);
+  }
+
+  .dial-chip-leader[data-pos='bottom'] {
+    left: 50%;
+    top: -38px;
+    height: 38px;
+    transform: translateX(-50%);
+    background: linear-gradient(to top, var(--line-dim), transparent);
+  }
+
+  .dial-chip-leader[data-pos='left'] {
+    top: 50%;
+    right: -38px;
+    width: 38px;
+    height: 1px;
+    transform: translateY(-50%);
+    background: linear-gradient(to right, var(--line-dim), transparent);
+  }
+
+  .dial-chip-leader[data-pos='right'] {
+    top: 50%;
+    left: -38px;
+    width: 38px;
+    height: 1px;
+    transform: translateY(-50%);
+    background: linear-gradient(to left, var(--line-dim), transparent);
+  }
+
+  .dial-chip-body {
+    position: relative;
+    min-width: 128px;
+  }
+
+  .dial-chip-face {
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  /* Resting: dim, not yet lit this revolution. */
+  .dial-chip-face--dim {
+    position: relative;
+    background: color-mix(in oklab, var(--surface-2) 55%, transparent);
+    box-shadow: inset 0 0 0 1px var(--line-dim);
+    opacity: 0.78;
+  }
+
+  /* Lit: a pre-rendered overlay crossfaded via opacity only — this loops
+     4x/revolution forever while in view, so it must never transition
+     background or box-shadow directly (spec amendment). */
+  .dial-chip-face--lit {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklab, var(--chip-c) 24%, transparent);
+    box-shadow:
+      inset 0 0 0 0.5px var(--chip-c),
+      var(--shadow-penumbra);
+    opacity: 0;
+  }
+
+  .dial-chip-title {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+
+  .dial-chip-meta {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--ink-muted);
+    margin-top: 2px;
+  }
+
+  .dial-chip-face--lit .dial-chip-title,
+  .dial-chip-face--lit .dial-chip-meta {
+    color: oklch(from var(--chip-c) 0.82 min(c, 0.1) h);
+  }
+
+  /* Hover preview (fine pointers only): instant on, 150ms off. Purely
+     additive — never pauses or affects the ambient loop. */
+  @media (hover: hover) and (pointer: fine) {
+    .dial-chip {
+      pointer-events: auto;
+    }
+
+    .dial-chip-face--lit {
+      transition: opacity 150ms var(--ease-out);
+    }
+
+    .dial-chip:hover .dial-chip-face--lit {
+      opacity: 1;
+      transition: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    /* Bug fix (integration QA #74-m-clock): .dial-chips used to be
+       position:absolute; top:100%, which visually sat below the dial but
+       contributed ZERO height to .dial-stage (abs-positioned boxes don't
+       participate in their containing block's size). .dial-stage's own
+       height was therefore just the dial square, so .section's computed
+       height never accounted for the chips grid — it rendered ~78px into
+       the next section (#receipts), text-on-text. Fix: .dial-stage stops
+       forcing aspect-ratio on its OWN box (that job moves to the new
+       .dial-square inner wrapper below) and the chips grid returns to
+       normal document flow, so its height is real and the section sizes
+       to contain it. */
+    .dial-stage {
+      width: min(72vw, 260px);
+      aspect-ratio: auto;
+      margin: 40px auto 0;
+    }
+
+    .dial-square {
+      position: relative;
+      inset: auto;
+      width: 100%;
+      aspect-ratio: 1;
+    }
+
+    .dial-chip-leader {
+      display: none;
+    }
+
+    .dial-chips {
+      position: static;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 28px;
+    }
+
+    .dial-chip[data-pos] {
+      position: static;
+      transform: none;
+    }
+
+    /* DOM order is top/right/bottom/left (Rent, Sam, Gym, Standup) for the
+       desktop cardinal layout; the mobile 2x2 grid reads Rent/Sam then
+       Standup/Gym (layout ASCII), so swap the bottom row via `order`. */
+    .dial-chip[data-pos='left'] {
+      order: 3;
+    }
+
+    .dial-chip[data-pos='bottom'] {
+      order: 4;
+    }
+
+    .dial-chip-body {
+      min-width: 0;
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dial-chip-face--lit {
+      transition: none;
+    }
+  }
+</style>

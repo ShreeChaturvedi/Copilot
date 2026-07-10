@@ -1,32 +1,78 @@
 ---
-// §6.7 — back to the void. The waiting chip from the hero margin finally
-// settles into a Saturday slot above the CTA, then the page asks once.
+// closing.md "THE LONG ARRIVAL" — the one thing the page has withheld
+// since the hero: the idler chip's landing. It travels in from the same
+// margin direction it idled in, along a drawn line that draws ahead of it
+// and undraws behind it, lands with the page's one rim-flash signal, and
+// the frame's floor ticks once. If the visitor already dragged the hero
+// idler onto the grid this session (sessionStorage `tf-idler-placed`, see
+// _synthesis.md (c) Closing #1 — fixes the spec's broken underscore
+// spelling), the chip renders pre-settled and the headline swaps to the
+// settled variant; nothing animates twice.
+//
+// sessionStorage is read TWICE, deliberately (integration-gate fix): once
+// at parse (below, for a reload that already has the flag) and again inside
+// the arrival IO callback (see the second script tag, below the section) —
+// because on a natural single-load visit the drag happens AFTER this parse-
+// time read already ran (the visitor drags the hero idler, then scrolls
+// down to closing), so only the second read can catch it.
 ---
 
 <section class="section closing" id="closing">
+  <div class="grid-ghost" aria-hidden="true"></div>
   <div class="container closing-inner">
-    <div
-      class="slot-frame"
-      role="img"
-      aria-label="A Saturday column with the task Plan the trip settled at 10:00."
-    >
-      <div class="s-head"><span class="s-dow">SAT</span></div>
-      <div class="s-body">
-        <span class="s-hour mono" style="top:25%">10 AM</span>
-        <span class="s-hour mono" style="top:75%">11 AM</span>
-        <div
-          class="chip s-chip flashable"
-          id="closing-chip"
-          style="--chip-c: var(--hue-violet); top:25%; height:37.5%"
-        >
-          <span class="c-t mono">10:00</span>
-          <span class="c-ti">Plan the trip</span>
+    <div class="arrival-stage">
+      <div
+        class="slot-frame"
+        role="img"
+        aria-label="A Saturday column with the task Plan the trip settled at 10:00."
+      >
+        <div class="s-head"><span class="s-dow">SAT</span></div>
+        <div class="s-body">
+          <span class="s-hour mono" style="top:25%">10 AM</span>
+          <span class="s-hour mono" style="top:75%">11 AM</span>
+          <div
+            class="chip s-chip flashable"
+            id="closing-chip"
+            style="--chip-c: var(--hue-violet); top:25%; height:37.5%"
+          >
+            <span class="c-t mono">10:00</span>
+            <span class="c-ti">Plan the trip</span>
+          </div>
+          <svg class="arrival-path" aria-hidden="true" viewBox="0 0 420 290">
+            <path
+              d="M390,130 Q260,90 134,280"
+              stroke="var(--line-dim)"
+              stroke-width="1.5"
+              fill="none"
+              stroke-linecap="round"
+              vector-effect="non-scaling-stroke"
+            ></path>
+          </svg>
         </div>
       </div>
+    </div>
+    <div class="floor">
+      <div class="now-tick" aria-hidden="true"></div>
     </div>
     <h2 class="display-section" data-reveal>
       One task is still waiting. Give it a time.
     </h2>
+    <script is:inline>
+      // Settled-state read: synchronous, immediately after the <h2>, so it
+      // runs during initial parse regardless of scroll position or motion
+      // preference. Catches the case where the flag is ALREADY set at parse
+      // time (e.g. a reload after a prior drag). The arrival script below
+      // re-reads sessionStorage a second time, inside its onVisible
+      // callback, to catch the flag flipping true later in the same load
+      // (drag the idler, then scroll to closing) — see its comment.
+      (function () {
+        var settled = sessionStorage.getItem('tf-idler-placed') === '1';
+        var h2 = document.querySelector('#closing h2');
+        if (settled && h2) h2.textContent = 'Every task has its time.';
+        var section = document.getElementById('closing');
+        if (section) section.classList.toggle('is-presettled', settled);
+      })();
+    </script>
     <div class="cta-stack" data-reveal>
       <a class="btn btn-primary" href="/app/signup">Start free</a>
       <p class="mono-line">NO CARD REQUIRED</p>
@@ -37,37 +83,156 @@
 <script is:inline>
   // The last settle: the idler comes in from the margin and lands, once.
   (function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var chip = document.getElementById('closing-chip');
-    if (!chip || !('IntersectionObserver' in window)) return;
-    chip.classList.add('offstage');
-    var io = new IntersectionObserver(
-      function (entries) {
-        if (!entries.some(function (e) { return e.isIntersecting; })) return;
-        io.disconnect();
-        chip.style.transition = 'transform 700ms cubic-bezier(0.16,1,0.3,1) 200ms';
-        chip.classList.remove('offstage');
-        chip.addEventListener('transitionend', function done(e) {
-          if (e.propertyName !== 'transform') return;
-          chip.removeEventListener('transitionend', done);
-          chip.style.transition = '';
-          chip.classList.add('is-flash');
-        });
-      },
-      { threshold: 0.6 }
-    );
-    io.observe(chip.closest('.slot-frame'));
+    var closing = document.getElementById('closing');
+    if (!closing) return;
+
+    // Idempotent: swap the headline to the settled variant and mark the
+    // section presettled. Safe to call more than once.
+    function applySettled() {
+      var h2 = closing.querySelector('h2');
+      if (h2) h2.textContent = 'Every task has its time.';
+      closing.classList.add('is-presettled');
+    }
+
+    function run() {
+      // Already known settled at parse time (e.g. a fresh reload with the
+      // flag already set) — the chip is already in its natural, un-offstage
+      // position and the headline already swapped; nothing left to wire up.
+      if (closing.classList.contains('is-presettled')) return;
+
+      var stage = closing.querySelector('.arrival-stage');
+      var chip = document.getElementById('closing-chip');
+      var svg = closing.querySelector('.arrival-path');
+      var pathEl = svg ? svg.querySelector('path') : null;
+      var floor = closing.querySelector('.floor');
+      var tick = closing.querySelector('.now-tick');
+      if (!stage || !chip || !svg || !pathEl || !floor || !tick) return;
+
+      window.TF.onVisible(
+        stage,
+        function () {
+          // Re-read sessionStorage here, not just at parse: in the natural
+          // single-load flow the visitor drags the hero idler and THEN
+          // scrolls down to closing, so the flag can flip true well after
+          // this file's parse-time script already ran. This is the single
+          // other place allowed to read the flag (see the parse-time script
+          // above) — it re-checks once, right as the section arrives, and
+          // routes into the same presettled branch a reload would take: no
+          // travel, no rim-flash (it was placed earlier in the session, this
+          // is not a placement event now).
+          if (sessionStorage.getItem('tf-idler-placed') === '1') {
+            applySettled();
+            return;
+          }
+
+          if (window.TF.reducedMotion) return;
+
+          var k = Math.min(1, window.innerWidth / 900);
+
+          // offstage: the chip's starting vector, echoing the hero idler's
+          // margin position (up and to the right), scaled by k.
+          chip.style.transition = 'none';
+          chip.style.transform =
+            'translate(' + 256 * k + 'px,' + -150 * k + 'px) rotate(10deg)';
+
+          // the path shrinks toward the landing point at narrow viewports;
+          // the endpoint itself never moves.
+          svg.style.transformOrigin = '134px 280px';
+          svg.style.transform = 'scale(' + k + ')';
+          svg.style.opacity = '1';
+
+          void chip.offsetWidth; // flush the offstage transform before animating away from it
+
+          // t=0: the path draws in ahead of the chip
+          window.TF.drawPath(pathEl, { duration: 420 });
+
+          // t=80ms: the chip travels the path to its slot
+          window.setTimeout(function () {
+            chip.style.transition = 'transform 700ms cubic-bezier(0.16,1,0.3,1)';
+            chip.style.transform = 'none';
+          }, 80);
+
+          chip.addEventListener('transitionend', function landed(e) {
+            if (e.propertyName !== 'transform') return;
+            chip.removeEventListener('transitionend', landed);
+            chip.style.transition = '';
+            chip.classList.add('is-flash');
+
+            // the path undraws behind the now-landed chip
+            var L = pathEl.getTotalLength();
+            pathEl.animate(
+              [{ strokeDashoffset: 0 }, { strokeDashoffset: -L }],
+              { duration: 320, easing: 'linear', fill: 'forwards' }
+            );
+          });
+
+          // the floor's one-shot tick, ~20ms after the rim-flash settles
+          chip.addEventListener('animationend', function flashed(e) {
+            if (e.animationName !== 'rim-flash') return;
+            chip.removeEventListener('animationend', flashed);
+            window.setTimeout(function () {
+              var w = floor.getBoundingClientRect().width;
+              tick.style.opacity = '1';
+              tick.animate(
+                [
+                  { transform: 'translate(-50%,-50%) translateX(0)', opacity: 1, offset: 0 },
+                  { transform: 'translate(-50%,-50%) translateX(' + w + 'px)', opacity: 1, offset: 0.75 },
+                  { transform: 'translate(-50%,-50%) translateX(' + w + 'px)', opacity: 0, offset: 1 },
+                ],
+                { duration: 480, easing: 'cubic-bezier(0.16,1,0.3,1)', fill: 'forwards' }
+              );
+            }, 20);
+          });
+        },
+        { once: true, threshold: 0.6 }
+      );
+    }
+
+    document.addEventListener('DOMContentLoaded', run);
   })();
 </script>
 
 <style>
   .closing {
-    /* the offstage chip travels in from outside the frame; never let it
-       widen the document */
+    position: relative;
+    /* the offstage chip and its path travel in from outside the frame;
+       never let them widen the document */
     overflow: hidden;
   }
 
+  /* faint 5x6 line-grid ghost behind the whole section — a texture, not a
+     diagram. Never --etch-* (etch is app-only, design-brief §2.5); this
+     uses --line-dim at an extra-dim mix so it never competes with content. */
+  .grid-ghost {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(20% - 1px),
+        color-mix(in oklab, var(--line-dim) 35%, transparent) calc(20% - 1px),
+        color-mix(in oklab, var(--line-dim) 35%, transparent) 20%
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(16.66% - 1px),
+        color-mix(in oklab, var(--line-dim) 35%, transparent) calc(16.66% - 1px),
+        color-mix(in oklab, var(--line-dim) 35%, transparent) 16.66%
+      );
+    background-size: 640px 420px;
+    background-position: center 40px;
+    background-repeat: no-repeat;
+    mask-image: radial-gradient(ellipse 60% 70% at center, black, transparent 85%);
+  }
+
   .closing-inner {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -79,7 +244,12 @@
     max-width: 430px;
   }
 
+  .arrival-stage {
+    position: relative;
+  }
+
   .slot-frame {
+    position: relative;
     width: 230px;
     background: var(--surface-1);
     border-radius: 10px;
@@ -133,10 +303,6 @@
     overflow: hidden;
   }
 
-  .s-chip.offstage {
-    transform: translate(150px, -90px) rotate(9deg);
-  }
-
   .c-t {
     font-size: 11px;
     padding-top: 1.5px;
@@ -148,6 +314,45 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.2;
+  }
+
+  /* the arrival path: hidden by default (no-JS, reduced motion, and the
+     pre-settled branch all leave it here — undrawn, not just static) and
+     only revealed by the arrival script right as it starts drawing in. */
+  .arrival-path {
+    position: absolute;
+    left: 0;
+    top: -190px;
+    width: 420px;
+    height: 290px;
+    overflow: visible;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .floor {
+    position: relative;
+    height: 1px;
+    width: 190px;
+    margin: 0 auto;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--aqua) 22%, transparent) 50%,
+      transparent
+    );
+  }
+
+  .now-tick {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--aqua);
+    transform: translate(-50%, -50%);
+    opacity: 0;
   }
 
   .cta-stack {
