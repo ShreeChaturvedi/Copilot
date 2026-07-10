@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useRequireAuth } from '@/hooks/useAuthGuard';
 import { AuthGuardSpinner } from './AuthGuardSpinner';
 
@@ -15,6 +15,7 @@ export function ProtectedRoute({
   children,
   redirectTo = '/login',
 }: ProtectedRouteProps) {
+  const location = useLocation();
   const { isLoading, isAuthenticated, shouldRedirect, redirectPath } =
     useRequireAuth(redirectTo);
 
@@ -22,12 +23,14 @@ export function ProtectedRoute({
     return <AuthGuardSpinner label="Verifying your session..." />;
   }
 
+  // Remember where the user was headed so the login flow can send them back
+  // there instead of dumping them on the dashboard (#14).
   if (shouldRedirect && redirectPath) {
-    return <Navigate to={redirectPath} replace />;
+    return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

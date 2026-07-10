@@ -1,12 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../authStore';
-import type { GoogleAuthTokens, GoogleUserInfo } from '../authStore';
+import type {
+  GoogleAuthTokens,
+  GoogleUserInfo,
+  JWTTokens,
+  User,
+} from '../authStore';
+import { authAPI } from '@/services/api/auth';
 
 vi.mock('@/services/api/auth', () => ({
   authAPI: {
     logout: vi.fn().mockResolvedValue(undefined),
+    changePassword: vi.fn(),
   },
 }));
+
+const mockedChangePassword = vi.mocked(authAPI.changePassword);
 
 // Mock tokens and user for testing
 const mockTokens: GoogleAuthTokens = {
@@ -22,6 +31,20 @@ const mockUser: GoogleUserInfo = {
   email: 'test@example.com',
   name: 'Test User',
   picture: 'https://example.com/avatar.jpg',
+};
+
+const mockJWTTokens: JWTTokens = {
+  accessToken: 'jwt-access-token',
+  refreshToken: 'jwt-refresh-token',
+  expiresAt: Date.now() + 3600000, // 1 hour from now (not expiring soon)
+};
+
+const mockJWTUser: User = {
+  id: 'jwt-user-id',
+  email: 'jwt@example.com',
+  name: 'JWT User',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 };
 
 const mockExpiredTokens: GoogleAuthTokens = {
@@ -173,6 +196,71 @@ describe('AuthStore', () => {
       expect(state.googleTokens).toBe(null);
       expect(state.googleUser).toBe(null);
       expect(state.error).toBe(null);
+    });
+  });
+
+  describe('Change Password', () => {
+    beforeEach(() => {
+      mockedChangePassword.mockReset();
+    });
+
+    it('swaps in the fresh token pair the server returns on success', async () => {
+      const { setJWTAuth, changePassword } = useAuthStore.getState();
+      setJWTAuth(mockJWTTokens, mockJWTUser);
+
+      const freshTokens = {
+        accessToken: 'fresh-access-token',
+        refreshToken: 'fresh-refresh-token',
+        expiresAt: Date.now() + 7200000,
+      };
+      mockedChangePassword.mockResolvedValue({
+        success: true,
+        tokens: freshTokens,
+      });
+
+      const result = await changePassword('OldPass1!', 'NewPass1!');
+
+      // Called with the current access token and the supplied passwords.
+      expect(mockedChangePassword).toHaveBeenCalledWith(
+        mockJWTTokens.accessToken,
+        'OldPass1!',
+        'NewPass1!'
+      );
+      expect(result.success).toBe(true);
+
+      // The now-revoked pair is replaced by the fresh one, so the next
+      // /auth/refresh won't 401 and force a logout.
+      const state = useAuthStore.getState();
+      expect(state.jwtTokens).toEqual(freshTokens);
+    });
+
+    it('keeps existing tokens and reports failure when the change fails', async () => {
+      const { setJWTAuth, changePassword } = useAuthStore.getState();
+      setJWTAuth(mockJWTTokens, mockJWTUser);
+
+      mockedChangePassword.mockResolvedValue({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+
+      const result = await changePassword('WrongPass', 'NewPass1!');
+
+      expect(result).toEqual({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+      // Tokens are untouched on failure.
+      expect(useAuthStore.getState().jwtTokens).toEqual(mockJWTTokens);
+    });
+
+    it('does not call the API when there is no valid access token', async () => {
+      // No auth set -> getValidAccessToken() returns null.
+      const { changePassword } = useAuthStore.getState();
+
+      const result = await changePassword('OldPass1!', 'NewPass1!');
+
+      expect(mockedChangePassword).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
     });
   });
 

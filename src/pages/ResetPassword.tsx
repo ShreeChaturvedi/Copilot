@@ -1,13 +1,68 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
+import { toUserMessage } from '@/utils/errorMessages';
+import {
+  calculatePasswordStrength,
+  getStrengthColor,
+  getStrengthText,
+  meetsAllRequirements,
+} from '@/utils/passwordStrength';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AuthCard, AuthStatus } from '@/components/auth';
 import { AlertCircle, Eye, EyeOff, Lock } from 'lucide-react';
+
+// Mirrors Signup's password-requirement glyph so the reset screen gives the
+// same live guidance while the user invents a new compliant password (#17).
+function RequirementCheck({
+  met,
+  children,
+}: {
+  met: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        aria-hidden="true"
+        className={cn(
+          'shrink-0 transition-[opacity,transform] duration-100 ease-settle',
+          met && 'scale-110'
+        )}
+      >
+        <circle
+          cx="6"
+          cy="6"
+          r="5"
+          className={
+            met
+              ? 'fill-aqua-film-08 stroke-aqua'
+              : 'fill-none stroke-etch-strong'
+          }
+          strokeWidth="1.25"
+        />
+        {met && (
+          <path
+            d="M3.5 6 l1.6 1.8 l3.2 -3.8"
+            fill="none"
+            stroke="var(--aqua)"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+      </svg>
+      {children}
+    </span>
+  );
+}
 
 function ResetPasswordForm({
   className,
@@ -28,6 +83,18 @@ function ResetPasswordForm({
   const passwordsMatch = confirm.length > 0 && confirm === password;
   const missingToken = useMemo(() => token.trim().length === 0, [token]);
 
+  const strength = useMemo(
+    () => calculatePasswordStrength(password),
+    [password]
+  );
+  // Same source of truth for gate, meter clamp, and submit button (#4/#5/#9).
+  const requirementsMet = meetsAllRequirements(strength.checks);
+  const canSubmit = requirementsMet && passwordsMatch;
+  const meterStrength = requirementsMet ? strength.strength : 'fair';
+  const meterWidth = requirementsMet
+    ? strength.score / 4
+    : Math.min(strength.score, 2) / 4;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -37,13 +104,8 @@ function ResetPasswordForm({
       setError('Passwords do not match.');
       return;
     }
-    // Mirror the backend rules (min 8, upper, lower, number, special char) for a
-    // fast, local error before hitting the network.
-    if (
-      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(
-        password
-      )
-    ) {
+    // Gate on the same rule the strength checklist shows (#4).
+    if (!requirementsMet) {
       setError(
         'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.'
       );
@@ -57,8 +119,10 @@ function ResetPasswordForm({
         setDone(true);
       } else {
         setError(
-          result.message ||
+          toUserMessage(
+            result.message,
             'Could not reset your password. The link may have expired.'
+          )
         );
       }
     } finally {
@@ -140,6 +204,7 @@ function ResetPasswordForm({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
+                aria-describedby="password-requirements"
                 required
                 className="pl-9 pr-9"
               />
@@ -157,6 +222,44 @@ function ResetPasswordForm({
                 )}
               </button>
             </div>
+            {/* Strength bar + live requirement checklist (parity with Signup, #17) */}
+            {password.length > 0 && (
+              <div id="password-requirements">
+                <div className="flex items-center gap-3 mt-1">
+                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full transition-[width,background-color] duration-150 ease-settle',
+                        getStrengthColor(meterStrength)
+                      )}
+                      style={{ width: `${meterWidth * 100}%` }}
+                    />
+                  </div>
+                  <span
+                    className="text-xs text-muted-foreground min-w-16 text-right"
+                    aria-live="polite"
+                  >
+                    {getStrengthText(meterStrength)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
+                  <RequirementCheck met={strength.checks.length}>
+                    8+ characters
+                  </RequirementCheck>
+                  <RequirementCheck
+                    met={strength.checks.uppercase && strength.checks.lowercase}
+                  >
+                    Upper & lower
+                  </RequirementCheck>
+                  <RequirementCheck met={strength.checks.numbers}>
+                    Number
+                  </RequirementCheck>
+                  <RequirementCheck met={strength.checks.symbols}>
+                    Symbol
+                  </RequirementCheck>
+                </div>
+              </div>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="confirmPassword">Confirm new password</Label>
@@ -172,6 +275,7 @@ function ResetPasswordForm({
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
                 aria-invalid={confirm.length > 0 && !passwordsMatch}
+                aria-describedby="confirm-password-msg"
                 required
                 className="pl-9 pr-9"
               />
@@ -191,6 +295,7 @@ function ResetPasswordForm({
             </div>
             {confirm.length > 0 && (
               <p
+                id="confirm-password-msg"
                 className={cn(
                   'text-xs',
                   passwordsMatch ? 'text-success' : 'text-destructive'
@@ -209,7 +314,11 @@ function ResetPasswordForm({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button type="submit" disabled={isSubmitting} className="w-full">
+          <Button
+            type="submit"
+            disabled={isSubmitting || !canSubmit}
+            className="w-full"
+          >
             {isSubmitting ? 'Resetting...' : 'Reset password'}
           </Button>
         </div>

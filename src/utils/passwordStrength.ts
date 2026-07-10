@@ -79,6 +79,25 @@ export function calculatePasswordStrength(
   };
 }
 
+/**
+ * The hard rule the signup/reset forms and the backend enforce: min 8 chars
+ * AND upper AND lower AND number AND symbol. The additive strength score is
+ * separate (it rewards length/variety), so a password can score high while
+ * still failing this gate. Both the submit gate and the meter clamp read from
+ * here so the checklist, the bar, and the button can never disagree.
+ */
+export function meetsAllRequirements(
+  checks: PasswordStrengthResult['checks']
+): boolean {
+  return (
+    checks.length &&
+    checks.lowercase &&
+    checks.uppercase &&
+    checks.numbers &&
+    checks.symbols
+  );
+}
+
 export function getStrengthColor(
   strength: PasswordStrengthResult['strength']
 ): string {

@@ -330,7 +330,14 @@ class AuthAPI {
     accessToken: string,
     currentPassword: string,
     newPassword: string
-  ): Promise<{ success: boolean; message?: string }> {
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    // The server revokes the old session and returns a fresh pair on success,
+    // so the client can swap it in and stay signed in (see change-password
+    // handler). Absent only on failure.
+    tokens?: { accessToken: string; refreshToken: string; expiresAt: number };
+  }> {
     try {
       const response = await fetch(`${this.baseURL}/change-password`, {
         method: 'POST',
@@ -350,7 +357,7 @@ class AuthAPI {
         };
       }
 
-      return { success: true };
+      return { success: true, tokens: data.data?.tokens };
     } catch (error) {
       console.error('Change password error:', error);
       return { success: false, message: 'Network error. Please try again.' };
@@ -424,19 +431,35 @@ class AuthAPI {
     }
   }
 
-  // Get Google OAuth URL
+  // Get Google OAuth URL for the login flow.
   getGoogleAuthUrl(redirectUri: string): string {
+    // CSRF: stash a random nonce and send it as `state`; the callback rejects
+    // any response whose state doesn't match (#15).
+    const state = crypto.randomUUID();
+    try {
+      sessionStorage.setItem(GOOGLE_OAUTH_STATE_KEY, state);
+    } catch {
+      // sessionStorage can be unavailable (private mode, disabled storage);
+      // the callback treats a missing nonce as a verification failure.
+    }
+
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: 'openid email profile',
-      access_type: 'offline',
-      prompt: 'consent',
+      // A stateless login doesn't need a persisted refresh token, so don't
+      // force the consent screen on every sign-in — let returning users pick
+      // an account. Consent/offline stay on the calendar-connect flow (#16).
+      prompt: 'select_account',
+      state,
     });
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 }
+
+/** sessionStorage key holding the Google login CSRF nonce (#15). */
+export const GOOGLE_OAUTH_STATE_KEY = 'google_oauth_state';
 
 export const authAPI = new AuthAPI();

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
+import { toUserMessage } from '@/utils/errorMessages';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,6 +18,7 @@ function ForgotPasswordForm({
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [resent, setResent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,8 +33,25 @@ function ForgotPasswordForm({
         // whether the email is registered.
         setSubmitted(true);
       } else {
-        setError(result.message || 'Something went wrong. Please try again.');
+        setError(
+          toUserMessage(
+            result.message,
+            'Something went wrong. Please try again.'
+          )
+        );
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (isSubmitting) return;
+    setResent(false);
+    setIsSubmitting(true);
+    try {
+      await authAPI.requestPasswordReset(email);
+      setResent(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -43,21 +62,48 @@ function ForgotPasswordForm({
     navigate('/login');
   };
 
+  const handleUseDifferentEmail = () => {
+    setSubmitted(false);
+    setResent(false);
+  };
+
   if (submitted) {
     return (
       <div className={cn('flex flex-col gap-6', className)} {...props}>
         <AuthStatus
           variant="success"
           title="Check your inbox"
-          description="If an account exists for that email, a password reset link has been sent. Check your inbox and follow the link to choose a new password."
+          description={`If an account exists for ${email}, a password reset link has been sent. Check your inbox and follow the link to choose a new password.`}
           action={
-            <Button
-              type="button"
-              className="w-full"
-              onClick={handleBackToLogin}
-            >
-              Back to sign in
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={handleBackToLogin}
+              >
+                Back to sign in
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResend}
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? 'Resending...'
+                  : resent
+                    ? 'Link resent'
+                    : 'Resend link'}
+              </Button>
+              <button
+                type="button"
+                onClick={handleUseDifferentEmail}
+                className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Use a different email
+              </button>
+            </div>
           }
         />
       </div>
@@ -90,6 +136,7 @@ function ForgotPasswordForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+                autoFocus
                 required
                 className="pl-9"
               />

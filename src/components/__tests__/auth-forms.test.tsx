@@ -14,7 +14,13 @@ import {
   beforeEach,
   vi,
 } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { http } from 'msw';
 import { setupServer } from 'msw/node';
@@ -97,9 +103,7 @@ describe('LoginForm', () => {
 
   it('surfaces the error and stays on the form when sign in fails (401)', async () => {
     server.use(
-      http.post('/api/auth/login', () =>
-        fail('Invalid email or password', 401)
-      )
+      http.post('/api/auth/login', () => fail('Invalid email or password', 401))
     );
     renderLogin();
 
@@ -150,7 +154,7 @@ describe('SignupForm', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 
-  it('blocks submission and shows the policy error for a weak password (#66)', async () => {
+  it('keeps the submit gate closed for a weak password (#66)', async () => {
     let hit = false;
     server.use(
       http.post('/api/auth/register', () => {
@@ -162,18 +166,23 @@ describe('SignupForm', () => {
 
     // 8+ chars but no uppercase/number/symbol -> fails the strong-password policy
     fillStrong('weakpassword');
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        /at least 8 characters and include an uppercase/i
-      )
-    );
+    // The meter now clamps to the server policy and the submit button is the
+    // gate: it stays disabled until every requirement is met, so the request
+    // can never leave the browser (#4/#5/#66).
+    const submit = screen.getByRole('button', { name: /create account/i });
+    expect(submit).toBeDisabled();
+    // The clamp keeps the meter from ever claiming a strong password.
+    expect(screen.queryByText(/^Strong$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Very Strong$/)).not.toBeInTheDocument();
+
+    fireEvent.click(submit);
+
     expect(hit).toBe(false);
     expect(screen.queryByText('HOME VIEW')).not.toBeInTheDocument();
   });
 
-  it('blocks submission when the passwords do not match', async () => {
+  it('keeps the submit gate closed when the passwords do not match', async () => {
     let hit = false;
     server.use(
       http.post('/api/auth/register', () => {
@@ -183,14 +192,17 @@ describe('SignupForm', () => {
     );
     renderSignup();
 
+    // Strong password, but the confirm field disagrees.
     fillStrong('Str0ng!Pass', 'Different1!');
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Passwords do not match.'
-      )
-    );
+    // The inline confirm message flags the mismatch and the submit button stays
+    // disabled, so the request never fires.
+    expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
+    const submit = screen.getByRole('button', { name: /create account/i });
+    expect(submit).toBeDisabled();
+
+    fireEvent.click(submit);
+
     expect(hit).toBe(false);
   });
 

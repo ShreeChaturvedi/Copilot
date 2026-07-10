@@ -10,9 +10,11 @@ import {
   calculatePasswordStrength,
   getStrengthColor,
   getStrengthText,
+  meetsAllRequirements,
 } from '@/utils/passwordStrength';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
+import { toUserMessage } from '@/utils/errorMessages';
 import { useAuthStore } from '@/stores/authStore';
 import { AlertCircle, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 
@@ -69,6 +71,7 @@ function RequirementCheck({
 
 function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
   const navigate = useNavigate();
+  const location = useLocation();
   const setJWTAuth = useAuthStore((s) => s.setJWTAuth);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -84,6 +87,17 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
     [password]
   );
   const passwordsMatch = confirm.length > 0 && confirm === password;
+  // The single source of truth for "will the form accept this password?" —
+  // shared with the submit gate and the meter clamp so the checklist, the bar,
+  // and the button can never contradict each other (#4/#5/#9).
+  const requirementsMet = meetsAllRequirements(strength.checks);
+  const canSubmit = requirementsMet && passwordsMatch;
+  // Never let the bar/label reach the aqua "confirmed" state until the form
+  // will actually accept the password; below that, cap it at "Fair"/amber.
+  const meterStrength = requirementsMet ? strength.strength : 'fair';
+  const meterWidth = requirementsMet
+    ? strength.score / 4
+    : Math.min(strength.score, 2) / 4;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,13 +108,9 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
       setError('Passwords do not match.');
       return;
     }
-    // Mirror the backend rules (min 8, upper, lower, number, special char) for a
-    // fast, local error before hitting the network.
-    if (
-      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(
-        password
-      )
-    ) {
+    // Gate on the same rule the strength checklist shows, so a green checklist
+    // can never contradict a rejected submit (#4).
+    if (!requirementsMet) {
       setError(
         'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.'
       );
@@ -113,10 +123,16 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
       if (result.success && result.data) {
         const { accessToken, refreshToken, expiresAt, user } = result.data;
         setJWTAuth({ accessToken, refreshToken, expiresAt }, user);
-        navigate('/');
+        // Return to the originally intended destination if any (#14).
+        const from = (location.state as { from?: { pathname?: string } } | null)
+          ?.from?.pathname;
+        navigate(from || '/', { replace: true });
       } else {
         setError(
-          result.message || 'Could not create account. Please try again.'
+          toUserMessage(
+            result.message,
+            'Could not create account. Please try again.'
+          )
         );
       }
     } finally {
@@ -156,6 +172,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"
+                autoFocus
                 required
                 className="pl-9"
               />
@@ -194,6 +211,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
+                aria-describedby="password-requirements"
                 required
                 className="pl-9 pr-9"
               />
@@ -213,19 +231,22 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
             </div>
             {/* Strength bar + text */}
             {password.length > 0 && (
-              <>
+              <div id="password-requirements">
                 <div className="flex items-center gap-3 mt-1">
                   <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className={cn(
                         'h-full transition-[width,background-color] duration-150 ease-settle',
-                        getStrengthColor(strength.strength)
+                        getStrengthColor(meterStrength)
                       )}
-                      style={{ width: `${(strength.score / 4) * 100}%` }}
+                      style={{ width: `${meterWidth * 100}%` }}
                     />
                   </div>
-                  <span className="text-xs text-muted-foreground min-w-16 text-right">
-                    {getStrengthText(strength.strength)}
+                  <span
+                    className="text-xs text-muted-foreground min-w-16 text-right"
+                    aria-live="polite"
+                  >
+                    {getStrengthText(meterStrength)}
                   </span>
                 </div>
                 {/* Requirements hints */}
@@ -245,7 +266,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
                     Symbol
                   </RequirementCheck>
                 </div>
-              </>
+              </div>
             )}
           </div>
           <div className="grid gap-2">
@@ -262,6 +283,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
                 aria-invalid={confirm.length > 0 && !passwordsMatch}
+                aria-describedby="confirm-password-msg"
                 required
                 className="pl-9 pr-9"
               />
@@ -281,6 +303,7 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
             </div>
             {confirm.length > 0 && (
               <p
+                id="confirm-password-msg"
                 className={cn(
                   'text-xs',
                   passwordsMatch ? 'text-success' : 'text-destructive'
@@ -300,8 +323,14 @@ function SignupForm({ className, ...props }: React.ComponentProps<'div'>) {
             </Alert>
           )}
           <div className="flex flex-col gap-3">
-            {/* The one aqua primary in the room (design-brief §4.8) */}
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            {/* The one aqua primary in the room (design-brief §4.8). Disabled
+                until the password meets every rule and the confirm matches, so
+                the gate and the meter agree before the user clicks (#5). */}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !canSubmit}
+              className="w-full"
+            >
               {isSubmitting ? 'Creating account...' : 'Create account'}
             </Button>
             <div className="relative flex items-center py-1" aria-hidden="true">

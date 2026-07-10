@@ -15,6 +15,10 @@ export interface GoogleUserInfo {
   email: string;
   name: string;
   picture?: string;
+  // Editable profile fields must ride on the Google user too, or a Google
+  // user's bio/timezone edits are dropped on save and lost on reload (#8).
+  bio?: string;
+  timezone?: string;
 }
 
 export interface JWTTokens {
@@ -63,6 +67,14 @@ interface AuthState {
   setJWTAuth: (tokens: JWTTokens, user: User) => void;
   updateJWTTokens: (tokens: Partial<JWTTokens>) => void;
   clearJWTAuth: () => void;
+
+  // Change the JWT user's password. The server revokes every existing session
+  // and returns a fresh token pair, which this swaps in so the current client
+  // stays signed in instead of being force-logged-out on the next refresh.
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; message?: string }>;
 
   // Profile updates (reflect persisted profile changes across the app)
   updateUser: (updates: Partial<User>) => void;
@@ -138,17 +150,49 @@ export const useAuthStore = create<AuthState>()(
         },
 
         clearJWTAuth: () =>
+          // Note: `error` is intentionally left untouched. A session-expiry
+          // reason set right before/after this clear must survive so the login
+          // screen can explain why the user was signed out (#13).
           set(
             {
               isAuthenticated: false,
               authMethod: null,
               jwtTokens: null,
               user: null,
-              error: null,
             },
             false,
             'clearJWTAuth'
           ),
+
+        changePassword: async (currentPassword, newPassword) => {
+          const { refreshTokenIfNeeded, getValidAccessToken, updateJWTTokens } =
+            get();
+
+          // Make sure the request goes out with a live access token.
+          await refreshTokenIfNeeded();
+          const accessToken = getValidAccessToken();
+          if (!accessToken) {
+            return {
+              success: false,
+              message: 'Your session has expired. Please log in again.',
+            };
+          }
+
+          const result = await authAPI.changePassword(
+            accessToken,
+            currentPassword,
+            newPassword
+          );
+
+          if (result.success && result.tokens) {
+            // The change revoked this client's refresh token server-side; swap
+            // in the fresh pair so the next /auth/refresh doesn't 401 and log
+            // the user out. Token-only update, same as the refresh flow.
+            updateJWTTokens(result.tokens);
+          }
+
+          return { success: result.success, message: result.message };
+        },
 
         updateUser: (updates) => {
           const { user, googleUser, authMethod } = get();
@@ -159,6 +203,8 @@ export const useAuthStore = create<AuthState>()(
                   ...googleUser,
                   name: updates.name ?? googleUser.name,
                   picture: updates.picture ?? googleUser.picture,
+                  bio: updates.bio ?? googleUser.bio,
+                  timezone: updates.timezone ?? googleUser.timezone,
                 },
               },
               false,
@@ -195,13 +241,13 @@ export const useAuthStore = create<AuthState>()(
         },
 
         clearGoogleAuth: () =>
+          // `error` left untouched on purpose, same rationale as clearJWTAuth (#13).
           set(
             {
               isAuthenticated: false,
               authMethod: null,
               googleTokens: null,
               googleUser: null,
-              error: null,
             },
             false,
             'clearGoogleAuth'
@@ -357,8 +403,10 @@ export const useAuthStore = create<AuthState>()(
               }
             } catch (error) {
               console.error('Token refresh error:', error);
-              setError('Session expired. Please log in again.');
+              // Clear first, then set the reason: clearJWTAuth no longer wipes
+              // `error`, so this message survives for the login screen (#13).
               clearJWTAuth();
+              setError('Session expired. Please log in again.');
               return false;
             }
           })().finally(() => {

@@ -1,28 +1,41 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authAPI } from '@/services/api/auth';
 import { googleRedirectUri } from '@/lib/urls';
 import { useAuthStore } from '@/stores/authStore';
+import { toUserMessage } from '@/utils/errorMessages';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { GoogleIcon } from '@/components/auth';
-import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Info, Lock, Mail } from 'lucide-react';
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<'div'>) {
   const navigate = useNavigate();
+  const location = useLocation();
   const setJWTAuth = useAuthStore((s) => s.setJWTAuth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Surface a session-expiry (or other) reason the user was bounced here with,
+  // then clear it from the store so it doesn't persist to the next visit (#13).
+  useEffect(() => {
+    const storeError = useAuthStore.getState().error;
+    if (storeError) {
+      setNotice(storeError);
+      useAuthStore.getState().setError(null);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,10 +47,16 @@ export function LoginForm({
       if (result.success && result.data) {
         const { accessToken, refreshToken, expiresAt, user } = result.data;
         setJWTAuth({ accessToken, refreshToken, expiresAt }, user);
-        navigate('/');
+        // Return to the page the user originally requested, if any (#14).
+        const from = (location.state as { from?: { pathname?: string } } | null)
+          ?.from?.pathname;
+        navigate(from || '/', { replace: true });
       } else {
         setError(
-          result.message || 'Sign in failed. Check your email and password.'
+          toUserMessage(
+            result.message,
+            'Sign in failed. Check your email and password.'
+          )
         );
       }
     } finally {
@@ -64,6 +83,12 @@ export function LoginForm({
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <h1 className="text-xl font-semibold tracking-[-0.01em]">Sign in</h1>
+      {notice && (
+        <Alert className="border-hairline animate-in fade-in slide-in-from-top-1 duration-150">
+          <Info className="size-4" aria-hidden="true" />
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-5">
           <div className="grid gap-2">
@@ -80,6 +105,7 @@ export function LoginForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+                autoFocus
                 required
                 className="pl-9"
               />
