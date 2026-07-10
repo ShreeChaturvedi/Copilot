@@ -325,7 +325,11 @@ export const ConsolidatedCalendarHeader: React.FC<
               )}
             >
               Today
-              <Keycap className="ml-0.5 hidden sm:inline-flex">T</Keycap>
+              {/* Decorative shortcut hint: keep it out of the button's
+                  accessible name (which must stay exactly "Today"). */}
+              <span aria-hidden="true" className="contents">
+                <Keycap className="ml-0.5 hidden sm:inline-flex">T</Keycap>
+              </span>
             </Button>
 
             <Tooltip>
