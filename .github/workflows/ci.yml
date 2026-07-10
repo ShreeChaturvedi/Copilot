@@ -31,7 +31,13 @@ jobs:
       - name: Typecheck
         run: npx tsc -p tsconfig.app.json --noEmit && npx tsc -p tsconfig.node.json --noEmit && npx tsc -p api/tsconfig.json --noEmit
       - name: Frontend tests
-        run: npm run test:frontend:run
+        # Two shards = two separate processes, so the jsdom suite's per-file
+        # memory retention is reclaimed between halves instead of accumulating
+        # past a worker's heap and OOMing (all tests pass; the worker dies).
+        # Tracked for a real fix in issue #112.
+        run: |
+          npm run test:frontend:run -- --shard=1/2
+          npm run test:frontend:run -- --shard=2/2
       - name: Backend tests (mocked, no DB)
         run: npm run test:backend:run
       - name: Shared tests
