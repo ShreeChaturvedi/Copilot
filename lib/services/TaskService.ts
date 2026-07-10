@@ -911,8 +911,16 @@ export class TaskService extends BaseService<
         params,
         this.db
       );
-      if (updatedRes.rowCount === 0)
-        throw new Error('NOT_FOUND: Task not found');
+      if (updatedRes.rowCount === 0) {
+        // With an owner scope, zero rows is not-found-OR-not-owned: deny with
+        // the same 403 the update path returns (#62/#67) instead of leaking
+        // whether the id exists. Unscoped, it can only be genuinely missing.
+        throw new Error(
+          context?.userId
+            ? 'AUTHORIZATION_ERROR: Access denied'
+            : 'NOT_FOUND: Task not found'
+        );
+      }
       const base = this.transformEntity(updatedRes.rows[0]);
       const [enriched] = await this.enrichEntities([base], context);
       this.log(
