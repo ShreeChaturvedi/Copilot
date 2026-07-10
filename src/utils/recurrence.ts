@@ -24,11 +24,14 @@ export interface RecurrenceEditorOptions {
   count?: number | null; // used when ends='after'
 }
 
-export type ParsedRecurrence = RecurrenceEditorOptions
+export type ParsedRecurrence = RecurrenceEditorOptions;
 
 const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 
-export function generateRRule(options: RecurrenceEditorOptions, dtstart: Date): string {
+export function generateRRule(
+  options: RecurrenceEditorOptions,
+  dtstart: Date
+): string {
   // Keep dtstart for potential future use; currently not embedded in string
   void dtstart;
   const parts: string[] = [];
@@ -45,7 +48,11 @@ export function generateRRule(options: RecurrenceEditorOptions, dtstart: Date): 
   const interval = Math.max(1, Math.floor(options.interval || 1));
   parts.push(`INTERVAL=${interval}`);
 
-  if (options.frequency === 'weekly' && options.daysOfWeek && options.daysOfWeek.length > 0) {
+  if (
+    options.frequency === 'weekly' &&
+    options.daysOfWeek &&
+    options.daysOfWeek.length > 0
+  ) {
     const byday = options.daysOfWeek
       .sort((a, b) => a - b)
       .map((d) => WEEKDAY_CODES[(d + 7) % 7])
@@ -82,17 +89,21 @@ export function generateRRule(options: RecurrenceEditorOptions, dtstart: Date): 
   if (options.ends === 'after' && options.count && options.count > 0) {
     parts.push(`COUNT=${Math.floor(options.count)}`);
   } else if (options.ends === 'on' && options.until) {
-    // UNTIL formatted as UTC in basic format YYYYMMDDT000000Z
-    const until = new Date(options.until);
-    // Normalize to 23:59:59.999 for all-day style ends for better UX
-    until.setHours(23, 59, 59, 999);
-    const yyyy = until.getUTCFullYear();
-    const mm = String(until.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(until.getUTCDate()).padStart(2, '0');
-    const HH = String(until.getUTCHours()).padStart(2, '0');
-    const MM = String(until.getUTCMinutes()).padStart(2, '0');
-    const SS = String(until.getUTCSeconds()).padStart(2, '0');
-    parts.push(`UNTIL=${yyyy}${mm}${dd}T${HH}${MM}${SS}Z`);
+    // Treat UNTIL as a date-only value so it is timezone-stable. Build it from
+    // the LOCAL calendar Y/M/D the user picked, pinned to 23:59:59 UTC, so a
+    // user east of UTC no longer rolls the stored date to the next day.
+    const picked = new Date(options.until);
+    const until = new Date(
+      Date.UTC(
+        picked.getFullYear(),
+        picked.getMonth(),
+        picked.getDate(),
+        23,
+        59,
+        59
+      )
+    );
+    parts.push(`UNTIL=${formatUntilUTC(until)}`);
   }
 
   // Always include DTSTART for deterministic expansion
@@ -127,7 +138,9 @@ export function parseRRule(rruleString: string): ParsedRecurrence | null {
 
   if (map['BYDAY']) {
     const bydays = map['BYDAY'].split(',');
-    opts.daysOfWeek = bydays.map((code) => WEEKDAY_CODES.indexOf(code as typeof WEEKDAY_CODES[number]));
+    opts.daysOfWeek = bydays.map((code) =>
+      WEEKDAY_CODES.indexOf(code as (typeof WEEKDAY_CODES)[number])
+    );
   }
   if (map['BYMONTHDAY']) {
     const md = parseInt(map['BYMONTHDAY'], 10);
@@ -140,7 +153,9 @@ export function parseRRule(rruleString: string): ParsedRecurrence | null {
   if (map['BYDAY'] && map['BYSETPOS'] && opts.frequency === 'monthly') {
     // monthly nth weekday case
     const w = map['BYDAY'].split(',')[0];
-    opts.monthlyWeekday = WEEKDAY_CODES.indexOf(w as typeof WEEKDAY_CODES[number]);
+    opts.monthlyWeekday = WEEKDAY_CODES.indexOf(
+      w as (typeof WEEKDAY_CODES)[number]
+    );
   }
 
   if (map['BYMONTH'] && opts.frequency === 'yearly') {
@@ -210,12 +225,18 @@ function buildCacheKey(
 }
 
 export function expandOccurrences(
-  event: Pick<CalendarEvent, 'id' | 'start' | 'end' | 'recurrence' | 'exceptions' | 'allDay'>,
+  event: Pick<
+    CalendarEvent,
+    'id' | 'start' | 'end' | 'recurrence' | 'exceptions' | 'allDay'
+  >,
   rangeStart: Date,
   rangeEnd: Date
 ): ExpandedOccurrence[] {
   if (!event.recurrence) return [];
-  const durationMs = Math.max(0, new Date(event.end).getTime() - new Date(event.start).getTime());
+  const durationMs = Math.max(
+    0,
+    new Date(event.end).getTime() - new Date(event.start).getTime()
+  );
   const exceptions = event.exceptions ?? [];
   const cacheKey = buildCacheKey(
     event.id,
@@ -235,7 +256,11 @@ export function expandOccurrences(
     return [];
   }
 
-  const occStarts = (rule as RRule).between(new Date(rangeStart), new Date(rangeEnd), true);
+  const occStarts = (rule as RRule).between(
+    new Date(rangeStart),
+    new Date(rangeEnd),
+    true
+  );
   const exceptionSet = new Set(exceptions);
   const occurrences: ExpandedOccurrence[] = [];
   for (const start of occStarts) {
@@ -257,6 +282,33 @@ function formatUntilUTC(date: Date): string {
   const MM = String(date.getUTCMinutes()).padStart(2, '0');
   const SS = String(date.getUTCSeconds()).padStart(2, '0');
   return `${yyyy}${mm}${dd}T${HH}${MM}${SS}Z`;
+}
+
+/**
+ * Convert a stored (timezone-stable, date-only) UNTIL instant back into a LOCAL
+ * Date at midnight so it can be shown/selected without the UTC/local drift that
+ * `format(until, ...)` would introduce for users east of UTC.
+ */
+export function untilToLocalDate(until: Date): Date {
+  return new Date(
+    until.getUTCFullYear(),
+    until.getUTCMonth(),
+    until.getUTCDate()
+  );
+}
+
+/**
+ * Strip COUNT / UNTIL from an RRULE so a rule reused for a fresh follow-up
+ * series does not inherit the parent's occurrence budget.
+ */
+export function stripRRuleCountUntil(rruleString: string): string {
+  if (!rruleString.startsWith('RRULE:')) return rruleString;
+  const body = rruleString.substring('RRULE:'.length);
+  const parts = body.split(';').filter((part) => {
+    const key = part.split('=')[0];
+    return key !== 'COUNT' && key !== 'UNTIL';
+  });
+  return `RRULE:${parts.join(';')}`;
 }
 
 /**
@@ -288,4 +340,3 @@ export function clampRRuleUntil(rruleString: string, untilDate: Date): string {
   }
   return `RRULE:${parts.join(';')}`;
 }
-

@@ -194,12 +194,14 @@ function StatRing({
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            className="transition-all duration-700 ease-out"
+            className="transition-[stroke-dashoffset] duration-[var(--dur-5)] ease-out"
           />
         </svg>
         {/* Center content - just the number */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-semibold tabular-nums">{value}</span>
+          <span className="text-2xl font-mono font-semibold tabular-nums">
+            {value}
+          </span>
         </div>
       </div>
       {/* Label with icon beside it */}
@@ -260,7 +262,7 @@ function StatusBar({
         {segments.map((seg) => (
           <div
             key={seg.name}
-            className="h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+            className="h-full transition-[width] duration-[var(--dur-5)] first:rounded-l-full last:rounded-r-full"
             style={{
               width: `${seg.percent}%`,
               backgroundColor: seg.color,
@@ -319,7 +321,7 @@ function WeeklyHeatmap({
         <div className="flex items-center gap-2">
           {totalCompleted > 0 && (
             <span
-              className="text-sm font-semibold tabular-nums"
+              className="text-sm font-mono font-semibold tabular-nums"
               style={{ color: COLORS.done }}
             >
               {totalCompleted}
@@ -327,7 +329,7 @@ function WeeklyHeatmap({
           )}
           {totalInProgress > 0 && (
             <span
-              className="text-sm font-semibold tabular-nums"
+              className="text-sm font-mono font-semibold tabular-nums"
               style={{ color: COLORS.inProgress }}
             >
               {totalInProgress}
@@ -335,14 +337,14 @@ function WeeklyHeatmap({
           )}
           {totalOverdue > 0 && (
             <span
-              className="text-sm font-semibold tabular-nums"
+              className="text-sm font-mono font-semibold tabular-nums"
               style={{ color: COLORS.overdue }}
             >
               {totalOverdue}
             </span>
           )}
           {totalActivity === 0 && (
-            <span className="text-2xl font-semibold tabular-nums text-muted-foreground">
+            <span className="text-2xl font-mono font-semibold tabular-nums text-muted-foreground">
               0
             </span>
           )}
@@ -366,7 +368,7 @@ function WeeklyHeatmap({
               <UiTooltip>
                 <TooltipTrigger asChild>
                   <div
-                    className="w-full aspect-square rounded-md transition-all duration-300 hover:brightness-110 dark:hover:brightness-125 overflow-hidden flex flex-col justify-end"
+                    className="w-full aspect-square rounded-md transition-[filter] duration-[var(--dur-4)] hover:brightness-110 dark:hover:brightness-125 overflow-hidden flex flex-col justify-end"
                     style={{
                       backgroundColor: hasActivity
                         ? 'transparent'

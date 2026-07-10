@@ -1,4 +1,5 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 // Import FullCalendar core & plugin styles so grid lines and headers render correctly
 
 import FullCalendar from '@fullcalendar/react';
@@ -27,6 +28,8 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { useCalendarSettingsStore } from '@/stores/calendarSettingsStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { UpcomingEmptyState } from '@/components/tasks/UpcomingTasksEmpty';
+import { Button } from '@/components/ui/Button';
+import { toUserMessage } from '@/utils/errorMessages';
 
 /** Mono chip time, 24h zero-padded per the §3 numeral law ("09:30"). */
 const fmtChipTime = (d: Date): string =>
@@ -111,28 +114,24 @@ export const CalendarView = ({
   // Get sidebar state to trigger calendar resize when sidebar expands/collapses
   const { state: sidebarState } = useSidebar();
 
-  // Handle sidebar state changes - continuously update calendar size during transition
+  // Handle sidebar state changes. FullCalendar's liquid layout already tracks
+  // its container as CSS animates the width; forcing updateSize() ~30x via a
+  // 7ms interval was pure layout thrash (#21/#26). One settle as the transition
+  // begins and one after it completes (timeout ~= the 200ms sidebar duration)
+  // is enough. The now-overlay is re-anchored by its own effect below (#19).
   useEffect(() => {
     const calendarApi = calendarRef.current?.getApi();
     if (!calendarApi) return;
 
-    // Immediately start updating size
+    // Immediately update size as the transition begins
     requestAnimationFrame(() => calendarApi.updateSize());
 
-    // Continue updating size during the sidebar transition for smooth resizing
-    const intervalId = setInterval(() => {
-      requestAnimationFrame(() => calendarApi.updateSize());
-    }, 7); // ~60fps for smooth animation
-
-    // Stop updating after the sidebar transition is complete
+    // Final settle once the sidebar transition completes
     const timeoutId = setTimeout(() => {
-      clearInterval(intervalId);
-      // Final update to ensure we're perfectly sized
       requestAnimationFrame(() => calendarApi.updateSize());
-    }, 210); // Slightly longer than sidebar transition duration (200ms)
+    }, 230);
 
     return () => {
-      clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
   }, [sidebarState, calendarRef]);
@@ -153,18 +152,36 @@ export const CalendarView = ({
 
   // Hooks for data management
   const { data: calendars = [], isLoading: calendarsLoading } = useCalendars();
-  const visibleCalendars = calendars.filter((cal) => cal.visible);
-  const visibleCalendarNames = visibleCalendars.map((cal) => cal.name);
-  // Track default calendar color for consistent preview styling
-  const defaultCalendar =
-    calendars.find((cal) => cal.isDefault) || visibleCalendars[0];
-
-  const { data: events = [], isSuccess: eventsFetched } = useEvents(
-    {
-      calendarNames: visibleCalendarNames,
-    },
-    { enabled: visibleCalendarNames.length > 0 && !calendarsLoading }
+  const visibleCalendars = useMemo(
+    () => calendars.filter((cal) => cal.visible),
+    [calendars]
   );
+  const visibleCalendarNames = useMemo(
+    () => visibleCalendars.map((cal) => cal.name),
+    [visibleCalendars]
+  );
+  // Track default calendar color for consistent preview styling
+  const defaultCalendar = useMemo(
+    () => calendars.find((cal) => cal.isDefault) || visibleCalendars[0],
+    [calendars, visibleCalendars]
+  );
+
+  // Stable filters reference so useEvents' internal filter memo only busts when
+  // the visible calendar set actually changes (#8/#23/#34).
+  const eventFilters = useMemo(
+    () => ({ calendarNames: visibleCalendarNames }),
+    [visibleCalendarNames]
+  );
+
+  const {
+    data: events = [],
+    isSuccess: eventsFetched,
+    isLoading: eventsLoading,
+    error: eventsError,
+    refetch: refetchEvents,
+  } = useEvents(eventFilters, {
+    enabled: visibleCalendarNames.length > 0 && !calendarsLoading,
+  });
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
@@ -172,6 +189,15 @@ export const CalendarView = ({
 
   // Combined ref for both drag & drop and gesture handling
   const combinedRef = useRef<HTMLDivElement>(null);
+
+  // Debounce revert explanations so a rapid drag doesn't stack toasts.
+  const lastRevertToast = useRef(0);
+  const noteRevert = useCallback((message: string) => {
+    const now = Date.now();
+    if (now - lastRevertToast.current < 1200) return;
+    lastRevertToast.current = now;
+    toast.info(message);
+  }, []);
 
   // Expose CSS var for default calendar color to use across components
   useEffect(() => {
@@ -235,10 +261,10 @@ export const CalendarView = ({
    */
   const transformEventsForCalendar = useCallback(
     (events: CalendarEvent[]): EventInput[] => {
+      // One Map lookup per event instead of an O(events x calendars) find.
+      const calendarByName = new Map(calendars.map((cal) => [cal.name, cal]));
       return events.map((event) => {
-        const calendar = calendars.find(
-          (cal) => cal.name === event.calendarName
-        );
+        const calendar = calendarByName.get(event.calendarName || '');
 
         const occurrenceStart = event.occurrenceInstanceStart ?? event.start;
         const occurrenceEnd = event.occurrenceInstanceEnd ?? event.end;
@@ -299,6 +325,15 @@ export const CalendarView = ({
     if (!body || !line) {
       nowOverlayRef.current?.remove();
       nowOverlayRef.current = null;
+      // Clear any hour label the overlay was occluding on the previous range.
+      // FullCalendar reuses the static time-axis DOM across navigation, so a
+      // label hidden while today was visible would otherwise stay hidden on a
+      // range that has no now-line (#22). Query from root — body is null here.
+      root
+        .querySelectorAll<HTMLElement>('.fc-timegrid-slot-label-cushion')
+        .forEach((el) => {
+          el.style.visibility = '';
+        });
       return;
     }
     let overlay = nowOverlayRef.current;
@@ -339,13 +374,25 @@ export const CalendarView = ({
   useEffect(() => {
     const raf = requestAnimationFrame(updateNowOverlay);
     const id = setInterval(updateNowOverlay, 60_000);
+    // Re-anchor on window resize so the gutter chip/ghost don't sit at a stale
+    // x/y offset until the next minute tick (#19).
+    const onResize = () => requestAnimationFrame(updateNowOverlay);
+    window.addEventListener('resize', onResize);
     return () => {
       cancelAnimationFrame(raf);
       clearInterval(id);
+      window.removeEventListener('resize', onResize);
       nowOverlayRef.current?.remove();
       nowOverlayRef.current = null;
     };
   }, [updateNowOverlay, currentView]);
+
+  // Re-anchor the now-overlay after a sidebar collapse/expand settles (the
+  // container width animates over ~200ms, so run just past that) — #19.
+  useEffect(() => {
+    const id = setTimeout(() => requestAnimationFrame(updateNowOverlay), 240);
+    return () => clearTimeout(id);
+  }, [sidebarState, updateNowOverlay]);
 
   /**
    * Handle date selection for creating new events
@@ -361,6 +408,7 @@ export const CalendarView = ({
 
       // Enforce: timed selections in time grid must remain within a single day
       if (viewType.startsWith('timeGrid') && !allDay && !sameDay) {
+        noteRevert('Timed events must stay within one day.');
         selectInfo.view.calendar.unselect();
         return;
       }
@@ -391,7 +439,7 @@ export const CalendarView = ({
       // Trigger create event callback
       onEventCreate?.(newEvent);
     },
-    [calendars, visibleCalendars, onEventCreate]
+    [calendars, visibleCalendars, onEventCreate, noteRevert]
   );
 
   /**
@@ -426,6 +474,7 @@ export const CalendarView = ({
       try {
         // For recurring series occurrence, revert and encourage editing via dialog
         if (originalEvent.recurrence) {
+          noteRevert('Edit recurring events from the event details.');
           changeInfo.revert();
           return;
         }
@@ -438,6 +487,7 @@ export const CalendarView = ({
           start.getMonth() === end.getMonth() &&
           start.getDate() === end.getDate();
         if (!allDay && !sameDay) {
+          noteRevert('Timed events must stay within one day.');
           changeInfo.revert();
           return;
         }
@@ -464,30 +514,36 @@ export const CalendarView = ({
         console.error('Failed to update event:', error);
       }
     },
-    [updateEventMutation]
+    [updateEventMutation, noteRevert]
   );
 
-  // Setup simple swipe detection
-  const swipeHandlers = useSwipeDetection({
-    onSwipedLeft: () => {
-      // Swipe left = next page
-      if (onNextClick) {
-        onNextClick();
-      } else {
-        const calendarApi = calendarRef.current?.getApi();
-        calendarApi?.next();
-      }
-    },
-    onSwipedRight: () => {
-      // Swipe right = previous page
-      if (onPrevClick) {
-        onPrevClick();
-      } else {
-        const calendarApi = calendarRef.current?.getApi();
-        calendarApi?.prev();
-      }
-    },
-  });
+  // Setup simple swipe detection. Memoize the input so onWheel keeps a stable
+  // identity and the wheel listener effect binds once instead of every render
+  // (#1/#7).
+  const swipeInput = useMemo(
+    () => ({
+      onSwipedLeft: () => {
+        // Swipe left = next page
+        if (onNextClick) {
+          onNextClick();
+        } else {
+          const calendarApi = calendarRef.current?.getApi();
+          calendarApi?.next();
+        }
+      },
+      onSwipedRight: () => {
+        // Swipe right = previous page
+        if (onPrevClick) {
+          onPrevClick();
+        } else {
+          const calendarApi = calendarRef.current?.getApi();
+          calendarApi?.prev();
+        }
+      },
+    }),
+    [onNextClick, onPrevClick, calendarRef]
+  );
+  const swipeHandlers = useSwipeDetection(swipeInput);
 
   // Connect refs and apply wheel listener
   useEffect(() => {
@@ -510,7 +566,10 @@ export const CalendarView = ({
     end: Date;
   } | null>(null);
 
-  const expandedEvents: CalendarEvent[] = (() => {
+  // Recurrence expansion is memoized on [events, visibleRange] so it only
+  // re-runs when data or the visible window actually changes — not on every
+  // sidebar/theme/isMobile re-render (#1/#6/#11/#15/#25).
+  const expandedEvents: CalendarEvent[] = useMemo(() => {
     if (!visibleRange) return events;
     const rangeStart = visibleRange.start;
     const rangeEnd = visibleRange.end;
@@ -542,9 +601,14 @@ export const CalendarView = ({
       }
     }
     return out;
-  })();
+  }, [events, visibleRange]);
 
-  const calendarEvents = transformEventsForCalendar(expandedEvents);
+  // Stable events reference for FullCalendar: only re-diffs when the expanded
+  // set or the transform (calendars) changes, not on unrelated re-renders.
+  const calendarEvents = useMemo(
+    () => transformEventsForCalendar(expandedEvents),
+    [transformEventsForCalendar, expandedEvents]
+  );
 
   // Mark events as seen AFTER commit (keeps the transform pure and survives
   // StrictMode double-renders). Master ids are seeded from the FULL fetched
@@ -577,7 +641,9 @@ export const CalendarView = ({
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
-        className={clsx('flex-1 relative bg-card transition-all duration-200')}
+        className={clsx(
+          'flex-1 relative bg-card transition-colors duration-[var(--dur-3)]'
+        )}
         style={{ overscrollBehavior: 'none' }}
       >
         <div className="h-full" style={{ overscrollBehavior: 'none' }}>
@@ -679,6 +745,28 @@ export const CalendarView = ({
                 info.event.extendedProps as { chipColor?: string } | undefined
               )?.chipColor;
               if (c) info.el.style.setProperty('--chip-c', c);
+
+              // Make chips keyboard-operable (#10): FullCalendar renders them
+              // as non-interactive elements, so Tab/Enter never reached them
+              // and the .fc-event:focus-visible ring in calendar.css was dead.
+              const el = info.el;
+              el.tabIndex = 0;
+              el.setAttribute('role', 'button');
+              const title = info.event.title || 'Untitled event';
+              el.setAttribute(
+                'aria-label',
+                info.event.allDay || !info.event.start
+                  ? title
+                  : `${title}, ${fmtChipTime(info.event.start)}`
+              );
+              const onKey = (e: KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  // Reuse the exact eventClick path (opens the detail view).
+                  el.click();
+                }
+              };
+              el.addEventListener('keydown', onKey);
             }}
             eventContent={(arg: EventContentArg) => {
               const viewType = arg.view?.type ?? '';
@@ -757,6 +845,10 @@ export const CalendarView = ({
             eventDisplay="block"
             displayEventTime={true}
             displayEventEnd={false}
+            /* Grid chips encode duration by height, so they stay start-only;
+               the list view is a scannable agenda and shows the full start–end
+               range so a 30-min sync reads differently from a 3-hour block. */
+            views={{ listWeek: { displayEventEnd: true } }}
             eventTimeFormat={{
               // List-view time cells (grid chips format their own time):
               // 24h mono per the §3 numeral law.
@@ -800,6 +892,51 @@ export const CalendarView = ({
             }}
           />
         </div>
+
+        {/* A failed events fetch must never read as an empty calendar. Surface
+            a tokenized error panel with a retry path over the grid (#2/#5/#12/
+            #13). Takes precedence over the empty/loading affordances. */}
+        {eventsError ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+            <div
+              className="flex max-w-xs flex-col items-center gap-3 border border-border bg-popover px-6 py-5 text-center"
+              style={{
+                borderRadius: 'var(--radius-card, 10px)',
+                boxShadow: 'var(--shadow-2)',
+              }}
+            >
+              <p className="font-serif text-base text-foreground">
+                Couldn&apos;t load events.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {toUserMessage(eventsError, 'Something went wrong.')}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchEvents()}
+              >
+                Try again
+              </Button>
+            </div>
+          </div>
+        ) : !calendarsLoading && visibleCalendars.length === 0 ? (
+          /* Every calendar toggled off — say so instead of a blank grid (#29). */
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <p className="max-w-xs text-center text-sm text-muted-foreground">
+              All calendars are hidden. Enable one in the sidebar to see your
+              events.
+            </p>
+          </div>
+        ) : eventsLoading && events.length === 0 ? (
+          /* Cold fetch: a quiet loading cue so the empty grid doesn't read as
+             "no events" before the data lands (#12). */
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <p className="animate-pulse text-sm text-muted-foreground">
+              Loading events…
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

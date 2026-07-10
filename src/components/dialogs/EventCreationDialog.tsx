@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { addHours, format } from 'date-fns';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { addHours, format, isSameDay } from 'date-fns';
+import { toast } from 'sonner';
 import { parseLocalDate } from '@/utils/date';
 import { MapPin, ArrowRight, Calendar, AtSign } from 'lucide-react';
 
@@ -54,10 +55,13 @@ import { ConditionalDialogHeader } from './ConditionalDialogHeader';
 import { ConflictWarning } from './ConflictWarning';
 import { RecurrenceScopeDialog } from './RecurrenceScopeDialog';
 import type { RecurrenceEditorOptions } from '@/utils/recurrence';
-import { parseRRule, generateRRule, clampRRuleUntil } from '@/utils/recurrence';
+import {
+  parseRRule,
+  generateRRule,
+  clampRRuleUntil,
+  untilToLocalDate,
+} from '@/utils/recurrence';
 import { CustomTimeInput } from '@/components/ui/CustomTimeInput';
-import { useSettingsStore, type DateDisplayMode } from '@/stores/settingsStore';
-//
 import RecurrenceSection from './RecurrenceSection';
 
 interface EventCreationDialogProps {
@@ -78,6 +82,42 @@ interface EventFormData {
   calendarName: string;
   recurrence?: string;
   exceptions?: string[];
+}
+
+/**
+ * Single source of truth for seeding the event form from an (optional) event.
+ * Used by both the initial state and the reset-on-new-event effect so the two
+ * can't drift (they previously both carried the endDate=startBase bug).
+ */
+function buildInitialFormData(
+  initialEventData?: Partial<CalendarEvent>,
+  defaultCalendarName?: string
+): EventFormData {
+  const now = new Date();
+  const oneHourLater = addHours(now, 1);
+
+  const startBase =
+    (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) ||
+    now;
+  const endBase =
+    (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) ||
+    oneHourLater;
+
+  return {
+    title: initialEventData?.title || '',
+    startDate: startBase,
+    // Seed from endBase (not startBase) so a multi-day all-day event keeps its
+    // real end date instead of collapsing to a single day on edit.
+    endDate: endBase,
+    startTime: format(startBase, 'HH:mm'),
+    endTime: format(endBase, 'HH:mm'),
+    allDay: initialEventData?.allDay || false,
+    description: initialEventData?.description || '',
+    location: initialEventData?.location || '',
+    calendarName: initialEventData?.calendarName || defaultCalendarName || '',
+    recurrence: initialEventData?.recurrence,
+    exceptions: initialEventData?.exceptions || [],
+  };
 }
 
 export function CustomDateInput({
@@ -198,11 +238,20 @@ function TaskTabContent({ onClose }: { onClose: () => void }) {
 function EventCreationDialogContent({
   initialEventData,
   onClose,
+  formData,
+  setFormData,
+  activeTab,
+  setActiveTab,
 }: {
   initialEventData?: Partial<CalendarEvent>;
   onClose: () => void;
+  // Form state is lifted to the parent so it survives the Sheet<->Dialog shell
+  // swap on the peek toggle (which unmounts/remounts this component).
+  formData: EventFormData;
+  setFormData: React.Dispatch<React.SetStateAction<EventFormData>>;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
 }) {
-  const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode);
   const { data: calendars = [] } = useCalendars();
   const createEventMutation = useCreateEvent();
   const updateEventMutation = useUpdateEvent();
@@ -211,40 +260,6 @@ function EventCreationDialogContent({
   // Check if we're editing an existing event
   const isEditing = Boolean(initialEventData?.id);
 
-  // Get default calendar for initial form data
-  const defaultCalendar = useMemo(() => {
-    return calendars.find((cal) => cal.isDefault) || calendars[0] || null;
-  }, [calendars]);
-
-  // Form state with enhanced multi-day support
-  const [formData, setFormData] = useState<EventFormData>(() => {
-    const now = new Date();
-    const oneHourLater = addHours(now, 1);
-
-    const startBase =
-      (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) ||
-      now;
-    const endBase =
-      (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) ||
-      oneHourLater;
-
-    return {
-      title: initialEventData?.title || '',
-      startDate: startBase,
-      endDate: startBase, // Default to same day for all-day events
-      startTime: format(startBase, 'HH:mm'),
-      endTime: format(endBase, 'HH:mm'),
-      allDay: initialEventData?.allDay || false,
-      description: initialEventData?.description || '',
-      location: initialEventData?.location || '',
-      calendarName:
-        initialEventData?.calendarName || defaultCalendar?.name || '',
-      recurrence: initialEventData?.recurrence,
-      exceptions: initialEventData?.exceptions || [],
-    };
-  });
-
-  const [activeTab, setActiveTab] = useState('event');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflicts, setConflicts] = useState<EventConflict[]>([]);
   const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
@@ -262,49 +277,6 @@ function EventCreationDialogContent({
     };
   }>(null);
 
-  // Ref for the title input to focus it when creating
-  const titleInputRef = useRef<HTMLInputElement>(null);
-
-  // Focus the title input when creating a new event (not editing)
-  useEffect(() => {
-    if (!isEditing && titleInputRef.current) {
-      // Small delay to ensure the dialog is fully rendered
-      const timeoutId = setTimeout(() => {
-        titleInputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isEditing]);
-
-  // Reset form when initial data changes
-  React.useEffect(() => {
-    const now = new Date();
-    const oneHourLater = addHours(now, 1);
-
-    const startBase =
-      (initialEventData?.occurrenceInstanceStart ?? initialEventData?.start) ||
-      now;
-    const endBase =
-      (initialEventData?.occurrenceInstanceEnd ?? initialEventData?.end) ||
-      oneHourLater;
-
-    setFormData({
-      title: initialEventData?.title || '',
-      startDate: startBase,
-      endDate: startBase, // Default to same day for all-day events
-      startTime: format(startBase, 'HH:mm'),
-      endTime: format(endBase, 'HH:mm'),
-      allDay: initialEventData?.allDay || false,
-      description: initialEventData?.description || '',
-      location: initialEventData?.location || '',
-      calendarName:
-        initialEventData?.calendarName || defaultCalendar?.name || '',
-      recurrence: initialEventData?.recurrence,
-      exceptions: initialEventData?.exceptions || [],
-    });
-    setActiveTab('event');
-  }, [initialEventData, defaultCalendar]);
-
   // Create calendar options for combobox
   const calendarOptions: ComboboxOption[] = useMemo(() => {
     return calendars.map((calendar) => ({
@@ -319,32 +291,11 @@ function EventCreationDialogContent({
     }));
   }, [calendars]);
 
-  // Calculate width based on longest calendar name
-  const calendarSelectWidth = useMemo(() => {
-    if (calendars.length === 0) return 'w-48'; // Default fallback
-
-    const longestName = calendars.reduce(
-      (longest, calendar) =>
-        calendar.name.length > longest.length ? calendar.name : longest,
-      ''
-    );
-
-    // Estimate width: ~0.6rem per character + padding + icon space
-    const estimatedChars = longestName.length + 8; // Extra for padding and icon
-
-    if (estimatedChars <= 16) return 'w-32';
-    if (estimatedChars <= 20) return 'w-40';
-    if (estimatedChars <= 24) return 'w-48';
-    if (estimatedChars <= 28) return 'w-56';
-    if (estimatedChars <= 32) return 'w-64';
-    return 'w-72'; // Max reasonable width
-  }, [calendars]);
-
   const updateFormData = useCallback(
     <K extends keyof EventFormData>(field: K, value: EventFormData[K]) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
     },
-    []
+    [setFormData]
   );
 
   const handleStartDateChange = useCallback(
@@ -368,16 +319,12 @@ function EventCreationDialogContent({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const dateValue = e.target.value;
       if (dateValue) {
-        // Use parseLocalDate to parse as local midnight, not UTC midnight
-        const newEndDate = parseLocalDate(dateValue);
-        // Prevent end date from being before start date
-        if (formData.startDate && newEndDate < formData.startDate) {
-          return;
-        }
-        updateFormData('endDate', newEndDate);
+        // Accept the value freely; correctness is enforced by validation + the
+        // inline error rather than by silently reverting the field.
+        updateFormData('endDate', parseLocalDate(dateValue));
       }
     },
-    [updateFormData, formData.startDate]
+    [updateFormData]
   );
 
   const handleStartTimeChange = useCallback(
@@ -385,46 +332,54 @@ function EventCreationDialogContent({
       const timeValue = e.target.value;
       updateFormData('startTime', timeValue);
 
-      // Auto-adjust end time if start time is after end time
-      if (timeValue && formData.endTime && timeValue >= formData.endTime) {
-        const startTime = new Date(`1970-01-01T${timeValue}:00`);
-        const endTime = addHours(startTime, 1);
-        updateFormData('endTime', format(endTime, 'HH:mm'));
+      // Convenience only: when the end sits at/before the new start on the SAME
+      // calendar day, nudge it to +1h via date math. A 23:00 start yields 00:00,
+      // which getEndDateTime rolls to the next day (so cross-midnight is valid).
+      if (timeValue && formData.endTime && formData.startDate) {
+        const [sh, sm] = timeValue.split(':').map(Number);
+        const [eh, em] = formData.endTime.split(':').map(Number);
+        const sameDay =
+          !formData.endDate || isSameDay(formData.startDate, formData.endDate);
+        if (sameDay && eh * 60 + em <= sh * 60 + sm) {
+          const bumped = addHours(new Date(1970, 0, 1, sh, sm), 1);
+          updateFormData('endTime', format(bumped, 'HH:mm'));
+        }
       }
     },
-    [formData.endTime, updateFormData]
+    [formData.endTime, formData.startDate, formData.endDate, updateFormData]
   );
 
   const handleEndTimeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const timeValue = e.target.value;
-      // Ensure end time is not before start time
-      if (timeValue && formData.startTime && timeValue <= formData.startTime) {
-        return;
-      }
-      updateFormData('endTime', timeValue);
+      // Accept the value; a too-early end is surfaced via the inline error and
+      // the disabled Create button rather than silently swallowed. (An overnight
+      // end also composes to a valid next-day datetime in getEndDateTime.)
+      updateFormData('endTime', e.target.value);
     },
-    [formData.startTime, updateFormData]
+    [updateFormData]
   );
 
-  const handleAllDayChange = useCallback((allDay: boolean) => {
-    setFormData((prev) => {
-      if (allDay) {
-        // When switching to all-day, ensure end date is set
-        return {
-          ...prev,
-          allDay,
-          endDate: prev.endDate || prev.startDate,
-        };
-      } else {
-        // When switching to timed, keep the dates but focus on times
-        return {
-          ...prev,
-          allDay,
-        };
-      }
-    });
-  }, []);
+  const handleAllDayChange = useCallback(
+    (allDay: boolean) => {
+      setFormData((prev) => {
+        if (allDay) {
+          // When switching to all-day, ensure end date is set
+          return {
+            ...prev,
+            allDay,
+            endDate: prev.endDate || prev.startDate,
+          };
+        } else {
+          // When switching to timed, keep the dates but focus on times
+          return {
+            ...prev,
+            allDay,
+          };
+        }
+      });
+    },
+    [setFormData]
+  );
 
   // Create start and end Date objects for submission with multi-day support
   const getStartDateTime = useCallback(() => {
@@ -450,12 +405,31 @@ function EventCreationDialogContent({
       return endOfDay;
     } else {
       if (!formData.startDate) return undefined;
-      const [hours, minutes] = formData.endTime.split(':').map(Number);
-      const dateTime = new Date(formData.startDate);
-      dateTime.setHours(hours, minutes, 0, 0);
-      return dateTime;
+      // Compose the end from its own date (falling back to the start date) plus
+      // the end time. If it lands at/before the start (e.g. 23:00 -> 00:00 or an
+      // overnight shift on the same day), roll it to the next day so timed events
+      // can cross midnight instead of self-invalidating.
+      const [sh, sm] = formData.startTime.split(':').map(Number);
+      const start = new Date(formData.startDate);
+      start.setHours(sh, sm, 0, 0);
+
+      const base = formData.endDate ?? formData.startDate;
+      const [eh, em] = formData.endTime.split(':').map(Number);
+      const end = new Date(base);
+      end.setHours(eh, em, 0, 0);
+
+      if (end <= start) {
+        end.setDate(end.getDate() + 1);
+      }
+      return end;
     }
-  }, [formData.startDate, formData.endDate, formData.endTime, formData.allDay]);
+  }, [
+    formData.startDate,
+    formData.startTime,
+    formData.endDate,
+    formData.endTime,
+    formData.allDay,
+  ]);
 
   // Real-time conflict detection: when the event time range is valid, ask the
   // backend for overlapping events and surface them as a non-blocking warning.
@@ -575,7 +549,12 @@ function EventCreationDialogContent({
       );
     } else {
       const hasValidTimes = Boolean(formData.startTime && formData.endTime);
-      const validTimeRange = formData.startTime < formData.endTime;
+      // Validate on the composed Date objects, not the raw HH:mm strings, so a
+      // cross-midnight timed event (23:00 -> 00:00) is valid instead of failing
+      // the string compare and blocking submit.
+      const start = getStartDateTime();
+      const end = getEndDateTime();
+      const validTimeRange = Boolean(start && end && start < end);
       return (
         hasTitle &&
         hasCalendar &&
@@ -584,7 +563,7 @@ function EventCreationDialogContent({
         validTimeRange
       );
     }
-  }, [formData]);
+  }, [formData, getStartDateTime, getEndDateTime]);
 
   const handleSubmit = useCallback(async () => {
     if (!isFormValid) return;
@@ -654,7 +633,12 @@ function EventCreationDialogContent({
         `Failed to ${isEditing ? 'update' : 'create'} event:`,
         error
       );
-      // Error handling could be improved with toast notifications
+      // Keep the dialog open (finally re-enables the button) and tell the user.
+      toast.error(
+        isEditing
+          ? "Couldn't save changes — try again."
+          : "Couldn't create event — try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -679,11 +663,31 @@ function EventCreationDialogContent({
     setPeekMode(peekMode === 'center' ? 'right' : 'center');
   }, [peekMode, setPeekMode]);
 
-  return (
-    <>
-      {/* Hidden element to receive initial focus instead of form elements */}
-      <div tabIndex={0} className="sr-only" />
+  // Keyboard submit for the highest-frequency create flow. Plain Enter from a
+  // simple text input submits; Cmd/Ctrl+Enter submits from anywhere. The rich
+  // text editor keeps Enter for newlines (only the modifier chord submits there).
+  const handleFormKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      if (activeTab !== 'event') return;
+      const target = e.target as HTMLElement;
+      const inEditor = Boolean(
+        target.closest('[contenteditable="true"]') ||
+          target.tagName === 'TEXTAREA'
+      );
+      const modifier = e.metaKey || e.ctrlKey;
+      if (!modifier) {
+        // Plain Enter: only from single-line inputs, and never from the editor.
+        if (inEditor || target.tagName !== 'INPUT') return;
+      }
+      e.preventDefault();
+      if (isFormValid && !isSubmitting) handleSubmit();
+    },
+    [activeTab, isFormValid, isSubmitting, handleSubmit]
+  );
 
+  return (
+    <div onKeyDown={handleFormKeyDown} className="contents">
       <ConditionalDialogHeader
         isEditing={isEditing}
         activeTab={activeTab}
@@ -707,18 +711,19 @@ function EventCreationDialogContent({
             {/* Event Name and Calendar Selection. Stacks below 640px (#46). */}
             <div className="flex items-end gap-3 min-w-0 max-sm:flex-col max-sm:items-stretch">
               <div className="flex-1 max-sm:w-full">
+                <Label htmlFor="event-title" className="sr-only">
+                  Event name
+                </Label>
                 <Input
-                  ref={titleInputRef}
                   id="event-title"
+                  autoFocus={!isEditing}
                   placeholder="Event name"
                   value={formData.title}
                   onChange={(e) => updateFormData('title', e.target.value)}
                   className="w-full"
                 />
               </div>
-              <div
-                className={`${calendarSelectWidth} max-w-[50%] max-sm:w-full max-sm:max-w-full`}
-              >
+              <div className="min-w-[8rem] max-w-[50%] max-sm:w-full max-sm:max-w-full">
                 <Combobox
                   options={calendarOptions}
                   value={formData.calendarName}
@@ -758,6 +763,17 @@ function EventCreationDialogContent({
                     onChange={handleEndTimeChange}
                     className="w-auto"
                   />
+                  {/* End date for timed events too, so an event can span days /
+                      cross midnight rather than being locked to the start day. */}
+                  <CustomDateInput
+                    value={
+                      formData.endDate
+                        ? format(formData.endDate, 'yyyy-MM-dd')
+                        : ''
+                    }
+                    onChange={handleEndDateChange}
+                    className="w-auto"
+                  />
                 </>
               )}
               {formData.allDay && (
@@ -775,39 +791,18 @@ function EventCreationDialogContent({
                 </>
               )}
             </div>
-            {!formData.allDay && formData.startTime >= formData.endTime && (
+            {(() => {
+              // Drive the error from the composed datetimes so it reflects real
+              // validity (cross-midnight is valid) and actually renders when the
+              // range is inverted, rather than off a raw HH:mm string compare.
+              const start = getStartDateTime();
+              const end = getEndDateTime();
+              return start && end && start >= end;
+            })() && (
               <p className="text-xs text-destructive">
-                End time must be after start time.
+                End must be after start.
               </p>
             )}
-
-            {/* Date Display Mode: a global preference riding along with
-                per-event fields, not an event property — demoted via the
-                caption so it visibly reads as different in kind. */}
-            <div className="flex items-center gap-2">
-              <Label className="text-sm">
-                Display{' '}
-                <span className="text-ink-muted text-[11px] font-normal">
-                  · all events
-                </span>
-              </Label>
-              <Select
-                value={dateDisplayMode}
-                onValueChange={(v) =>
-                  useSettingsStore
-                    .getState()
-                    .setDateDisplayMode(v as DateDisplayMode)
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Relative" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="relative">Relative</SelectItem>
-                  <SelectItem value="absolute">Absolute</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* All Day + Repeat + Ends row */}
             <div className="flex flex-wrap items-center gap-3">
@@ -879,8 +874,13 @@ function EventCreationDialogContent({
                             const parsed = formData.recurrence
                               ? parseRRule(formData.recurrence)
                               : null;
+                            // Format from the UTC-stable date-only value so the
+                            // label matches the day the user picked in every tz.
                             return parsed?.until
-                              ? format(parsed.until, 'yyyy-MM-dd')
+                              ? format(
+                                  untilToLocalDate(parsed.until),
+                                  'yyyy-MM-dd'
+                                )
                               : 'Pick date';
                           })()}
                         </Button>
@@ -890,7 +890,12 @@ function EventCreationDialogContent({
                           mode="single"
                           selected={
                             (formData.recurrence &&
-                              parseRRule(formData.recurrence)?.until) ||
+                              (() => {
+                                const u = parseRRule(
+                                  formData.recurrence
+                                )?.until;
+                                return u ? untilToLocalDate(u) : undefined;
+                              })()) ||
                             undefined
                           }
                           onSelect={(d) => {
@@ -946,6 +951,7 @@ function EventCreationDialogContent({
             <div className="relative min-w-0">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                aria-label="Location"
                 value={formData.location}
                 onChange={(e) => updateFormData('location', e.target.value)}
                 placeholder="Add location"
@@ -1087,7 +1093,7 @@ function EventCreationDialogContent({
           onClose();
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -1097,6 +1103,59 @@ export function EventCreationDialog({
   initialEventData,
 }: EventCreationDialogProps) {
   const { peekMode } = useUIStore();
+  const { data: calendars = [] } = useCalendars();
+
+  const defaultCalendar = useMemo(
+    () => calendars.find((cal) => cal.isDefault) || calendars[0] || null,
+    [calendars]
+  );
+
+  // Form state is owned here (the always-mounted shell) so it survives the
+  // Sheet<->Dialog swap on the peek toggle, which unmounts one content instance
+  // and mounts the other. Previously that swap re-ran the child's initializer
+  // and discarded everything the user had typed mid-edit.
+  const [formData, setFormData] = useState<EventFormData>(() =>
+    buildInitialFormData(initialEventData, defaultCalendar?.name)
+  );
+  const [activeTab, setActiveTab] = useState('event');
+
+  // Re-seed the form only when the target event identity changes (open/edit a
+  // different event) — NOT when the async calendars query resolves. Depending on
+  // defaultCalendar here used to wipe input the user typed before calendars
+  // loaded. Key on id (+ occurrence start for a specific recurring instance).
+  const eventKey = initialEventData?.id
+    ? `${initialEventData.id}:${
+        initialEventData.occurrenceInstanceStart
+          ? new Date(initialEventData.occurrenceInstanceStart).toISOString()
+          : ''
+      }`
+    : undefined;
+  const prevKeyRef = React.useRef<string | undefined>(eventKey);
+  const openedRef = React.useRef(open);
+  useEffect(() => {
+    const justOpened = open && !openedRef.current;
+    openedRef.current = open;
+    if (justOpened || eventKey !== prevKeyRef.current) {
+      prevKeyRef.current = eventKey;
+      setFormData(
+        buildInitialFormData(initialEventData, defaultCalendar?.name)
+      );
+      setActiveTab('event');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, eventKey, initialEventData]);
+
+  // Backfill only the calendar name once the default arrives, and only if the
+  // user hasn't already chosen one — so late-loading calendars never clobber input.
+  useEffect(() => {
+    if (defaultCalendar) {
+      setFormData((prev) =>
+        prev.calendarName
+          ? prev
+          : { ...prev, calendarName: defaultCalendar.name }
+      );
+    }
+  }, [defaultCalendar]);
 
   const handleClose = () => {
     onOpenChange(false);
@@ -1127,6 +1186,10 @@ export function EventCreationDialog({
           <EventCreationDialogContent
             initialEventData={initialEventData}
             onClose={handleClose}
+            formData={formData}
+            setFormData={setFormData}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
           />
         </SheetContent>
       </Sheet>
@@ -1144,6 +1207,10 @@ export function EventCreationDialog({
           <EventCreationDialogContent
             initialEventData={initialEventData}
             onClose={handleClose}
+            formData={formData}
+            setFormData={setFormData}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
           />
         </DialogContent>
       </Dialog>

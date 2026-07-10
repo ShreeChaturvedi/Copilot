@@ -24,6 +24,16 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { sanitizeHtml } from '@/utils/validation';
 import { IntegratedActionBar } from './IntegratedActionBar';
 import { RecurrenceScopeDialog } from './RecurrenceScopeDialog';
@@ -32,7 +42,11 @@ import {
   useCreateEvent,
   useDeleteEvent,
 } from '@/hooks/useEvents';
-import { toHumanText, clampRRuleUntil } from '@/utils/recurrence';
+import {
+  toHumanText,
+  clampRRuleUntil,
+  stripRRuleCountUntil,
+} from '@/utils/recurrence';
 
 import type { CalendarEvent } from '@shared/types';
 import { useCalendars } from '@/hooks/useCalendars';
@@ -53,13 +67,6 @@ function EventDisplayDialogContent({
   actions?: React.ReactNode;
 }) {
   const { data: calendars = [] } = useCalendars();
-  // Mutations are lazily used in actions; keep declarations close to use sites to avoid unused warnings
-  // Lazy usage within action handlers; define here to initialize hooks
-  // Keep hooks declarations but reference variables to satisfy linter until used in handlers
-  const updateEventMutation = useUpdateEvent();
-  void updateEventMutation;
-  const createEventMutation = useCreateEvent();
-  void createEventMutation;
 
   const calendar = React.useMemo(() => {
     if (!event) return null;
@@ -101,9 +108,6 @@ function EventDisplayDialogContent({
 
   return (
     <>
-      {/* Hidden element to receive initial focus instead of edit button */}
-      <div tabIndex={0} className="sr-only" />
-
       {/* Title + actions inline; title truncates within available space */}
       <div className="flex items-center justify-between gap-2 overflow-hidden">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -239,6 +243,7 @@ export function EventDisplayDialog({
   const createEventMutation = useCreateEvent();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
 
   const handleClose = React.useCallback(() => {
@@ -285,8 +290,10 @@ export function EventDisplayDialog({
         handleEdit();
       }}
       onDelete={() => {
+        // Recurring events get the scope dialog; single events now get a
+        // lightweight confirm so one mis-click can't permanently drop an event.
         if (event.recurrence) setDeleteDialogOpen(true);
-        else void handleDelete();
+        else setConfirmDeleteOpen(true);
       }}
       onClose={handleClose}
       isDeleting={isDeleting}
@@ -299,6 +306,32 @@ export function EventDisplayDialog({
 
   return (
     <>
+      {/* Confirm delete for single (non-recurring) events. Rendered at the top
+          level so it works in both the sheet and center-dialog shells. */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove &ldquo;{event.title}&rdquo;. This can&rsquo;t be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDeleteOpen(false);
+                void handleDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Sheet (right panel) - only open when open=true AND peekMode='right' */}
       <Sheet open={open && isSheetMode} onOpenChange={onOpenChange}>
         <SheetContent
@@ -400,19 +433,39 @@ export function EventDisplayDialog({
             onEdit?.({ ...oneOff });
             handleClose();
           }}
-          onThisAndFollowing={() => {
-            // This and following: convert series at this point into a split by clamping and creating a new follow-up
+          onThisAndFollowing={async () => {
+            // This and following: mirror the save-flow split. Clamp the master to
+            // end before this occurrence, then create a NEW future series that
+            // starts at this occurrence and carries the (budget-stripped) rule,
+            // and open the editor on THAT event. Previously this re-opened the
+            // editor on the now-clamped master (editing the PAST half) and
+            // double-prompted for scope on save.
             const occStart = new Date(
               event.occurrenceInstanceStart || event.start
             );
+            const occEnd = event.occurrenceInstanceEnd || event.end;
             const clamped = clampRRuleUntil(event.recurrence!, occStart);
-            // Update current series to end before this occurrence
-            updateEventMutation.mutate({
+            await updateEventMutation.mutateAsync({
               id: event.id,
               data: { recurrence: clamped },
             });
+            // Strip COUNT/UNTIL so the new series doesn't inherit the parent's
+            // occurrence budget.
+            const futureRule = stripRRuleCountUntil(event.recurrence!);
+            const futureSeries = await createEventMutation.mutateAsync({
+              title: event.title,
+              start: occStart,
+              end: occEnd,
+              allDay: event.allDay,
+              description: event.description,
+              location: event.location,
+              calendarName: event.calendarName || '',
+              color: event.color,
+              recurrence: futureRule,
+            });
             setEditDialogOpen(false);
-            handleEdit();
+            onEdit?.({ ...futureSeries });
+            handleClose();
           }}
           onAllEvents={() => {
             setEditDialogOpen(false);

@@ -15,6 +15,10 @@ import { UpcomingEmptyState } from '@/components/tasks/UpcomingTasksEmpty';
 // occurrences, in days.
 const UPCOMING_EXPANSION_DAYS = 90;
 
+// Stable empty filters reference so useEvents' internal filter memo isn't
+// busted by a fresh `{}` literal on every render (#34).
+const EMPTY_FILTERS = {} as const;
+
 interface EventOverviewProps {
   maxEvents?: number;
   className?: string;
@@ -31,12 +35,19 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
   showHeader = true,
 }) => {
   const { data: calendars = [] } = useCalendars();
-  const { data: allEvents = [], isLoading } = useEvents({}, { enabled: true });
+  const {
+    data: allEvents = [],
+    isLoading,
+    error,
+    refetch,
+  } = useEvents(EMPTY_FILTERS, { enabled: true });
 
-  // Filter events to get visible calendar events only
-  const visibleCalendarNames = calendars
-    .filter((cal) => cal.visible)
-    .map((cal) => cal.name);
+  // Filter events to get visible calendar events only. Memoized so a fresh
+  // array identity never busts the recurring-expansion memo below every render.
+  const visibleCalendarNames = React.useMemo(
+    () => calendars.filter((cal) => cal.visible).map((cal) => cal.name),
+    [calendars]
+  );
 
   // Compute all upcoming events (not truncated) for accurate totals
   const upcomingEventsAll = React.useMemo(() => {
@@ -121,6 +132,30 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
     );
   }
 
+  // A failed fetch must never read as a calm "all clear" — surface a distinct
+  // error state with a retry path instead of the aqua caught-up art (#5/#13).
+  if (error) {
+    return (
+      <div className={cn('space-y-3 px-3 py-4 text-center', className)}>
+        <p className="text-sm font-medium text-sidebar-foreground">
+          Couldn&apos;t load events.
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className={cn(
+            'inline-flex items-center rounded-btn border border-sidebar-border px-3 py-1.5',
+            'text-xs font-medium text-sidebar-foreground',
+            'transition-colors duration-150 ease-out hover:bg-surface-hover',
+            'focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1'
+          )}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   // If no events, show the shared §4.7 schedule-empty state (matches the
   // upcoming tasks list so the two sidebar lists read as one system).
   if (upcomingEvents.length === 0) {
@@ -153,7 +188,10 @@ const EventOverviewComponent: React.FC<EventOverviewProps> = ({
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {dayKey}
               </span>
-              <Badge variant="outline" className="text-xs h-5 tabular-nums">
+              <Badge
+                variant="outline"
+                className="text-xs h-5 font-mono tabular-nums"
+              >
                 {groupedEventTotals[dayKey] ?? events.length}
               </Badge>
             </div>

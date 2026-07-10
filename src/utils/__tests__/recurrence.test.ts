@@ -33,7 +33,11 @@ function iso(list: { start: Date; end: Date }[]): string[] {
 describe('recurrence utils', () => {
   describe('generateRRule', () => {
     const cases: Array<[string, RecurrenceEditorOptions, string]> = [
-      ['daily every 1', { frequency: 'daily', interval: 1 }, 'RRULE:FREQ=DAILY;INTERVAL=1'],
+      [
+        'daily every 1',
+        { frequency: 'daily', interval: 1 },
+        'RRULE:FREQ=DAILY;INTERVAL=1',
+      ],
       [
         'daily every 3, COUNT=5',
         { frequency: 'daily', interval: 3, ends: 'after', count: 5 },
@@ -56,12 +60,22 @@ describe('recurrence utils', () => {
       ],
       [
         'monthly last Friday (BYSETPOS=-1)',
-        { frequency: 'monthly', interval: 1, monthlyBySetPos: -1, monthlyWeekday: 5 },
+        {
+          frequency: 'monthly',
+          interval: 1,
+          monthlyBySetPos: -1,
+          monthlyWeekday: 5,
+        },
         'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1',
       ],
       [
         'monthly first Monday (BYSETPOS=1)',
-        { frequency: 'monthly', interval: 1, monthlyBySetPos: 1, monthlyWeekday: 1 },
+        {
+          frequency: 'monthly',
+          interval: 1,
+          monthlyBySetPos: 1,
+          monthlyWeekday: 1,
+        },
         'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=MO;BYSETPOS=1',
       ],
       [
@@ -71,7 +85,11 @@ describe('recurrence utils', () => {
       ],
       [
         'yearly last Thursday of November (US Thanksgiving-ish)',
-        { frequency: 'yearly', interval: 1, yearNthWeekday: { setpos: -1, weekday: 4, month: 11 } },
+        {
+          frequency: 'yearly',
+          interval: 1,
+          yearNthWeekday: { setpos: -1, weekday: 4, month: 11 },
+        },
         'RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH=11;BYDAY=TH;BYSETPOS=-1',
       ],
     ];
@@ -82,30 +100,55 @@ describe('recurrence utils', () => {
 
     it('dayOfMonth takes precedence over BYSETPOS when both are provided', () => {
       const rule = generateRRule(
-        { frequency: 'monthly', interval: 1, dayOfMonth: 10, monthlyBySetPos: -1, monthlyWeekday: 5 },
+        {
+          frequency: 'monthly',
+          interval: 1,
+          dayOfMonth: 10,
+          monthlyBySetPos: -1,
+          monthlyWeekday: 5,
+        },
         DT
       );
       expect(rule).toBe('RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=10');
     });
 
     it('interval floors and clamps to a minimum of 1', () => {
-      expect(generateRRule({ frequency: 'daily', interval: 0 }, DT)).toBe('RRULE:FREQ=DAILY;INTERVAL=1');
-      expect(generateRRule({ frequency: 'daily', interval: 2.9 }, DT)).toBe('RRULE:FREQ=DAILY;INTERVAL=2');
+      expect(generateRRule({ frequency: 'daily', interval: 0 }, DT)).toBe(
+        'RRULE:FREQ=DAILY;INTERVAL=1'
+      );
+      expect(generateRRule({ frequency: 'daily', interval: 2.9 }, DT)).toBe(
+        'RRULE:FREQ=DAILY;INTERVAL=2'
+      );
     });
 
-    it('UNTIL is derived from LOCAL end-of-day (23:59:59.999) then serialized as UTC', () => {
-      // June 30 2026 local end-of-day (EDT, -04:00) => 2026-07-01T03:59:59Z
+    it('UNTIL pins the picked LOCAL calendar day to 23:59:59 UTC (timezone-stable, no next-day roll)', () => {
+      // The user picks June 30 2026 (local midnight, EDT -04:00). generateRRule
+      // reads the LOCAL Y/M/D (2026/06/30) and pins it to 23:59:59 UTC via
+      // Date.UTC, so the stored day stays June 30 regardless of the viewer's
+      // timezone. (The old behavior serialized local end-of-day to UTC, which
+      // rolled an east-of-UTC user forward to 2026-07-01T03:59:59Z.)
       const rule = generateRRule(
-        { frequency: 'weekly', interval: 1, daysOfWeek: [1], ends: 'on', until: new Date(2026, 5, 30) },
+        {
+          frequency: 'weekly',
+          interval: 1,
+          daysOfWeek: [1],
+          ends: 'on',
+          until: new Date(2026, 5, 30),
+        },
         DT
       );
-      expect(rule).toBe('RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO;UNTIL=20260701T035959Z');
+      expect(rule).toBe(
+        'RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO;UNTIL=20260630T235959Z'
+      );
     });
 
     it('ends=after with a non-positive count omits COUNT', () => {
-      expect(generateRRule({ frequency: 'daily', interval: 1, ends: 'after', count: 0 }, DT)).toBe(
-        'RRULE:FREQ=DAILY;INTERVAL=1'
-      );
+      expect(
+        generateRRule(
+          { frequency: 'daily', interval: 1, ends: 'after', count: 0 },
+          DT
+        )
+      ).toBe('RRULE:FREQ=DAILY;INTERVAL=1');
     });
   });
 
@@ -126,7 +169,9 @@ describe('recurrence utils', () => {
     });
 
     it('parses weekly BYDAY into daysOfWeek indices', () => {
-      expect(parseRRule('RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR')).toMatchObject({
+      expect(
+        parseRRule('RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR')
+      ).toMatchObject({
         frequency: 'weekly',
         interval: 2,
         daysOfWeek: [1, 3, 5],
@@ -134,7 +179,9 @@ describe('recurrence utils', () => {
     });
 
     it('parses monthly last-Friday (BYDAY+BYSETPOS) into setpos + weekday', () => {
-      expect(parseRRule('RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1')).toMatchObject({
+      expect(
+        parseRRule('RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1')
+      ).toMatchObject({
         frequency: 'monthly',
         monthlyBySetPos: -1,
         monthlyWeekday: 5,
@@ -149,13 +196,18 @@ describe('recurrence utils', () => {
     });
 
     it('parses UNTIL (basic UTC format) as ends=on with a Date', () => {
-      const parsed = parseRRule('RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO;UNTIL=20260630T235959Z');
+      const parsed = parseRRule(
+        'RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO;UNTIL=20260630T235959Z'
+      );
       expect(parsed?.ends).toBe('on');
       expect(parsed?.until?.toISOString()).toBe('2026-06-30T23:59:59.000Z');
     });
 
     it('defaults interval to 1 and frequency to weekly when FREQ is unknown/missing', () => {
-      expect(parseRRule('RRULE:FREQ=WEEKLY')).toMatchObject({ frequency: 'weekly', interval: 1 });
+      expect(parseRRule('RRULE:FREQ=WEEKLY')).toMatchObject({
+        frequency: 'weekly',
+        interval: 1,
+      });
     });
 
     it('round-trips generate -> parse -> generate for a yearly nth-weekday rule', () => {
@@ -168,22 +220,34 @@ describe('recurrence utils', () => {
       // parseRRule of a yearly nth-weekday rule keeps FREQ/interval; regenerating
       // requires yearNthWeekday which parse does not reconstruct, so we assert the
       // string round-trips through rrulestr instead (see toHumanText below).
-      expect(parseRRule(rule)).toMatchObject({ frequency: 'yearly', interval: 1 });
+      expect(parseRRule(rule)).toMatchObject({
+        frequency: 'yearly',
+        interval: 1,
+      });
     });
 
     it('CHARACTERIZATION: yearly BYMONTHDAY also leaks a stray dayOfMonth field', () => {
       // Known quirk: the BYMONTHDAY handler sets dayOfMonth unconditionally, so a
       // yearly rule parses with BOTH dayOfMonth and yearDayOfMonth. Harmless for
       // regeneration (yearly branch ignores dayOfMonth) but documented here.
-      const parsed = parseRRule('RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH=12;BYMONTHDAY=25');
-      expect(parsed).toMatchObject({ month: 12, yearDayOfMonth: 25, dayOfMonth: 25 });
+      const parsed = parseRRule(
+        'RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH=12;BYMONTHDAY=25'
+      );
+      expect(parsed).toMatchObject({
+        month: 12,
+        yearDayOfMonth: 25,
+        dayOfMonth: 25,
+      });
     });
   });
 
   describe('toHumanText', () => {
     it.each<[string, string]>([
       ['RRULE:FREQ=DAILY;INTERVAL=1', 'every day'],
-      ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR', 'every 2 weeks on Monday, Wednesday, Friday'],
+      [
+        'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR',
+        'every 2 weeks on Monday, Wednesday, Friday',
+      ],
     ])('%s -> %s', (rule, text) => {
       expect(toHumanText(rule, DT)).toBe(text);
     });
@@ -194,7 +258,10 @@ describe('recurrence utils', () => {
   });
 
   describe('expandOccurrences', () => {
-    const base: Pick<CalendarEvent, 'id' | 'start' | 'end' | 'allDay' | 'exceptions'> = {
+    const base: Pick<
+      CalendarEvent,
+      'id' | 'start' | 'end' | 'allDay' | 'exceptions'
+    > = {
       id: 'seed',
       start: new Date(Date.UTC(2026, 0, 14, 9, 0, 0)).toISOString(),
       end: new Date(Date.UTC(2026, 0, 14, 10, 0, 0)).toISOString(),
@@ -205,12 +272,22 @@ describe('recurrence utils', () => {
     const FEB = new Date(Date.UTC(2026, 1, 1));
 
     it('returns [] when the event has no recurrence', () => {
-      expect(expandOccurrences({ ...base, id: 'e-none', recurrence: '' } as CalendarEvent, JAN, FEB)).toEqual([]);
+      expect(
+        expandOccurrences(
+          { ...base, id: 'e-none', recurrence: '' } as CalendarEvent,
+          JAN,
+          FEB
+        )
+      ).toEqual([]);
     });
 
     it('COUNT terminates the series', () => {
       const occ = expandOccurrences(
-        { ...base, id: 'e-count', recurrence: 'RRULE:FREQ=DAILY;INTERVAL=1;COUNT=3' } as CalendarEvent,
+        {
+          ...base,
+          id: 'e-count',
+          recurrence: 'RRULE:FREQ=DAILY;INTERVAL=1;COUNT=3',
+        } as CalendarEvent,
         JAN,
         FEB
       );
@@ -225,7 +302,11 @@ describe('recurrence utils', () => {
 
     it('weekly rule is clipped to the requested [rangeStart, rangeEnd] window', () => {
       const occ = expandOccurrences(
-        { ...base, id: 'e-weekly', recurrence: 'RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=WE' } as CalendarEvent,
+        {
+          ...base,
+          id: 'e-weekly',
+          recurrence: 'RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=WE',
+        } as CalendarEvent,
         JAN,
         FEB
       );
@@ -241,7 +322,8 @@ describe('recurrence utils', () => {
         {
           ...base,
           id: 'e-lastfri',
-          recurrence: 'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1;COUNT=3',
+          recurrence:
+            'RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=FR;BYSETPOS=-1;COUNT=3',
         } as CalendarEvent,
         JAN,
         new Date(Date.UTC(2026, 6, 1))
@@ -264,7 +346,10 @@ describe('recurrence utils', () => {
         JAN,
         FEB
       );
-      expect(iso(occ)).toEqual(['2026-01-14T09:00:00.000Z', '2026-01-16T09:00:00.000Z']);
+      expect(iso(occ)).toEqual([
+        '2026-01-14T09:00:00.000Z',
+        '2026-01-16T09:00:00.000Z',
+      ]);
     });
 
     it('UNTIL terminates the series before the window end', () => {
@@ -286,7 +371,15 @@ describe('recurrence utils', () => {
 
     it('returns [] for an unparseable recurrence string', () => {
       expect(
-        expandOccurrences({ ...base, id: 'e-bad', recurrence: 'RRULE:FREQ=BOGUS' } as CalendarEvent, JAN, FEB)
+        expandOccurrences(
+          {
+            ...base,
+            id: 'e-bad',
+            recurrence: 'RRULE:FREQ=BOGUS',
+          } as CalendarEvent,
+          JAN,
+          FEB
+        )
       ).toEqual([]);
     });
   });
@@ -294,13 +387,19 @@ describe('recurrence utils', () => {
   describe('clampRRuleUntil', () => {
     it('replaces COUNT with an UNTIL set one second before the given date', () => {
       expect(
-        clampRRuleUntil('RRULE:FREQ=DAILY;INTERVAL=1;COUNT=10', new Date(Date.UTC(2026, 5, 30, 12, 0, 0)))
+        clampRRuleUntil(
+          'RRULE:FREQ=DAILY;INTERVAL=1;COUNT=10',
+          new Date(Date.UTC(2026, 5, 30, 12, 0, 0))
+        )
       ).toBe('RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20260630T115959Z');
     });
 
     it('overwrites an existing UNTIL', () => {
       expect(
-        clampRRuleUntil('RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20270101T000000Z', new Date(Date.UTC(2026, 5, 30)))
+        clampRRuleUntil(
+          'RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20270101T000000Z',
+          new Date(Date.UTC(2026, 5, 30))
+        )
       ).toBe('RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20260629T235959Z');
     });
 

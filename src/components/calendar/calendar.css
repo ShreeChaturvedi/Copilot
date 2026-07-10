@@ -704,10 +704,6 @@
    SPECIAL DAY STYLING
    ================================ */
 
-.fc-non-business {
-  background-color: color-mix(in oklab, var(--muted) 30%, transparent);
-}
-
 /* Weekend wash: neutral ink at 2% (§4.4) */
 .fc-day-sat,
 .fc-day-sun {
@@ -716,11 +712,6 @@
 
 .fc-day-disabled {
   background-color: color-mix(in oklab, var(--muted) 50%, transparent);
-  color: var(--muted-foreground);
-}
-
-.fc-loading {
-  background-color: color-mix(in oklab, var(--background) 80%, transparent);
   color: var(--muted-foreground);
 }
 

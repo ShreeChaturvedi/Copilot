@@ -1,18 +1,8 @@
-import { useMemo, useState, useEffect } from 'react';
-// import { addDays } from 'date-fns';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-// import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-// import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-// import {
-//   Select,
-//   SelectTrigger,
-//   SelectContent,
-//   SelectItem,
-//   SelectValue,
-// } from '@/components/ui/Select';
 import {
   generateRRule,
   parseRRule,
@@ -32,6 +22,13 @@ interface RecurrenceSectionProps {
 }
 
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Max day-of-month for a 1-based month. February allows 29 so leap-day yearly
+// series stay possible; the RRULE engine skips non-leap years for Feb 29.
+const MONTH_MAX_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function daysInMonth(month1Based: number): number {
+  return MONTH_MAX_DAYS[Math.min(12, Math.max(1, month1Based)) - 1];
+}
 
 export default function RecurrenceSection(props: RecurrenceSectionProps) {
   const {
@@ -61,7 +58,17 @@ export default function RecurrenceSection(props: RecurrenceSectionProps) {
 
   const [opts, setOpts] = useState<RecurrenceEditorOptions>(initialOpts);
   const [summary, setSummary] = useState<string>('Does not repeat');
-  // const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Single commit path: update local view state then serialize + notify the
+  // parent. Keeps every handler on one source of truth for how options map to
+  // an RRULE string.
+  const commit = useCallback(
+    (next: RecurrenceEditorOptions) => {
+      setOpts(next);
+      onChange(generateRRule(next, startDateTime ?? new Date()));
+    },
+    [onChange, startDateTime]
+  );
 
   // Sync internal options when external RRULE value changes
   useEffect(() => {
@@ -82,63 +89,33 @@ export default function RecurrenceSection(props: RecurrenceSectionProps) {
   }, [startDateTime, value]);
 
   const handleIntervalChange = (n: number) => {
-    const next = { ...opts, interval: Math.max(1, Math.floor(n || 1)) };
-    setOpts(next);
-    onChange(generateRRule(next, startDateTime || new Date()));
+    commit({ ...opts, interval: Math.max(1, Math.floor(n || 1)) });
   };
-
-  // const toggleDay = (day: number) => {
-  //   const set = new Set(opts.daysOfWeek || []);
-  //   if (set.has(day)) set.delete(day); else set.add(day);
-  //   const next = { ...opts, daysOfWeek: Array.from(set).sort((a, b) => a - b) };
-  //   setOpts(next);
-  //   onChange(generateRRule(next, startDateTime || new Date()));
-  // };
 
   const handleMonthModeChange = (mode: 'dayOfMonth' | 'nthWeekday') => {
     const dt = startDateTime ? new Date(startDateTime) : new Date();
     if (mode === 'dayOfMonth') {
-      const next = {
+      commit({
         ...opts,
         dayOfMonth: dt.getDate(),
         monthlyBySetPos: undefined,
         monthlyWeekday: undefined,
-      };
-      setOpts(next);
-      onChange(generateRRule(next, startDateTime || new Date()));
+      });
     } else {
       const weekday = dt.getDay();
       const weekIndex = Math.ceil(dt.getDate() / 7); // 1..5 approx, 5 means last
       const setpos = weekIndex >= 5 ? -1 : weekIndex;
-      const next = {
+      commit({
         ...opts,
         dayOfMonth: undefined,
         monthlyBySetPos: setpos,
         monthlyWeekday: weekday,
-      };
-      setOpts(next);
-      onChange(generateRRule(next, startDateTime || new Date()));
+      });
     }
   };
 
-  // const handleEndsChange = (ends: 'never' | 'on' | 'after') => {
-  //   const next = { ...opts, ends, count: ends === 'after' ? (opts.count || 10) : null, until: ends === 'on' ? (opts.until || addDays(new Date(), 30)) : null };
-  //   setOpts(next);
-  //   onChange(generateRRule(next, startDateTime || new Date()));
-  // };
-
-  // const handleUntilChange = (d?: Date) => {
-  //   if (!d) return;
-  //   const next = { ...opts, until: d };
-  //   setOpts(next);
-  //   onChange(generateRRule(next, startDateTime || new Date()));
-  //   setShowDatePicker(false);
-  // };
-
   const handleCountChange = (c: number) => {
-    const next = { ...opts, count: Math.max(1, Math.floor(c || 1)) };
-    setOpts(next);
-    onChange(generateRRule(next, startDateTime || new Date()));
+    commit({ ...opts, count: Math.max(1, Math.floor(c || 1)) });
   };
 
   const currentFreq: 'none' | RecurrenceEditorOptions['frequency'] = value
@@ -233,9 +210,7 @@ export default function RecurrenceSection(props: RecurrenceSectionProps) {
                   const nextDays = values
                     .map((v) => parseInt(v, 10))
                     .sort((a, b) => a - b);
-                  const next = { ...opts, daysOfWeek: nextDays };
-                  setOpts(next);
-                  onChange(generateRRule(next, startDateTime || new Date()));
+                  commit({ ...opts, daysOfWeek: nextDays });
                 }}
                 aria-label="Select days of week"
               >
@@ -288,53 +263,58 @@ export default function RecurrenceSection(props: RecurrenceSectionProps) {
             </div>
           )}
 
-          {currentFreq === 'yearly' && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Input
-                type="number"
-                min={1}
-                max={12}
-                className="w-16"
-                value={
-                  opts.month ||
-                  (startDateTime
-                    ? new Date(startDateTime).getMonth() + 1
-                    : new Date().getMonth() + 1)
-                }
-                onChange={(e) => {
-                  const v = Math.min(
-                    12,
-                    Math.max(1, parseInt(e.target.value || '1', 10))
-                  );
-                  const next = { ...opts, month: v };
-                  setOpts(next);
-                  onChange(generateRRule(next, startDateTime || new Date()));
-                }}
-              />
-              <span className="text-sm">/</span>
-              <Input
-                type="number"
-                min={1}
-                max={31}
-                className="w-16"
-                value={
-                  opts.yearDayOfMonth ||
-                  (startDateTime
-                    ? new Date(startDateTime).getDate()
-                    : new Date().getDate())
-                }
-                onChange={(e) => {
-                  const v = Math.min(
-                    31,
-                    Math.max(1, parseInt(e.target.value || '1', 10))
-                  );
-                  const next = { ...opts, yearDayOfMonth: v };
-                  setOpts(next);
-                  onChange(generateRRule(next, startDateTime || new Date()));
-                }}
-              />
-            </div>
-          )}
+          {currentFreq === 'yearly' &&
+            (() => {
+              const selectedMonth =
+                opts.month ||
+                (startDateTime
+                  ? new Date(startDateTime).getMonth() + 1
+                  : new Date().getMonth() + 1);
+              // Clamp the day to the selected month's length so impossible dates
+              // (e.g. Feb 31) can't be entered and silently never recur. Feb is
+              // allowed 29 so leap-day series remain possible.
+              const daysInSelectedMonth = daysInMonth(selectedMonth);
+              const selectedDay =
+                opts.yearDayOfMonth ||
+                (startDateTime
+                  ? new Date(startDateTime).getDate()
+                  : new Date().getDate());
+              return (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    className="w-16"
+                    value={selectedMonth}
+                    onChange={(e) => {
+                      const v = Math.min(
+                        12,
+                        Math.max(1, parseInt(e.target.value || '1', 10))
+                      );
+                      // Re-clamp the day when the month shrinks under it.
+                      const clampedDay = Math.min(selectedDay, daysInMonth(v));
+                      commit({ ...opts, month: v, yearDayOfMonth: clampedDay });
+                    }}
+                  />
+                  <span className="text-sm">/</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={daysInSelectedMonth}
+                    className="w-16"
+                    value={selectedDay}
+                    onChange={(e) => {
+                      const v = Math.min(
+                        daysInSelectedMonth,
+                        Math.max(1, parseInt(e.target.value || '1', 10))
+                      );
+                      commit({ ...opts, yearDayOfMonth: v });
+                    }}
+                  />
+                </div>
+              );
+            })()}
 
           {/* Row 3: when ends is managed by parent but is 'after', expose N occurrences */}
           {endsControlled && opts.ends === 'after' && (
