@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { generateTokenPair } from '../../utils/jwt.js';
+import { refreshTokenService } from '../RefreshTokenService.js';
 
 // Mock database module
 const mockQuery = vi.fn();
@@ -24,6 +25,7 @@ vi.mock('../../utils/jwt.js', () => ({
 vi.mock('../RefreshTokenService.js', () => ({
   refreshTokenService: {
     storeRefreshToken: vi.fn(),
+    invalidateAllUserTokens: vi.fn(),
   },
 }));
 
@@ -284,14 +286,30 @@ describe('AuthService', () => {
 
   describe('updatePassword', () => {
     it('should update user password', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      // updatePassword now does UPDATE ... RETURNING email, role, then revokes
+      // every existing session and re-mints a token pair for the caller.
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ email: 'test@example.com', role: 'user' }],
+        rowCount: 1,
+      });
 
-      await authService.updatePassword('user-123', 'NewPassword123!');
+      const tokens = await authService.updatePassword(
+        'user-123',
+        'NewPassword123!'
+      );
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE users SET password'),
         [expect.any(String), 'user-123']
       );
+      expect(refreshTokenService.invalidateAllUserTokens).toHaveBeenCalledWith(
+        'user-123'
+      );
+      expect(tokens).toEqual({
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+        expiresAt: expect.any(Number),
+      });
     });
   });
 

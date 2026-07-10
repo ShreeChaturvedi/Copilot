@@ -85,8 +85,12 @@ describe.skipIf(!dbAvailable)('L3 attachments + upload contracts', () => {
       expect(r.body.error?.message).toContain('BLOB_READ_WRITE_TOKEN');
     });
 
-    it('400 "Empty body" for an empty PUT (body length check runs before the blob check)', async () => {
+    it('400 "Empty body" for an empty authenticated PUT (body length check runs before the blob check)', async () => {
+      // Auth (requireAuth: true) now runs before the body/blob checks, so the
+      // request must carry a valid token to reach the empty-body branch at
+      // upload/index.ts:62-68 (an unauthenticated PUT 401s first).
       const r = await req<Envelope>('PUT', '/api/upload?filename=empty.bin', {
+        token: user.accessToken,
         headers: { 'Content-Type': 'application/octet-stream' },
       });
       expect(r.status).toBe(400);

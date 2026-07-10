@@ -24,6 +24,15 @@ import {
 interface Envelope<T = unknown> {
   success: boolean;
   data?: T;
+  meta?: {
+    timestamp?: string;
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
   error?: {
     code: string;
     message: string;
@@ -58,7 +67,7 @@ interface Task {
   updatedAt: string;
 }
 
-type TaskList = Envelope<{ data: Task[] }>;
+type TaskList = Envelope<Task[]>;
 
 describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
   let server: TestServer;
@@ -154,14 +163,14 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
   });
 
   describe('GET /api/tasks (list, filters, pagination)', () => {
-    it('default list is wrapped as data.data (tasks.ts:184-186 handles the double nest)', async () => {
+    it('default list returns a bare array in data (tasks.ts:184-186 unwrap)', async () => {
       const r = await req<TaskList>('GET', '/api/tasks', {
         token: user.accessToken,
       });
       expect(r.status).toBe(200);
-      expect(Array.isArray(r.body.data?.data)).toBe(true);
+      expect(Array.isArray(r.body.data)).toBe(true);
       // Only this user's rows ever appear.
-      for (const t of r.body.data!.data) expect(t.userId).toBe(user.userId);
+      for (const t of r.body.data!) expect(t.userId).toBe(user.userId);
     });
 
     it('completed/priority/search filters apply server-side', async () => {
@@ -175,22 +184,20 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
       const done = await req<TaskList>('GET', '/api/tasks?completed=true', {
         token: u.accessToken,
       });
-      expect(done.body.data!.data.map((t) => t.title)).toEqual([
-        'L3 other banana',
-      ]);
+      expect(done.body.data!.map((t) => t.title)).toEqual(['L3 other banana']);
 
       const high = await req<TaskList>('GET', '/api/tasks?priority=HIGH', {
         token: u.accessToken,
       });
-      expect(high.body.data!.data.map((t) => t.title)).toEqual([
+      expect(high.body.data!.map((t) => t.title)).toEqual([
         'L3 grep needle apple',
       ]);
 
       const search = await req<TaskList>('GET', '/api/tasks?search=needle', {
         token: u.accessToken,
       });
-      expect(search.body.data!.data).toHaveLength(1);
-      expect(search.body.data!.data[0].title).toContain('needle');
+      expect(search.body.data!).toHaveLength(1);
+      expect(search.body.data![0].title).toContain('needle');
     });
 
     it('tags filter matches tag name', async () => {
@@ -217,29 +224,23 @@ describe.skipIf(!dbAvailable)('L3 tasks contracts', () => {
         `/api/tasks?tags=${encodeURIComponent(tagName)}`,
         { token: u.accessToken }
       );
-      expect(r.body.data!.data.map((t) => t.title)).toEqual([
-        'Tagged for filter',
-      ]);
+      expect(r.body.data!.map((t) => t.title)).toEqual(['Tagged for filter']);
     });
 
-    it('pagination (page/limit) returns {data, pagination:{page,limit,total,totalPages}}', async () => {
+    it('pagination (page/limit) returns {data: Task[], meta:{pagination:{page,limit,total,totalPages}}}', async () => {
       const u = await registerUser(req);
       for (let i = 0; i < 3; i++)
         await createTask({ title: `Page task ${i}` }, u);
-      const r = await req<
-        Envelope<{
-          data: Task[];
-          pagination: {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-          };
-        }>
-      >('GET', '/api/tasks?page=1&limit=2', { token: u.accessToken });
+      const r = await req<Envelope<Task[]>>(
+        'GET',
+        '/api/tasks?page=1&limit=2',
+        {
+          token: u.accessToken,
+        }
+      );
       expect(r.status).toBe(200);
-      expect(r.body.data!.data).toHaveLength(2);
-      expect(r.body.data!.pagination).toEqual({
+      expect(r.body.data!).toHaveLength(2);
+      expect(r.body.meta!.pagination).toEqual({
         page: 1,
         limit: 2,
         total: 3,
