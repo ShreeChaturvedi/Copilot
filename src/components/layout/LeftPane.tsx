@@ -12,6 +12,7 @@ import React, {
   Suspense,
 } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { EASE_SETTLE, DUR_3_S } from '@/lib/motion';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 // Lazy load SmartTaskInput to code-split the 405KB bundle
@@ -52,7 +53,7 @@ export interface LeftPaneProps {
 }
 
 const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
-  const { currentView } = useUIStore();
+  const currentView = useUIStore((s) => s.currentView);
 
   // Track today so the mini calendar keeps today's highlight updated without reload
   const [today, setToday] = useState<Date>(() => new Date());
@@ -138,7 +139,17 @@ const LeftPaneComponent: React.FC<LeftPaneProps> = ({ className }) => {
     leftSmartInputTaskListId,
     setLeftSmartInputTaskListId,
     showSidebarTaskAnalytics,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((s) => ({
+      calendarViewInputExpanded: s.calendarViewInputExpanded,
+      toggleCalendarViewInput: s.toggleCalendarViewInput,
+      taskViewMiniCalendarExpanded: s.taskViewMiniCalendarExpanded,
+      toggleTaskViewMiniCalendar: s.toggleTaskViewMiniCalendar,
+      leftSmartInputTaskListId: s.leftSmartInputTaskListId,
+      setLeftSmartInputTaskListId: s.setLeftSmartInputTaskListId,
+      showSidebarTaskAnalytics: s.showSidebarTaskAnalytics,
+    }))
+  );
 
   // Sync persisted SmartTaskInput list selection to TaskList active selection on load
   useEffect(() => {

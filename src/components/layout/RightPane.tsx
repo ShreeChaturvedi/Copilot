@@ -34,7 +34,8 @@ export const RightPane = ({
   const calendarRef = externalCalendarRef || internalCalendarRef;
   const [currentView, setCurrentView] =
     useState<CalendarViewType>('timeGridWeek');
-  const { calendarSubView, setCalendarSubView } = useSettingsStore();
+  const calendarSubView = useSettingsStore((s) => s.calendarSubView);
+  const setCalendarSubView = useSettingsStore((s) => s.setCalendarSubView);
 
   // Initialize calendar sub-view from settings on mount and when settings change
   useEffect(() => {

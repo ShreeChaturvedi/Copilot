@@ -74,10 +74,14 @@ export class SmartParser {
 
     for (const parser of this.parsers) {
       try {
-        if (parser.test(text)) {
-          const tags = parser.parse(text);
-          allTags.push(...tags);
-        }
+        // Call parse() directly without the parser.test() pre-gate. Each
+        // parse() already returns [] when nothing matches, so the gate bought
+        // nothing but doubled the cost of the two heaviest parsers (chrono and
+        // compromise each ran their full pipeline once in test() and again in
+        // parse()). It also let a stateful global-regex lastIndex in test()
+        // wrongly veto a real match.
+        const tags = parser.parse(text);
+        allTags.push(...tags);
       } catch (error) {
         console.warn(`Parser ${parser.id} failed:`, error);
       }

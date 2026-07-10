@@ -104,7 +104,7 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
   const [inputText, setInputText] = useState('');
 
   // Initialize text parser
-  const { error, tags, confidence, clear } = useTextParser(inputText, {
+  const { tags, confidence, clear } = useTextParser(inputText, {
     enabled: enableSmartParsing,
     debounceMs: parsingOptions.debounceMs || 100,
     minLength: parsingOptions.minLength || 2,
@@ -303,12 +303,19 @@ export const SmartTaskInput: React.FC<SmartTaskInputProps> = ({
         />
       )}
 
-      {/* Error Display */}
-      {error && enableSmartParsing && (
-        <div className="text-sm text-destructive px-1">
-          Parsing error: {error}
-        </div>
-      )}
+      {/* Announce parse results to screen readers -- the chips are sight-only. */}
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {showTags
+          ? `${tags.length} tag${tags.length === 1 ? '' : 's'} detected: ${tags
+              .map((t) => t.displayText)
+              .join(', ')}`
+          : ''}
+      </div>
     </div>
   );
 };

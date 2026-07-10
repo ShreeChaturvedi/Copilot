@@ -6,6 +6,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import { useUIStore } from '@/stores/uiStore';
@@ -54,11 +55,18 @@ export const BaseSidebarPane: React.FC<BaseSidebarPaneProps> = ({
   onViewToggle,
   onOpenSettings,
 }) => {
-  const { currentView, setCurrentView } = useUIStore();
+  // Field selectors, not a whole-store read, so this pane doesn't re-render on
+  // unrelated uiStore changes.
+  const currentView = useUIStore((s) => s.currentView);
+  const setCurrentView = useUIStore((s) => s.setCurrentView);
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const handleViewToggle = (view: ViewMode) => {
     setCurrentView(view);
     onViewToggle?.(view);
+    // On mobile the sidebar is an offcanvas drawer covering the content the
+    // user just switched to — dismiss it so a view toggle reads as navigation.
+    if (isMobile) setOpenMobile(false);
   };
 
   // Default header content (controls only, no branding)

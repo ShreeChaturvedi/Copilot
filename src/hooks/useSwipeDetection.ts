@@ -1,4 +1,4 @@
-import { useState, TouchEvent, useRef, useCallback } from 'react';
+import { TouchEvent, useRef, useCallback } from 'react';
 
 interface SwipeInput {
   onSwipedLeft: () => void;
@@ -17,11 +17,12 @@ interface SwipeOutput {
  * Supports both touch devices (mobile) and trackpad (desktop)
  */
 export const useSwipeDetection = (input: SwipeInput): SwipeOutput => {
-  // Touch tracking state
-  const [touchStartX, setTouchStartX] = useState(0);
-  const [touchStartY, setTouchStartY] = useState(0);
-  const [touchEndX, setTouchEndX] = useState(0);
-  const [touchEndY, setTouchEndY] = useState(0);
+  // Touch tracking in refs — these are only read in onTouchEnd, so updating
+  // them per touch-move frame must never trigger a re-render of the caller.
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchEndX = useRef(0);
+  const touchEndY = useRef(0);
 
   // Simple debounce for wheel events
   const lastWheelTime = useRef(0);
@@ -29,24 +30,24 @@ export const useSwipeDetection = (input: SwipeInput): SwipeOutput => {
   const minSwipeDistance = 50;
   const wheelDebounceMs = 300;
 
-  const onTouchStart = (e: TouchEvent) => {
-    setTouchEndX(0);
-    setTouchEndY(0);
-    setTouchStartX(e.targetTouches[0].clientX);
-    setTouchStartY(e.targetTouches[0].clientY);
-  };
+  const onTouchStart = useCallback((e: TouchEvent) => {
+    touchEndX.current = 0;
+    touchEndY.current = 0;
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
+  }, []);
 
-  const onTouchMove = (e: TouchEvent) => {
-    setTouchEndX(e.targetTouches[0].clientX);
-    setTouchEndY(e.targetTouches[0].clientY);
-  };
+  const onTouchMove = useCallback((e: TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+    touchEndY.current = e.targetTouches[0].clientY;
+  }, []);
 
-  const onTouchEnd = () => {
-    if (!touchStartX || !touchEndX) return;
-    
-    const distanceX = touchStartX - touchEndX;
-    const distanceY = Math.abs(touchStartY - touchEndY);
-    
+  const onTouchEnd = useCallback(() => {
+    if (!touchStartX.current || !touchEndX.current) return;
+
+    const distanceX = touchStartX.current - touchEndX.current;
+    const distanceY = Math.abs(touchStartY.current - touchEndY.current);
+
     const isLeftSwipe = distanceX > minSwipeDistance;
     const isRightSwipe = distanceX < -minSwipeDistance;
 
@@ -57,35 +58,43 @@ export const useSwipeDetection = (input: SwipeInput): SwipeOutput => {
     if (isRightSwipe && Math.abs(distanceX) > distanceY) {
       input.onSwipedRight();
     }
-  };
+  }, [input]);
 
-  const onWheel = useCallback((e: WheelEvent) => {
-    const now = Date.now();
-    
-    // Simple debounce to prevent multiple rapid triggers
-    if (now - lastWheelTime.current < wheelDebounceMs) {
-      return;
-    }
+  const onWheel = useCallback(
+    (e: WheelEvent) => {
+      const now = Date.now();
 
-    // Only handle horizontal wheel events (trackpad horizontal swipes)
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 10) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      lastWheelTime.current = now;
-      
-      if (e.deltaX > 0) {
-        input.onSwipedLeft(); // Swipe left = next
-      } else {
-        input.onSwipedRight(); // Swipe right = prev
+      // Simple debounce to prevent multiple rapid triggers
+      if (now - lastWheelTime.current < wheelDebounceMs) {
+        return;
       }
-    }
-  }, [input, wheelDebounceMs]);
+
+      // Only navigate on a deliberate horizontal fling: the delta must be
+      // large AND decisively dominate the vertical component, so a slightly
+      // diagonal two-finger scroll never hijacks the period (#17/#20/#32).
+      if (
+        Math.abs(e.deltaX) > 60 &&
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) * 2.5
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        lastWheelTime.current = now;
+
+        if (e.deltaX > 0) {
+          input.onSwipedLeft(); // Swipe left = next
+        } else {
+          input.onSwipedRight(); // Swipe right = prev
+        }
+      }
+    },
+    [input]
+  );
 
   return {
     onTouchStart,
     onTouchMove,
     onTouchEnd,
-    onWheel
+    onWheel,
   };
 };

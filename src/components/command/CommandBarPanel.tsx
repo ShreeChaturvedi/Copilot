@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Command } from 'cmdk';
-import { CalendarClock, Search, SearchX } from 'lucide-react';
+import { CalendarClock, Search, SearchX, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCommandBarStore } from '@/stores/commandBarStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -13,17 +13,18 @@ import {
   actionNewEvent,
   actionNewTask,
   actionOpenAppView,
+  actionOpenProfile,
   actionOpenSettings,
   actionSetCalendarView,
+  actionToggleSidebar,
   actionToggleTheme,
+  getIsMac,
 } from './actions';
 import { parseDateGrammar } from './dateGrammar';
 import { commandFilter } from './commandFilter';
 import './command-bar.css';
 
-const isMac =
-  typeof navigator !== 'undefined' &&
-  navigator.platform.toUpperCase().includes('MAC');
+const isMac = getIsMac();
 
 /**
  * The Cmd+K palette (design-brief §4.6). Commands are real app capabilities;
@@ -37,10 +38,14 @@ export default function CommandBarPanel() {
   const { addTask } = useTasks();
   const [query, setQuery] = useState('');
   const [isPlacing, setIsPlacing] = useState(false);
+  // Element focused before the palette opened, restored on close so keyboard
+  // and screen-reader users don't get dropped onto <body>.
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   // Fresh input every open
   useEffect(() => {
     if (open) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
       setQuery('');
       setIsPlacing(false);
     }
@@ -60,6 +65,8 @@ export default function CommandBarPanel() {
         openAppView: actionOpenAppView,
         toggleTheme: actionToggleTheme,
         openSettings: actionOpenSettings,
+        openProfile: actionOpenProfile,
+        toggleSidebar: actionToggleSidebar,
       }),
     [resolvedTheme]
   );
@@ -91,7 +98,13 @@ export default function CommandBarPanel() {
         <DialogPrimitive.Content
           className="tf-cmdk-panel tf-cmdk"
           aria-describedby={undefined}
-          onCloseAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => {
+            // Restore focus to the element that opened the palette (the store
+            // opens it from arbitrary contexts, so Radix's default return is
+            // unreliable; capture-on-open is the robust path).
+            e.preventDefault();
+            restoreFocusRef.current?.focus?.();
+          }}
         >
           <DialogPrimitive.Title className="sr-only">
             Command menu
@@ -105,6 +118,16 @@ export default function CommandBarPanel() {
                 placeholder="Type a command or a task with a time"
                 autoFocus
               />
+              {/* Touch devices have no Esc key; the scrim is the only other
+                  dismiss. Shown only under a coarse pointer via CSS. */}
+              <button
+                type="button"
+                className="tf-cmdk-close"
+                aria-label="Close command menu"
+                onClick={close}
+              >
+                <X aria-hidden />
+              </button>
             </div>
             <Command.List>
               <Command.Empty>

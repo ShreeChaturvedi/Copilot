@@ -120,7 +120,10 @@ export const HighlightedTextareaField: React.FC<
   }, [value, autoResize]);
 
   const highlightedHTML = useMemo(
-    () => buildHighlightedHtml(value, tags, { newlineToBr: true }),
+    // No newlineToBr: the overlay uses `white-space: pre-wrap`, so real
+    // newlines and consecutive spaces render exactly as the textarea lays them
+    // out (a <br> would double-count against pre-wrap and drift the marks).
+    () => buildHighlightedHtml(value, tags),
     [value, tags]
   );
 
@@ -254,6 +257,10 @@ export const HighlightedTextareaField: React.FC<
           'w-full',
           // Typography matching
           'text-foreground leading-relaxed',
+          // Preserve spaces and wrap exactly like the textarea, so highlight
+          // marks stay under the characters they describe (default `normal`
+          // collapses runs of spaces and wraps at different points).
+          'whitespace-pre-wrap break-words',
           // Scrolling and overflow
           'overflow-hidden',
           // Ensure it's behind the textarea
@@ -269,8 +276,6 @@ export const HighlightedTextareaField: React.FC<
           fontSize: 'inherit',
           lineHeight: 'inherit',
           letterSpacing: 'inherit',
-          // Match text rendering
-          textRendering: 'optimizeLegibility',
           // Ensure exact alignment
           boxSizing: 'border-box',
           // Match textarea dimensions

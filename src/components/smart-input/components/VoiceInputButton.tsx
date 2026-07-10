@@ -276,6 +276,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             variant="ghost"
             size="sm"
             disabled
+            aria-label="Voice input not supported"
             className={cn(
               sizeClasses[size],
               'p-0 text-muted-foreground',
@@ -302,12 +303,22 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleListening}
           disabled={disabled}
+          aria-label={
+            permissionDenied
+              ? 'Microphone access denied'
+              : isListening
+                ? 'Stop recording'
+                : 'Start voice input'
+          }
+          aria-pressed={isListening}
           className={cn(
             sizeClasses[size],
-            'p-0 transition-all duration-200',
+            'p-0 transition-colors duration-[var(--dur-3)]',
             isListening && [
               'bg-destructive hover:bg-destructive/90 text-white',
-              'animate-pulse',
+              // motion-safe: continuous pulse is decorative; suppress it under
+              // prefers-reduced-motion (the Square icon + fill still signal state).
+              'motion-safe:animate-pulse',
             ],
             permissionDenied && 'text-destructive',
             className
@@ -340,6 +351,16 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
           )}
         </div>
       </TooltipContent>
+
+      {/* Announce recording start/stop and errors to assistive tech: the
+          tooltip only wires a description while open, never the live state. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {error
+          ? error
+          : isListening
+            ? 'Recording. Speak now.'
+            : 'Voice input idle'}
+      </span>
     </Tooltip>
   );
 };

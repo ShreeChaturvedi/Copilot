@@ -156,7 +156,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           <div className="mt-2">
             <div className="w-full bg-muted rounded-full h-1">
               <div
-                className="bg-primary h-1 rounded-full transition-all duration-300"
+                className="bg-primary h-1 rounded-full transition-[width] duration-[var(--dur-4)]"
                 style={{ width: `${file.uploadProgress}%` }}
               />
             </div>

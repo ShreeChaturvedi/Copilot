@@ -52,6 +52,15 @@ export interface GoogleSyncStats {
   pages: number;
 }
 
+/** Outbox drain totals for a sync cycle (M2 outbound push). */
+export interface GoogleOutboundStats {
+  due: number;
+  succeeded: number;
+  conflicts: number;
+  dropped: number;
+  retried: number;
+}
+
 export interface GoogleUserSyncResult {
   userId: string;
   links: Array<{
@@ -60,6 +69,10 @@ export interface GoogleUserSyncResult {
     stats?: GoogleSyncStats;
     error?: string;
   }>;
+  /** Outbound (local -> Google) push totals for the cycle. */
+  outbound?: GoogleOutboundStats;
+  /** Set when the outbox drain failed to push local changes to Google. */
+  outboundError?: string;
 }
 
 const apiBase = '/api/google';

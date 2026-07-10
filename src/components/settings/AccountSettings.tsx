@@ -68,8 +68,12 @@ export function AccountSettings() {
     mode: 'onChange',
   });
 
-  // Keep form in sync if profile rehydrates from outside.
+  // Keep form in sync if profile rehydrates from outside — but never while the
+  // user is mid-edit, or an external store update (or the post-save updateUser)
+  // during the debounce/network window would clobber in-flight keystrokes and
+  // jump the caret.
   useEffect(() => {
+    if (form.formState.isDirty) return;
     form.reset({
       name: formData.name,
       bio: formData.bio,
@@ -298,10 +302,10 @@ export function AccountSettings() {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
-                    void persist({
-                      ...form.getValues(),
-                      timezone: v,
-                    });
+                    // Route through the same validated + isDirty-guarded path as
+                    // name/bio so an invalid name can't be persisted and an
+                    // unchanged timezone doesn't fire a no-op write.
+                    flushSave();
                   }}
                 >
                   <FormControl>

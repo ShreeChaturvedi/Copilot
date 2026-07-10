@@ -8,7 +8,8 @@ import {
   Suspense,
 } from 'react';
 import { useIsFetching } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { EASE_SETTLE, DUR_3_S } from '@/lib/motion';
 const LeftPane = lazy(async () => ({
   default: (await import('./LeftPane')).LeftPane,
@@ -64,9 +65,23 @@ const MainContent = ({ children }: { children?: ReactNode }) => {
 };
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { currentView, dragState, setCurrentView } = useUIStore();
-  const { logout } = useAuthStore();
-  const { sidebarExpanded, appViewMode } = useSettingsStore();
+  // Field selectors (not whole-store reads) so this always-mounted shell root
+  // only re-renders on the fields it actually uses, not on any unrelated
+  // uiStore/settings change.
+  const { currentView, dragState, setCurrentView } = useUIStore(
+    useShallow((s) => ({
+      currentView: s.currentView,
+      dragState: s.dragState,
+      setCurrentView: s.setCurrentView,
+    }))
+  );
+  const logout = useAuthStore((s) => s.logout);
+  const { sidebarExpanded, appViewMode } = useSettingsStore(
+    useShallow((s) => ({
+      sidebarExpanded: s.sidebarExpanded,
+      appViewMode: s.appViewMode,
+    }))
+  );
 
   // Apply the user's saved preferences (theme, default view, week start) on load
   usePreferencesSync();
@@ -112,72 +127,76 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   }, []);
 
   return (
-    <SidebarProvider defaultOpen={sidebarExpanded}>
-      <TopProgressBar />
-      <div
-        className={cn(
-          'h-screen w-screen overflow-hidden bg-background flex',
-          dragState?.isDragging && 'select-none'
-        )}
-        data-view={currentView}
-        data-dragging={dragState?.isDragging}
-        style={{ overscrollBehavior: 'none' }}
-      >
-        {/* LEFT SIDEBAR - Always rendered */}
-        <Suspense fallback={null}>
-          <LeftPane />
-        </Suspense>
-
-        {/* MAIN CONTENT - The View Settle: Calendar⟷Tasks resolves on the
-            shared --ease-settle entrance curve instead of a hard cut. */}
-        <AnimatePresence mode="wait" initial={false}>
-          {currentView === 'task' ? (
-            <motion.div
-              key="task"
-              className="flex-1 min-w-0 flex flex-col"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
-            >
-              <Suspense fallback={null}>
-                <TaskFocusPane />
-              </Suspense>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="calendar"
-              className="flex flex-col flex-1 min-w-0"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
-            >
-              <MainContent children={children} />
-            </motion.div>
+    <MotionConfig reducedMotion="user">
+      <SidebarProvider defaultOpen={sidebarExpanded}>
+        <TopProgressBar />
+        <div
+          className={cn(
+            'h-dvh w-full overflow-hidden bg-background flex',
+            dragState?.isDragging && 'select-none'
           )}
-        </AnimatePresence>
+          data-view={currentView}
+          data-dragging={dragState?.isDragging}
+          style={{ overscrollBehavior: 'none' }}
+        >
+          {/* LEFT SIDEBAR - Always rendered */}
+          <Suspense fallback={null}>
+            <LeftPane />
+          </Suspense>
 
-        {/* Cmd+K command bar */}
-        <CommandBar />
+          {/* MAIN CONTENT - The View Settle: Calendar⟷Tasks resolves on the
+            shared --ease-settle entrance curve instead of a hard cut. */}
+          <AnimatePresence mode="wait" initial={false}>
+            {currentView === 'task' ? (
+              <motion.div
+                key="task"
+                className="flex-1 min-w-0 flex flex-col"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+              >
+                <Suspense fallback={null}>
+                  <TaskFocusPane />
+                </Suspense>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="calendar"
+                className="flex flex-col flex-1 min-w-0"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: DUR_3_S, ease: EASE_SETTLE }}
+              >
+                <MainContent children={children} />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Settings Dialog */}
-        <Suspense fallback={null}>
-          <SettingsDialog
-            open={isSettingsOpen}
-            onOpenChange={closeSettings}
-            defaultSection={currentSection}
-          />
-        </Suspense>
-      </div>
-    </SidebarProvider>
+          {/* Cmd+K command bar */}
+          <CommandBar />
+
+          {/* Settings Dialog */}
+          <Suspense fallback={null}>
+            <SettingsDialog
+              open={isSettingsOpen}
+              onOpenChange={closeSettings}
+              defaultSection={currentSection}
+            />
+          </Suspense>
+        </div>
+      </SidebarProvider>
+    </MotionConfig>
   );
 };
 
 /**
  * TopProgressBar renders a minimal, smooth, reactive loading indicator at the very top of the page.
  * It tracks both ongoing queries and mutations from TanStack Query and derives a progress value
- * that advances smoothly while work is in flight, then completes and fades quickly.
+ * that advances smoothly while work is in flight, then completes and fades quickly. It reflects
+ * every fetch cycle for the app's lifetime (view switches, range refetches, mutations), not just
+ * the first load.
  */
 const TopProgressBar = () => {
   const fetchingCount = useIsFetching();
@@ -186,8 +205,7 @@ const TopProgressBar = () => {
   const [progress, setProgress] = useState(0); // 0..1
   const [visible, setVisible] = useState(false);
   const [startInFlight, setStartInFlight] = useState(0); // frozen baseline for this cycle
-  const [initialPhase, setInitialPhase] = useState(true); // only show during initial load
-  const [initialStarted, setInitialStarted] = useState(false);
+  const [started, setStarted] = useState(false); // work started in the current cycle
   const [isFinishing, setIsFinishing] = useState(false);
 
   const inFlight = fetchingCount;
@@ -202,19 +220,20 @@ const TopProgressBar = () => {
     return reservedHeadroom + fraction * (0.9 - reservedHeadroom); // maps to [0.1 .. 0.9]
   }, [visible, startInFlight, inFlight]);
 
-  // Start/stop visibility and manage life-cycle around work starting/ending
+  // Start/stop visibility and manage life-cycle around work starting/ending.
+  // Re-arms every cycle: when the current cycle finishes it resets startInFlight
+  // to 0 so the next 0→>0 transition picks a fresh baseline and shows again.
   useEffect(() => {
-    if (!initialPhase) return;
     if (inFlight > 0) {
-      // Initial work started or ongoing
+      // Work started or ongoing
       setVisible(true);
       setIsFinishing(false);
-      setInitialStarted(true);
+      setStarted(true);
       setStartInFlight((prev) => (prev === 0 ? inFlight : prev));
       // Kick progress if it is at rest
       setProgress((prev) => (prev === 0 ? 0.04 : prev));
-    } else if (visible && initialStarted) {
-      // Initial work finished
+    } else if (visible && started) {
+      // Work finished
       setIsFinishing(true);
       setProgress(1);
       // Fade out shortly after hitting 100%
@@ -223,16 +242,15 @@ const TopProgressBar = () => {
         setIsFinishing(false);
         setProgress(0);
         setStartInFlight(0);
-        setInitialStarted(false);
-        setInitialPhase(false); // disable for subsequent API calls
+        setStarted(false);
       }, 220);
       return () => window.clearTimeout(fadeTimer);
     }
-  }, [inFlight, visible, initialPhase, initialStarted]);
+  }, [inFlight, visible, started]);
 
   // rAF-driven smoother with EMA towards target; monotonic, low-jitter
   useEffect(() => {
-    if (!visible || !initialPhase || inFlight <= 0) return;
+    if (!visible || inFlight <= 0) return;
     let raf = 0;
     const tick = () => {
       setProgress((prev) => {
@@ -253,13 +271,13 @@ const TopProgressBar = () => {
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [visible, initialPhase, inFlight, targetProgress]);
+  }, [visible, inFlight, targetProgress]);
 
   // Ensure we never regress on abrupt target changes
   useEffect(() => {
-    if (!visible || !initialPhase) return;
+    if (!visible) return;
     setProgress((prev) => (targetProgress > prev ? targetProgress : prev));
-  }, [targetProgress, visible, initialPhase]);
+  }, [targetProgress, visible]);
 
   if (!visible && progress === 0) return null;
 
@@ -273,7 +291,12 @@ const TopProgressBar = () => {
   return (
     <div
       className="fixed top-0 left-0 right-0 h-[3px] z-50 pointer-events-none"
-      aria-hidden
+      role="progressbar"
+      aria-label="Loading"
+      aria-busy={visible && !isFinishing}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress * 100)}
     >
       <div
         className="h-full rounded-sm relative overflow-hidden"

@@ -12,6 +12,41 @@ export const APP_EVENT_NEW_TASK = 'app:new-task';
 export const APP_EVENT_CALENDAR_TODAY = 'app:calendar-today';
 export const APP_EVENT_OPEN_SETTINGS = 'app:open-settings';
 
+/**
+ * Keyboard-initiated actions never animate (design-brief §5): flag the
+ * document for a short window so CSS can suppress the view-switcher slider
+ * transition (`[data-kbd-nav] .view-switcher-slider { transition: none }`).
+ * Shared by both keyboard hooks so the Task-view path (which routes through
+ * these actions) suppresses the slider the same way the calendar path does.
+ */
+export function withKbdNav(fn: () => void) {
+  document.documentElement.setAttribute('data-kbd-nav', '');
+  try {
+    fn();
+  } finally {
+    window.setTimeout(() => {
+      document.documentElement.removeAttribute('data-kbd-nav');
+    }, 250);
+  }
+}
+
+/**
+ * Best-effort Mac detection, preferring the non-deprecated UA Client Hints
+ * platform over the deprecated `navigator.platform`. One shared source so the
+ * palette and the shortcut cheatsheet never render mismatched ⌘/Ctrl keycaps.
+ */
+export function getIsMac(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const uaPlatform = (
+    navigator as Navigator & { userAgentData?: { platform?: string } }
+  ).userAgentData?.platform;
+  if (uaPlatform) return /mac/i.test(uaPlatform);
+  return /mac/i.test(navigator.userAgent);
+}
+
+/** The platform modifier glyph used in keycap hints. */
+export const getModKey = (): string => (getIsMac() ? '⌘' : 'Ctrl');
+
 /** Open the task-creation input (enhanced input in the task view). */
 export function actionNewTask() {
   const ui = useUIStore.getState();
@@ -51,6 +86,20 @@ export function actionSetCalendarView(view: CalendarSubView) {
 /** Switch between the calendar and tasks app views. */
 export function actionOpenAppView(view: 'calendar' | 'task') {
   useUIStore.getState().setCurrentView(view);
+}
+
+/** Open the Account settings section (the former ⌘P profile target). */
+export function actionOpenProfile() {
+  window.dispatchEvent(
+    new CustomEvent(APP_EVENT_OPEN_SETTINGS, {
+      detail: { section: 'account' },
+    })
+  );
+}
+
+/** Collapse/expand the main sidebar. */
+export function actionToggleSidebar() {
+  useSettingsStore.getState().toggleSidebar();
 }
 
 /** Toggle light/dark theme via the theme store. */

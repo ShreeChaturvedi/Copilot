@@ -14,10 +14,12 @@ import {
   LayoutGrid,
   List,
   Moon,
+  PanelLeft,
   Plus,
   RectangleVertical,
   Settings,
   Sun,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react';
 import type { CalendarSubView } from '@/stores/settingsStore';
@@ -44,6 +46,8 @@ export interface AppCommandDeps {
   openAppView: (view: 'calendar' | 'task') => void;
   toggleTheme: () => void;
   openSettings: () => void;
+  openProfile?: () => void;
+  toggleSidebar?: () => void;
 }
 
 export function buildAppCommands(deps: AppCommandDeps): AppCommand[] {
@@ -128,6 +132,14 @@ export function buildAppCommands(deps: AppCommandDeps): AppCommand[] {
       run: () => deps.setCalendarView('listWeek'),
     },
     {
+      id: 'toggle-sidebar',
+      group: 'View',
+      label: 'Toggle sidebar',
+      icon: PanelLeft,
+      keywords: ['sidebar', 'panel', 'collapse', 'expand', 'hide'],
+      run: () => deps.toggleSidebar?.(),
+    },
+    {
       id: 'toggle-theme',
       group: 'Preferences',
       label:
@@ -139,12 +151,20 @@ export function buildAppCommands(deps: AppCommandDeps): AppCommand[] {
       run: deps.toggleTheme,
     },
     {
+      id: 'open-profile',
+      group: 'Preferences',
+      label: 'Open profile',
+      icon: UserCog,
+      keywords: ['account', 'profile', 'me', 'user'],
+      run: () => deps.openProfile?.(),
+    },
+    {
       id: 'open-settings',
       group: 'Preferences',
       label: 'Open settings',
       icon: Settings,
       keys: [mod, ','],
-      keywords: ['preferences', 'options', 'profile'],
+      keywords: ['preferences', 'options'],
       run: deps.openSettings,
     },
   ];

@@ -325,8 +325,12 @@ describe('HighlightedTextareaField - Comprehensive Tests', () => {
       ) as HTMLDivElement;
       expect(overlay).toBeInTheDocument();
 
-      // Check that overlay content includes line breaks
-      expect(overlay.innerHTML).toContain('<br>');
+      // Newlines render via CSS `white-space: pre-wrap` on the overlay, not
+      // converted <br> tags: real "\n" is preserved literally and the
+      // container carries the pre-wrap class.
+      expect(overlay.className).toContain('whitespace-pre-wrap');
+      expect(overlay.innerHTML).not.toContain('<br>');
+      expect(overlay.innerHTML).toContain('\n');
 
       // Check that highlighted spans are present, each carrying its type's
       // tone (theme tokens in smart-tags.css, not a per-instance hex)
@@ -379,8 +383,11 @@ describe('HighlightedTextareaField - Comprehensive Tests', () => {
         '[aria-hidden="true"]'
       ) as HTMLDivElement;
 
-      // Should have proper line breaks and highlighting
-      expect(overlay.innerHTML).toContain('<br>');
+      // Newlines are preserved literally under pre-wrap (no <br>), and the
+      // highlight spans still render at the line boundaries.
+      expect(overlay.className).toContain('whitespace-pre-wrap');
+      expect(overlay.innerHTML).not.toContain('<br>');
+      expect(overlay.innerHTML).toContain('\n');
       expect(overlay.innerHTML).toContain('inline-highlight-span');
     });
 

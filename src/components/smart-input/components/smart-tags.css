@@ -43,7 +43,7 @@
    "recognized" via fill. Slightly quieter than the badge since this sits
    inside flowing text, not as a standalone chip. */
 .inline-highlight-span {
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0 1px;
   color: inherit;
   transition: background-color var(--dur-2) var(--ease-out);

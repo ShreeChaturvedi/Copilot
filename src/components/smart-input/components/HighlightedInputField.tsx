@@ -228,8 +228,6 @@ export const HighlightedInputField: React.FC<HighlightedInputFieldProps> = ({
             fontSize: 'inherit',
             lineHeight: 'inherit',
             letterSpacing: 'inherit',
-            // Match text rendering
-            textRendering: 'optimizeLegibility',
             // Ensure exact alignment
             boxSizing: 'border-box',
           }}

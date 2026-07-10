@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ParsedTag } from '@shared/types';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,10 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
     typeof maxTags === 'number' && maxTags > 0 ? tags.slice(0, maxTags) : tags;
   const hiddenCount = tags.length - displayTags.length;
 
+  // Degrade the scale-in/out under prefers-reduced-motion: fade only, no
+  // transform (SETTLE motion grammar requires everything to degrade).
+  const reduceMotion = useReducedMotion();
+
   if (displayTags.length === 0) {
     return null;
   }
@@ -59,18 +63,27 @@ export const ParsedTags: React.FC<ParsedTagsProps> = ({
         {displayTags.map((tag) => (
           <motion.span
             key={tag.id}
-            layout
-            initial={{ opacity: 0, scale: 0.92 }}
+            layout={!reduceMotion}
+            initial={
+              reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }
+            }
             animate={{
               opacity: 1,
               scale: 1,
               transition: { duration: DUR_2_S, ease: EASE_SETTLE },
             }}
-            exit={{
-              opacity: 0,
-              scale: 0.92,
-              transition: { duration: DUR_1_S, ease: EASE_OUT },
-            }}
+            exit={
+              reduceMotion
+                ? {
+                    opacity: 0,
+                    transition: { duration: DUR_1_S, ease: EASE_OUT },
+                  }
+                : {
+                    opacity: 0,
+                    scale: 0.92,
+                    transition: { duration: DUR_1_S, ease: EASE_OUT },
+                  }
+            }
           >
             <TagBadge
               tag={tag}

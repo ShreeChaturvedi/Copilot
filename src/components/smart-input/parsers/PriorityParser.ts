@@ -23,23 +23,23 @@ export class PriorityParser implements Parser {
       level: 'high',
       confidence: 0.85,
     },
-    { pattern: /\bhigh\b/gi, level: 'high', confidence: 0.75 },
 
-    // Medium priority keywords
+    // Medium priority keywords. Bare single-word "high/medium/low" removed:
+    // they matched everyday English ("high chair", "medium roast", "low
+    // battery") and, above the 0.6 fade threshold, silently set task priority.
     {
       pattern: /\b(medium priority|normal priority|moderate)\b/gi,
       level: 'medium',
       confidence: 0.8,
     },
-    { pattern: /\bmedium\b/gi, level: 'medium', confidence: 0.7 },
 
-    // Low priority keywords
+    // Low priority keywords. "maybe"/"optional" dropped -- too common in normal
+    // task text to read as a deliberate priority signal.
     {
-      pattern: /\b(low priority|when possible|someday|maybe|optional)\b/gi,
+      pattern: /\b(low priority|when possible|someday)\b/gi,
       level: 'low',
       confidence: 0.8,
     },
-    { pattern: /\blow\b/gi, level: 'low', confidence: 0.65 },
 
     // Alternative priority expressions
     {
@@ -60,7 +60,9 @@ export class PriorityParser implements Parser {
       confidence: 0.8,
     },
     {
-      pattern: /\b(no rush|no hurry|later|eventually)\b/gi,
+      // "later"/"eventually" removed -- they fire on ordinary phrasing ("call
+      // mom later") and mis-tag the task as low priority.
+      pattern: /\b(no rush|no hurry)\b/gi,
       level: 'low',
       confidence: 0.75,
     },
@@ -70,7 +72,12 @@ export class PriorityParser implements Parser {
    * Test if the text contains priority indicators
    */
   test(text: string): boolean {
-    return this.priorityPatterns.some(({ pattern }) => pattern.test(text));
+    return this.priorityPatterns.some(({ pattern }) => {
+      // These are long-lived /gi RegExps; reset lastIndex before testing so a
+      // stale index from a previous match can't make test() miss a real one.
+      pattern.lastIndex = 0;
+      return pattern.test(text);
+    });
   }
 
   /**
@@ -110,7 +117,13 @@ export class PriorityParser implements Parser {
             startIndex,
             endIndex,
             originalText: match[0],
-            confidence: this.adjustConfidence(confidence, match[0], text),
+            confidence: this.adjustConfidence(
+              confidence,
+              match[0],
+              text,
+              startIndex,
+              endIndex
+            ),
             source: this.id,
             color: this.getColorForPriority(level as 'high' | 'medium' | 'low'),
           };
@@ -141,7 +154,9 @@ export class PriorityParser implements Parser {
   private adjustConfidence(
     baseConfidence: number,
     matchText: string,
-    fullText: string
+    fullText: string,
+    startIndex: number,
+    endIndex: number
   ): number {
     let confidence = baseConfidence;
 
@@ -155,10 +170,11 @@ export class PriorityParser implements Parser {
       confidence = Math.min(0.98, confidence + 0.1);
     }
 
-    // Reduce confidence if the match is part of a larger word
-    const beforeChar =
-      fullText[matchText.length > 0 ? fullText.indexOf(matchText) - 1 : -1];
-    const afterChar = fullText[fullText.indexOf(matchText) + matchText.length];
+    // Reduce confidence if the match is part of a larger word. Use the real
+    // match position, not indexOf(matchText) (which returns the first textual
+    // occurrence and mis-locates repeated words).
+    const beforeChar = fullText[startIndex - 1];
+    const afterChar = fullText[endIndex];
 
     if (beforeChar && /[a-zA-Z0-9]/.test(beforeChar)) {
       confidence *= 0.7;

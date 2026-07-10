@@ -75,9 +75,14 @@ describe('LeftPane Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    (useUIStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      currentView: 'calendar',
-    });
+    // The store now reads via selectors (useUIStore(s => s.currentView)), so the
+    // mock must apply the selector to a mock state object rather than returning
+    // the whole store — otherwise the selector receives nothing and the branch
+    // logic breaks.
+    (useUIStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (selector: (state: { currentView: string }) => unknown) =>
+        selector({ currentView: 'calendar' })
+    );
 
     (useTaskManagement as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       tasks: [],
@@ -114,15 +119,23 @@ describe('LeftPane Component', () => {
       handleDeleteCalendar: vi.fn(),
     });
 
-    (useSettingsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      calendarViewInputExpanded: true,
-      toggleCalendarViewInput: vi.fn(),
-      taskViewMiniCalendarExpanded: true,
-      toggleTaskViewMiniCalendar: vi.fn(),
-      leftSmartInputTaskListId: null,
-      setLeftSmartInputTaskListId: vi.fn(),
-      showSidebarTaskAnalytics: false,
-    });
+    // useSettingsStore is read via useShallow((s) => ({ ... })). useShallow(fn)
+    // hands back a selector, so the mock must apply that selector to a mock
+    // state object for the destructured fields to resolve.
+    (
+      useSettingsStore as unknown as ReturnType<typeof vi.fn>
+    ).mockImplementation(
+      (selector: (state: Record<string, unknown>) => unknown) =>
+        selector({
+          calendarViewInputExpanded: true,
+          toggleCalendarViewInput: vi.fn(),
+          taskViewMiniCalendarExpanded: true,
+          toggleTaskViewMiniCalendar: vi.fn(),
+          leftSmartInputTaskListId: null,
+          setLeftSmartInputTaskListId: vi.fn(),
+          showSidebarTaskAnalytics: false,
+        })
+    );
   });
 
   it('renders task list and calendar list in calendar view', async () => {
@@ -135,19 +148,25 @@ describe('LeftPane Component', () => {
   });
 
   it('renders event overview and task group list in task view', async () => {
-    (useUIStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      currentView: 'task',
-    });
+    (useUIStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (selector: (state: { currentView: string }) => unknown) =>
+        selector({ currentView: 'task' })
+    );
 
-    (useSettingsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      calendarViewInputExpanded: false,
-      toggleCalendarViewInput: vi.fn(),
-      taskViewMiniCalendarExpanded: true,
-      toggleTaskViewMiniCalendar: vi.fn(),
-      leftSmartInputTaskListId: null,
-      setLeftSmartInputTaskListId: vi.fn(),
-      showSidebarTaskAnalytics: true,
-    });
+    (
+      useSettingsStore as unknown as ReturnType<typeof vi.fn>
+    ).mockImplementation(
+      (selector: (state: Record<string, unknown>) => unknown) =>
+        selector({
+          calendarViewInputExpanded: false,
+          toggleCalendarViewInput: vi.fn(),
+          taskViewMiniCalendarExpanded: true,
+          toggleTaskViewMiniCalendar: vi.fn(),
+          leftSmartInputTaskListId: null,
+          setLeftSmartInputTaskListId: vi.fn(),
+          showSidebarTaskAnalytics: true,
+        })
+    );
 
     render(<LeftPane />);
 

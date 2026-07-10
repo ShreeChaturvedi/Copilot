@@ -44,7 +44,9 @@ export function useStartGoogleConnect() {
       window.location.assign(authUrl);
     },
     onError: (error: Error) => {
-      toast.error(toUserMessage(error, 'Could not start the Google connection'));
+      toast.error(
+        toUserMessage(error, 'Could not start the Google connection')
+      );
     },
   });
 }
@@ -68,9 +70,18 @@ export function useLinkGoogleCalendar() {
     mutationFn: (googleCalendarId: string) =>
       googleSyncApi.linkCalendar(googleCalendarId),
     onSuccess: ({ stats }) => {
-      toast.success(
-        `Imported ${stats.inserted} event${stats.inserted === 1 ? '' : 's'} from Google Calendar`
-      );
+      const total = stats.inserted + stats.updated + stats.deleted;
+      if (stats.inserted > 0) {
+        toast.success(
+          `Imported ${stats.inserted} event${stats.inserted === 1 ? '' : 's'} from Google Calendar`
+        );
+      } else if (total > 0) {
+        toast.success(
+          `Calendar synced (${total} change${total === 1 ? '' : 's'})`
+        );
+      } else {
+        toast.success('Calendar linked — already up to date.');
+      }
       queryClient.invalidateQueries({ queryKey: googleSyncQueryKeys.all });
       queryClient.invalidateQueries({ queryKey: eventQueryKeys.all });
       queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
@@ -87,10 +98,22 @@ export function useGoogleSyncNow() {
     mutationFn: googleSyncApi.syncNow,
     onSuccess: (result) => {
       const failed = result.links.filter((l) => l.error);
-      if (failed.length > 0) {
-        toast.error(`Sync finished with errors: ${toUserMessage(failed[0].error, 'some events failed')}`);
+      // Ops left in the outbox with a backoff never reached Google this cycle.
+      const stuck = result.outbound?.retried ?? 0;
+      if (result.outboundError) {
+        toast.error(
+          `Some changes couldn't reach Google: ${toUserMessage(result.outboundError, 'push failed')}`
+        );
+      } else if (failed.length > 0) {
+        toast.error(
+          `Sync finished with errors: ${toUserMessage(failed[0].error, 'some events failed')}`
+        );
+      } else if (stuck > 0) {
+        toast.error(
+          `${stuck} change${stuck === 1 ? '' : 's'} couldn't reach Google — retrying shortly.`
+        );
       } else {
-        const changed = result.links.reduce(
+        const inbound = result.links.reduce(
           (n, l) =>
             n +
             (l.stats
@@ -98,9 +121,10 @@ export function useGoogleSyncNow() {
               : 0),
           0
         );
+        const changed = inbound + (result.outbound?.succeeded ?? 0);
         toast.success(
           changed > 0
-            ? `Synced ${changed} change${changed === 1 ? '' : 's'} from Google`
+            ? `Synced ${changed} change${changed === 1 ? '' : 's'} with Google`
             : 'Already up to date with Google'
         );
       }

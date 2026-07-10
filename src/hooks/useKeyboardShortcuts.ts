@@ -1,11 +1,20 @@
 import { useEffect } from 'react';
+import { isOverlayOpen, isTypingTarget } from './useGlobalShortcuts';
+import { getModKey, withKbdNav } from '@/components/command/actions';
 
 export type CalendarViewKey = 'D' | 'W' | 'M' | 'L';
 
 interface KeyboardShortcutsOptions {
+  /**
+   * @deprecated ⌘P Print-override binding was removed; kept for caller compat.
+   */
   onOpenProfile?: () => void;
   onOpenSettings?: () => void;
   onOpenHelp?: () => void;
+  /**
+   * @deprecated ⌘Q logout binding was removed (OS-reserved / native confirm);
+   * kept for caller compat.
+   */
   onLogout?: () => void;
   /** Single-key `T`: go to today (calendar surfaces) */
   onToday?: () => void;
@@ -17,43 +26,6 @@ interface KeyboardShortcutsOptions {
   onNext?: () => void;
 }
 
-/** True when the event targets something that consumes typing. */
-const isEditableTarget = (event: KeyboardEvent): boolean => {
-  const el = event.target as HTMLElement | null;
-  if (!el) return false;
-  const tag = el.tagName;
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    tag === 'SELECT' ||
-    el.isContentEditable
-  );
-};
-
-/** True while any dialog/sheet is open (single keys must not leak through). */
-const isOverlayOpen = (): boolean =>
-  Boolean(
-    document.querySelector(
-      '[data-slot=dialog-content][data-state=open], [data-slot=sheet-content][data-state=open], [role=dialog]'
-    )
-  );
-
-/**
- * Keyboard-initiated actions never animate (design-brief §5): flag the
- * document for one frame window so CSS can suppress transitions
- * (`[data-kbd-nav] .view-switcher-slider { transition: none }`).
- */
-const withKbdNav = (fn: () => void) => {
-  document.documentElement.setAttribute('data-kbd-nav', '');
-  try {
-    fn();
-  } finally {
-    window.setTimeout(() => {
-      document.documentElement.removeAttribute('data-kbd-nav');
-    }, 250);
-  }
-};
-
 /**
  * Global keyboard shortcuts hook
  * Handles application-wide shortcuts (modifier combos) and, when the
@@ -61,10 +33,8 @@ const withKbdNav = (fn: () => void) => {
  * `T` today, `D/W/M/L` views, arrow keys navigate.
  */
 export function useKeyboardShortcuts({
-  onOpenProfile,
   onOpenSettings,
   onOpenHelp,
-  onLogout,
   onToday,
   onViewKey,
   onPrev,
@@ -82,13 +52,6 @@ export function useKeyboardShortcuts({
 
       if (isModifierPressed) {
         switch (event.key.toLowerCase()) {
-          case 'p':
-            // ⌘P / Ctrl+P - Open Profile
-            if (!onOpenProfile) break;
-            preventDefault();
-            onOpenProfile();
-            break;
-
           case ',':
             // ⌘, / Ctrl+, - Open Settings (common pattern)
             if (!onOpenSettings) break;
@@ -96,28 +59,11 @@ export function useKeyboardShortcuts({
             onOpenSettings();
             break;
 
-          case '/':
-            // ⌘⇧/ - Show keyboard shortcuts help
-            if (event.shiftKey && onOpenHelp) {
-              preventDefault();
-              onOpenHelp();
-            }
-            break;
-
           case '?':
-            // ⌘? / Ctrl+? - Help (alternative)
+            // ⌘? / Ctrl+? (⇧+/ produces '?') - keyboard shortcuts help
             if (!onOpenHelp) break;
             preventDefault();
             onOpenHelp();
-            break;
-
-          case 'q':
-            // ⌘Q / Ctrl+Q - Logout (with confirmation)
-            if (!onLogout) break;
-            preventDefault();
-            if (confirm('Are you sure you want to log out?')) {
-              onLogout();
-            }
             break;
 
           default:
@@ -127,7 +73,8 @@ export function useKeyboardShortcuts({
       }
 
       // Single-key map (calendar): inert while typing or under an overlay.
-      if (event.altKey || isEditableTarget(event) || isOverlayOpen()) return;
+      if (event.altKey || isTypingTarget(event.target) || isOverlayOpen())
+        return;
 
       switch (event.key) {
         case 't':
@@ -178,32 +125,22 @@ export function useKeyboardShortcuts({
         capture: true,
       });
     };
-  }, [
-    onOpenProfile,
-    onOpenSettings,
-    onOpenHelp,
-    onLogout,
-    onToday,
-    onViewKey,
-    onPrev,
-    onNext,
-  ]);
+  }, [onOpenSettings, onOpenHelp, onToday, onViewKey, onPrev, onNext]);
 }
 
 /**
  * Get keyboard shortcuts help text
  */
 export const getKeyboardShortcuts = () => {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const modKey = isMac ? '⌘' : 'Ctrl';
+  const modKey = getModKey();
 
   return [
+    { keys: `${modKey}+K`, description: 'Open command palette' },
+    { keys: 'N', description: 'New task' },
     { keys: 'T', description: 'Go to today' },
     { keys: 'D / W / M / L', description: 'Day, Week, Month, List view' },
     { keys: '← / →', description: 'Previous / next period' },
-    { keys: `${modKey}+P`, description: 'Open Profile settings' },
-    { keys: `${modKey}+,`, description: 'Open Settings' },
-    { keys: `${modKey}+?`, description: 'Show Help' },
-    { keys: `${modKey}+Q`, description: 'Logout' },
+    { keys: `${modKey}+,`, description: 'Open settings' },
+    { keys: `${modKey}+?`, description: 'Keyboard shortcuts' },
   ];
 };

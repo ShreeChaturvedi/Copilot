@@ -60,6 +60,9 @@ export function IntegrationsSettings() {
   const disconnect = useGoogleDisconnect();
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [removeImported, setRemoveImported] = useState(false);
+  // Track which calendar's Import is in flight so a shared mutation flag
+  // doesn't spin/disable every row at once.
+  const [linkingId, setLinkingId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -223,11 +226,16 @@ export function IntegrationsSettings() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => linkCalendar.mutate(cal.id)}
+                        onClick={() => {
+                          setLinkingId(cal.id);
+                          linkCalendar.mutate(cal.id, {
+                            onSettled: () => setLinkingId(null),
+                          });
+                        }}
                         disabled={linkCalendar.isPending || status.needsReauth}
                         className="shrink-0"
                       >
-                        {linkCalendar.isPending ? (
+                        {linkingId === cal.id ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
                           <Download className="mr-2 h-4 w-4" />
@@ -276,7 +284,10 @@ export function IntegrationsSettings() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setDisconnectOpen(true)}
+                onClick={() => {
+                  setRemoveImported(false);
+                  setDisconnectOpen(true);
+                }}
                 disabled={disconnect.isPending}
               >
                 <Unplug className="mr-2 h-4 w-4" />
@@ -284,11 +295,18 @@ export function IntegrationsSettings() {
               </Button>
             </div>
 
+            {status.links.length === 0 && !status.needsReauth && (
+              <p className="text-xs text-ink-muted">
+                Import a calendar above to enable syncing.
+              </p>
+            )}
+
             <p className="text-xs text-ink-muted">
-              Changes made in Google appear here within 15 minutes (or instantly
-              with Sync now). Editing synced events here does not update Google
-              yet. Recurring events that span daylight-saving changes can differ
-              by an hour between the two calendars.
+              Changes sync both ways. Edits and deletions you make here update
+              Google Calendar within 15 minutes (or instantly with Sync now) —
+              deleting a synced event here removes it from Google too. Recurring
+              events that span daylight-saving changes can differ by an hour
+              between the two calendars.
             </p>
           </div>
         </div>

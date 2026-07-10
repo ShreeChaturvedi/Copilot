@@ -57,6 +57,11 @@ function formatHour(h: number): string {
   return `${h - 12} PM`;
 }
 
+// Module-level cache so re-entering the General panel (it remounts on every
+// section switch via AnimatePresence) renders from the last-loaded values
+// instead of flashing skeletons and re-hitting the network each time.
+let cachedPreferences: UserPreferences | null = null;
+
 function applyDefaultView(defaultView: UserPreferences['defaultView']) {
   if (defaultView === 'calendar' || defaultView === 'tasks') {
     const view = defaultView === 'tasks' ? 'task' : 'calendar';
@@ -88,16 +93,21 @@ export function GeneralSettings() {
     setCustomRange,
   } = useCalendarSettingsStore();
 
-  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
-  const [loadingPrefs, setLoadingPrefs] = useState(true);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(
+    cachedPreferences
+  );
+  const [loadingPrefs, setLoadingPrefs] = useState(!cachedPreferences);
   const [prefsError, setPrefsError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        setLoadingPrefs(true);
+        // Only show the skeleton on the first load; a re-entry refreshes in the
+        // background from the cached values already on screen.
+        if (!cachedPreferences) setLoadingPrefs(true);
         const prefs = await userAPI.getPreferences();
+        cachedPreferences = prefs;
         if (active) setPreferences(prefs);
       } catch (err) {
         if (active)
@@ -112,6 +122,24 @@ export function GeneralSettings() {
       active = false;
     };
   }, []);
+
+  const handleNotificationsToggle = async (checked: boolean) => {
+    if (checked) {
+      if (typeof Notification === 'undefined') {
+        setPrefsError('This browser does not support notifications.');
+        return;
+      }
+      let permission = Notification.permission;
+      if (permission !== 'granted') {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== 'granted') {
+        setPrefsError('Allow notifications in your browser to enable this.');
+        return;
+      }
+    }
+    await patchPreference('notificationsEnabled', checked);
+  };
 
   const effectiveLabel = useMemo(() => {
     const { startHour, endHour } =
@@ -132,6 +160,7 @@ export function GeneralSettings() {
     setPrefsError(null);
     try {
       const saved = await userAPI.updatePreferences({ [key]: value });
+      cachedPreferences = saved;
       setPreferences(saved);
       if (key === 'weekStartsOn') {
         useCalendarSettingsStore.getState().setWeekStartsOn(saved.weekStartsOn);
@@ -278,7 +307,7 @@ export function GeneralSettings() {
                 id="notifications"
                 checked={preferences.notificationsEnabled}
                 onCheckedChange={(checked) =>
-                  void patchPreference('notificationsEnabled', checked)
+                  void handleNotificationsToggle(checked)
                 }
               />
             </SettingsRow>

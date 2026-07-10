@@ -8,8 +8,84 @@ import { QueryProvider, ThemeProvider } from './components/providers';
 import { ProtectedRoute, PublicRoute, AuthLayout } from './components/auth';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import {
+  Component,
+  useEffect,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+  type ErrorInfo,
+  type ReactNode,
+} from 'react';
 import { Toaster } from 'sonner';
+import { MotionConfig } from 'framer-motion';
+
+/**
+ * Top-level error boundary. React 19 does not auto-recover from a render throw:
+ * without this, any uncaught exception in a route/component (a malformed date,
+ * a schema-drift undefined, a bad FullCalendar render) unmounts the whole tree
+ * to a blank white page. This catches it and offers a tokenized recovery path.
+ */
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('App render error:', error, info.componentStack);
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false });
+  };
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6 text-center">
+        <div className="flex max-w-sm flex-col items-center gap-4">
+          <h1 className="font-serif text-2xl text-foreground">
+            Something broke on our end.
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            The view hit an unexpected error. Reloading usually clears it.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={this.handleReset}
+              className="rounded-[10px] border border-border bg-popover px-4 py-2 text-sm text-foreground transition-colors hover:bg-surface-hover"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-[10px] bg-foreground px-4 py-2 text-sm text-background transition-opacity hover:opacity-90"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+// Minimal branded entry fallback so app boot (or a failed lazy chunk retry)
+// never flashes a blank white screen.
+const AppLoading = () => (
+  <div className="flex h-dvh w-full items-center justify-center bg-background">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-hairline border-t-aqua" />
+  </div>
+);
 
 const MainLayout = lazy(async () => ({
   default: (await import('./components/layout/MainLayout')).MainLayout,
@@ -221,91 +297,98 @@ function App() {
   return (
     <QueryProvider>
       <ThemeProvider>
-        <Router basename="/app">
-          {/* Development auth toggle */}
-          {showDevToggle && <DevAuthToggle />}
-          <Toaster
-            position="top-right"
-            closeButton
-            theme={resolvedTheme}
-            toastOptions={{
-              classNames: {
-                // Feedback chrome on tokens (design-brief 2.3): success and
-                // "placed" are aqua, red only for errors.
-                toast:
-                  'rounded-[10px] shadow-lg border border-border text-foreground bg-popover',
-                description: 'text-muted-foreground',
-                success:
-                  'bg-success text-success-foreground border-transparent',
-                error: 'bg-destructive text-white border-transparent',
-                warning:
-                  'bg-warning text-warning-foreground border-transparent',
-              },
-            }}
-          />
-          <Suspense fallback={null}>
-            <Routes>
-              {/* Public routes */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <AuthLayout>
-                      <LoginPage />
-                    </AuthLayout>
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/signup"
-                element={
-                  <PublicRoute>
-                    <AuthLayout>
-                      <SignupPage />
-                    </AuthLayout>
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/forgot-password"
-                element={
-                  <PublicRoute>
-                    <AuthLayout>
-                      <ForgotPasswordPage />
-                    </AuthLayout>
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/reset-password"
-                element={
-                  <PublicRoute>
-                    <AuthLayout>
-                      <ResetPasswordPage />
-                    </AuthLayout>
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/auth/google/callback"
-                element={<GoogleCallbackPage />}
-              />
+        {/* Honor the OS prefers-reduced-motion for every framer-motion
+            animation in one place (design-brief §5): scale/slide degrade to
+            opacity-only. The CSS keyframes already guard themselves. */}
+        <MotionConfig reducedMotion="user">
+          <Router basename="/app">
+            {/* Development auth toggle */}
+            {showDevToggle && <DevAuthToggle />}
+            <Toaster
+              position="top-right"
+              closeButton
+              theme={resolvedTheme}
+              toastOptions={{
+                classNames: {
+                  // Feedback chrome on tokens (design-brief 2.3): success and
+                  // "placed" are aqua, red only for errors.
+                  toast:
+                    'rounded-[10px] [box-shadow:var(--shadow-popover)] border border-border text-foreground bg-popover',
+                  description: 'text-muted-foreground',
+                  success:
+                    'bg-success text-success-foreground border-transparent',
+                  error: 'bg-destructive text-white border-transparent',
+                  warning:
+                    'bg-warning text-warning-foreground border-transparent',
+                },
+              }}
+            />
+            <ErrorBoundary>
+              <Suspense fallback={<AppLoading />}>
+                <Routes>
+                  {/* Public routes */}
+                  <Route
+                    path="/login"
+                    element={
+                      <PublicRoute>
+                        <AuthLayout>
+                          <LoginPage />
+                        </AuthLayout>
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/signup"
+                    element={
+                      <PublicRoute>
+                        <AuthLayout>
+                          <SignupPage />
+                        </AuthLayout>
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/forgot-password"
+                    element={
+                      <PublicRoute>
+                        <AuthLayout>
+                          <ForgotPasswordPage />
+                        </AuthLayout>
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/reset-password"
+                    element={
+                      <PublicRoute>
+                        <AuthLayout>
+                          <ResetPasswordPage />
+                        </AuthLayout>
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/auth/google/callback"
+                    element={<GoogleCallbackPage />}
+                  />
 
-              {/* Protected routes */}
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Protected routes */}
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Redirect to login for unknown routes */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </Router>
+                  {/* Redirect to login for unknown routes */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </Router>
+        </MotionConfig>
       </ThemeProvider>
     </QueryProvider>
   );

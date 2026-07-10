@@ -109,12 +109,21 @@ export class CompromiseNLPParser implements Parser {
     tags: ParsedTag[]
   ): void {
     const people = doc.people();
+    const lowerText = text.toLowerCase();
+    // Track a running cursor so repeated entities ("email Sarah about Sarah's
+    // review") locate each occurrence in order instead of both resolving to the
+    // first via indexOf-from-0.
+    let searchFrom = 0;
 
     people.forEach((person: CompromiseMatch) => {
       const personText = person.text();
-      const startIndex = text.toLowerCase().indexOf(personText.toLowerCase());
+      const startIndex = lowerText.indexOf(
+        personText.toLowerCase(),
+        searchFrom
+      );
 
       if (startIndex !== -1) {
+        searchFrom = startIndex + personText.length;
         tags.push({
           // Deterministic id (parser + span): stable across debounced
           // re-parses so tag identity survives unrelated keystrokes.
@@ -143,12 +152,15 @@ export class CompromiseNLPParser implements Parser {
     tags: ParsedTag[]
   ): void {
     const places = doc.places();
+    const lowerText = text.toLowerCase();
+    let searchFrom = 0;
 
     places.forEach((place: CompromiseMatch) => {
       const placeText = place.text();
-      const startIndex = text.toLowerCase().indexOf(placeText.toLowerCase());
+      const startIndex = lowerText.indexOf(placeText.toLowerCase(), searchFrom);
 
       if (startIndex !== -1) {
+        searchFrom = startIndex + placeText.length;
         tags.push({
           id: `${this.id}:${startIndex}:${startIndex + placeText.length}`,
           type: 'location',
@@ -175,12 +187,15 @@ export class CompromiseNLPParser implements Parser {
     tags: ParsedTag[]
   ): void {
     const organizations = doc.organizations();
+    const lowerText = text.toLowerCase();
+    let searchFrom = 0;
 
     organizations.forEach((org: CompromiseMatch) => {
       const orgText = org.text();
-      const startIndex = text.toLowerCase().indexOf(orgText.toLowerCase());
+      const startIndex = lowerText.indexOf(orgText.toLowerCase(), searchFrom);
 
       if (startIndex !== -1) {
+        searchFrom = startIndex + orgText.length;
         tags.push({
           id: `${this.id}:${startIndex}:${startIndex + orgText.length}`,
           type: 'project', // Treat organizations as projects

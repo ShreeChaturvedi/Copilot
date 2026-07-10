@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { EASE_SETTLE, DUR_2_S } from '@/lib/motion';
 import { SettingsNav } from './SettingsNav';
@@ -39,6 +40,11 @@ export function SettingsDialog({
     useState<SettingsSection>(resolvedDefault);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const reduceMotion = useReducedMotion();
+  const isMobile = useIsMobile();
+  // The rail is off-canvas only on mobile; on md+ it is md:static and fully
+  // visible/interactive, so aria-hidden must be scoped to the mobile layout —
+  // hiding a still-visible nav (with focusable buttons) breaks WCAG 4.1.2.
+  const railHidden = isMobile && mobileDetailOpen;
 
   useEffect(() => {
     if (open) {
@@ -104,7 +110,8 @@ export function SettingsDialog({
               'md:border-r md:border-hairline md:bg-surface-2 md:p-3',
               mobileDetailOpen && '-translate-x-1/4 md:translate-x-0'
             )}
-            aria-hidden={mobileDetailOpen ? true : undefined}
+            aria-hidden={railHidden ? true : undefined}
+            inert={railHidden ? true : undefined}
           >
             <SettingsNav
               activeSection={activeSection}
@@ -121,7 +128,7 @@ export function SettingsDialog({
                 : 'duration-[160ms] ease-out',
               'md:static md:flex-1 md:translate-x-0',
               mobileDetailOpen
-                ? 'translate-x-0 shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.4)] md:shadow-none'
+                ? 'translate-x-0 [box-shadow:var(--shadow-dialog)] md:shadow-none'
                 : 'translate-x-full md:translate-x-0'
             )}
           >
@@ -139,7 +146,7 @@ export function SettingsDialog({
                     Settings
                   </Button>
                 )}
-                <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground max-md:sr-only">
+                <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground max-md:hidden">
                   {SECTION_TITLES[activeSection]}
                 </h2>
                 {mobileDetailOpen && (

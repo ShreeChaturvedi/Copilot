@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, Info, Trash2, Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 import { useAuthStore } from '@/stores/authStore';
@@ -39,6 +40,8 @@ export function SecuritySettings() {
   const [pwSuccess, setPwSuccess] = useState(false);
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const [exportingData, setExportingData] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -82,6 +85,12 @@ export function SecuritySettings() {
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => setPwSuccess(false), 3000);
+    } catch (err) {
+      setPwError(
+        err instanceof Error
+          ? err.message
+          : 'Could not change password. Try again.'
+      );
     } finally {
       setChanging(false);
     }
@@ -90,7 +99,14 @@ export function SecuritySettings() {
   const handleLogoutEverywhere = async () => {
     try {
       setLoggingOut(true);
+      setLogoutError(null);
       await logoutEverywhere();
+      setLogoutDialogOpen(false);
+      toast.success('Signed out on all devices');
+    } catch (err) {
+      setLogoutError(
+        err instanceof Error ? err.message : 'Could not log out. Try again.'
+      );
     } finally {
       setLoggingOut(false);
     }
@@ -101,6 +117,7 @@ export function SecuritySettings() {
       setExportingData(true);
       setExportError(null);
       await userAPI.exportData();
+      toast.success('Your data is downloading');
     } catch (error) {
       setExportError(
         error instanceof Error ? error.message : 'Failed to export data'
@@ -267,7 +284,10 @@ export function SecuritySettings() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleLogoutEverywhere}
+            onClick={() => {
+              setLogoutError(null);
+              setLogoutDialogOpen(true);
+            }}
             disabled={loggingOut}
           >
             {loggingOut ? (
@@ -280,6 +300,11 @@ export function SecuritySettings() {
             )}
           </Button>
         </SettingsRow>
+        {logoutError && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertDescription>{logoutError}</AlertDescription>
+          </Alert>
+        )}
       </SettingsSection>
 
       <SettingsSection title="Data">
@@ -336,6 +361,35 @@ export function SecuritySettings() {
           Delete
         </Button>
       </div>
+
+      <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log out of all sessions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll be signed out on every device, including this one, and will
+              need to log in again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {logoutError && (
+            <Alert variant="destructive">
+              <AlertDescription>{logoutError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loggingOut}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleLogoutEverywhere();
+              }}
+              disabled={loggingOut}
+            >
+              {loggingOut ? 'Logging out...' : 'Log out everywhere'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

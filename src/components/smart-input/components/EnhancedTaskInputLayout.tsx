@@ -10,8 +10,15 @@ export interface EnhancedTaskInputLayoutProps {
   value: string;
   /** Change handler */
   onChange: (value: string) => void;
-  /** Parsed tags for highlighting */
+  /** Parsed tags for the inline chip row under the field (date/time stripped) */
   tags: ParsedTag[];
+  /**
+   * Tags fed to the inline highlight overlay. Defaults to `tags` but callers
+   * pass the date-inclusive set here so typed dates light up aqua in-place
+   * (the chip row still uses `tags`, which hides date/time in favor of the
+   * Due Date badge).
+   */
+  highlightTags?: ParsedTag[];
   /** Placeholder text */
   placeholder?: string;
   /** Whether input is disabled */
@@ -66,6 +73,7 @@ export const EnhancedTaskInputLayout: React.FC<
   value,
   onChange,
   tags,
+  highlightTags,
   placeholder = 'Enter a new task...',
   disabled = false,
   className,
@@ -130,7 +138,7 @@ export const EnhancedTaskInputLayout: React.FC<
               name="enhanced-task-input-textarea"
               value={value}
               onChange={onChange}
-              tags={tags}
+              tags={highlightTags ?? tags}
               placeholder={placeholder}
               disabled={disabled}
               onKeyPress={onKeyPress}

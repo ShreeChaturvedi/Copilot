@@ -244,11 +244,17 @@ describe('HighlightedTextareaField - Requirements Verification', () => {
         />
       );
 
-      const overlay = container.querySelector('[aria-hidden="true"]');
+      const overlay = container.querySelector(
+        '[aria-hidden="true"]'
+      ) as HTMLDivElement;
 
-      // Check that line breaks are preserved in overlay
-      expect(overlay?.innerHTML).toContain('<br>');
-      expect(overlay?.innerHTML).toContain('inline-highlight-span');
+      // Line breaks are preserved via CSS `white-space: pre-wrap`, not <br>:
+      // the literal "\n" survives in the overlay HTML and the container carries
+      // the pre-wrap class (this also preserves consecutive spaces).
+      expect(overlay.className).toContain('whitespace-pre-wrap');
+      expect(overlay.innerHTML).not.toContain('<br>');
+      expect(overlay.innerHTML).toContain('\n');
+      expect(overlay.innerHTML).toContain('inline-highlight-span');
     });
   });
 

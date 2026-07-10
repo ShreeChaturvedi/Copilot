@@ -16,6 +16,8 @@
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import { ALL_ACCEPTED_FILES } from '@shared/config/fileTypes';
 //
 
 import { Button } from '@/components/ui/Button';
@@ -113,7 +115,6 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
   // Initialize text parser
   const {
-    error,
     tags: parsedTags,
     confidence,
     clear,
@@ -269,6 +270,24 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     [onFilesAdded]
   );
 
+  // Drop-to-attach on the composer card itself. Chat-style composers are
+  // expected to accept a file dropped anywhere on them; the paperclip/dialog
+  // stays for click-to-browse. noClick/noKeyboard so this only handles drops
+  // and never intercepts typing or focus, reusing handleFilesAdded + limits.
+  const dropDisabled =
+    disabled || !enableFileUpload || uploadedFiles.length >= maxFiles;
+  const { getRootProps, getInputProps, isDragActive, isDragReject } =
+    useDropzone({
+      onDrop: (accepted: File[]) => {
+        if (accepted.length > 0) handleFilesAdded(accepted);
+      },
+      accept: ALL_ACCEPTED_FILES,
+      maxFiles: maxFiles - uploadedFiles.length,
+      disabled: dropDisabled,
+      noClick: true,
+      noKeyboard: true,
+    });
+
   // Create a stable signature for a tag to support dismissal without changing input text
   const makeTagSignature = useCallback(
     (t: { type: string; originalText: string; startIndex: number }) => {
@@ -283,6 +302,15 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
     const base = (parsedTags || []).filter(
       (t) => t.type !== 'date' && t.type !== 'time'
     );
+    if (dismissedTagSignatures.size === 0) return base;
+    return base.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
+  }, [parsedTags, dismissedTagSignatures, makeTagSignature]);
+
+  // Tags for the inline highlight overlay: keep date/time (so the typed date
+  // lights up aqua under the text, matching the Due Date badge) while the chip
+  // row keeps using the date-stripped `filteredTags`.
+  const highlightTags = useMemo(() => {
+    const base = parsedTags || [];
     if (dismissedTagSignatures.size === 0) return base;
     return base.filter((t) => !dismissedTagSignatures.has(makeTagSignature(t)));
   }, [parsedTags, dismissedTagSignatures, makeTagSignature]);
@@ -360,6 +388,14 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
         clear();
         setDismissedTagSignatures(new Set());
         setManualDueDate(undefined);
+
+        // Return focus to the title field so rapid keyboard entry continues.
+        // Submitting from the description field otherwise drops focus to
+        // <body> (that field goes aria-hidden/tabIndex -1 once the text
+        // clears), stalling the next keystroke.
+        requestAnimationFrame(() => {
+          document.getElementById('enhanced-task-input-textarea')?.focus();
+        });
       }
     },
     [
@@ -536,7 +572,19 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
   );
 
   return (
-    <div className={cn('max-w-2xl mx-auto', className)}>
+    <div
+      {...getRootProps({
+        className: cn(
+          'max-w-2xl mx-auto rounded-2xl transition-colors',
+          isDragActive &&
+            !isDragReject &&
+            'ring-2 ring-aqua ring-offset-2 ring-offset-transparent bg-aqua-film-04',
+          isDragReject && 'ring-2 ring-destructive',
+          className
+        ),
+      })}
+    >
+      <input {...getInputProps()} />
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -547,6 +595,7 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
           value={inputText}
           onChange={setInputText}
           tags={filteredTags}
+          highlightTags={highlightTags}
           placeholder={placeholder}
           disabled={disabled}
           onKeyPress={handleKeyDown}
@@ -583,12 +632,21 @@ export const EnhancedTaskInput: React.FC<EnhancedTaskInputProps> = ({
 
       {/* External tag display removed; tags shown inline under textarea to prevent layout shift */}
 
-      {/* Error Display */}
-      {error && smartParsingEnabled && (
-        <div className="mt-2 px-1">
-          <div className="text-sm text-destructive">Parsing error: {error}</div>
-        </div>
-      )}
+      {/* Announce parse results to screen readers. The chips are a purely
+          visual signal; this sr-only live region speaks what was detected as
+          the user types so the feature's core affordance isn't sight-only. */}
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {smartParsingEnabled && hasContent && highlightTags.length > 0
+          ? `${highlightTags.length} tag${highlightTags.length === 1 ? '' : 's'} detected: ${highlightTags
+              .map((t) => t.displayText)
+              .join(', ')}`
+          : ''}
+      </div>
     </div>
   );
 };
