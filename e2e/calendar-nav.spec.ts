@@ -56,6 +56,15 @@ test.describe('calendar navigation (regression for #32)', () => {
     await gotoCalendarView(page);
     await expect(titleLocator(page)).toBeVisible();
 
+    // Establish a known Month-view baseline first: the default view is Week, so
+    // capturing the title before switching would compare a week range against a
+    // month title after the round trip.
+    const monthBaseline = page.getByRole('button', {
+      name: 'Month',
+      exact: true,
+    });
+    await monthBaseline.click();
+    await expect(monthBaseline).toHaveAttribute('aria-pressed', 'true');
     const monthTitle = await normalizedTitle(page);
 
     // Switch to Day view: the segmented control marks it pressed and the title

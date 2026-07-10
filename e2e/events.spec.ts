@@ -41,11 +41,16 @@ test.describe('event CRUD, recurrence, exceptions, color', () => {
     await createEventViaDialog(page, title);
     await expect(page.getByText(title, { exact: false }).first()).toBeVisible();
 
-    // Delete (non-recurring → no scope dialog).
+    // Delete (non-recurring → a lightweight confirm dialog, not a scope dialog).
     await page.getByText(title, { exact: false }).first().click();
     await page
       .getByRole('button', { name: /^Delete/i })
       .first()
+      .click();
+    // Single events now guard against a mis-click with a confirm AlertDialog.
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete' })
       .click();
 
     await expect(page.getByText(title, { exact: false })).toHaveCount(0);

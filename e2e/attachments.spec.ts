@@ -22,7 +22,12 @@ test('attachment upload surfaces the 503 error (no silent fallback, #35)', async
   // Attach a small valid file through the hidden dropzone input.
   await page.getByRole('button', { name: 'Attach files' }).click();
   await expect(page.getByText('Attach Files')).toBeVisible();
-  await page.locator('input[type="file"]').setInputFiles(NOTE_TXT);
+  // Scope to the dialog: the composer card now also renders a drag-drop file
+  // input, so a bare input[type=file] matches two elements.
+  await page
+    .getByRole('dialog')
+    .locator('input[type="file"]')
+    .setInputFiles(NOTE_TXT);
   await page.getByRole('button', { name: 'Done' }).click();
 
   // Submitting triggers the upload → 503 → surfaced error toast.
