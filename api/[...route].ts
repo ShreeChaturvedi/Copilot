@@ -196,7 +196,18 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
-  const { segments, query } = parseUrl(req.url || '');
+  // parseUrl decodes each path segment; a malformed percent-escape (e.g.
+  // `/api/tasks/%E0%A4%A`) makes decodeURIComponent throw URIError. Guard it so
+  // the failure returns the app's standard error envelope instead of escaping
+  // as an unhandled rejection and a bare platform 500.
+  let segments: string[];
+  let query: Record<string, string | string[]>;
+  try {
+    ({ segments, query } = parseUrl(req.url || ''));
+  } catch {
+    sendError(res, new ApiError(400, 'BAD_REQUEST', 'Malformed request URL'));
+    return;
+  }
   // Vercel may or may not include the leading `/api` in req.url; handle both.
   const routeSegments = segments[0] === 'api' ? segments.slice(1) : segments;
 

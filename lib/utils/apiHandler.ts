@@ -19,10 +19,23 @@ import { devAuth, authenticateJWT } from '../middleware/auth.js';
 import { ApiError } from '../types/api.js';
 
 /**
+ * Rate-limit tier names. Each maps to a preset in rateLimitPresets. Handlers
+ * pick a tier (default 'api') instead of every route sharing the 100/15min
+ * bucket, so the strict `auth` (5/15min) and `upload` (10/hour) presets are
+ * actually reachable in production.
+ */
+export type RateLimitTier = keyof typeof rateLimitPresets;
+
+function selectRateLimit(tier?: RateLimitTier) {
+  return rateLimitPresets[tier ?? 'api'] ?? rateLimitPresets.api;
+}
+
+/**
  * Create a standardized API route handler
  */
 export function createApiHandler(
-  routes: Partial<Record<HttpMethod, RouteConfig>>
+  routes: Partial<Record<HttpMethod, RouteConfig>>,
+  options: { rateLimit?: RateLimitTier } = {}
 ) {
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -54,13 +67,10 @@ export function createApiHandler(
         requestLogger(),
       ];
 
-      // Add rate limiting if configured
-      if (route.rateLimit) {
-        // Custom per-route limits could be wired here; default preset for now
-        middlewares.push(rateLimitPresets.api);
-      } else {
-        middlewares.push(rateLimitPresets.api); // Default rate limiting
-      }
+      // Rate limiting: select the configured tier (default 'api'). This is what
+      // makes the strict `auth`/`upload` presets reachable instead of every
+      // route sharing the 100/15min `api` bucket.
+      middlewares.push(selectRateLimit(options.rateLimit));
 
       // Add authentication if required
       if (route.requireAuth) {
@@ -97,7 +107,7 @@ export function createApiHandler(
  */
 export function createMethodHandler(
   handlers: Partial<Record<HttpMethod, RouteHandler>>,
-  options: { requireAuth?: boolean } = {}
+  options: { requireAuth?: boolean; rateLimit?: RateLimitTier } = {}
 ) {
   return asyncHandler(
     async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -128,7 +138,7 @@ export function createMethodHandler(
         middlewares.push(devAuth());
       }
 
-      middlewares.push(requestLogger(), rateLimitPresets.api);
+      middlewares.push(requestLogger(), selectRateLimit(options.rateLimit));
 
       if (options.requireAuth) {
         middlewares.push(authenticateJWT());
@@ -151,7 +161,7 @@ export function createCrudHandler(config: {
   patch?: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
   delete?: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
   requireAuth?: boolean;
-  rateLimit?: 'read' | 'write' | 'api';
+  rateLimit?: RateLimitTier;
 }) {
   const routes: Partial<Record<HttpMethod, RouteConfig>> = {};
 
@@ -195,7 +205,7 @@ export function createCrudHandler(config: {
     };
   }
 
-  return createApiHandler(routes);
+  return createApiHandler(routes, { rateLimit: config.rateLimit });
 }
 
 /**

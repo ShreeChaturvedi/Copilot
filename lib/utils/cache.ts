@@ -219,18 +219,6 @@ interface CachedTaskList {
   description?: string | null;
 }
 
-interface CachedCalendar {
-  id: string;
-  name: string;
-  color: string;
-  isVisible: boolean;
-}
-
-interface CachedApiResponse {
-  data: unknown;
-  timestamp: number;
-}
-
 /**
  * Global cache instances for common use cases
  * In production, consider using Redis or similar distributed cache
@@ -243,27 +231,11 @@ export const taskListCache = new InMemoryCache<CachedTaskList[]>(
   true // Enable auto-cleanup
 );
 
-// Cache for calendar metadata (rarely change)
-export const calendarMetadataCache = new InMemoryCache<CachedCalendar[]>(
-  5 * 60 * 1000, // 5 minutes TTL
-  500, // Max 500 user's calendars cached
-  true
-);
-
-// Generic short-term cache for API responses
-export const apiResponseCache = new InMemoryCache<CachedApiResponse>(
-  60 * 1000, // 1 minute TTL
-  1000, // Max 1000 responses
-  true
-);
-
 /**
  * Cleanup all caches on process exit
  */
 if (typeof process !== 'undefined') {
   process.on('beforeExit', () => {
     taskListCache.destroy();
-    calendarMetadataCache.destroy();
-    apiResponseCache.destroy();
   });
 }

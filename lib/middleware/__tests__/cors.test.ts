@@ -61,7 +61,15 @@ describe('CORS Middleware', () => {
       const middleware = corsMiddleware();
       middleware(req, res, mockNext);
 
+      // Security fix: with origin:true and a request Origin present, the
+      // middleware reflects the caller's Origin (and sets Vary: Origin) instead
+      // of emitting a wildcard '*', which is invalid alongside Allow-Credentials.
       expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
+        'Access-Control-Allow-Origin',
+        'https://any-domain.com'
+      );
+      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith('Vary', 'Origin');
+      expect(vi.mocked(res.setHeader)).not.toHaveBeenCalledWith(
         'Access-Control-Allow-Origin',
         '*'
       );
@@ -220,7 +228,10 @@ describe('CORS Middleware', () => {
         'X-Content-Type-Options',
         'nosniff'
       );
-      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith('X-Frame-Options', 'DENY');
+      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
+        'X-Frame-Options',
+        'DENY'
+      );
       expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
         'X-XSS-Protection',
         '1; mode=block'
@@ -382,23 +393,33 @@ describe('CORS Middleware', () => {
       });
       const res = createMockResponse();
 
-      // This combination should work but is a security anti-pattern
-      // (browsers reject Access-Control-Allow-Origin: * with credentials)
+      // Security fix: origin:true + credentials must never resolve to a
+      // wildcard. With a request Origin present the middleware reflects that
+      // specific Origin (and sets Vary: Origin), so credentials remain valid
+      // without an Access-Control-Allow-Origin: * / Allow-Credentials pairing
+      // that browsers reject.
       const middleware = corsMiddleware({
         origin: true,
         credentials: true,
       });
       middleware(req, res, mockNext);
 
+      // Reflects the caller's Origin, never a wildcard.
       expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
+        'Access-Control-Allow-Origin',
+        'https://any-domain.com'
+      );
+      expect(vi.mocked(res.setHeader)).not.toHaveBeenCalledWith(
         'Access-Control-Allow-Origin',
         '*'
       );
+      expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith('Vary', 'Origin');
+      // Credentials are allowed because the origin is a specific reflected
+      // value, not '*'.
       expect(vi.mocked(res.setHeader)).toHaveBeenCalledWith(
         'Access-Control-Allow-Credentials',
         'true'
       );
-      // Note: Browsers will reject this combination, but middleware allows it
     });
 
     it('should handle production environment with VERCEL_URL', () => {
@@ -440,7 +461,7 @@ describe('CORS Middleware', () => {
         'Referrer-Policy',
       ];
 
-      securityHeaders.forEach(header => {
+      securityHeaders.forEach((header) => {
         const headerCall = setHeaderCalls.find(([name]) => name === header);
         expect(headerCall).toBeDefined();
       });

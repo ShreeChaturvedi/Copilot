@@ -138,7 +138,15 @@ export function devAuth(): Middleware {
     _res: VercelResponse,
     next: () => void
   ) => {
-    if (process.env.NODE_ENV !== 'production' && !req.user) {
+    // Only inject the ADMIN dev user for genuine local development. On any
+    // deployed environment (Vercel sets process.env.VERCEL) require an explicit
+    // ENABLE_DEV_AUTH opt-in, so a preview/staging deploy where NODE_ENV is not
+    // exactly 'production' can't silently hand ADMIN to every caller.
+    const devAuthEnabled =
+      process.env.NODE_ENV !== 'production' &&
+      (!process.env.VERCEL || process.env.ENABLE_DEV_AUTH === 'true');
+
+    if (devAuthEnabled && !req.user) {
       req.user = {
         id: 'dev-user-id',
         email: 'dev@example.com',

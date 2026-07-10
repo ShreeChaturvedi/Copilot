@@ -1,9 +1,9 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import type { put as blobPut } from '@vercel/blob';
-import {
-  asyncHandler,
-  sendSuccess,
-} from '../../../lib/middleware/errorHandler.js';
+import { createMethodHandler } from '../../../lib/utils/apiHandler.js';
+import { HttpMethod } from '../../../lib/types/api.js';
+import type { AuthenticatedRequest } from '../../../lib/types/api.js';
+import { sendSuccess } from '../../../lib/middleware/errorHandler.js';
 
 interface BlobPutResult {
   url: string;
@@ -12,28 +12,51 @@ interface BlobPutResult {
 
 type PutOptions = NonNullable<Parameters<typeof blobPut>[2]>;
 
-async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  if (req.method !== 'PUT') {
-    res.status(405).json({
-      success: false,
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PUT' },
-    });
-    return;
-  }
+// Hard cap on the request body. Without it the handler buffered the entire
+// stream into memory with no guard, so a large body could OOM the function.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 
+async function handler(
+  req: AuthenticatedRequest,
+  res: VercelResponse
+): Promise<void> {
   try {
     const filename = (req.query.filename as string) || `upload-${Date.now()}`;
     const contentType =
       (req.headers['content-type'] as string) || 'application/octet-stream';
 
     const chunks: Buffer[] = [];
+    let received = 0;
+    let tooLarge = false;
     await new Promise<void>((resolve, reject) => {
-      req.on('data', (chunk) =>
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-      );
+      req.on('data', (chunk) => {
+        if (tooLarge) return;
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        received += buf.length;
+        if (received > MAX_UPLOAD_BYTES) {
+          // Stop buffering and tear down the stream so we don't hold the whole
+          // oversized body in memory.
+          tooLarge = true;
+          req.destroy();
+          resolve();
+          return;
+        }
+        chunks.push(buf);
+      });
       req.on('end', () => resolve());
       req.on('error', (err) => reject(err));
     });
+
+    if (tooLarge) {
+      res.status(413).json({
+        success: false,
+        error: {
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'File exceeds the 10MB upload limit',
+        },
+      });
+      return;
+    }
 
     const body = Buffer.concat(chunks);
     if (!body || body.length === 0) {
@@ -160,5 +183,11 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   }
 }
 
-export default asyncHandler(handler);
+// Route uploads through the shared pipeline: CORS, auth (a missing/invalid
+// Bearer token now 401s instead of allowing anonymous public blob writes), and
+// the strict 10/hour upload rate-limit tier (previously the 100/15min default).
+export default createMethodHandler(
+  { [HttpMethod.PUT]: handler },
+  { requireAuth: true, rateLimit: 'upload' }
+);
 export { handler };

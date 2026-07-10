@@ -29,6 +29,19 @@ const defaultCorsConfig: CorsConfig = {
   maxAge: 86400, // 24 hours
 };
 
+// Surface a misconfigured production deploy: if none of VERCEL_URL /
+// VERCEL_PROJECT_PRODUCTION_URL / FRONTEND_URL are set the allowlist is empty
+// and every cross-origin call fails closed with no signal. Warn once at load.
+if (
+  process.env.NODE_ENV === 'production' &&
+  Array.isArray(defaultCorsConfig.origin) &&
+  defaultCorsConfig.origin.length === 0
+) {
+  console.warn(
+    '[cors] Production CORS allowlist is empty; set FRONTEND_URL (or VERCEL_URL / VERCEL_PROJECT_PRODUCTION_URL) or all cross-origin requests will be blocked.'
+  );
+}
+
 /**
  * CORS middleware
  */
@@ -61,14 +74,26 @@ function setCorsHeaders(
   req: VercelRequest
 ) {
   // Handle origin
+  const requestOrigin = req.headers.origin;
   if (config.origin === true) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Dev: a wildcard '*' is invalid alongside Allow-Credentials (browsers
+    // reject the combination), so reflect the caller's Origin when present and
+    // only fall back to '*' when there is no Origin header.
+    if (requestOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
   } else if (typeof config.origin === 'string') {
     res.setHeader('Access-Control-Allow-Origin', config.origin);
   } else if (Array.isArray(config.origin)) {
-    const origin = req.headers.origin;
-    if (origin && config.origin.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
+    if (requestOrigin && config.origin.includes(requestOrigin)) {
+      // Reflecting from an allowlist means the response varies by Origin; set
+      // Vary so a shared cache/CDN can't serve one origin's CORS response to
+      // another.
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      res.setHeader('Vary', 'Origin');
     }
   }
 
@@ -79,7 +104,12 @@ function setCorsHeaders(
     config.allowedHeaders.join(', ')
   );
 
-  if (config.credentials) {
+  // Never send Allow-Credentials together with a wildcard origin: the pair is
+  // invalid and, if honored, dangerous.
+  if (
+    config.credentials &&
+    res.getHeader('Access-Control-Allow-Origin') !== '*'
+  ) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
 

@@ -74,8 +74,12 @@ class MemoryStore {
 // Global store instance
 const store = new MemoryStore();
 
-// Cleanup expired entries every 5 minutes
-setInterval(() => store.cleanup(), 5 * 60 * 1000);
+// Cleanup expired entries every 5 minutes. unref() so this timer doesn't keep
+// the serverless event loop referenced / the lambda from settling.
+const cleanupTimer = setInterval(() => store.cleanup(), 5 * 60 * 1000);
+if (typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 // Test-only helper to reset the in-memory store between test cases.
 export function resetRateLimitStore(): void {
@@ -151,21 +155,32 @@ export function rateLimit(config: Partial<RateLimitConfig> = {}) {
  * Get client IP address
  */
 function getClientIP(req: AuthenticatedRequest): string | undefined {
-  // Check various headers for the real IP
-  const forwarded = req.headers['x-forwarded-for'];
   const realIP = req.headers['x-real-ip'];
   const cfConnectingIP = req.headers['cf-connecting-ip'];
+  const forwarded = req.headers['x-forwarded-for'];
 
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim();
+  // Prefer platform-trusted single-value headers. Vercel sets x-real-ip to the
+  // true peer; Cloudflare sets cf-connecting-ip. These can't be spoofed by the
+  // client the way x-forwarded-for can.
+  if (typeof realIP === 'string' && realIP.trim()) {
+    return realIP.trim();
   }
 
-  if (typeof realIP === 'string') {
-    return realIP;
+  if (typeof cfConnectingIP === 'string' && cfConnectingIP.trim()) {
+    return cfConnectingIP.trim();
   }
 
-  if (typeof cfConnectingIP === 'string') {
-    return cfConnectingIP;
+  // Fall back to x-forwarded-for, but take the LAST hop (the one appended by the
+  // trusted proxy) rather than the leftmost value, which is caller-supplied and
+  // lets an attacker land in a fresh rate-limit bucket every request.
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    const hops = forwarded
+      .split(',')
+      .map((h) => h.trim())
+      .filter(Boolean);
+    if (hops.length > 0) {
+      return hops[hops.length - 1];
+    }
   }
 
   return req.connection?.remoteAddress || req.socket?.remoteAddress;
