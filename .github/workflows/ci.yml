@@ -36,8 +36,10 @@ jobs:
         # past a worker's heap and OOMing (all tests pass; the worker dies).
         # Tracked for a real fix in issue #112.
         run: |
-          npm run test:frontend:run -- --shard=1/2
-          npm run test:frontend:run -- --shard=2/2
+          npm run test:frontend:run -- --shard=1/4
+          npm run test:frontend:run -- --shard=2/4
+          npm run test:frontend:run -- --shard=3/4
+          npm run test:frontend:run -- --shard=4/4
       - name: Backend tests (mocked, no DB)
         run: npm run test:backend:run
       - name: Shared tests
