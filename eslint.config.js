@@ -110,7 +110,7 @@ export default tseslint.config([
   },
   // L5 Playwright E2E (Node context, its own runner) + the root config.
   {
-    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    files: ['e2e/**/*.ts', 'playwright.config.ts', 'vite.config.ts'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: 2022,
