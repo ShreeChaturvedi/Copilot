@@ -88,12 +88,18 @@ vi.mock('../../dialogs/EventDisplayDialog', () => ({
   ),
 }));
 
-vi.mock('@/stores/settingsStore', () => ({
-  useSettingsStore: () => ({
-    calendarSubView: null,
-    setCalendarSubView: vi.fn(),
-  }),
-}));
+vi.mock('@/stores/settingsStore', () => {
+  // Honor the Zustand selector contract: returning the whole state object on
+  // every call (ignoring the selector) made `useSettingsStore(s => s.calendarSubView)`
+  // yield a new truthy object each render, so RightPane's calendar-sub-view sync
+  // effect re-fired forever and OOM'd the worker. Keep the state stable and apply
+  // the selector.
+  const state = { calendarSubView: null, setCalendarSubView: vi.fn() };
+  return {
+    useSettingsStore: (selector: (s: typeof state) => unknown) =>
+      selector(state),
+  };
+});
 
 // Test wrapper
 const TestWrapper = ({ children }: { children: React.ReactNode }) => {
