@@ -18,6 +18,11 @@ if (!JWT_SECRET) {
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
+// Issuer/audience claims are stamped on every token at sign time and pinned at
+// verify time. Shared constants keep the sign and verify paths from drifting.
+const JWT_ISSUER = 'react-calendar-app';
+const JWT_AUDIENCE = 'react-calendar-app-users';
+
 // Promisified wrappers with correct generics
 function signAsync(
   payload: string | object | Buffer,
@@ -81,8 +86,8 @@ export async function generateAccessToken(
 
   return await signAsync(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-    issuer: 'react-calendar-app',
-    audience: 'react-calendar-app-users',
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   });
 }
 
@@ -104,8 +109,8 @@ export async function generateRefreshToken(
 
   return await signAsync(payload, JWT_SECRET, {
     expiresIn: JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-    issuer: 'react-calendar-app',
-    audience: 'react-calendar-app-users',
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   });
 }
 
@@ -138,7 +143,15 @@ export async function generateTokenPair(
  */
 export async function verifyToken(token: string): Promise<JWTPayload> {
   try {
-    const decoded = await verifyAsync<JWTPayload>(token, JWT_SECRET);
+    // Pin the algorithm and require the issuer/audience the sign path stamps.
+    // Without this, any HS-signed token minted with the same secret (for any
+    // purpose or audience) would validate, and the accepted algorithm set would
+    // be unrestricted (defense-in-depth against token or algorithm confusion).
+    const decoded = await verifyAsync<JWTPayload>(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
     return decoded as JWTPayload;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {

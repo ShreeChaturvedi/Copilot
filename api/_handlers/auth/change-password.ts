@@ -76,11 +76,19 @@ export default createApiHandler({
           });
         }
 
-        await authService.updatePassword(req.user.id, newPassword);
+        // updatePassword revokes every existing session (including this
+        // client's refresh token) and mints a fresh pair so the caller who
+        // just changed their password stays signed in. Return that pair so the
+        // client can swap it in; otherwise its now-revoked refresh token would
+        // 401 on the next /auth/refresh and force-log the user out.
+        const tokens = await authService.updatePassword(
+          req.user.id,
+          newPassword
+        );
 
         return res.status(200).json({
           success: true,
-          data: { message: 'Password updated successfully' },
+          data: { message: 'Password updated successfully', tokens },
           meta: { timestamp: new Date().toISOString() },
         });
       } catch (error) {

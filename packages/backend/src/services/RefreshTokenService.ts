@@ -100,6 +100,20 @@ class RefreshTokenService {
    */
   async rotateRefreshToken(oldRefreshToken: string): Promise<TokenPair> {
     const info = await this.validateRefreshToken(oldRefreshToken);
+
+    // Atomically claim the old token before minting anything. The revoke is a
+    // conditional UPDATE ... WHERE revoked = false, so only one of two
+    // concurrent requests presenting the same still-valid token can flip the
+    // row. If we didn't flip it (rowCount 0), another request already rotated
+    // this token, so burn the whole family and refuse (a double-use).
+    // Doing this first (rather than after issuing the new pair) closes the race
+    // where both requests validate before either revoke lands.
+    const claimed = await this.invalidateRefreshToken(oldRefreshToken);
+    if (!claimed) {
+      await this.invalidateTokenFamily(info.family);
+      throw new Error('REFRESH_TOKEN_NOT_FOUND');
+    }
+
     // Carry the role claim into the rotated access token so requireRole avoids
     // a per-request DB lookup (refresh tokens themselves do not store the role).
     const roleRes = await query<{ role: string | null }>(
@@ -114,20 +128,22 @@ class RefreshTokenService {
       info.email,
       info.family
     );
-    await this.invalidateRefreshToken(oldRefreshToken);
     return newPair;
   }
 
   /**
-   * Revoke a single refresh token.
+   * Revoke a single refresh token. Returns true when this call actually flipped
+   * a live token to revoked (rowCount === 1), false when the token was already
+   * revoked or absent, so the caller can detect concurrent double-use.
    */
-  async invalidateRefreshToken(refreshToken: string): Promise<void> {
+  async invalidateRefreshToken(refreshToken: string): Promise<boolean> {
     const tokenHash = hashToken(refreshToken);
-    await query(
+    const res = await query(
       `UPDATE refresh_tokens SET revoked = true, "revokedAt" = NOW()
        WHERE "tokenHash" = $1 AND revoked = false`,
       [tokenHash]
     );
+    return (res.rowCount ?? 0) === 1;
   }
 
   /**

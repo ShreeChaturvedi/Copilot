@@ -18,35 +18,41 @@ const forgotPasswordSchema = z.object({
 const GENERIC_MESSAGE =
   'If an account exists for that email, a password reset link has been sent.';
 
-export default createMethodHandler({
-  [HttpMethod.POST]: async (req: AuthenticatedRequest, res: VercelResponse) => {
-    const validationResult = forgotPasswordSchema.safeParse(req.body);
+export default createMethodHandler(
+  {
+    [HttpMethod.POST]: async (
+      req: AuthenticatedRequest,
+      res: VercelResponse
+    ) => {
+      const validationResult = forgotPasswordSchema.safeParse(req.body);
 
-    if (!validationResult.success) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'A valid email address is required',
-          details: validationResult.error.errors,
-          timestamp: new Date().toISOString(),
-        },
+      if (!validationResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'A valid email address is required',
+            details: validationResult.error.errors,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+
+      try {
+        await authService.requestPasswordReset(validationResult.data.email);
+      } catch (error) {
+        // Log internally but never reveal failures to the caller; the response
+        // must stay generic regardless of whether the email exists or sending
+        // succeeded.
+        console.error('Password reset request error:', error);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: { message: GENERIC_MESSAGE },
+        meta: { timestamp: new Date().toISOString() },
       });
-    }
-
-    try {
-      await authService.requestPasswordReset(validationResult.data.email);
-    } catch (error) {
-      // Log internally but never reveal failures to the caller; the response
-      // must stay generic regardless of whether the email exists or sending
-      // succeeded.
-      console.error('Password reset request error:', error);
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: { message: GENERIC_MESSAGE },
-      meta: { timestamp: new Date().toISOString() },
-    });
+    },
   },
-});
+  { rateLimit: 'auth' }
+);

@@ -7,6 +7,17 @@ import { refreshTokenService } from './RefreshTokenService.js';
 // Password reset tokens are valid for one hour.
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
+// A fixed bcrypt hash used to equalize login timing. When no user row is found
+// (or the account is OAuth-only with no password), we still run a full cost-12
+// bcrypt.compare against this so the response time cannot distinguish an
+// unregistered email from a registered one with a wrong password (account
+// enumeration). Computed once at module load; the plaintext never matches a
+// real password.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(
+  'constant-time-timing-equalizer',
+  12
+);
+
 export interface RegisterUserData {
   email: string;
   password: string;
@@ -133,12 +144,16 @@ class AuthService {
     );
     const user = res.rows[0];
 
-    if (!user) {
-      throw new Error('INVALID_CREDENTIALS');
-    }
-
-    // Check if user has a password (not OAuth-only user)
-    if (!user.password) {
+    // Equalize timing: the missing-user and OAuth-only (no password) paths must
+    // pay the same bcrypt cost as the wrong-password path, otherwise the
+    // response-time delta lets an attacker enumerate which emails are
+    // registered (and which are Google-only). Compare against a fixed dummy
+    // hash before throwing.
+    if (!user || !user.password) {
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      if (!user) {
+        throw new Error('INVALID_CREDENTIALS');
+      }
       throw new Error('OAUTH_USER_NO_PASSWORD');
     }
 
@@ -220,15 +235,43 @@ class AuthService {
   }
 
   /**
-   * Update user password
+   * Update user password. Revokes every existing refresh token so a changed
+   * password actually logs out any other (possibly attacker) session, the
+   * canonical "someone got into my account, I changed my password" remediation.
+   * Because that mass-revoke also kills the caller's own refresh token, a fresh
+   * token pair is minted, stored, and returned so the current session survives.
    */
-  async updatePassword(userId: string, newPassword: string): Promise<void> {
+  async updatePassword(
+    userId: string,
+    newPassword: string
+  ): Promise<TokenPair> {
     const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
 
-    await query(
-      `UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2`,
+    const res = await query<{ email: string; role: string | null }>(
+      `UPDATE users SET password = $1, "updatedAt" = NOW() WHERE id = $2
+       RETURNING email, "role"`,
       [hashedPassword, userId]
     );
+    const row = res.rows[0];
+    if (!row) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
+    // Log out every existing session (including any stolen refresh token).
+    await refreshTokenService.invalidateAllUserTokens(userId);
+
+    // Re-mint so the caller who just changed their password stays signed in.
+    const tokens = await generateTokenPair(
+      userId,
+      row.email,
+      row.role ?? undefined
+    );
+    await refreshTokenService.storeRefreshToken(
+      tokens.refreshToken,
+      userId,
+      row.email
+    );
+    return tokens;
   }
 
   /**
@@ -293,7 +336,7 @@ class AuthService {
     const tokenHash = this.hashToken(token);
     const hashedPassword = await bcrypt.hash(newPassword, this.saltRounds);
 
-    await withTransaction(async (tx) => {
+    const userId = await withTransaction(async (tx) => {
       const res = await query<{
         id: string;
         userId: string;
@@ -330,7 +373,14 @@ class AuthService {
         [row.id],
         tx
       );
+      return row.userId;
     });
+
+    // Revoke every refresh token for this user once the reset has committed. A
+    // reset is the exact flow a compromised user is told to run, so any session
+    // an attacker still holds (their stolen refresh token stays valid for up to
+    // 7 days otherwise) must be killed. The user re-logs in afterward.
+    await refreshTokenService.invalidateAllUserTokens(userId);
   }
 
   /**

@@ -78,6 +78,11 @@ class GoogleOAuthService {
 
       return result;
     } catch (error) {
+      // Surface the account-takeover guard distinctly so handlers can 400 it
+      // rather than folding it into a generic OAuth failure.
+      if (error instanceof Error && error.message === 'EMAIL_NOT_VERIFIED') {
+        throw error;
+      }
       console.error('Google OAuth callback error:', error);
       throw new Error('GOOGLE_OAUTH_FAILED');
     }
@@ -111,6 +116,10 @@ class GoogleOAuthService {
 
       return result;
     } catch (error) {
+      // Preserve the account-takeover guard distinctly (see handleCallback).
+      if (error instanceof Error && error.message === 'EMAIL_NOT_VERIFIED') {
+        throw error;
+      }
       console.error('Google ID token verification error:', error);
       throw new Error('GOOGLE_TOKEN_VERIFICATION_FAILED');
     }
@@ -174,6 +183,17 @@ class GoogleOAuthService {
     let isNewUser = false;
 
     if (!user) {
+      // No account is yet linked to this Google id. Before we either link this
+      // identity onto an existing email/password account or auto-create a new
+      // account, require that Google has verified the email. Otherwise an
+      // attacker controlling a Google account with an unverified address equal
+      // to a victim's registered email could get linked into (take over) that
+      // account, and every future Google login would authenticate as the
+      // victim. verified_email was captured but never enforced before.
+      if (!googleUserInfo.verified_email) {
+        throw new Error('EMAIL_NOT_VERIFIED');
+      }
+
       userRow = await query<{
         id: string;
         email: string;
