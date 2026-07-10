@@ -147,25 +147,25 @@ export async function createTaskInline(
 }
 
 /**
- * Open the Settings dialog to a section. The dialog is bridged via an
- * `app:open-settings` CustomEvent; a follow-up click on the section's unique
- * nav description disambiguates (the "Preferences" title text also appears in
- * the Calendar item's description). Pass `navDescription` for the sections that
- * need it (general/preferences/etc.); omit for profile (opens directly).
+ * Open the Settings dialog to a section via the `app:open-settings` bridge.
+ * Canonical ids: general | account | integrations | security | about.
+ * Legacy ids (profile, preferences, calendar, help) are aliased in the app.
+ * The optional second arg is ignored (kept for call-site compatibility).
  */
 export async function openSettingsSection(
   page: Page,
   section: string,
-  navDescription?: string
+  _navDescription?: string
 ): Promise<void> {
   await page.evaluate((s) => {
     window.dispatchEvent(
       new CustomEvent('app:open-settings', { detail: { section: s } })
     );
   }, section);
-  if (navDescription) {
-    await page.getByText(navDescription, { exact: true }).first().click();
-  }
+  // Wait for the dialog shell so callers can interact immediately.
+  await expect(page.getByRole('dialog', { name: /settings/i })).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 /**

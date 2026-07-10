@@ -1,20 +1,24 @@
 import { useState, useCallback } from 'react';
-import type { SettingsSection } from '@/components/settings/SettingsDialog';
+import {
+  resolveSettingsSection,
+  type SettingsSection,
+} from '@/components/settings/settingsSections';
 
 interface UseSettingsDialogReturn {
   isOpen: boolean;
   currentSection: SettingsSection;
-  openSettings: (section?: SettingsSection) => void;
+  openSettings: (section?: string) => void;
   closeSettings: () => void;
   setSection: (section: SettingsSection) => void;
 }
 
 export function useSettingsDialog(): UseSettingsDialogReturn {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentSection, setCurrentSection] = useState<SettingsSection>('general');
+  const [currentSection, setCurrentSection] =
+    useState<SettingsSection>('general');
 
-  const openSettings = useCallback((section: SettingsSection = 'general') => {
-    setCurrentSection(section);
+  const openSettings = useCallback((section: string = 'general') => {
+    setCurrentSection(resolveSettingsSection(section));
     setIsOpen(true);
   }, []);
 

@@ -7,34 +7,31 @@ import {
 } from './support/helpers';
 
 test.describe('settings', () => {
-  test('profile: display name update persists across reload', async ({
+  test('account: display name update persists across reload', async ({
     page,
   }) => {
     await signupAndEnter(page);
-    await openSettingsSection(page, 'profile');
+    await openSettingsSection(page, 'account');
 
-    const nameField = page.getByLabel('Display Name');
+    const nameField = page.getByLabel('Display name');
     await expect(nameField).toBeVisible();
     await nameField.fill('Renamed User');
-    await page.getByRole('button', { name: 'Save Changes' }).click();
-    await expect(page.getByText(/Profile updated/i)).toBeVisible();
+    // Blur-save (instant-apply model) — leave the field so the PATCH fires.
+    await nameField.blur();
+    await expect(page.getByText(/^Saved$/i)).toBeVisible({ timeout: 10_000 });
 
     // Reload; the persisted profile rehydrates and re-verifies via /api/auth/me.
     await page.goto(appPath('/'));
     await waitForApp(page);
-    await openSettingsSection(page, 'profile');
-    await expect(page.getByLabel('Display Name')).toHaveValue('Renamed User');
+    await openSettingsSection(page, 'account');
+    await expect(page.getByLabel('Display name')).toHaveValue('Renamed User');
   });
 
   test('data export downloads a JSON file including task_tags', async ({
     page,
   }) => {
     await signupAndEnter(page);
-    await openSettingsSection(
-      page,
-      'general',
-      'Account and application settings'
-    );
+    await openSettingsSection(page, 'security');
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -48,45 +45,30 @@ test.describe('settings', () => {
 
     expect(payload).toHaveProperty('taskTags');
     expect(payload).toHaveProperty('tasks');
-    expect(Array.isArray(payload.taskTags)).toBe(true);
+    expect(Array.isArray(payload.taskTags)).toBeTruthy();
   });
 
   test('preferences: default view persists across reload', async ({ page }) => {
     await signupAndEnter(page);
-    await openSettingsSection(
-      page,
-      'preferences',
-      'Workspace and display settings'
-    );
+    await openSettingsSection(page, 'general');
 
     const select = page.locator('#default-view');
     await expect(select).toBeVisible();
     await select.click();
-    // Pick a value distinct from the "Calendar View" default.
-    await page.getByRole('option', { name: 'Remember Last Used' }).click();
-    await page.getByRole('button', { name: 'Save Preferences' }).click();
-
+    // Pick a value distinct from the Calendar default.
+    await page.getByRole('option', { name: 'Last used' }).click();
+    // Instant apply — no Save button. Reopen after reload to confirm.
     await page.goto(appPath('/'));
     await waitForApp(page);
-    await openSettingsSection(
-      page,
-      'preferences',
-      'Workspace and display settings'
-    );
-    await expect(page.locator('#default-view')).toContainText(
-      'Remember Last Used'
-    );
+    await openSettingsSection(page, 'general');
+    await expect(page.locator('#default-view')).toContainText('Last used');
   });
 
   test('delete account logs the user out to the login page', async ({
     page,
   }) => {
     await signupAndEnter(page);
-    await openSettingsSection(
-      page,
-      'general',
-      'Account and application settings'
-    );
+    await openSettingsSection(page, 'security');
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.getByText('Delete your account?')).toBeVisible();

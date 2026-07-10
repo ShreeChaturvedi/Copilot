@@ -81,19 +81,20 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
-    onOpenProfile: () => openSettings('profile'),
+    onOpenProfile: () => openSettings('account'),
     onOpenSettings: () => openSettings('general'),
-    onOpenHelp: () => openSettings('help'),
+    onOpenHelp: () => openSettings('about'),
     onLogout: () => logout(),
   });
 
   // Cmd+K palette + single-key map (T, D/W/M/L, N) — design-brief §4.6
   useGlobalShortcuts();
 
-  // Global event bridge so dropdown can open settings without prop drilling
+  // Global event bridge so dropdown can open settings without prop drilling.
+  // resolveSettingsSection (via openSettings) maps legacy ids (profile, help, …).
   useEffect(() => {
     const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ section?: 'general' | 'profile' | 'help' }>;
+      const ce = e as CustomEvent<{ section?: string }>;
       const section = ce.detail?.section ?? 'general';
       openSettings(section);
     };

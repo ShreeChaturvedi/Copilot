@@ -12,27 +12,21 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { EASE_SETTLE, DUR_2_S } from '@/lib/motion';
 import { SettingsNav } from './SettingsNav';
-import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
-import { PreferencesSettings } from './PreferencesSettings';
+import { AccountSettings } from './AccountSettings';
 import { SecuritySettings } from './SecuritySettings';
-import { HelpSettings } from './HelpSettings';
-import { CalendarSettings } from './CalendarSettings';
+import { AboutSettings } from './AboutSettings';
 import { IntegrationsSettings } from './IntegrationsSettings';
-
-export type SettingsSection =
-  | 'general'
-  | 'profile'
-  | 'preferences'
-  | 'security'
-  | 'integrations'
-  | 'help'
-  | 'calendar';
+import {
+  resolveSettingsSection,
+  SECTION_TITLES,
+  type SettingsSection,
+} from './settingsSections';
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultSection?: SettingsSection;
+  defaultSection?: SettingsSection | string;
 }
 
 export function SettingsDialog({
@@ -40,19 +34,17 @@ export function SettingsDialog({
   onOpenChange,
   defaultSection = 'general',
 }: SettingsDialogProps) {
+  const resolvedDefault = resolveSettingsSection(String(defaultSection));
   const [activeSection, setActiveSection] =
-    useState<SettingsSection>(defaultSection);
-  // Below 768px settings is a list -> detail push (#48): the nav is the
-  // first screen, a section choice slides the detail pane in over it.
+    useState<SettingsSection>(resolvedDefault);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
-  // Update active section when defaultSection changes and dialog opens
   useEffect(() => {
     if (open) {
-      setActiveSection(defaultSection);
-      // Deep links (e.g. straight to Integrations) land on the detail pane
-      setMobileDetailOpen(defaultSection !== 'general');
+      const next = resolveSettingsSection(String(defaultSection));
+      setActiveSection(next);
+      setMobileDetailOpen(next !== 'general');
     }
   }, [open, defaultSection]);
 
@@ -65,68 +57,51 @@ export function SettingsDialog({
     switch (activeSection) {
       case 'general':
         return <GeneralSettings />;
-      case 'calendar':
-        return <CalendarSettings />;
-      case 'profile':
-        return <ProfileSettings />;
-      case 'preferences':
-        return <PreferencesSettings />;
+      case 'account':
+        return <AccountSettings />;
       case 'security':
         return <SecuritySettings />;
       case 'integrations':
         return <IntegrationsSettings />;
-      case 'help':
-        return <HelpSettings />;
+      case 'about':
+        return <AboutSettings />;
       default:
         return <GeneralSettings />;
-    }
-  };
-
-  const getSectionTitle = () => {
-    switch (activeSection) {
-      case 'general':
-        return 'General';
-      case 'calendar':
-        return 'Calendar';
-      case 'profile':
-        return 'Profile';
-      case 'preferences':
-        return 'Preferences';
-      case 'security':
-        return 'Security';
-      case 'integrations':
-        return 'Integrations';
-      case 'help':
-        return 'Help & Support';
-      default:
-        return 'Settings';
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full max-w-[calc(100vw-2rem)] sm:max-w-[90vw] md:max-w-5xl h-[80vh] max-h-[800px] p-0 gap-0 grid-rows-[auto_1fr] max-sm:max-w-full max-sm:h-[92vh] max-sm:pb-0 overflow-hidden"
-        closeButtonClassName="top-2"
+        className={cn(
+          // Preference window: wide enough for rail + content, not a second app.
+          'w-full max-w-[calc(100vw-2rem)] sm:max-w-[52rem]',
+          'h-[min(78vh,680px)] p-0 gap-0 grid-rows-[auto_1fr]',
+          'max-sm:max-w-full max-sm:h-[92vh] max-sm:pb-0 overflow-hidden',
+          'border-hairline bg-surface-1'
+        )}
+        closeButtonClassName="top-3 right-3"
       >
         <DialogHeader className="px-5 py-3 border-b border-hairline max-sm:pt-5">
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+            Settings
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            Manage your account, preferences, and integrations
+            Manage account, workspace, and integrations
           </DialogDescription>
         </DialogHeader>
 
         <div className="relative min-h-0 overflow-hidden md:flex">
-          {/* Navigation: static rail on md+, first screen of the push below */}
+          {/* Rail: wide enough for name+email (~14rem) */}
           <aside
             className={cn(
-              'absolute inset-0 w-full overflow-y-auto p-4 bg-surface-3',
+              'absolute inset-0 w-full overflow-y-auto p-3 bg-surface-1',
               'transition-transform motion-reduce:transition-none',
-              // Close (~70%) is faster than open, never the reverse (§3.1).
               mobileDetailOpen
                 ? 'duration-[240ms] ease-settle'
                 : 'duration-[160ms] ease-out',
-              'md:static md:w-64 md:shrink-0 md:translate-x-0 md:border-r md:border-hairline md:bg-surface-2',
+              'md:static md:w-60 md:shrink-0 md:translate-x-0',
+              'md:border-r md:border-hairline md:bg-surface-2 md:p-3',
               mobileDetailOpen && '-translate-x-1/4 md:translate-x-0'
             )}
             aria-hidden={mobileDetailOpen ? true : undefined}
@@ -137,12 +112,10 @@ export function SettingsDialog({
             />
           </aside>
 
-          {/* Detail pane: slides in over the nav below md (#48) */}
           <section
             className={cn(
-              'absolute inset-0 w-full overflow-y-auto bg-surface-3',
+              'absolute inset-0 w-full overflow-y-auto bg-surface-1',
               'transition-transform motion-reduce:transition-none',
-              // Close (~70%) is faster than open, never the reverse (§3.1).
               mobileDetailOpen
                 ? 'duration-[240ms] ease-settle'
                 : 'duration-[160ms] ease-out',
@@ -152,44 +125,35 @@ export function SettingsDialog({
                 : 'translate-x-full md:translate-x-0'
             )}
           >
-            <div className="p-5">
-              <div className="mb-3 space-y-1">
-                <div className="flex items-center gap-1">
+            <div className="px-6 py-5 max-w-[36rem]">
+              <div className="mb-5 flex items-center gap-1">
+                {mobileDetailOpen && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="md:hidden -ml-2 px-2 text-muted-foreground"
+                    className="md:hidden -ml-2 h-8 px-2 text-ink-muted"
                     onClick={() => setMobileDetailOpen(false)}
                     aria-label="Back to settings"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Settings
                   </Button>
-                </div>
-                <h2 className="text-base font-semibold tracking-[-0.01em]">
-                  {getSectionTitle()}
+                )}
+                <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground max-md:sr-only">
+                  {SECTION_TITLES[activeSection]}
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  {activeSection === 'general' &&
-                    'Manage your account and application settings'}
-                  {activeSection === 'profile' &&
-                    'Manage your personal information and preferences'}
-                  {activeSection === 'preferences' &&
-                    'Customize your workspace and default preferences'}
-                  {activeSection === 'security' &&
-                    'Manage your password and security settings'}
-                  {activeSection === 'integrations' &&
-                    'Connect external services like Google Calendar'}
-                  {activeSection === 'help' &&
-                    'Get help, documentation, and support'}
-                </p>
+                {mobileDetailOpen && (
+                  <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground md:hidden">
+                    {SECTION_TITLES[activeSection]}
+                  </h2>
+                )}
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={activeSection}
-                  initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: 3 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
                   transition={{ duration: DUR_2_S, ease: EASE_SETTLE }}
                 >
                   {renderContent()}

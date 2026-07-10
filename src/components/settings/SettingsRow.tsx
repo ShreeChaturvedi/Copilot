@@ -6,18 +6,13 @@ export interface SettingsRowProps {
   label: React.ReactNode;
   description?: React.ReactNode;
   htmlFor?: string;
-  /** 'start' when the control is multi-line/wide (SharedToggleButton, RangeSlider). */
+  /** 'start' when the control is multi-line/wide (segmented, slider). */
   align?: 'center' | 'start';
-  /** The control. */
   children: React.ReactNode;
 }
 
 /**
- * Structural label/control row for a Settings panel. No hover/focus of its
- * own — the row is not itself an activation target; the control in the slot
- * (Switch/Select/Button/…) already carries the correct interaction states.
- * Meant to sit inside a `SettingsSection`'s `divide-y` container, or stand
- * alone in `space-y-*` for single-topic panels that need no heading.
+ * Label left / control right. Control column min-width keeps selects aligned.
  */
 export function SettingsRow({
   label,
@@ -29,22 +24,31 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        'flex gap-4 py-3.5 justify-between',
+        'flex gap-6 py-2.5 justify-between',
         align === 'start' ? 'items-start' : 'items-center'
       )}
     >
-      <div className="space-y-0.5 min-w-0">
+      <div className="min-w-0 flex-1 space-y-0.5 pr-2">
         <Label
           htmlFor={htmlFor}
-          className="text-sm font-medium text-foreground"
+          className="text-[13px] font-medium text-foreground leading-snug"
         >
           {label}
         </Label>
         {description && (
-          <p className="text-[0.8125rem] text-ink-muted">{description}</p>
+          <p className="text-[12px] leading-snug text-ink-muted max-w-[22rem]">
+            {description}
+          </p>
         )}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div
+        className={cn(
+          'shrink-0 flex justify-end',
+          align === 'start' && 'pt-0.5'
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

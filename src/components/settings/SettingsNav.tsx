@@ -1,30 +1,20 @@
 import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button-variants';
-import {
-  Settings2,
-  HelpCircle,
-  Shield,
-  Sliders,
-  Calendar as CalendarIcon,
-  Link2,
-  ChevronRight,
-} from 'lucide-react';
+import { HelpCircle, Shield, Link2, Sliders, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useProfileData } from '@/hooks/useProfileData';
-import type { SettingsSection } from './SettingsDialog';
+import type { SettingsSection } from './settingsSections';
 
-// Navigation items excluding 'profile' (rendered separately). Descriptions
-// were dropped (#1.D/#2.7) — they duplicated the detail-pane's own header,
-// visible simultaneously on any viewport >=768px.
-const navItems = [
-  { id: 'general' as const, title: 'General', icon: Sliders },
-  { id: 'calendar' as const, title: 'Calendar', icon: CalendarIcon },
-  { id: 'preferences' as const, title: 'Preferences', icon: Settings2 },
-  { id: 'security' as const, title: 'Security', icon: Shield },
-  { id: 'integrations' as const, title: 'Integrations', icon: Link2 },
-  { id: 'help' as const, title: 'Help & Support', icon: HelpCircle },
-] as const;
+const navItems: {
+  id: Exclude<SettingsSection, 'account'>;
+  title: string;
+  icon: typeof Sliders;
+}[] = [
+  { id: 'general', title: 'General', icon: Sliders },
+  { id: 'integrations', title: 'Integrations', icon: Link2 },
+  { id: 'security', title: 'Security', icon: Shield },
+  { id: 'about', title: 'About', icon: HelpCircle },
+];
 
 interface SettingsNavProps {
   activeSection: SettingsSection;
@@ -37,57 +27,55 @@ export function SettingsNav({
 }: SettingsNavProps) {
   const profileData = useProfileData();
 
-  // Generate initials from name
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(' ')
       .map((word) => word.charAt(0))
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
 
   return (
     <nav
-      className="space-y-3"
+      className="flex flex-col gap-3"
       role="navigation"
       aria-label="Settings navigation"
     >
-      {/* Profile Section */}
-      <div className="space-y-1">
-        <button
-          onClick={() => onSectionChange('profile')}
-          className={cn(
-            buttonVariants({ variant: 'ghost' }),
-            activeSection === 'profile'
-              ? 'bg-aqua-film-08 text-foreground'
-              : 'text-ink-muted hover:bg-surface-hover hover:text-foreground',
-            'w-full justify-start h-auto px-3 py-2.5 flex items-center gap-3'
-          )}
-        >
-          <Avatar className="size-8">
-            <AvatarImage src={profileData.picture} alt={profileData.name} />
-            <AvatarFallback>{getInitials(profileData.name)}</AvatarFallback>
-          </Avatar>
-          <div className="text-left flex-1 min-w-0">
-            <div className="font-medium text-sm truncate">
-              {profileData.name}
-            </div>
-            <div className="text-xs text-ink-muted truncate">
-              {profileData.email}
-            </div>
+      <button
+        type="button"
+        onClick={() => onSectionChange('account')}
+        className={cn(
+          'w-full flex items-center gap-2.5 rounded-btn px-2 py-2 text-left',
+          'transition-colors duration-150 ease-out',
+          'outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong',
+          activeSection === 'account'
+            ? 'bg-surface-3 text-foreground'
+            : 'text-ink-2 hover:bg-surface-hover'
+        )}
+      >
+        <Avatar className="size-8 shrink-0">
+          <AvatarImage src={profileData.picture} alt={profileData.name} />
+          <AvatarFallback className="text-[11px] font-medium">
+            {getInitials(profileData.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium truncate leading-tight">
+            {profileData.name}
           </div>
-          <ChevronRight
-            className="h-4 w-4 shrink-0 text-ink-muted md:hidden"
-            aria-hidden="true"
-          />
-        </button>
+          <div className="text-[11px] text-ink-muted truncate leading-tight mt-0.5">
+            {profileData.email}
+          </div>
+        </div>
+        <ChevronRight
+          className="size-3.5 shrink-0 text-ink-muted md:hidden"
+          aria-hidden
+        />
+      </button>
 
-        <Separator />
-      </div>
+      <Separator className="bg-hairline" />
 
-      {/* Other Settings Sections */}
-      <div className="space-y-1">
+      <div className="flex flex-col gap-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
@@ -95,24 +83,29 @@ export function SettingsNav({
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => onSectionChange(item.id)}
               className={cn(
-                buttonVariants({ variant: 'ghost' }),
+                'w-full flex items-center gap-2.5 rounded-btn h-8 px-2',
+                'text-[13px] font-medium transition-colors duration-150 ease-out',
+                'outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong',
                 isActive
-                  ? 'bg-aqua-film-08 text-foreground'
-                  : 'text-ink-muted hover:bg-surface-hover hover:text-foreground',
-                'w-full justify-start h-auto px-3 py-2.5 flex items-center gap-3'
+                  ? 'bg-surface-3 text-foreground'
+                  : 'text-ink-muted hover:bg-surface-hover hover:text-foreground'
               )}
             >
               <Icon
-                className={cn('h-4 w-4 shrink-0', isActive && 'text-aqua')}
+                className={cn(
+                  'size-3.5 shrink-0',
+                  isActive ? 'text-aqua' : 'text-ink-muted'
+                )}
               />
-              <span className="flex-1 min-w-0 text-left text-sm font-medium">
+              <span className="flex-1 min-w-0 text-left truncate">
                 {item.title}
               </span>
               <ChevronRight
-                className="h-4 w-4 shrink-0 text-ink-muted md:hidden"
-                aria-hidden="true"
+                className="size-3.5 shrink-0 text-ink-muted md:hidden"
+                aria-hidden
               />
             </button>
           );

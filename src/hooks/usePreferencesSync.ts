@@ -8,9 +8,8 @@ import { userAPI } from '@/services/api/user';
 
 /**
  * On authentication, load the user's saved preferences from the server and
- * apply them to the app shell. Preferences persisted via Settings > Preferences
- * are otherwise never read back, so a reload never honored theme, default view,
- * or week start.
+ * apply them to the app shell. Workspace prefs from Settings > General are
+ * applied here on login so theme, default view, and week start survive reload.
  */
 export function usePreferencesSync() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

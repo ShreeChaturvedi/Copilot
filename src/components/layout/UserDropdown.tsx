@@ -18,7 +18,7 @@ import { Keycap } from '@/components/ui/Keycap';
 import { useAuthStore } from '@/stores/authStore';
 
 interface UserDropdownProps {
-  onOpenSettings?: (section: 'general' | 'profile' | 'help') => void;
+  onOpenSettings?: (section: string) => void;
 }
 
 export const UserDropdown: React.FC<UserDropdownProps> = ({
@@ -52,7 +52,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
       .slice(0, 2);
   };
 
-  const dispatchOpen = (section: 'general' | 'profile' | 'help') => {
+  const dispatchOpen = (section: string) => {
     // Fire custom event as a fallback bridge
     window.dispatchEvent(
       new CustomEvent('app:open-settings', { detail: { section } })
@@ -60,11 +60,11 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
     onOpenSettings?.(section);
   };
 
-  const handleProfileClick = () => dispatchOpen('profile');
+  const handleProfileClick = () => dispatchOpen('account');
 
   const handleSettingsClick = () => dispatchOpen('general');
 
-  const handleHelpClick = () => dispatchOpen('help');
+  const handleHelpClick = () => dispatchOpen('about');
 
   const handleLogoutClick = async () => {
     if (isLoggingOut) return;

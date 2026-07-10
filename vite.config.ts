@@ -1,14 +1,77 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { existsSync, readFileSync } from 'node:fs';
+import http from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
+import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
+
+const DEFAULT_API_TARGET = 'http://localhost:3001';
+const PORT_FILE = resolve(process.cwd(), '.dev-api-port');
+
+/** Resolve API target: API_PROXY_TARGET > .dev-api-port > :3001 */
+function resolveApiTarget(): string {
+  if (process.env.API_PROXY_TARGET) return process.env.API_PROXY_TARGET;
+  try {
+    if (existsSync(PORT_FILE)) {
+      const port = readFileSync(PORT_FILE, 'utf-8').trim();
+      if (/^\d+$/.test(port)) return `http://localhost:${port}`;
+    }
+  } catch {
+    // fall through
+  }
+  return DEFAULT_API_TARGET;
+}
+
+/**
+ * Proxies /api with a target re-read on every request so concurrent
+ * `npm run dev` (API + Vite) works when the API probes off :3001.
+ * API_PROXY_TARGET (E2E) still wins and is stable for the process.
+ */
+function dynamicApiProxy(): Plugin {
+  return {
+    name: 'dynamic-api-proxy',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/api')) return next();
+
+        const target = new URL(resolveApiTarget());
+        const proxyReq = http.request(
+          {
+            protocol: target.protocol,
+            hostname: target.hostname,
+            port: target.port,
+            path: req.url,
+            method: req.method,
+            headers: {
+              ...req.headers,
+              host: target.host,
+            },
+          },
+          (proxyRes) => {
+            res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+            proxyRes.pipe(res);
+          }
+        );
+
+        proxyReq.on('error', (err) => {
+          res.statusCode = 502;
+          res.setHeader('Content-Type', 'text/plain');
+          res.end(`Bad Gateway: API unreachable (${err.message})`);
+        });
+
+        req.pipe(proxyReq);
+      });
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   // SPA is served under /app (landing owns /). Vite prefixes root-absolute
   // asset URLs and import.meta.env.BASE_URL with this in dev and build.
   base: '/app/',
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), dynamicApiProxy()],
   optimizeDeps: {
     include: [
       'react-resizable-panels',
@@ -122,12 +185,6 @@ export default defineConfig({
   server: {
     port: 5180,
     strictPort: true,
-    proxy: {
-      '/api': {
-        target: process.env.API_PROXY_TARGET || 'http://localhost:3001', // Local Express backend
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    // /api proxy is handled by dynamicApiProxy (re-reads .dev-api-port).
   },
 });

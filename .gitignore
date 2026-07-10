@@ -31,6 +31,9 @@ dist-ssr
 AGENTS.md
 tests.md
 
+# Dev API port handoff (scripts/dev-server.ts <-> vite)
+.dev-api-port
+
 # Environment variables
 .env
 .env.local

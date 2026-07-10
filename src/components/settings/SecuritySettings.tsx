@@ -4,11 +4,22 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Info } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Info, Trash2, Download } from 'lucide-react';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 import { useAuthStore } from '@/stores/authStore';
 import { authAPI } from '@/services/api/auth';
+import { userAPI } from '@/services/api/user';
 
 export function SecuritySettings() {
   const {
@@ -17,6 +28,7 @@ export function SecuritySettings() {
     getValidAccessToken,
     refreshTokenIfNeeded,
     logoutEverywhere,
+    logout,
   } = useAuthStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -28,8 +40,12 @@ export function SecuritySettings() {
 
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Local (password) accounts can change their password. Google-only accounts
-  // have no password to verify against.
+  const [exportingData, setExportingData] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const hasPassword = authMethod === 'jwt';
   const googleConnected = authMethod === 'google' || Boolean(user?.googleId);
 
@@ -43,9 +59,6 @@ export function SecuritySettings() {
       return;
     }
 
-    // Refresh a stale-but-renewable JWT first so an idle session changes its
-    // password transparently instead of being forced to log in again (matches
-    // the api service authHeaders() behavior).
     await refreshTokenIfNeeded();
     const accessToken = getValidAccessToken();
     if (!accessToken) {
@@ -83,46 +96,95 @@ export function SecuritySettings() {
     }
   };
 
+  const handleExportData = async () => {
+    try {
+      setExportingData(true);
+      setExportError(null);
+      await userAPI.exportData();
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : 'Failed to export data'
+      );
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setDeletingAccount(true);
+      setDeleteError(null);
+      await userAPI.deleteAccount();
+      setDeleteDialogOpen(false);
+      await logout();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : 'Failed to delete account'
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   return (
     <div>
-      {/* Change Password */}
-      <SettingsSection title="Change Password" first>
+      <SettingsSection title="Password" first>
         {hasPassword ? (
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
+          <form
+            onSubmit={handleChangePassword}
+            className="space-y-3 py-1 max-w-sm"
+          >
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="current-password"
+                className="text-[12px] text-ink-muted font-medium"
+              >
+                Current password
+              </Label>
               <Input
                 id="current-password"
                 type="password"
                 autoComplete="current-password"
+                className="h-8 text-[13px]"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 disabled={changing}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="new-password"
+                className="text-[12px] text-ink-muted font-medium"
+              >
+                New password
+              </Label>
               <Input
                 id="new-password"
                 type="password"
                 autoComplete="new-password"
+                className="h-8 text-[13px]"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={changing}
                 required
               />
-              <p className="text-xs text-ink-muted">
-                At least 8 characters with uppercase, lowercase, a number, and a
-                special character.
+              <p className="text-[11px] text-ink-muted">
+                8+ chars with upper, lower, number, and special character.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="confirm-password"
+                className="text-[12px] text-ink-muted font-medium"
+              >
+                Confirm new password
+              </Label>
               <Input
                 id="confirm-password"
                 type="password"
                 autoComplete="new-password"
+                className="h-8 text-[13px]"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={changing}
@@ -137,15 +199,14 @@ export function SecuritySettings() {
             )}
             {pwSuccess && (
               <Alert className="border-aqua-rim bg-aqua-film-08 text-success">
-                <AlertDescription>
-                  Password changed successfully.
-                </AlertDescription>
+                <AlertDescription>Password changed.</AlertDescription>
               </Alert>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-1">
               <Button
                 type="submit"
+                size="sm"
                 disabled={
                   changing ||
                   !currentPassword ||
@@ -155,7 +216,7 @@ export function SecuritySettings() {
               >
                 {changing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                     Updating...
                   </>
                 ) : (
@@ -165,24 +226,23 @@ export function SecuritySettings() {
             </div>
           </form>
         ) : (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              You are signed in with Google, so there is no password to change.
-              Manage your password in your Google account.
-            </AlertDescription>
-          </Alert>
+          <div className="py-3">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Signed in with Google — manage your password in your Google
+                account.
+              </AlertDescription>
+            </Alert>
+          </div>
         )}
       </SettingsSection>
 
-      {/* Connected Accounts */}
-      <SettingsSection title="Connected Accounts">
+      <SettingsSection title="Sign-in">
         <SettingsRow
-          label="Sign-in with Google"
+          label="Google"
           description={
-            googleConnected
-              ? 'Your Google account is linked for sign-in.'
-              : 'No Google account is linked.'
+            googleConnected ? 'Linked for sign-in' : 'No Google account linked'
           }
         >
           {googleConnected ? (
@@ -199,20 +259,20 @@ export function SecuritySettings() {
         </SettingsRow>
       </SettingsSection>
 
-      {/* Active Sessions */}
-      <SettingsSection title="Active Sessions">
+      <SettingsSection title="Sessions">
         <SettingsRow
           label="Log out everywhere"
-          description="Ends every active session, including this one."
+          description="Ends every active session, including this one"
         >
           <Button
             variant="outline"
+            size="sm"
             onClick={handleLogoutEverywhere}
             disabled={loggingOut}
           >
             {loggingOut ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                 Logging out...
               </>
             ) : (
@@ -221,6 +281,94 @@ export function SecuritySettings() {
           </Button>
         </SettingsRow>
       </SettingsSection>
+
+      <SettingsSection title="Data">
+        <SettingsRow
+          label="Export data"
+          description="Download tasks, events, and settings as JSON"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportData}
+            disabled={exportingData}
+          >
+            {exportingData ? (
+              <>
+                <Download className="mr-2 h-3.5 w-3.5 animate-pulse" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-3.5 w-3.5" />
+                Export
+              </>
+            )}
+          </Button>
+        </SettingsRow>
+      </SettingsSection>
+
+      {exportError && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertDescription>{exportError}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mt-5 flex items-center justify-between gap-4 rounded-btn border border-destructive/20 bg-destructive/5 px-3 py-2.5">
+        <div className="space-y-0.5 min-w-0">
+          <p className="text-[13px] font-medium text-destructive">
+            Delete account
+          </p>
+          <p className="text-[12px] text-ink-muted">
+            Permanently delete your account and all data
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setDeleteError(null);
+            setDeleteDialogOpen(true);
+          }}
+          className="shrink-0 h-7 text-[12px] border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+        >
+          <Trash2 className="mr-1.5 size-3.5" />
+          Delete
+        </Button>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes your account and all associated data:
+              tasks, events, calendars, lists, and attachments. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAccount}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
+              }}
+              disabled={deletingAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAccount ? 'Deleting...' : 'Delete Account'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

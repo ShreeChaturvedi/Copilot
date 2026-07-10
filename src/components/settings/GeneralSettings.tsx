@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { useEffect, useMemo, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import {
   Select,
@@ -8,54 +7,66 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/Select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   SharedToggleButton,
   type ToggleOption,
 } from '@/components/ui/SharedToggleButton';
+import { RangeSlider } from '@/components/ui/RangeSlider';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
-import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore, type Theme } from '@/stores/themeStore';
-import {
-  Monitor,
-  Moon,
-  Sun,
-  Trash2,
-  Download,
-  CheckSquare,
-  Tag,
-} from 'lucide-react';
 import {
   useSettingsStore,
   type TaskCompletionControl,
 } from '@/stores/settingsStore';
-import { userAPI } from '@/services/api/user';
+import {
+  useCalendarSettingsStore,
+  type TimeRangeMode,
+} from '@/stores/calendarSettingsStore';
+import { useUIStore } from '@/stores/uiStore';
+import { userAPI, type UserPreferences } from '@/services/api/user';
+import { CheckSquare, Monitor, Moon, Sun, Tag } from 'lucide-react';
+
+/** Shared select width so row controls align. */
+const SELECT_W = 'w-[9.5rem]';
 
 const THEME_OPTIONS: ToggleOption<Theme>[] = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: 'Light', shortLabel: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', shortLabel: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', shortLabel: 'Auto', icon: Monitor },
 ];
 
+const MODE_OPTIONS: ToggleOption<TimeRangeMode>[] = [
+  { value: 'default', label: 'Default', shortLabel: 'Def' },
+  { value: 'fullDay', label: 'Full day', shortLabel: 'Full' },
+  { value: 'custom', label: 'Custom', shortLabel: 'Cust' },
+];
+
+const WEEK_DAYS = [
+  { value: '0', label: 'Sunday' },
+  { value: '1', label: 'Monday' },
+  { value: '6', label: 'Saturday' },
+] as const;
+
+function formatHour(h: number): string {
+  if (h === 0 || h === 24) return '12 AM';
+  if (h === 12) return '12 PM';
+  if (h < 12) return `${h} AM`;
+  return `${h - 12} PM`;
+}
+
+function applyDefaultView(defaultView: UserPreferences['defaultView']) {
+  if (defaultView === 'calendar' || defaultView === 'tasks') {
+    const view = defaultView === 'tasks' ? 'task' : 'calendar';
+    useSettingsStore.getState().setAppViewMode(view);
+    useUIStore.getState().setCurrentView(view);
+  }
+}
+
 export function GeneralSettings() {
-  const { logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
-  const [exportingData, setExportingData] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const taskCompletionControl = useSettingsStore(
     (s) => s.taskCompletionControl
   );
@@ -69,54 +80,214 @@ export function GeneralSettings() {
     (s) => s.setShowSidebarTaskAnalytics
   );
 
-  const handleExportData = async () => {
-    try {
-      setExportingData(true);
-      setExportError(null);
-      await userAPI.exportData();
-    } catch (error) {
-      setExportError(
-        error instanceof Error ? error.message : 'Failed to export data'
-      );
-    } finally {
-      setExportingData(false);
-    }
-  };
+  const {
+    timeRangeMode,
+    customStartHour,
+    customEndHour,
+    setTimeRangeMode,
+    setCustomRange,
+  } = useCalendarSettingsStore();
 
-  const handleConfirmDelete = async () => {
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [loadingPrefs, setLoadingPrefs] = useState(true);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoadingPrefs(true);
+        const prefs = await userAPI.getPreferences();
+        if (active) setPreferences(prefs);
+      } catch (err) {
+        if (active)
+          setPrefsError(
+            err instanceof Error ? err.message : 'Failed to load preferences'
+          );
+      } finally {
+        if (active) setLoadingPrefs(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const effectiveLabel = useMemo(() => {
+    const { startHour, endHour } =
+      timeRangeMode === 'fullDay'
+        ? { startHour: 0, endHour: 24 }
+        : timeRangeMode === 'custom'
+          ? { startHour: customStartHour, endHour: customEndHour }
+          : { startHour: 6, endHour: 22 };
+    return `${formatHour(startHour)} – ${formatHour(endHour)}`;
+  }, [timeRangeMode, customStartHour, customEndHour]);
+
+  const patchPreference = async <K extends keyof UserPreferences>(
+    key: K,
+    value: UserPreferences[K]
+  ) => {
+    const previous = preferences;
+    setPreferences((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setPrefsError(null);
     try {
-      setDeletingAccount(true);
-      setDeleteError(null);
-      await userAPI.deleteAccount();
-      setDeleteDialogOpen(false);
-      // End the session after the account is removed server-side.
-      await logout();
-    } catch (error) {
-      setDeleteError(
-        error instanceof Error ? error.message : 'Failed to delete account'
+      const saved = await userAPI.updatePreferences({ [key]: value });
+      setPreferences(saved);
+      if (key === 'weekStartsOn') {
+        useCalendarSettingsStore.getState().setWeekStartsOn(saved.weekStartsOn);
+      }
+      if (key === 'defaultView') {
+        applyDefaultView(saved.defaultView);
+      }
+    } catch (err) {
+      setPreferences(previous);
+      setPrefsError(
+        err instanceof Error ? err.message : 'Failed to save preference'
       );
-    } finally {
-      setDeletingAccount(false);
     }
   };
 
   return (
-    <div>
+    <div className="space-y-0">
       <SettingsSection title="Appearance" first>
         <SettingsRow label="Theme" align="start">
           <SharedToggleButton
             currentValue={theme}
             options={THEME_OPTIONS}
             onValueChange={setTheme}
-            size="md"
+            size="sm"
           />
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Application Preferences">
+      <SettingsSection title="Calendar">
         <SettingsRow
-          label="Task Completion Control"
-          description="Choose whether to use a checkbox or a status tag icon in list view"
+          label="Visible hours"
+          description="Week and day view range"
+          align="start"
+        >
+          <SharedToggleButton
+            currentValue={timeRangeMode}
+            options={MODE_OPTIONS}
+            onValueChange={(mode) => setTimeRangeMode(mode as TimeRangeMode)}
+            size="sm"
+          />
+        </SettingsRow>
+        {timeRangeMode === 'custom' && (
+          <SettingsRow label="Custom range" align="start">
+            <div className="w-[12rem]">
+              <RangeSlider
+                min={0}
+                max={24}
+                step={1}
+                values={[customStartHour, customEndHour]}
+                onChange={([start, end]) => setCustomRange(start, end)}
+              />
+            </div>
+          </SettingsRow>
+        )}
+        <div className="flex items-center justify-between py-2.5">
+          <span className="text-[12px] text-ink-muted">Effective</span>
+          <span className="font-mono text-[11px] tabular-nums text-foreground">
+            {effectiveLabel}
+          </span>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Workspace">
+        {loadingPrefs ? (
+          <>
+            <div className="flex items-center justify-between gap-6 py-2.5">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-3 w-36" />
+              </div>
+              <Skeleton className="h-7 w-[9.5rem]" />
+            </div>
+            <div className="flex items-center justify-between gap-6 py-2.5">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+              <Skeleton className="h-7 w-[9.5rem]" />
+            </div>
+          </>
+        ) : preferences ? (
+          <>
+            <SettingsRow
+              label="Default view"
+              description="Opens when you start the app"
+              htmlFor="default-view"
+            >
+              <Select
+                value={preferences.defaultView}
+                onValueChange={(v) =>
+                  void patchPreference(
+                    'defaultView',
+                    v as UserPreferences['defaultView']
+                  )
+                }
+              >
+                <SelectTrigger
+                  id="default-view"
+                  className={SELECT_W + ' h-7 text-[12px]'}
+                >
+                  <SelectValue placeholder="View" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="calendar">Calendar</SelectItem>
+                  <SelectItem value="tasks">Tasks</SelectItem>
+                  <SelectItem value="last-used">Last used</SelectItem>
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+
+            <SettingsRow
+              label="Week starts on"
+              description="First day on the grid"
+              htmlFor="week-start"
+            >
+              <Select
+                value={String(preferences.weekStartsOn)}
+                onValueChange={(v) =>
+                  void patchPreference('weekStartsOn', Number(v))
+                }
+              >
+                <SelectTrigger
+                  id="week-start"
+                  className={SELECT_W + ' h-7 text-[12px]'}
+                >
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEEK_DAYS.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+
+            <SettingsRow
+              label="Desktop notifications"
+              description="Upcoming events and tasks"
+              htmlFor="notifications"
+            >
+              <Switch
+                id="notifications"
+                checked={preferences.notificationsEnabled}
+                onCheckedChange={(checked) =>
+                  void patchPreference('notificationsEnabled', checked)
+                }
+              />
+            </SettingsRow>
+          </>
+        ) : null}
+
+        <SettingsRow
+          label="Task completion"
+          description="Control style in list view"
           htmlFor="completion-control"
         >
           <Select
@@ -125,27 +296,30 @@ export function GeneralSettings() {
               setTaskCompletionControl(v as TaskCompletionControl)
             }
           >
-            <SelectTrigger id="completion-control" className="w-44">
-              <SelectValue placeholder="Select control" />
+            <SelectTrigger
+              id="completion-control"
+              className={SELECT_W + ' h-7 text-[12px]'}
+            >
+              <SelectValue placeholder="Control" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="checkbox">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4" /> Checkbox
-                </div>
+                <span className="inline-flex items-center gap-1.5">
+                  <CheckSquare className="size-3.5" /> Checkbox
+                </span>
               </SelectItem>
               <SelectItem value="status-tag">
-                <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4" /> Status Tag (icon)
-                </div>
+                <span className="inline-flex items-center gap-1.5">
+                  <Tag className="size-3.5" /> Status tag
+                </span>
               </SelectItem>
             </SelectContent>
           </Select>
         </SettingsRow>
 
         <SettingsRow
-          label="Sidebar Task Analytics Summary"
-          description="Show a compact analytics card above Task Lists in the sidebar"
+          label="Sidebar analytics"
+          description="Summary above task lists"
           htmlFor="sidebar-analytics"
         >
           <Switch
@@ -156,97 +330,11 @@ export function GeneralSettings() {
         </SettingsRow>
       </SettingsSection>
 
-      <div>
-        <SettingsSection title="Data Management">
-          <SettingsRow
-            label="Export Data"
-            description="Download all your tasks, events, and settings"
-          >
-            <Button
-              variant="outline"
-              onClick={handleExportData}
-              disabled={exportingData}
-            >
-              {exportingData ? (
-                <>
-                  <Download className="mr-2 h-4 w-4 animate-pulse" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </>
-              )}
-            </Button>
-          </SettingsRow>
-        </SettingsSection>
-
-        {exportError && (
-          <Alert variant="destructive" className="mt-3">
-            <AlertDescription>{exportError}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Named box exception (§2.1): a destructive/irreversible action earns
-            a visually distinct fence instead of the flat hairline-divided rows
-            every other grouping in this area uses. */}
-        <div className="mt-3 flex items-center justify-between gap-4 rounded-card border border-destructive/20 bg-destructive/5 px-4 py-3.5">
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-sm font-medium text-destructive">
-              Delete Account
-            </p>
-            <p className="text-[0.8125rem] text-ink-muted">
-              Permanently delete your account and all data
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setDeleteError(null);
-              setDeleteDialogOpen(true);
-            }}
-            className="shrink-0 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
-      </div>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes your account and all associated data:
-              tasks, events, calendars, lists, and attachments. This action
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteError && (
-            <Alert variant="destructive">
-              <AlertDescription>{deleteError}</AlertDescription>
-            </Alert>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingAccount}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                // Keep the dialog open until the request resolves.
-                e.preventDefault();
-                void handleConfirmDelete();
-              }}
-              disabled={deletingAccount}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deletingAccount ? 'Deleting...' : 'Delete Account'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {prefsError && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{prefsError}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

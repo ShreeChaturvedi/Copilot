@@ -2,8 +2,9 @@
  * Local development API server
  * Run with: npx tsx scripts/dev-server.ts
  */
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { createServer as createNetServer } from 'net';
 
 // Load env files before importing anything else
 function loadEnv() {
@@ -39,7 +40,52 @@ import {
 } from '../packages/backend/src/utils/jwt';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+
+const DEFAULT_API_PORT = 3001;
+const PORT_PROBE_ATTEMPTS = 10;
+const PORT_FILE = resolve(process.cwd(), '.dev-api-port');
+
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolveFree) => {
+    const tester = createNetServer();
+    tester.unref();
+    tester.once('error', () => resolveFree(false));
+    tester.once('listening', () => {
+      tester.close(() => resolveFree(true));
+    });
+    tester.listen(port, '127.0.0.1');
+  });
+}
+
+/** When PORT is set, use it only (E2E). Otherwise probe from 3001. */
+async function resolveListenPort(): Promise<number> {
+  if (process.env.PORT) {
+    const fixed = Number(process.env.PORT);
+    if (!Number.isFinite(fixed) || fixed <= 0) {
+      throw new Error(`Invalid PORT: ${process.env.PORT}`);
+    }
+    return fixed;
+  }
+  for (let i = 0; i < PORT_PROBE_ATTEMPTS; i++) {
+    const candidate = DEFAULT_API_PORT + i;
+    if (await isPortFree(candidate)) return candidate;
+  }
+  throw new Error(
+    `No free API port in ${DEFAULT_API_PORT}-${DEFAULT_API_PORT + PORT_PROBE_ATTEMPTS - 1}`
+  );
+}
+
+function writePortFile(port: number): void {
+  writeFileSync(PORT_FILE, String(port), 'utf-8');
+}
+
+function cleanupPortFile(): void {
+  try {
+    if (existsSync(PORT_FILE)) unlinkSync(PORT_FILE);
+  } catch {
+    // best-effort
+  }
+}
 
 // Middleware
 app.use(cors());
@@ -1245,11 +1291,41 @@ app.post('/api/auth/change-password', async (req, res) => {
 console.log('Initializing services...');
 initServices();
 
-app.listen(PORT, () => {
+const port = await resolveListenPort();
+// Write before listen so a concurrent Vite can discover the port ASAP.
+writePortFile(port);
+
+const server = app.listen(port, () => {
   console.log(`
-🚀 Dev API server on http://localhost:${PORT}
+🚀 Dev API server on http://localhost:${port}
    Ensure PostgreSQL is running: docker-compose up -d
   `);
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  cleanupPortFile();
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${port} is already in use` +
+        (process.env.PORT
+          ? ' (PORT is fixed; free it or unset PORT to probe).'
+          : '.')
+    );
+    process.exit(1);
+  }
+  console.error(err);
+  process.exit(1);
+});
+
+const cleanup = () => cleanupPortFile();
+process.on('exit', cleanup);
+process.on('SIGINT', () => {
+  cleanup();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  cleanup();
+  process.exit(0);
 });
 
 // ============================================================================

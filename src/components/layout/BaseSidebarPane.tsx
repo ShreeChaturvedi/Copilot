@@ -35,7 +35,7 @@ export interface BaseSidebarPaneProps {
   userProfileContent?: ReactNode;
 
   // Settings dialog handler
-  onOpenSettings?: (section: 'general' | 'profile' | 'help') => void;
+  onOpenSettings?: (section: string) => void;
 
   // Event handlers
   onViewToggle?: (view: ViewMode) => void;

@@ -63,9 +63,9 @@ export function IntegrationsSettings() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-20 w-full" />
+      <div className="space-y-3">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
     );
   }
@@ -86,36 +86,37 @@ export function IntegrationsSettings() {
     // up" motif in place of a plain Card + button, extending "The Etch"
     // (foundation §4) into the one empty state this area actually owns.
     return (
-      <div className="flex flex-col items-center px-6 py-12 text-center">
-        <div className="flex items-center justify-center gap-3">
-          <div className="grid size-11 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
-            <CalendarClock className="size-5" />
+      <div className="flex flex-col items-center px-4 py-10 text-center">
+        <div className="flex items-center justify-center gap-2.5">
+          <div className="grid size-10 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
+            <CalendarClock className="size-4" />
           </div>
           <div
-            className="h-px w-10 border-t border-dashed border-etch-strong"
+            className="h-px w-8 border-t border-dashed border-etch-strong"
             aria-hidden="true"
           />
-          <div className="grid size-7 place-items-center rounded-full border border-dashed border-etch-strong text-ink-muted">
-            <Link2 className="size-3.5" />
+          <div className="grid size-6 place-items-center rounded-full border border-dashed border-etch-strong text-ink-muted">
+            <Link2 className="size-3" />
           </div>
           <div
-            className="h-px w-10 border-t border-dashed border-etch-strong"
+            className="h-px w-8 border-t border-dashed border-etch-strong"
             aria-hidden="true"
           />
-          <div className="grid size-11 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
-            <Cloud className="size-5" />
+          <div className="grid size-10 place-items-center rounded-card border border-dashed border-etch-strong text-ink-muted">
+            <Cloud className="size-4" />
           </div>
         </div>
 
-        <p className="mt-5 font-serif text-base leading-[1.3] text-ink">
+        <p className="mt-4 font-serif text-[0.9375rem] leading-[1.3] text-ink">
           Bring your calendar in.
         </p>
-        <p className="mt-1 text-[0.8125rem] text-ink-muted max-w-[32ch]">
+        <p className="mt-1 text-[0.75rem] text-ink-muted max-w-[32ch]">
           Google Calendar syncs in automatically, every 15 minutes.
         </p>
 
         <Button
-          className="mt-5"
+          className="mt-4"
+          size="sm"
           onClick={() => startConnect.mutate()}
           disabled={startConnect.isPending}
         >

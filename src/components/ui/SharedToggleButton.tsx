@@ -21,8 +21,8 @@ export interface SharedToggleButtonProps<T = string> {
 }
 
 /**
- * SharedToggleButton - Reusable toggle button component with sliding indicator
- * Based on the ViewSwitcher pattern from ConsolidatedCalendarHeader
+ * Segmented control with sliding indicator (ViewSwitcher pattern).
+ * Default visual is dense charcoal — hairline track, quiet slider, no accent wash.
  */
 export const SharedToggleButton = <T extends string | number = string>({
   currentValue,
@@ -39,12 +39,9 @@ export const SharedToggleButton = <T extends string | number = string>({
   const [sliderStyle, setSliderStyle] = React.useState<React.CSSProperties>({});
 
   const handleValueClick = (value: T) => {
-    if (!disabled) {
-      onValueChange(value);
-    }
+    if (!disabled) onValueChange(value);
   };
 
-  // Update slider position when current value changes
   React.useEffect(() => {
     const updateSliderPosition = () => {
       const currentIndex = options.findIndex(
@@ -67,48 +64,61 @@ export const SharedToggleButton = <T extends string | number = string>({
       }
     };
 
-    // Small delay to ensure DOM is updated
     const timeoutId = setTimeout(updateSliderPosition, 0);
-
     return () => clearTimeout(timeoutId);
   }, [currentValue, options]);
 
-  // Size-based styling
+  // Dense by default. md/lg only for rare large contexts.
   const sizeClasses = {
     sm: {
-      container: 'p-1',
-      button: 'h-7 px-3 text-xs',
+      container: 'p-0.5 gap-0',
+      button: 'h-6 min-w-0 px-2 text-[11px] leading-none tracking-[-0.01em]',
+      icon: 'size-3',
+      gap: 'gap-1',
+      radius: 'rounded-[7px]',
+      slider: 'rounded-[5px]',
     },
     md: {
-      container: 'p-1.5',
-      button: 'h-8 px-4 text-sm',
+      container: 'p-0.5',
+      button: 'h-7 px-2.5 text-xs leading-none',
+      icon: 'size-3.5',
+      gap: 'gap-1',
+      radius: 'rounded-btn',
+      slider: 'rounded-[6px]',
     },
     lg: {
-      container: 'p-2',
-      button: 'h-9 px-5 text-base',
+      container: 'p-1',
+      button: 'h-8 px-3 text-[13px]',
+      icon: 'size-4',
+      gap: 'gap-1.5',
+      radius: 'rounded-btn',
+      slider: 'rounded-md',
     },
   };
 
-  const currentSizeClasses = sizeClasses[size];
+  const s = sizeClasses[size];
 
   return (
     <div
       ref={containerRef}
       className={cn(
-        'relative inline-flex rounded-lg border bg-background shadow-xs',
-        'hover:bg-accent hover:text-accent-foreground',
-        'dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
-        'transition-all duration-200',
+        'relative inline-flex items-center border border-hairline bg-surface-2',
+        'shadow-none transition-colors duration-150 ease-out',
+        s.radius,
+        s.container,
         disabled && 'opacity-50 cursor-not-allowed',
-        currentSizeClasses.container,
         className
       )}
       role="group"
     >
-      {/* Sliding background indicator */}
       <div
-        className="absolute bg-background rounded-md shadow-sm transition-[left,width] duration-200 ease-out"
+        className={cn(
+          'absolute bg-surface-1 border border-hairline-strong/40 shadow-1',
+          'transition-[left,width] duration-200 ease-settle',
+          s.slider
+        )}
         style={sliderStyle}
+        aria-hidden
       />
 
       {options.map((option, index) => {
@@ -122,38 +132,26 @@ export const SharedToggleButton = <T extends string | number = string>({
               buttonRefs.current[index] = el;
             }}
             variant="ghost"
-            size={size === 'md' ? 'default' : size}
+            size="sm"
             onClick={() => handleValueClick(option.value)}
             disabled={disabled}
             className={cn(
-              'relative z-10 font-medium transition-colors duration-200',
-              currentSizeClasses.button,
+              'relative z-10 shrink-0 font-medium rounded-none',
+              'hover:!bg-transparent active:!bg-transparent',
+              'focus-visible:ring-0 focus-visible:outline-none',
+              s.button,
+              IconComponent && showLabels && s.gap,
               isActive
-                ? 'text-foreground hover:!bg-transparent hover:!text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-              // Icon spacing when both icon and label are present
-              IconComponent && showLabels && 'gap-1.5'
+                ? 'text-foreground'
+                : 'text-ink-muted hover:text-foreground'
             )}
           >
-            {/* Icon */}
             {IconComponent && (
-              <IconComponent
-                className={cn(
-                  size === 'sm'
-                    ? 'w-3 h-3'
-                    : size === 'md'
-                      ? 'w-4 h-4'
-                      : 'w-5 h-5'
-                )}
-              />
+              <IconComponent className={cn(s.icon, 'shrink-0 opacity-80')} />
             )}
 
-            {/* Labels */}
             {showLabels && (
               <>
-                {/* Full label on larger screens. Only hide it on mobile when
-                    a short label exists to replace it; otherwise the control
-                    rendered as empty pills below 640px. */}
                 <span
                   className={cn(
                     showShortLabelsOnMobile && option.shortLabel
@@ -163,8 +161,6 @@ export const SharedToggleButton = <T extends string | number = string>({
                 >
                   {option.label}
                 </span>
-
-                {/* Short label on mobile if available */}
                 {showShortLabelsOnMobile && option.shortLabel && (
                   <span className="sm:hidden">{option.shortLabel}</span>
                 )}
