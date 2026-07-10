@@ -25,14 +25,16 @@ export default defineConfig({
     globals: true,
     // The jsdom suite grew past a single fork's default ~4GB V8 heap: every
     // test passes, but a worker OOMs ("Reached heap limit") and exits non-zero,
-    // failing CI. Bound the fork count and raise each fork's heap so the total
-    // stays well under a 16GB runner while giving each worker generous headroom.
+    // failing CI. Memory accumulates across files in a fork (~2GB baseline +
+    // ~118MB/file), so at 2 forks (~34 files each) a fork needs ~6GB. Give each
+    // an 8GB ceiling for headroom; actual peak is ~2 x 6GB = 12GB, well under a
+    // 16GB runner. (The per-file retention is tracked separately as tech debt.)
     pool: 'forks',
     poolOptions: {
       forks: {
         maxForks: 2,
         minForks: 1,
-        execArgv: ['--max-old-space-size=6144'],
+        execArgv: ['--max-old-space-size=8192'],
       },
     },
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
