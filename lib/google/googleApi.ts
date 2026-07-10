@@ -82,6 +82,10 @@ export interface GoogleStatus {
   lastError: string | null;
   lastErrorAt: Date | null;
   links: GoogleLinkStatus[];
+  /** Outbound (write-back) queue depth for the user. */
+  pendingOutbound: number;
+  /** Oldest persisted outbound-op error, or null when the queue is healthy. */
+  outboundError: string | null;
 }
 
 export interface GoogleCalendarEntry {
@@ -212,8 +216,11 @@ export async function getStatus(userId: string): Promise<GoogleStatus> {
       lastError: null,
       lastErrorAt: null,
       links: [],
+      pendingOutbound: 0,
+      outboundError: null,
     };
   }
+  const outbox = await repo.getOutboxSummary(userId);
   const res = await query<GoogleLinkStatus>(
     `SELECT l.id, l."googleCalendarId", l."appCalendarId", c.name AS "appCalendarName",
             l."syncEnabled", (l."syncToken" IS NOT NULL) AS "hasSyncToken",
@@ -235,6 +242,8 @@ export async function getStatus(userId: string): Promise<GoogleStatus> {
     lastError: account.lastError,
     lastErrorAt: account.lastErrorAt,
     links: res.rows,
+    pendingOutbound: outbox.pending,
+    outboundError: outbox.oldestError,
   };
 }
 
@@ -633,6 +642,12 @@ export async function disconnect(
   }
   unmappedEvents = await repo.unmapEventsForUser(userId);
   await repo.deleteLinksForUser(userId);
+  // Clean cutover: outbox ops and tombstones FK-cascade on users, not on the
+  // google_account, so a disconnect must clear them explicitly. Otherwise a
+  // reconnect + re-link replays stale ops (deleting kept Google events,
+  // duplicating unmapped inserts) and stale tombstones skew edit-vs-delete.
+  await repo.deleteOutboxForUser(userId);
+  await repo.deleteTombstonesForUser(userId);
   await repo.deleteAccount(userId);
   return { removedEvents, unmappedEvents };
 }

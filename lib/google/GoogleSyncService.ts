@@ -414,9 +414,15 @@ export class GoogleSyncService {
     appFields.exceptions = appFields.exceptions.filter(
       (e) => !instanceExceptions.includes(e)
     );
-    const appChanged =
-      !!base && !syncedFieldsEqual(appFieldsToSynced(appFields), base);
     const googleUpdated = item.updated ? new Date(item.updated) : null;
+    // With a base snapshot, compare fields. WITHOUT one (an app-origin row
+    // whose first outbound insert hasn't completed, or a legacy row) we cannot
+    // prove the row is unchanged, so fall back to timestamps like the merge
+    // path does — a locally-newer edit survives via the re-insert-as-new
+    // branch below instead of being silently deleted.
+    const appChanged = base
+      ? !syncedFieldsEqual(appFieldsToSynced(appFields), base)
+      : existing.updatedAt.getTime() > (googleUpdated?.getTime() ?? 0);
 
     if (
       appChanged &&

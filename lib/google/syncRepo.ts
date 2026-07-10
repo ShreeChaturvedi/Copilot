@@ -241,6 +241,24 @@ export async function deleteLinksForUser(userId: string): Promise<void> {
   ]);
 }
 
+/**
+ * Surface a permanently-dropped outbound op on its link so the existing
+ * "Last sync issue" Alert fires (finding: unretryable drops were console-only,
+ * leaving the two calendars silently diverged). No-ops when the link is gone.
+ */
+export async function recordOutboundDropOnLink(
+  userId: string,
+  googleCalendarId: string,
+  error: string
+): Promise<void> {
+  await query(
+    `UPDATE google_calendar_links
+     SET "lastError" = $3, "lastErrorAt" = NOW(), "updatedAt" = NOW()
+     WHERE "userId" = $1 AND "googleCalendarId" = $2`,
+    [userId, googleCalendarId, error.slice(0, 500)]
+  );
+}
+
 // --- push channels (M3) --------------------------------------------------------
 
 /** Webhook lookup: the notification's X-Goog-Channel-ID -> link. */
@@ -508,8 +526,15 @@ export async function addExceptionToMaster(
 /**
  * Full-resync deletion sweep (plan §3, 410 handling): drop mapped rows of
  * this link that the fresh full feed no longer contains. Guarded to rows the
- * feed could actually have returned: recurring masters always, timed rows
- * only when they end inside the import window.
+ * feed could actually have returned:
+ *  - timed rows only when they end inside the import window;
+ *  - open-ended recurring masters (no COUNT/UNTIL) always — Google returns
+ *    them regardless of age, so absence means genuine deletion;
+ *  - FINITE recurring masters (COUNT/UNTIL) only when their start is inside
+ *    the window. A finite series whose last occurrence predates timeMin=now-1y
+ *    is NOT returned by Google yet still exists there; sweeping it on every
+ *    410/token-loss would silently drop legitimate old series that never
+ *    return (they stay outside the import window on the next full sync too).
  */
 export async function deleteMappedEventsNotSeen(
   tx: PoolClient,
@@ -523,7 +548,11 @@ export async function deleteMappedEventsNotSeen(
      WHERE "userId" = $1 AND "googleCalendarId" = $2
        AND "googleEventId" IS NOT NULL
        AND NOT ("googleEventId" = ANY($3::text[]))
-       AND (recurrence IS NOT NULL OR "end" >= $4)`,
+       AND (
+         "end" >= $4
+         OR (recurrence IS NOT NULL
+             AND (recurrence !~* '(COUNT|UNTIL)=' OR start >= $4))
+       )`,
     [userId, googleCalendarId, seenGoogleEventIds, windowStart.toISOString()],
     tx
   );
@@ -755,6 +784,17 @@ export async function deleteTombstone(
   );
 }
 
+/**
+ * Delete every tombstone for a user (disconnect cutover). Tombstones
+ * FK-cascade on users, not google_accounts, so they survive a disconnect and
+ * would skew edit-vs-delete resolution on a later reconnect.
+ */
+export async function deleteTombstonesForUser(userId: string): Promise<void> {
+  await query('DELETE FROM google_event_tombstones WHERE "userId" = $1', [
+    userId,
+  ]);
+}
+
 // --- google_sync_ops (outbox) ------------------------------------------------------
 //
 // Enqueues COALESCE per event: a still-pending op of the same kind is updated
@@ -973,6 +1013,45 @@ export async function countPendingOps(userId: string): Promise<number> {
     [userId]
   );
   return Number(res.rows[0]?.count ?? 0);
+}
+
+/**
+ * Outbox health for the status endpoint: total pending ops, how many are
+ * carrying a persisted lastError, and the oldest such error message. Lets the
+ * Settings panel surface queued/stuck outbound writes instead of a green
+ * "Connected" while a local edit silently fails to reach Google.
+ */
+export async function getOutboxSummary(userId: string): Promise<{
+  pending: number;
+  failing: number;
+  oldestError: string | null;
+}> {
+  const res = await query<{
+    pending: string;
+    failing: string;
+    oldest_error: string | null;
+  }>(
+    `SELECT COUNT(*)::bigint AS pending,
+            COUNT(*) FILTER (WHERE "lastError" IS NOT NULL)::bigint AS failing,
+            (SELECT "lastError" FROM google_sync_ops
+             WHERE "userId" = $1 AND "lastError" IS NOT NULL
+             ORDER BY "createdAt" ASC LIMIT 1) AS oldest_error
+     FROM google_sync_ops WHERE "userId" = $1`,
+    [userId]
+  );
+  const row = res.rows[0];
+  return {
+    pending: Number(row?.pending ?? 0),
+    failing: Number(row?.failing ?? 0),
+    oldestError: row?.oldest_error ?? null,
+  };
+}
+
+/** Delete every outbox op for a user (disconnect cutover). Ops FK-cascade on
+ * users, not google_accounts, so they survive a disconnect and would replay
+ * against Google on a later reconnect (deleting kept events / duplicating). */
+export async function deleteOutboxForUser(userId: string): Promise<void> {
+  await query('DELETE FROM google_sync_ops WHERE "userId" = $1', [userId]);
 }
 
 export { withTransaction };

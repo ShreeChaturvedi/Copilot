@@ -217,9 +217,7 @@ export function parseExdateLine(line: string): string[] {
   const values = line.slice(colonIdx + 1).split(',');
   const tzidMatch = header.match(/;TZID=([^;:]+)/i);
   const tzid = tzidMatch?.[1];
-  return values
-    .filter((v) => v.trim())
-    .map((v) => rfc5545ValueToIso(v, tzid));
+  return values.filter((v) => v.trim()).map((v) => rfc5545ValueToIso(v, tzid));
 }
 
 /**
@@ -332,11 +330,11 @@ export function appEventToGoogle(
     body.start = { dateTime: e.start.toISOString(), timeZone };
     body.end = { dateTime: e.end.toISOString(), timeZone };
   }
-  const recurrence = buildGoogleRecurrence(
-    e.recurrence,
-    e.exceptions,
-    e.allDay
-  );
-  if (recurrence) body.recurrence = recurrence;
+  // Always set recurrence explicitly (empty array = "no recurrence"). A PATCH
+  // that OMITS the field leaves Google's stored RRULE untouched, so turning a
+  // recurring event into a single one would never clear it on Google; an empty
+  // array removes the RRULE/EXDATE. Inserts read [] as non-recurring too.
+  body.recurrence =
+    buildGoogleRecurrence(e.recurrence, e.exceptions, e.allDay) ?? [];
   return body;
 }

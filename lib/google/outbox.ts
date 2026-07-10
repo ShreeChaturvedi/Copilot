@@ -311,10 +311,19 @@ async function handleOpError(
     error.status !== 412
   ) {
     // Unretryable request problem (e.g. 400 bad payload): retrying cannot
-    // help; drop it so the outbox never wedges.
+    // help; drop it so the outbox never wedges. Unlike a dead grant, this
+    // leaves no user-facing signal — the two calendars diverge forever — so
+    // record it on the link's lastError to fire the "Last sync issue" Alert.
     console.error(
       `Dropping unretryable google_sync_op ${op.id} (${op.op}): ${message}`
     );
+    await repo
+      .recordOutboundDropOnLink(
+        userId,
+        op.googleCalendarId,
+        `A change could not be synced to Google and was dropped: ${message}`
+      )
+      .catch(() => {});
     await repo.deleteClaimedOp(pool, op);
     return 'dropped';
   }
