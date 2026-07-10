@@ -133,7 +133,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     <Popover open={isOpen} onOpenChange={handlePopoverOpenChange} modal={false}>
       <PopoverTrigger asChild>
         <button
-          className={`w-3 h-3 rounded-full border border-border hover:scale-110 transition-transform ${className}`}
+          className={`relative w-3 h-3 rounded-full border border-border motion-safe:hover:scale-110 transition-transform before:absolute before:-inset-2 before:content-[''] ${className}`}
           style={{
             background: isDarkMode
               ? multicolorGradientDark
@@ -150,8 +150,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         align="start"
         side="right"
         sideOffset={10}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
         onEscapeKeyDown={() => handlePopoverOpenChange(false)}
         onPointerDownOutside={(e) => {
           const target = e.target as Element;
@@ -186,13 +184,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 <button
                   key={color}
                   onClick={(e) => handleColorChange(color, e)}
-                  className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                  className={`w-8 h-8 rounded-full border-2 transition-[transform,border-color] motion-safe:hover:scale-110 ${
                     committedColor === color
                       ? 'border-foreground'
                       : 'border-transparent'
                   }`}
                   style={{ backgroundColor: color }}
                   aria-label={`Select color ${color}`}
+                  aria-pressed={committedColor === color}
                 />
               ))}
             </div>
@@ -203,6 +202,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             <Label className="text-sm font-medium">Custom Color</Label>
             <div className="flex items-center gap-2 mt-2">
               <div
+                role="img"
                 className="w-8 h-8 rounded-full border-2 border-border/60 flex-shrink-0"
                 style={{ backgroundColor: committedColor }}
                 aria-label={`Current color ${committedColor}`}

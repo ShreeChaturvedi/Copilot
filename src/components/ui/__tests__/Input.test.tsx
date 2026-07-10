@@ -13,7 +13,7 @@ describe('Input Component', () => {
     const input = screen.getByRole('textbox');
     expect(input).toBeInTheDocument();
     expect(input).toHaveAttribute('data-slot', 'input');
-    expect(input).toHaveClass('border-input', 'rounded-md', 'bg-transparent');
+    expect(input).toHaveClass('border-input', 'rounded-btn', 'bg-transparent');
   });
 
   it('should support different input types', () => {

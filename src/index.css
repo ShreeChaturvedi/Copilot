@@ -138,6 +138,12 @@
     var(--edge-machined), var(--shadow-2); /* popover/dropdown/select/tooltip/combobox */
   --shadow-dialog:
     var(--edge-machined), var(--shadow-3); /* dialog/alert-dialog/sheet/command palette */
+  /* §1.8 [NEW, Wave 2] Resting elevation for small controls (switch/toggle/
+     radio/tabs/mini-calendar/RTE/ViewSwitcher slider). Composes from tokens
+     that already swap per theme (edge-machined + shadow-1), so no .dark
+     override is needed and, unlike Tailwind's fixed rgb(0 0 0 / .05) shadow-xs,
+     it stays visible on dark surfaces. */
+  --shadow-control: var(--edge-machined), var(--shadow-1);
 
   /* §1.8 [NEW] Warning foreground — --warning does NOT flip per theme (fixed
      mid-light amber both ways), so its foreground can't either; chained to
@@ -930,6 +936,34 @@ body {
     [data-slot='sheet-content'][data-state='closed'] {
       animation: settle-fade-out 120ms ease-out forwards;
     }
+  }
+}
+
+/* ==========================================
+   [Wave 2 #3] Reduced-motion safety net for the floating primitives that
+   animate via tw-animate-css utilities (popover / dropdown / select /
+   tooltip). tw-animate-css ships no prefers-reduced-motion guard, and the
+   dialog reduced-motion rules above (in @layer components) can't reach these
+   because their animate-in / zoom / slide classes live in the LATER
+   @layer utilities. This block is deliberately UNLAYERED (plus !important) so
+   it wins the cascade, collapsing entrance/exit to the same 120ms crossfade
+   the dialogs/sheets already degrade to. (Motion in the non-reduced path is
+   left on the tw-animate defaults — see designsys #13, deferred.)
+   ========================================== */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='popover-content'],
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='select-content'],
+  [data-slot='tooltip-content'] {
+    animation: settle-fade-in 120ms ease-out !important;
+  }
+  [data-slot='popover-content'][data-state='closed'],
+  [data-slot='dropdown-menu-content'][data-state='closed'],
+  [data-slot='dropdown-menu-sub-content'][data-state='closed'],
+  [data-slot='select-content'][data-state='closed'],
+  [data-slot='tooltip-content'][data-state='closed'] {
+    animation: settle-fade-out 120ms ease-out forwards !important;
   }
 }
 

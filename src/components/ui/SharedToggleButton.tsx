@@ -114,7 +114,7 @@ export const SharedToggleButton = <T extends string | number = string>({
       <div
         className={cn(
           'absolute bg-surface-1 border border-hairline-strong/40 shadow-1',
-          'transition-[left,width] duration-200 ease-settle',
+          'transition-[left,width] duration-[var(--dur-3)] ease-settle',
           s.slider
         )}
         style={sliderStyle}
@@ -135,6 +135,8 @@ export const SharedToggleButton = <T extends string | number = string>({
             size="sm"
             onClick={() => handleValueClick(option.value)}
             disabled={disabled}
+            aria-pressed={isActive}
+            aria-label={!showLabels ? option.label : undefined}
             className={cn(
               'relative z-10 shrink-0 font-medium rounded-none',
               'hover:!bg-transparent active:!bg-transparent',

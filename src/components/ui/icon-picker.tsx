@@ -48,6 +48,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         <Input
           type="text"
           placeholder="Search icons..."
+          aria-label="Search icons"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 pr-10"
@@ -57,6 +58,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
             variant="ghost"
             size="sm"
             onClick={clearSearch}
+            aria-label="Clear search"
             className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
           >
             <X className="w-3 h-3" />
@@ -85,6 +87,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => onIconSelect(iconName)}
+                    aria-label={iconName}
+                    aria-pressed={selectedIcon === iconName}
                     className={cn(
                       'h-10 w-10 p-0 hover:bg-accent',
                       selectedIcon === iconName &&
@@ -100,7 +104,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
           </div>
         )}
 
-        {filteredIcons.length === 0 && (
+        {readyToShow && filteredIcons.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">No icons found</p>
             <p className="text-xs">Try a different search term</p>

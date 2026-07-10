@@ -15,6 +15,8 @@
  * per theme in `src/index.css`.
  */
 
+import { DEFAULT_PRESET_COLOR } from './colors';
+
 /** The three core status colors every analytics surface shares. */
 export const ANALYTICS_STATUS_COLORS = {
   done: 'var(--aqua, #1a7c70)', // success / completed
@@ -28,7 +30,7 @@ export const ANALYTICS_STATUS_COLORS = {
  */
 export const ANALYTICS_COLORS = {
   ...ANALYTICS_STATUS_COLORS,
-  created: '#0d97d5', // curated blue (= DEFAULT_PRESET_COLOR), a fixed palette hue
+  created: DEFAULT_PRESET_COLOR, // curated blue (single source of truth in colors.ts), a fixed palette hue
   overdue: 'var(--destructive, #d8625c)', // overdue / urgent, red only
 } as const;
 

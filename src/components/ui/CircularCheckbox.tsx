@@ -36,8 +36,8 @@ export const CircularCheckbox: React.FC<CircularCheckboxProps> = ({
       disabled={disabled}
       onClick={handleClick}
       className={cn(
-        'relative w-5 h-5 border-2 transition-all duration-200 flex items-center justify-center',
-        'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+        'relative w-5 h-5 border-2 transition-[background-color,border-color] duration-[var(--dur-3)] flex items-center justify-center',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         'rounded-full', // ACTUALLY MAKE IT CIRCULAR
         checked
@@ -47,11 +47,11 @@ export const CircularCheckbox: React.FC<CircularCheckboxProps> = ({
       )}
     >
       {checked && (
-        <Check 
+        <Check
           className={cn(
             'w-3 h-3 text-primary-foreground',
-            'animate-in zoom-in-50 duration-200'
-          )} 
+            'animate-in zoom-in-50 duration-[var(--dur-2)]'
+          )}
           strokeWidth={2.5}
         />
       )}
@@ -59,4 +59,4 @@ export const CircularCheckbox: React.FC<CircularCheckboxProps> = ({
   );
 };
 
-export default CircularCheckbox; 
+export default CircularCheckbox;

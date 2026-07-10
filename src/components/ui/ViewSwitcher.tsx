@@ -103,8 +103,8 @@ export function ViewSwitcher<T extends string = string>({
       {/* Sliding background indicator */}
       <div
         className={cn(
-          'view-switcher-slider absolute rounded-md bg-surface-1 shadow-xs',
-          'transition-all duration-200 ease-out',
+          'view-switcher-slider absolute rounded-md bg-surface-1 [box-shadow:var(--shadow-control)]',
+          'transition-[left,width] duration-[var(--dur-3)] ease-settle',
           '[[data-kbd-nav]_&]:transition-none'
         )}
         style={sliderStyle}
@@ -150,7 +150,7 @@ export function ViewSwitcher<T extends string = string>({
               <TooltipContent className="flex items-center gap-1.5">
                 {label}
                 <kbd
-                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[4px] bg-surface-2 px-1 font-mono text-[11px] leading-none text-muted-foreground"
+                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-sm bg-surface-2 px-1 font-mono text-[11px] leading-none text-muted-foreground"
                   style={{ boxShadow: 'var(--edge-machined)' }}
                 >
                   {shortcut}

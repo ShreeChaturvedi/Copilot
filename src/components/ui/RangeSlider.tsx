@@ -152,13 +152,9 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
         />
         {/* Visible draggable labels/handles, OVER the track */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 min-w-[40px] text-center text-[11px] px-2 py-1 rounded-md border bg-card text-foreground shadow-sm whitespace-nowrap -translate-x-1/2 cursor-grab active:cursor-grabbing z-50 select-none"
+          className="absolute top-1/2 -translate-y-1/2 min-w-[40px] text-center text-[11px] px-2 py-1 rounded-md border bg-card text-foreground [box-shadow:var(--shadow-popover)] whitespace-nowrap -translate-x-1/2 cursor-grab active:cursor-grabbing z-50 select-none"
           style={{ left: clampLeftCss(startPct), touchAction: 'none' }}
-          role="slider"
-          aria-label={ariaLabel[0]}
-          aria-valuemin={min}
-          aria-valuemax={max}
-          aria-valuenow={start}
+          aria-hidden="true"
           onPointerDown={onHandlePointerDown('start')}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
@@ -166,13 +162,9 @@ export const RangeSlider: React.FC<RangeSliderProps> = ({
           {formatHour(start)}
         </div>
         <div
-          className="absolute top-1/2 -translate-y-1/2 min-w-[40px] text-center text-[11px] px-2 py-1 rounded-md border bg-card text-foreground shadow-sm whitespace-nowrap -translate-x-1/2 cursor-grab active:cursor-grabbing z-50 select-none"
+          className="absolute top-1/2 -translate-y-1/2 min-w-[40px] text-center text-[11px] px-2 py-1 rounded-md border bg-card text-foreground [box-shadow:var(--shadow-popover)] whitespace-nowrap -translate-x-1/2 cursor-grab active:cursor-grabbing z-50 select-none"
           style={{ left: clampLeftCss(endPct), touchAction: 'none' }}
-          role="slider"
-          aria-label={ariaLabel[1]}
-          aria-valuemin={min}
-          aria-valuemax={max}
-          aria-valuenow={end}
+          aria-hidden="true"
           onPointerDown={onHandlePointerDown('end')}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}

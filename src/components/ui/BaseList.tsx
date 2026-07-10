@@ -4,7 +4,6 @@ import {
   Plus,
   ChevronUp,
   MoreVertical,
-  Settings,
   Edit,
   Trash2,
   Archive,
@@ -233,7 +232,7 @@ export function BaseList<T extends BaseListItem>({
                 className="h-5 w-5 p-0"
               >
                 <div
-                  className={`transition-transform duration-200 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}
+                  className={`transition-transform duration-[var(--dur-3)] ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}
                 >
                   <ChevronUp className="w-3 h-3" />
                 </div>
@@ -305,7 +304,7 @@ export function BaseList<T extends BaseListItem>({
                       key={color}
                       onClick={() => setSelectedColor(color)}
                       className={cn(
-                        'w-5 h-5 rounded-full border-2 transition-all',
+                        'w-5 h-5 rounded-full border-2 transition-[border-color,transform]',
                         selectedColor === color
                           ? 'border-foreground scale-110'
                           : 'border-transparent hover:border-border'
@@ -493,7 +492,7 @@ function BaseListItem<T extends BaseListItem>({
                 key={color}
                 onClick={() => setEditColor(color)}
                 className={cn(
-                  'w-4 h-4 rounded-full border transition-all',
+                  'w-4 h-4 rounded-full border transition-[border-color,transform]',
                   editColor === color
                     ? 'border-foreground scale-110'
                     : 'border-transparent hover:border-border'
@@ -585,10 +584,6 @@ function BaseListItem<T extends BaseListItem>({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   onStartEdit ? onStartEdit(item) : setIsEditing(true)

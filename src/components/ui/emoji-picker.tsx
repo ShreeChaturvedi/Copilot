@@ -1,5 +1,4 @@
-import React, { memo, useCallback } from 'react';
-import data from '@emoji-mart/data';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import Picker from '@emoji-mart/react';
 import { useThemeStore } from '@/stores/themeStore';
 
@@ -23,6 +22,19 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = memo(
   ({ selectedEmoji: _selectedEmoji, onEmojiSelect, className }) => {
     const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
+    // Defer the ~600KB emoji dataset into its own async chunk so the picker
+    // shell can paint immediately while the data resolves in parallel.
+    const [data, setData] = useState<unknown>(null);
+    useEffect(() => {
+      let cancelled = false;
+      import('@emoji-mart/data').then((m) => {
+        if (!cancelled) setData(m.default);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+
     type EmojiSelection = { native?: string; shortcodes?: string; id?: string };
 
     const handleSelect = useCallback(
@@ -33,6 +45,17 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = memo(
       },
       [onEmojiSelect]
     );
+
+    if (!data) {
+      return (
+        <div
+          className={className}
+          role="status"
+          aria-label="Loading emoji picker"
+          style={{ minHeight: 220 }}
+        />
+      );
+    }
 
     return (
       <Picker
