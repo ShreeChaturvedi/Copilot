@@ -510,13 +510,41 @@ describe('AttachmentService', () => {
         attachmentFixtures.spreadsheet,
       ];
 
+      // getStorageStats now aggregates per-type counts/sizes in SQL (a single
+      // GROUP BY query) and only materializes the top-10 largest rows. Postgres
+      // returns bigint COUNT/SUM as strings, so mirror that here.
+      const byType = new Map<
+        string,
+        { fileType: string; count: number; size: number }
+      >();
+      for (const att of attachments) {
+        const bucket = byType.get(att.fileType) ?? {
+          fileType: att.fileType,
+          count: 0,
+          size: 0,
+        };
+        bucket.count += 1;
+        bucket.size += att.fileSize;
+        byType.set(att.fileType, bucket);
+      }
+      const byTypeRows = [...byType.values()].map((r) => ({
+        fileType: r.fileType,
+        count: String(r.count),
+        size: String(r.size),
+      }));
+
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
         if (lower.startsWith('alter table attachments')) {
           return createQueryResult([]);
         }
+        // The aggregate query (GROUP BY) must be matched before the top-10
+        // largest query, since both reference "from attachments a".
+        if (lower.includes('group by')) {
+          return createQueryResult(byTypeRows);
+        }
         if (lower.includes('from attachments a')) {
-          return createQueryResult(attachments);
+          return createQueryResult(attachments.slice(0, 10));
         }
         return createQueryResult([]);
       });
@@ -535,7 +563,9 @@ describe('AttachmentService', () => {
     });
 
     it('should return zero stats when user has no attachments', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([]));
+      // getStorageStats fires two queries in parallel (per-type aggregate +
+      // top-10 largest); both must resolve empty for the zero-stats path.
+      mockedQuery.mockResolvedValue(createQueryResult([]));
 
       const result = await attachmentService.getStorageStats(mockContext);
 

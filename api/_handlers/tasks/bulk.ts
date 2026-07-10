@@ -114,10 +114,7 @@ export default createMethodHandler(
           return sendError(res, new ForbiddenError('Access denied'));
         }
 
-        sendError(
-          res,
-          new InternalServerError(error.message || 'Failed to update tasks')
-        );
+        sendError(res, new InternalServerError('Failed to update tasks'));
       }
     },
 
@@ -197,10 +194,7 @@ export default createMethodHandler(
           return sendError(res, new ForbiddenError('Access denied'));
         }
 
-        sendError(
-          res,
-          new InternalServerError(error.message || 'Failed to delete tasks')
-        );
+        sendError(res, new InternalServerError('Failed to delete tasks'));
       }
     },
   },

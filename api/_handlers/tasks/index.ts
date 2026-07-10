@@ -45,7 +45,7 @@ export default createCrudHandler({
         sortBy,
         sortOrder,
         page = '1',
-        limit = '20',
+        limit,
       } = req.query;
 
       // Build filters
@@ -98,31 +98,34 @@ export default createCrudHandler({
         filters.sortOrder = (sortOrder as string) === 'asc' ? 'asc' : 'desc';
       }
 
-      // Get tasks with pagination if requested
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
+      // Always take the paginated path so the response has one stable shape
+      // (bare array in `data`, pagination in `meta`) and a hard upper bound.
+      // Parse defensively: a bad value like `?limit=abc` must not reach SQL as
+      // `LIMIT NaN`. The default cap (500) preserves the app's current
+      // "load everything" behavior for typical accounts while bounding runaway
+      // ones. Clamp page to >=1 and limit to [1, 500].
+      const rawLimit = parseInt(String(limit), 10);
+      const limitNum = Math.min(
+        Math.max(Number.isFinite(rawLimit) ? rawLimit : 500, 1),
+        500
+      );
+      const rawPage = parseInt(String(page), 10);
+      const pageNum = Math.max(Number.isFinite(rawPage) ? rawPage : 1, 1);
 
-      let result;
-      if (pageNum > 1 || limitNum !== 20) {
-        result = await taskService.findPaginated(filters, pageNum, limitNum, {
+      const { data, pagination } = await taskService.findPaginated(
+        filters,
+        pageNum,
+        limitNum,
+        {
           userId,
           requestId: req.headers['x-request-id'] as string,
-        });
-      } else {
-        const tasks = await taskService.findAll(filters, {
-          userId,
-          requestId: req.headers['x-request-id'] as string,
-        });
-        result = { data: tasks };
-      }
+        }
+      );
 
-      sendSuccess(res, result);
+      sendSuccess(res, data, 200, { pagination });
     } catch (error) {
       console.error('GET /api/tasks error:', error);
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to fetch tasks')
-      );
+      sendError(res, new InternalServerError('Failed to fetch tasks'));
     }
   },
 
@@ -175,10 +178,7 @@ export default createCrudHandler({
         );
       }
 
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to create task')
-      );
+      sendError(res, new InternalServerError('Failed to create task'));
     }
   },
 

@@ -65,10 +65,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/task-lists error:', error);
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to fetch task lists')
-      );
+      sendError(res, new InternalServerError('Failed to fetch task lists'));
     }
   },
 
@@ -135,10 +132,7 @@ export default createCrudHandler({
         );
       }
 
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to create task list')
-      );
+      sendError(res, new InternalServerError('Failed to create task list'));
     }
   },
 

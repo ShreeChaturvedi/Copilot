@@ -577,11 +577,9 @@ describe('TaskListService', () => {
         ) {
           return createQueryResult(taskListIds.map((id) => ({ id })));
         }
-        // Individual fetches for ordering
-        if (sqlLower.includes('select * from task_lists where id = $1')) {
-          // Return the appropriate task list based on the param
-          const matchingList = taskLists[0];
-          return createQueryResult([matchingList || taskLists[0]]);
+        // Single bulk fetch of all rows in one query (reordered in memory)
+        if (sqlLower.includes('select * from task_lists where id = any')) {
+          return createQueryResult(taskLists);
         }
         return createQueryResult([]);
       });
@@ -697,21 +695,11 @@ describe('TaskListService', () => {
 
   describe('getStatistics', () => {
     it('should return comprehensive task list statistics', async () => {
-      let queryIndex = 0;
-      mockedQuery.mockImplementation(async () => {
-        queryIndex++;
-        // The service uses Promise.all with 3 queries in parallel
-        switch (queryIndex) {
-          case 1:
-            return createQueryResult([{ count: '5' }]); // total lists
-          case 2:
-            return createQueryResult([{ count: '25' }]); // total tasks
-          case 3:
-            return createQueryResult([{ count: '15' }]); // completed tasks
-          default:
-            return createQueryResult([{ count: '0' }]);
-        }
-      });
+      // The service now issues ONE aggregate query returning a single row with
+      // the list count as a scalar subquery plus conditional task aggregates.
+      mockedQuery.mockResolvedValue(
+        createQueryResult([{ lists: '5', total: '25', completed: '15' }])
+      );
 
       const result = await taskListService.getStatistics(mockContext);
 

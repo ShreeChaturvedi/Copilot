@@ -63,10 +63,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/calendars error:', error);
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to fetch calendars')
-      );
+      sendError(res, new InternalServerError('Failed to fetch calendars'));
     }
   },
 
@@ -133,10 +130,7 @@ export default createCrudHandler({
         );
       }
 
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to create calendar')
-      );
+      sendError(res, new InternalServerError('Failed to create calendar'));
     }
   },
 

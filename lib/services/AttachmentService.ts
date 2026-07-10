@@ -4,11 +4,10 @@
 // PrismaClient type is not directly referenced in this file
 import {
   BaseService,
-  type BaseServiceConfig,
   type ServiceContext,
   type BaseEntity,
 } from './BaseService.js';
-import { query, type SqlClient } from '../config/database.js';
+import { query } from '../config/database.js';
 import { deleteBlobs } from '../utils/blobStorage.js';
 
 /**
@@ -140,14 +139,6 @@ export class AttachmentService extends BaseService<
   AttachmentFilters
 > {
   private static schemaEnsured = false;
-
-  constructor(
-    dbOrConfig?: SqlClient | BaseServiceConfig,
-    maybeConfig?: BaseServiceConfig
-  ) {
-    super(dbOrConfig, maybeConfig);
-    void this.ensureSchema();
-  }
 
   private async ensureSchema(): Promise<void> {
     if (AttachmentService.schemaEnsured) return;
@@ -304,6 +295,10 @@ export class AttachmentService extends BaseService<
   ): Promise<AttachmentEntity> {
     try {
       this.log('create', { data }, context);
+      // Ensure the thumbnailUrl column exists before the INSERT references it.
+      // Awaited here (not fire-and-forget in the constructor) so a cold-start
+      // create can't run the INSERT before the ALTER TABLE completes.
+      await this.ensureSchema();
       await this.validateCreate(data, context);
       await this.ensureUserExists(context?.userId, 'dev@example.com');
 
@@ -355,6 +350,8 @@ export class AttachmentService extends BaseService<
   ): Promise<AttachmentEntity | null> {
     try {
       this.log('update', { id, data }, context);
+      // Ensure the thumbnailUrl column exists before an update can reference it.
+      await this.ensureSchema();
       await this.validateUpdate(id, data, context);
 
       const sets: string[] = [];
@@ -595,38 +592,49 @@ export class AttachmentService extends BaseService<
     try {
       this.log('getStorageStats', {}, context);
 
-      const attachmentsRes = await query<AttachmentEntity>(
-        `SELECT a.* FROM attachments a
-         JOIN tasks t ON t.id = a."taskId"
-         WHERE t."userId" = $1
-         ORDER BY a."fileSize" DESC`,
-        [userId],
-        this.db
-      );
+      // Aggregate the scalars and per-type buckets in SQL instead of pulling
+      // every attachment row into memory to reduce it in JS. Only the top-10
+      // largest are materialized as rows.
+      const [byTypeRes, largestRes] = await Promise.all([
+        query<{ fileType: string; count: string; size: string | null }>(
+          `SELECT a."fileType" AS "fileType",
+                  COUNT(*)::bigint AS count,
+                  COALESCE(SUM(a."fileSize"), 0)::bigint AS size
+           FROM attachments a
+           JOIN tasks t ON t.id = a."taskId"
+           WHERE t."userId" = $1
+           GROUP BY a."fileType"`,
+          [userId],
+          this.db
+        ),
+        query<AttachmentEntity>(
+          `SELECT a.* FROM attachments a
+           JOIN tasks t ON t.id = a."taskId"
+           WHERE t."userId" = $1
+           ORDER BY a."fileSize" DESC
+           LIMIT 10`,
+          [userId],
+          this.db
+        ),
+      ]);
 
-      const attachments = attachmentsRes.rows;
-      const totalFiles = attachments.length;
-      const totalSize = attachments.reduce(
-        (sum, att) => sum + Number(att.fileSize),
-        0
-      );
+      const filesByType: Record<string, { count: number; size: number }> = {};
+      let totalFiles = 0;
+      let totalSize = 0;
+      byTypeRes.rows.forEach((r) => {
+        const count = Number(r.count);
+        const size = Number(r.size ?? 0);
+        filesByType[r.fileType] = { count, size };
+        totalFiles += count;
+        totalSize += size;
+      });
       const totalSizeMB = Math.round((totalSize / 1024 / 1024) * 100) / 100;
       const averageFileSize =
         totalFiles > 0 ? Math.round(totalSize / totalFiles) : 0;
 
-      // Group by file type
-      const filesByType: Record<string, { count: number; size: number }> = {};
-      attachments.forEach((attachment) => {
-        if (!filesByType[attachment.fileType]) {
-          filesByType[attachment.fileType] = { count: 0, size: 0 };
-        }
-        filesByType[attachment.fileType].count++;
-        filesByType[attachment.fileType].size += attachment.fileSize;
-      });
-
-      const largestFiles = attachments
-        .slice(0, 10)
-        .map((attachment) => this.transformEntity(attachment));
+      const largestFiles = largestRes.rows.map((attachment) =>
+        this.transformEntity(attachment)
+      );
 
       const stats = {
         totalFiles,

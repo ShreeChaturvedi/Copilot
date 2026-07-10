@@ -520,7 +520,6 @@ export class TaskListService extends BaseService<
         this.db
       );
       const listIds = listsRes.rows.map((row) => row.id);
-      const placeholders = listIds.map((_, i) => `$${i + 1}`).join(',');
       interface TaskRow {
         id: string;
         title: string;
@@ -529,20 +528,46 @@ export class TaskListService extends BaseService<
         priority: string;
         taskListId: string;
       }
+      // Limit to the first 10 tasks PER list in SQL (window function) instead of
+      // fetching every task and slicing in JS — a full account's task history is
+      // no longer transferred to render a 10-item preview.
       const tasksRes = listIds.length
         ? await query<TaskRow>(
             `SELECT id, title, completed, "scheduledDate", priority, "taskListId"
-             FROM tasks WHERE "taskListId" IN (${placeholders})
-             ORDER BY completed ASC, "scheduledDate" ASC NULLS LAST, "createdAt" DESC`,
-            listIds,
+             FROM (
+               SELECT t.id, t.title, t.completed, t."scheduledDate", t.priority, t."taskListId",
+                      ROW_NUMBER() OVER (
+                        PARTITION BY t."taskListId"
+                        ORDER BY t.completed ASC, t."scheduledDate" ASC NULLS LAST, t."createdAt" DESC
+                      ) AS rn
+               FROM tasks t
+               WHERE t."taskListId" = ANY($1::text[])
+             ) x
+             WHERE rn <= 10`,
+            [listIds],
             this.db
           )
         : { rows: [] as TaskRow[] }; // Empty result set for no task lists
+      // The true per-list count (not the capped preview length) via a separate
+      // grouped count, so _count reflects the real total.
+      const countRes = listIds.length
+        ? await query<{ taskListId: string; count: string }>(
+            `SELECT "taskListId", COUNT(*)::bigint AS count
+             FROM tasks WHERE "taskListId" = ANY($1::text[])
+             GROUP BY "taskListId"`,
+            [listIds],
+            this.db
+          )
+        : { rows: [] as Array<{ taskListId: string; count: string }> };
+      const countByList = new Map<string, number>();
+      countRes.rows.forEach((r) =>
+        countByList.set(r.taskListId, Number(r.count))
+      );
       const tasksByList = new Map<string, TaskRow[]>();
       tasksRes.rows.forEach((task) => {
         // Database rows
         const arr = tasksByList.get(task.taskListId) || [];
-        if (arr.length < 10) arr.push(task);
+        arr.push(task);
         tasksByList.set(task.taskListId, arr);
       });
       const results = listsRes.rows.map((list) => ({
@@ -555,7 +580,7 @@ export class TaskListService extends BaseService<
         userId: list.userId,
         createdAt: new Date(list.createdAt),
         updatedAt: new Date(list.updatedAt),
-        _count: { tasks: (tasksByList.get(list.id) || []).length },
+        _count: { tasks: countByList.get(list.id) ?? 0 },
         tasks: (tasksByList.get(list.id) || []).map((task) => ({
           id: task.id,
           title: task.title,
@@ -600,21 +625,18 @@ export class TaskListService extends BaseService<
         );
       }
 
-      // For now, just return the task lists in the requested order
-      // In a full implementation, you might add an `order` field to the database
-      const orderedTaskLists = await Promise.all(
-        taskListIds.map(async (id) => {
-          const r = await query(
-            'SELECT * FROM task_lists WHERE id = $1',
-            [id],
-            this.db
-          );
-          return r.rows[0];
-        })
+      // Fetch every row in one query, then reorder in memory to the requested
+      // id order (avoids the previous SELECT-per-id N+1). Order is not
+      // persisted — there is no order column — so this stays client-only.
+      const rowsRes = await query<TaskListEntity>(
+        'SELECT * FROM task_lists WHERE id = ANY($1::text[])',
+        [taskListIds],
+        this.db
       );
-
-      const results = orderedTaskLists
-        .filter(Boolean)
+      const rowMap = new Map(rowsRes.rows.map((row) => [row.id, row]));
+      const results = taskListIds
+        .map((id) => rowMap.get(id))
+        .filter((row): row is TaskListEntity => Boolean(row))
         .map((taskList) => this.transformEntity(taskList));
 
       this.log('reorder:success', { count: results.length }, context);
@@ -691,26 +713,24 @@ export class TaskListService extends BaseService<
     try {
       this.log('getStatistics', {}, context);
 
-      const [listsRes, tasksRes, completedRes] = await Promise.all([
-        query<{ count: string }>(
-          'SELECT COUNT(*)::bigint AS count FROM task_lists WHERE "userId" = $1',
-          [context.userId!],
-          this.db
-        ),
-        query<{ count: string }>(
-          'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1',
-          [context.userId!],
-          this.db
-        ),
-        query<{ count: string }>(
-          'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true',
-          [context.userId!],
-          this.db
-        ),
-      ]);
-      const totalLists = Number(listsRes.rows[0].count);
-      const totalTasks = Number(tasksRes.rows[0].count);
-      const completedTasks = Number(completedRes.rows[0].count);
+      // One round-trip: task totals via conditional aggregation plus the list
+      // count as a scalar subquery, replacing three separate COUNT queries.
+      const statsRes = await query<{
+        lists: string;
+        total: string;
+        completed: string;
+      }>(
+        `SELECT
+           (SELECT COUNT(*)::bigint FROM task_lists WHERE "userId" = $1) AS lists,
+           COUNT(*)::bigint AS total,
+           COUNT(*) FILTER (WHERE completed)::bigint AS completed
+         FROM tasks WHERE "userId" = $1`,
+        [context.userId!],
+        this.db
+      );
+      const totalLists = Number(statsRes.rows[0].lists);
+      const totalTasks = Number(statsRes.rows[0].total);
+      const completedTasks = Number(statsRes.rows[0].completed);
       const pendingTasks = totalTasks - completedTasks;
       const averageTasksPerList =
         totalLists > 0 ? Math.round((totalTasks / totalLists) * 100) / 100 : 0;

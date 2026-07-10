@@ -372,14 +372,28 @@ export class TagService extends BaseService<
 
       await this.validateCreate(data, context);
 
+      const name = data.name.trim().toLowerCase();
+      // tags.name is UNIQUE. Use ON CONFLICT so a create racing another create
+      // (or the tag inserts inside TaskService.create) returns the existing tag
+      // idempotently instead of surfacing a raw unique-violation 500 — matching
+      // findOrCreate and the task_tags insert path.
       const inserted = await query(
         `INSERT INTO tags (id, name, type, color)
          VALUES (gen_random_uuid()::text, $1, $2, $3)
+         ON CONFLICT (name) DO NOTHING
          RETURNING *`,
-        [data.name.trim().toLowerCase(), data.type, data.color || null],
+        [name, data.type, data.color || null],
         this.db
       );
-      const row = inserted.rows[0];
+      let row = inserted.rows[0];
+      if (!row) {
+        const existing = await query(
+          'SELECT * FROM tags WHERE name = $1 LIMIT 1',
+          [name],
+          this.db
+        );
+        row = existing.rows[0];
+      }
       this.log('create:success', { id: row.id }, context);
       return this.transformEntity(row);
     } catch (error) {
@@ -844,31 +858,34 @@ export class TagService extends BaseService<
   }> {
     try {
       this.log('getStatistics', {}, context);
-      const totalRes = await query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tags',
-        [],
-        this.db
-      );
-      const byTypeRes = await query<{ type: TagType; count: string }>(
-        'SELECT type, COUNT(*)::bigint AS count FROM tags GROUP BY type',
-        [],
-        this.db
-      );
-      const mostUsedRes = await query<TagEntity & { usage: string | number }>(
-        `SELECT t.*, COALESCE(cnt.c, 0)::bigint AS usage
-         FROM tags t
-         LEFT JOIN (
-           SELECT "tagId", COUNT(*)::bigint AS c FROM task_tags GROUP BY "tagId"
-         ) cnt ON cnt."tagId" = t.id
-         ORDER BY usage DESC
-         LIMIT 10`,
-        [],
-        this.db
-      );
+      // Run the two independent aggregates in parallel (were three sequential
+      // awaits). totalTags is derived from the per-type sums, dropping the
+      // standalone COUNT(*) query.
+      const [byTypeRes, mostUsedRes] = await Promise.all([
+        query<{ type: TagType; count: string }>(
+          'SELECT type, COUNT(*)::bigint AS count FROM tags GROUP BY type',
+          [],
+          this.db
+        ),
+        query<TagEntity & { usage: string | number }>(
+          `SELECT t.*, COALESCE(cnt.c, 0)::bigint AS usage
+           FROM tags t
+           LEFT JOIN (
+             SELECT "tagId", COUNT(*)::bigint AS c FROM task_tags GROUP BY "tagId"
+           ) cnt ON cnt."tagId" = t.id
+           ORDER BY usage DESC
+           LIMIT 10`,
+          [],
+          this.db
+        ),
+      ]);
 
+      let totalTags = 0;
       const typeStats = byTypeRes.rows.reduce(
         (acc, r) => {
-          acc[r.type] = Number(r.count);
+          const n = Number(r.count);
+          acc[r.type] = n;
+          totalTags += n;
           return acc;
         },
         {} as Record<TagType, number>
@@ -878,7 +895,7 @@ export class TagService extends BaseService<
         usageCount: Number(row.usage),
       }));
       const stats = {
-        totalTags: Number(totalRes.rows[0].count),
+        totalTags,
         tagsByType: typeStats,
         mostUsedTags: topTags,
       };

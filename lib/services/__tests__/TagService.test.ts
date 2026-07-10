@@ -4,7 +4,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TagService } from '../TagService';
-import { query as mockQuery, withTransaction as mockWithTransaction } from '../../config/database.js';
+import {
+  query as mockQuery,
+  withTransaction as mockWithTransaction,
+} from '../../config/database.js';
 import { testUsers, testTasks } from '../../__tests__/helpers/fixtures';
 import { createQueryResult } from './helpers/mockDatabase';
 
@@ -73,7 +76,11 @@ describe('TagService', () => {
 
   describe('findAll', () => {
     it('should fetch all tags', async () => {
-      const mockTags = [tagFixtures.priority, tagFixtures.label, tagFixtures.project];
+      const mockTags = [
+        tagFixtures.priority,
+        tagFixtures.label,
+        tagFixtures.project,
+      ];
       mockedQuery.mockResolvedValueOnce(createQueryResult(mockTags));
 
       const result = await tagService.findAll({}, mockContext);
@@ -86,7 +93,10 @@ describe('TagService', () => {
       const priorityTags = [tagFixtures.priority];
       mockedQuery.mockResolvedValueOnce(createQueryResult(priorityTags));
 
-      const result = await tagService.findAll({ type: 'PRIORITY' }, mockContext);
+      const result = await tagService.findAll(
+        { type: 'PRIORITY' },
+        mockContext
+      );
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('type = $1'),
@@ -101,7 +111,10 @@ describe('TagService', () => {
       const searchResults = [tagFixtures.priority];
       mockedQuery.mockResolvedValueOnce(createQueryResult(searchResults));
 
-      const result = await tagService.findAll({ search: 'priority' }, mockContext);
+      const result = await tagService.findAll(
+        { search: 'priority' },
+        mockContext
+      );
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('name ILIKE $1'),
@@ -115,7 +128,10 @@ describe('TagService', () => {
       const activeTags = [tagFixtures.priority];
       mockedQuery.mockResolvedValueOnce(createQueryResult(activeTags));
 
-      const result = await tagService.findAll({ hasActiveTasks: true, userId: mockUserId }, mockContext);
+      const result = await tagService.findAll(
+        { hasActiveTasks: true, userId: mockUserId },
+        mockContext
+      );
 
       const tagCall = mockedQuery.mock.calls[0];
       expect(String(tagCall[0])).toContain('tk."userId" = $1');
@@ -184,10 +200,15 @@ describe('TagService', () => {
     });
 
     it('should prevent duplicate tag names', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.priority.id }], 1));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ id: tagFixtures.priority.id }], 1)
+      );
 
       await expect(
-        tagService.create({ name: 'High-Priority', type: 'PRIORITY' }, mockContext)
+        tagService.create(
+          { name: 'High-Priority', type: 'PRIORITY' },
+          mockContext
+        )
       ).rejects.toThrow('VALIDATION_ERROR');
     });
 
@@ -195,7 +216,10 @@ describe('TagService', () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(
-        tagService.create({ name: 'test', type: 'PROJECT', color: 'invalid-color' }, mockContext)
+        tagService.create(
+          { name: 'test', type: 'PROJECT', color: 'invalid-color' },
+          mockContext
+        )
       ).rejects.toThrow('VALIDATION_ERROR');
     });
 
@@ -203,7 +227,10 @@ describe('TagService', () => {
       mockedQuery.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(
-        tagService.create({ name: 'test', type: 'INVALID_TYPE' as any, color: '#FF0000' }, mockContext)
+        tagService.create(
+          { name: 'test', type: 'INVALID_TYPE' as any, color: '#FF0000' },
+          mockContext
+        )
       ).rejects.toThrow('VALIDATION_ERROR');
     });
   });
@@ -260,17 +287,21 @@ describe('TagService', () => {
         name: 'high-priority',
       };
 
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.priority.id }], 1));
-
-      await expect(tagService.update(tagId, updateDTO, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR'
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([{ id: tagFixtures.priority.id }], 1)
       );
+
+      await expect(
+        tagService.update(tagId, updateDTO, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
   });
 
   describe('findOrCreate', () => {
     it('should return existing tag when found', async () => {
-      mockedQuery.mockResolvedValueOnce(createQueryResult([tagFixtures.priority], 1));
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([tagFixtures.priority], 1)
+      );
 
       const result = await tagService.findOrCreate(
         { name: 'High-Priority', type: 'PRIORITY' },
@@ -282,7 +313,11 @@ describe('TagService', () => {
 
     it('should create tag when not found', async () => {
       const createDTO = { name: 'new-tag', type: 'PROJECT' as const };
-      const createdTag = { ...tagFixtures.project, id: 'tag-new', name: 'new-tag' };
+      const createdTag = {
+        ...tagFixtures.project,
+        id: 'tag-new',
+        name: 'new-tag',
+      };
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
@@ -315,7 +350,9 @@ describe('TagService', () => {
       };
 
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: taskTagData.taskId }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: taskTagData.taskId }], 1)
+        )
         .mockResolvedValueOnce(createQueryResult([], 1));
 
       await tagService.attachToTask(taskTagData, mockContext);
@@ -329,10 +366,16 @@ describe('TagService', () => {
 
     it('should detach tag from task', async () => {
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: testTasks.incomplete.id }], 1)
+        )
         .mockResolvedValueOnce(createQueryResult([], 1));
 
-      await tagService.detachFromTask(testTasks.incomplete.id, tagFixtures.priority.id, mockContext);
+      await tagService.detachFromTask(
+        testTasks.incomplete.id,
+        tagFixtures.priority.id,
+        mockContext
+      );
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM task_tags'),
@@ -343,7 +386,9 @@ describe('TagService', () => {
 
     it('should return task tags with metadata', async () => {
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: testTasks.incomplete.id }], 1)
+        )
         .mockResolvedValueOnce(
           createQueryResult([
             {
@@ -360,7 +405,10 @@ describe('TagService', () => {
           ])
         );
 
-      const result = await tagService.getTaskTags(testTasks.incomplete.id, mockContext);
+      const result = await tagService.getTaskTags(
+        testTasks.incomplete.id,
+        mockContext
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].tag.id).toBe(tagFixtures.priority.id);
@@ -369,7 +417,9 @@ describe('TagService', () => {
 
     it('should update task-tag fields', async () => {
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: testTasks.incomplete.id }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: testTasks.incomplete.id }], 1)
+        )
         .mockResolvedValueOnce(createQueryResult([], 1));
 
       await tagService.updateTaskTag(
@@ -381,7 +431,11 @@ describe('TagService', () => {
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE task_tags SET'),
-        expect.arrayContaining(['Updated Priority', testTasks.incomplete.id, tagFixtures.priority.id]),
+        expect.arrayContaining([
+          'Updated Priority',
+          testTasks.incomplete.id,
+          tagFixtures.priority.id,
+        ]),
         expect.anything()
       );
     });
@@ -390,7 +444,9 @@ describe('TagService', () => {
   describe('cleanup', () => {
     it('should delete unused tags', async () => {
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ id: tagFixtures.project.id }], 1))
+        .mockResolvedValueOnce(
+          createQueryResult([{ id: tagFixtures.project.id }], 1)
+        )
         .mockResolvedValueOnce(createQueryResult([], 1));
 
       const result = await tagService.cleanupUnusedTags(mockContext);
@@ -415,9 +471,15 @@ describe('TagService', () => {
       mockedQuery
         .mockResolvedValueOnce(createQueryResult([], 1))
         .mockResolvedValueOnce(createQueryResult([], 1))
-        .mockResolvedValueOnce(createQueryResult([{ ...tagFixtures.priority }], 1));
+        .mockResolvedValueOnce(
+          createQueryResult([{ ...tagFixtures.priority }], 1)
+        );
 
-      const result = await tagService.mergeTags(sourceTagId, targetTagId, mockContext);
+      const result = await tagService.mergeTags(
+        sourceTagId,
+        targetTagId,
+        mockContext
+      );
 
       expect(mockedQuery).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE task_tags SET "tagId" = $1'),
@@ -430,16 +492,18 @@ describe('TagService', () => {
     it('should not merge a tag with itself', async () => {
       const tagId = tagFixtures.priority.id;
 
-      await expect(tagService.mergeTags(tagId, tagId, mockContext)).rejects.toThrow(
-        'VALIDATION_ERROR'
-      );
+      await expect(
+        tagService.mergeTags(tagId, tagId, mockContext)
+      ).rejects.toThrow('VALIDATION_ERROR');
     });
   });
 
   describe('getStatistics', () => {
     it('should calculate tag usage statistics', async () => {
+      // Refactored getStatistics runs two aggregates in parallel: a
+      // per-type GROUP BY (totalTags is summed from these) and the
+      // most-used LEFT JOIN. The standalone COUNT(*) query was dropped.
       mockedQuery
-        .mockResolvedValueOnce(createQueryResult([{ count: '5' }], 1))
         .mockResolvedValueOnce(
           createQueryResult([
             { type: 'PRIORITY', count: '2' },
@@ -466,7 +530,9 @@ describe('TagService', () => {
     it('should handle database connection errors gracefully', async () => {
       mockedQuery.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      await expect(tagService.findAll({}, mockContext)).rejects.toThrow('Connection timeout');
+      await expect(tagService.findAll({}, mockContext)).rejects.toThrow(
+        'Connection timeout'
+      );
     });
 
     it('should handle special characters in tag names', async () => {

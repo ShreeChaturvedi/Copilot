@@ -116,18 +116,24 @@ describe('Tasks API Integration Tests', () => {
       });
       const res = createMockResponse();
 
-      mockTaskService.findAll.mockResolvedValue([mockTask]);
+      // Source now always takes the paginated path. With no page/limit in the
+      // query it clamps to page 1 and the default cap of 500.
+      const pagination = { page: 1, limit: 500, total: 1, totalPages: 1 };
+      mockTaskService.findPaginated.mockResolvedValue({
+        data: [mockTask],
+        pagination,
+      });
 
       await tasksHandler(req, res);
 
-      expect(mockTaskService.findAll).toHaveBeenCalledWith(
-        {},
-        {
-          userId: 'user-123',
-          requestId: 'test-request-123',
-        }
-      );
-      expect(mockSendSuccess).toHaveBeenCalledWith(res, { data: [mockTask] });
+      expect(mockTaskService.findPaginated).toHaveBeenCalledWith({}, 1, 500, {
+        userId: 'user-123',
+        requestId: 'test-request-123',
+      });
+      // Bare array in `data`, pagination threaded into `meta`.
+      expect(mockSendSuccess).toHaveBeenCalledWith(res, [mockTask], 200, {
+        pagination,
+      });
     });
 
     it('should apply filters from query parameters', async () => {
@@ -148,11 +154,16 @@ describe('Tasks API Integration Tests', () => {
       });
       const res = createMockResponse();
 
-      mockTaskService.findAll.mockResolvedValue([mockTask]);
+      mockTaskService.findPaginated.mockResolvedValue({
+        data: [mockTask],
+        pagination: { page: 1, limit: 500, total: 1, totalPages: 1 },
+      });
 
       await tasksHandler(req, res);
 
-      expect(mockTaskService.findAll).toHaveBeenCalledWith(
+      // Filters are forwarded to the always-paginated path (page 1, default
+      // cap 500 since no page/limit was supplied).
+      expect(mockTaskService.findPaginated).toHaveBeenCalledWith(
         {
           completed: true,
           taskListId: 'list-123',
@@ -167,6 +178,8 @@ describe('Tasks API Integration Tests', () => {
           sortBy: 'scheduledDate',
           sortOrder: 'asc',
         },
+        1,
+        500,
         {
           userId: 'user-123',
           requestId: 'test-request-123',
@@ -184,14 +197,15 @@ describe('Tasks API Integration Tests', () => {
       });
       const res = createMockResponse();
 
+      const pagination = {
+        page: 2,
+        limit: 10,
+        total: 25,
+        totalPages: 3,
+      };
       const paginatedResult = {
         data: [mockTask],
-        pagination: {
-          page: 2,
-          limit: 10,
-          total: 25,
-          totalPages: 3,
-        },
+        pagination,
       };
 
       mockTaskService.findPaginated.mockResolvedValue(paginatedResult);
@@ -202,7 +216,10 @@ describe('Tasks API Integration Tests', () => {
         userId: 'user-123',
         requestId: 'test-request-123',
       });
-      expect(mockSendSuccess).toHaveBeenCalledWith(res, paginatedResult);
+      // Response is the bare `data` array with pagination in `meta`.
+      expect(mockSendSuccess).toHaveBeenCalledWith(res, [mockTask], 200, {
+        pagination,
+      });
     });
 
     it('should return 401 for unauthenticated requests', async () => {
@@ -225,16 +242,17 @@ describe('Tasks API Integration Tests', () => {
       const req = createMockAuthRequest(mockUser, { method: 'GET' });
       const res = createMockResponse();
 
-      mockTaskService.findAll.mockRejectedValue(
+      mockTaskService.findPaginated.mockRejectedValue(
         new Error('Database connection failed')
       );
 
       await tasksHandler(req, res);
 
+      // Error hygiene: the 500 no longer echoes the internal error message.
       expect(mockSendError).toHaveBeenCalledWith(res, {
         statusCode: 500,
         code: 'INTERNAL_ERROR',
-        message: 'Database connection failed',
+        message: 'Failed to fetch tasks',
       });
     });
   });

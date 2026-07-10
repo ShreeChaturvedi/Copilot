@@ -652,55 +652,42 @@ describe('Task Management Comprehensive Tests', () => {
 
   describe('Statistics and Analytics', () => {
     it('should provide comprehensive task statistics', async () => {
-      let queryIndex = 0;
-      mockedQuery.mockImplementation(async () => {
-        queryIndex++;
-        switch (queryIndex) {
-          case 1:
-            return createQueryResult([{ count: '100' }]); // total
-          case 2:
-            return createQueryResult([{ count: '60' }]); // completed
-          case 3:
-            return createQueryResult([{ count: '40' }]); // pending
-          case 4:
-            return createQueryResult([{ count: '8' }]); // overdue
-          case 5:
-            return createQueryResult([{ count: '5' }]); // today
-          case 6:
-            return createQueryResult([{ count: '15' }]); // this week
-          case 7:
-            return createQueryResult([{ count: '10' }]); // completed week
-          case 8:
-            return createQueryResult([{ count: '45' }]); // completed month
-          default:
-            return createQueryResult([{ count: '0' }]);
-        }
-      });
+      // getStats now collapses the six COUNT round-trips into ONE aggregate
+      // query returning aliased columns (total/completed/overdue/today/week/
+      // month) rather than a sequence of { count } rows. pending is derived as
+      // total - completed in JS.
+      mockedQuery.mockResolvedValue(
+        createQueryResult([
+          {
+            total: '100',
+            completed: '60',
+            overdue: '8',
+            today: '5',
+            week: '15',
+            month: '45',
+          },
+        ])
+      );
 
       const result = await taskService.getStats(mockContext);
 
-      expect(result).toMatchObject({
+      expect(result).toEqual({
         total: 100,
         completed: 60,
         pending: 40,
+        overdue: 8,
+        completedToday: 5,
+        completedThisWeek: 15,
+        completedThisMonth: 45,
       });
     });
 
     it('should provide task list statistics', async () => {
-      let queryIndex = 0;
-      mockedQuery.mockImplementation(async () => {
-        queryIndex++;
-        switch (queryIndex) {
-          case 1:
-            return createQueryResult([{ count: '8' }]); // total lists
-          case 2:
-            return createQueryResult([{ count: '120' }]); // total tasks
-          case 3:
-            return createQueryResult([{ count: '75' }]); // completed tasks
-          default:
-            return createQueryResult([{ count: '0' }]);
-        }
-      });
+      // getStatistics now issues ONE aggregate query returning aliased columns
+      // (lists/total/completed) instead of three separate COUNT queries.
+      mockedQuery.mockResolvedValue(
+        createQueryResult([{ lists: '8', total: '120', completed: '75' }])
+      );
 
       const result = await taskListService.getStatistics(mockContext);
 

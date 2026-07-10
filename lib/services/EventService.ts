@@ -37,6 +37,11 @@ const { rrulestr } = rrulePkg as unknown as typeof import('rrule');
 // occurrences of a list, in days.
 const UPCOMING_EXPANSION_DAYS = 90;
 
+// Hard cap on how many occurrences a single recurring master may expand to in
+// one window. A guardrail against a pathological rule (e.g. one that slips past
+// validation) exhausting CPU/heap for the whole request.
+const MAX_OCCURRENCES = 1000;
+
 /**
  * Event entity interface extending base
  */
@@ -274,17 +279,27 @@ export class EventService extends BaseService<
     // that fall inside the requested window (the master's stored time may sit
     // entirely outside the range).
     const dateClauses: string[] = [];
+    let endParamIndex: number | null = null;
     if (filters.start) {
       params.push(this.toTimestampParam(filters.start));
       dateClauses.push('"end" >= $' + params.length);
     }
     if (filters.end) {
       params.push(this.toTimestampParam(filters.end));
-      dateClauses.push('start <= $' + params.length);
+      endParamIndex = params.length;
+      dateClauses.push('start <= $' + endParamIndex);
     }
     if (dateClauses.length) {
+      // Bound the recurring-master set: a master can only produce occurrences
+      // at/after its own dtstart, so a series whose start is past the window's
+      // end cannot contribute and shouldn't be fetched + rrule-expanded. Only
+      // masters with start <= rangeEnd are included when an end bound exists.
+      const recurBranch =
+        endParamIndex !== null
+          ? `(recurrence IS NOT NULL AND start <= $${endParamIndex})`
+          : 'recurrence IS NOT NULL';
       clauses.push(
-        '(recurrence IS NOT NULL OR (' + dateClauses.join(' AND ') + '))'
+        '(' + recurBranch + ' OR (' + dateClauses.join(' AND ') + '))'
       );
     }
     if (filters.search) {
@@ -397,6 +412,17 @@ export class EventService extends BaseService<
       return [master];
     }
 
+    // Guardrail: never expand more than MAX_OCCURRENCES from one master, so a
+    // bad/sub-daily rule that slips past validation can't blow up memory.
+    if (occStarts.length > MAX_OCCURRENCES) {
+      this.log('generateOccurrences:truncated', {
+        masterId: master.id,
+        requested: occStarts.length,
+        cap: MAX_OCCURRENCES,
+      });
+      occStarts = occStarts.slice(0, MAX_OCCURRENCES);
+    }
+
     const exceptionSet = new Set(master.exceptions ?? []);
     const occurrences: EventEntity[] = [];
     for (const occStart of occStarts) {
@@ -494,16 +520,15 @@ export class EventService extends BaseService<
       throw new Error('VALIDATION_ERROR: Event title cannot be empty');
     }
 
-    if (context?.userId) {
-      const hasAccess = await this.checkOwnership(id, context.userId);
-      if (!hasAccess) {
-        throw new Error('AUTHORIZATION_ERROR: Access denied');
-      }
-    }
-
-    // Get current event data for validation
-    const currentRes = await query(
-      'SELECT start, "end", "allDay" FROM events WHERE id = $1',
+    // Fetch the owner and the current start/end/allDay in one round-trip, then
+    // check ownership in JS — removes the separate checkOwnership SELECT.
+    const currentRes = await query<{
+      userId: string;
+      start: Date;
+      end: Date;
+      allDay: boolean;
+    }>(
+      'SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1',
       [id],
       this.db
     );
@@ -511,6 +536,10 @@ export class EventService extends BaseService<
 
     if (!currentEvent) {
       throw new Error('NOT_FOUND: Event not found');
+    }
+
+    if (context?.userId && currentEvent.userId !== context.userId) {
+      throw new Error('AUTHORIZATION_ERROR: Access denied');
     }
 
     // Validate start/end relationship
@@ -763,9 +792,15 @@ export class EventService extends BaseService<
         `SELECT e.*
          FROM events e
          JOIN calendars c ON c.id = e."calendarId"
-         WHERE e."userId" = $1 AND (e.recurrence IS NOT NULL OR e.start >= $2) AND c."isVisible" = true
+         WHERE e."userId" = $1
+           AND ((e.recurrence IS NOT NULL AND e.start <= $3) OR e.start >= $2)
+           AND c."isVisible" = true
          ORDER BY e.start ASC`,
-        [context.userId!, this.toTimestampParam(now)],
+        [
+          context.userId!,
+          this.toTimestampParam(now),
+          this.toTimestampParam(windowEnd),
+        ],
         this.db
       );
       const base = res.rows.map((row) => this.transformEntity(row));
@@ -841,7 +876,10 @@ export class EventService extends BaseService<
       ];
       const and: string[] = [
         'e."userId" = $1',
-        '(e.recurrence IS NOT NULL OR (e.start < $2 AND e."end" > $3))',
+        // $2 is rangeEnd, $3 is rangeStart. A recurring master can only produce
+        // occurrences at/after its own start, so bound it by start < rangeEnd
+        // rather than fetching every recurring master the account has ever made.
+        '((e.recurrence IS NOT NULL AND e.start < $2) OR (e.start < $2 AND e."end" > $3))',
       ];
       if (excludeId) {
         params.push(excludeId);
@@ -1067,6 +1105,15 @@ export class EventService extends BaseService<
     for (const part of parts) {
       const [key, value] = part.split('=');
       if (!validKeywords.includes(key)) {
+        return false;
+      }
+      // Reject sub-daily granularity: a SECONDLY/MINUTELY/HOURLY series expands
+      // to millions of occurrences over any real window and is never something
+      // the recurrence editor emits. Only calendar-scale frequencies are valid.
+      if (
+        key === 'FREQ' &&
+        !['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(value)
+      ) {
         return false;
       }
       // BYSETPOS is a comma-separated list of non-zero positions in the range

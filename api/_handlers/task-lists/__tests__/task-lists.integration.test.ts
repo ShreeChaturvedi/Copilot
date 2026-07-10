@@ -186,7 +186,7 @@ describe('Task Lists API Integration Tests', () => {
       expect(mockSendError).toHaveBeenCalledWith(res, {
         statusCode: 500,
         code: 'INTERNAL_ERROR',
-        message: 'Database connection failed',
+        message: 'Failed to fetch task lists',
       });
     });
   });

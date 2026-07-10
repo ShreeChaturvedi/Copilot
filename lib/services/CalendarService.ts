@@ -321,15 +321,6 @@ export class CalendarService extends BaseService<
       if (data.isDefault !== undefined) {
         updates.push(`"isDefault" = $${paramIndex++}`);
         params.push(data.isDefault);
-
-        // If setting as default, unset other calendars first
-        if (data.isDefault && context?.userId) {
-          await query(
-            'UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true AND id <> $2',
-            [context.userId, id],
-            this.db
-          );
-        }
       }
 
       if (updates.length === 0) {
@@ -340,13 +331,25 @@ export class CalendarService extends BaseService<
       updates.push(`"updatedAt" = NOW()`);
       params.push(id);
 
-      const result = await query(
-        `UPDATE calendars SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-        params,
-        this.db
-      );
+      const updateSql = `UPDATE calendars SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
 
-      const row = result.rows[0];
+      // When flipping this calendar to the default, unset the previous default
+      // and write the row in ONE transaction (mirrors setDefault/create). Doing
+      // the two statements separately on this.db could strand the user with no
+      // default if the second fails or two default-setting requests interleave.
+      const needsUnset = data.isDefault === true && !!context?.userId;
+      const row = needsUnset
+        ? await withTransaction(async (client) => {
+            await query(
+              'UPDATE calendars SET "isDefault" = false WHERE "userId" = $1 AND "isDefault" = true AND id <> $2',
+              [context!.userId!, id],
+              client
+            );
+            const res = await query(updateSql, params, client);
+            return res.rows[0] ?? null;
+          })
+        : ((await query(updateSql, params, this.db)).rows[0] ?? null);
+
       if (!row) {
         return null;
       }
@@ -541,6 +544,7 @@ export class CalendarService extends BaseService<
          LEFT JOIN (
            SELECT "calendarId", COUNT(*)::bigint AS count
            FROM events
+           WHERE "calendarId" IN (SELECT id FROM calendars WHERE "userId" = $1)
            GROUP BY "calendarId"
          ) e_cnt ON e_cnt."calendarId" = c.id
          WHERE c."userId" = $1
@@ -576,45 +580,53 @@ export class CalendarService extends BaseService<
           throw new Error('AUTHORIZATION_ERROR: Access denied');
         }
 
-        // Check if this is the only calendar
-        const userCalendarCountRes = await query<{ count: string }>(
-          'SELECT COUNT(*)::bigint AS count FROM calendars WHERE "userId" = $1',
-          [context.userId!],
-          this.db
-        );
-        const userCalendarCount = Number(userCalendarCountRes.rows[0].count);
-        if (userCalendarCount <= 1) {
-          throw new Error('VALIDATION_ERROR: Cannot delete the only calendar');
-        }
-
-        // Check if this is the default calendar
-        const calendarRes = await query<{ isDefault: boolean }>(
-          'SELECT "isDefault" FROM calendars WHERE id = $1',
-          [id],
-          this.db
-        );
-        const calendar = calendarRes.rows[0];
-
-        if (calendar?.isDefault) {
-          // Set another calendar as default before deleting
-          const otherRes = await query(
-            'SELECT id FROM calendars WHERE "userId" = $1 AND id <> $2 LIMIT 1',
-            [context.userId!, id],
-            this.db
+        // Do the only-calendar guard, default reassignment, and DELETE in ONE
+        // transaction so a failure between the reassignment and the delete
+        // can't leave the user with either zero calendars or no default.
+        await withTransaction(async (client) => {
+          const userCalendarCountRes = await query<{ count: string }>(
+            'SELECT COUNT(*)::bigint AS count FROM calendars WHERE "userId" = $1',
+            [context.userId!],
+            client
           );
-          const otherCalendar = otherRes.rows[0];
-
-          if (otherCalendar) {
-            await query(
-              'UPDATE calendars SET "isDefault" = true WHERE id = $1',
-              [otherCalendar.id],
-              this.db
+          const userCalendarCount = Number(userCalendarCountRes.rows[0].count);
+          if (userCalendarCount <= 1) {
+            throw new Error(
+              'VALIDATION_ERROR: Cannot delete the only calendar'
             );
           }
-        }
-      }
 
-      await query('DELETE FROM calendars WHERE id = $1', [id], this.db);
+          // Check if this is the default calendar
+          const calendarRes = await query<{ isDefault: boolean }>(
+            'SELECT "isDefault" FROM calendars WHERE id = $1',
+            [id],
+            client
+          );
+          const calendar = calendarRes.rows[0];
+
+          if (calendar?.isDefault) {
+            // Set another calendar as default before deleting
+            const otherRes = await query(
+              'SELECT id FROM calendars WHERE "userId" = $1 AND id <> $2 LIMIT 1',
+              [context.userId!, id],
+              client
+            );
+            const otherCalendar = otherRes.rows[0];
+
+            if (otherCalendar) {
+              await query(
+                'UPDATE calendars SET "isDefault" = true WHERE id = $1',
+                [otherCalendar.id],
+                client
+              );
+            }
+          }
+
+          await query('DELETE FROM calendars WHERE id = $1', [id], client);
+        });
+      } else {
+        await query('DELETE FROM calendars WHERE id = $1', [id], this.db);
+      }
 
       this.log('delete:success', { id }, context);
       return true;
@@ -653,21 +665,18 @@ export class CalendarService extends BaseService<
         );
       }
 
-      // For now, just return the calendars in the requested order
-      // In a full implementation, you might add an `order` field to the database
-      const orderedCalendars = await Promise.all(
-        calendarIds.map(async (id) => {
-          const res = await query(
-            'SELECT * FROM calendars WHERE id = $1',
-            [id],
-            this.db
-          );
-          return res.rows[0];
-        })
+      // Fetch every row in one query, then reorder in memory to the requested
+      // id order (avoids the previous SELECT-per-id N+1). Order is not
+      // persisted — there is no order column — so this stays client-only.
+      const rowsRes = await query<CalendarEntity>(
+        'SELECT * FROM calendars WHERE id = ANY($1::text[])',
+        [calendarIds],
+        this.db
       );
-
-      const results = orderedCalendars
-        .filter(Boolean)
+      const rowMap = new Map(rowsRes.rows.map((row) => [row.id, row]));
+      const results = calendarIds
+        .map((id) => rowMap.get(id))
+        .filter((row): row is CalendarEntity => Boolean(row))
         .map((calendar) => this.transformEntity(calendar));
 
       this.log('reorder:success', { count: results.length }, context);

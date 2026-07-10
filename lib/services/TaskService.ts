@@ -15,6 +15,12 @@ import { deleteBlobs } from '../utils/blobStorage.js';
  */
 export type DbPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
+/**
+ * Upper bound on rows returned by the unbounded findAll path (list/search
+ * convenience finders). A memory/scan guardrail, not a UI page size.
+ */
+const MAX_FIND_ALL_ROWS = 1000;
+
 export interface TaskEntity extends UserOwnedEntity {
   title: string;
   description: string | null;
@@ -357,7 +363,8 @@ export class TaskService extends BaseService<
       };
       const allListsRes = await query<TaskListRow>(
         `SELECT id, name, color, icon, description FROM "task_lists" WHERE "userId" = $1`,
-        [userId]
+        [userId],
+        this.db
       );
 
       // Cache all user's task lists for future use
@@ -376,7 +383,8 @@ export class TaskService extends BaseService<
     const attachmentsRes = await query<AttachmentRow>(
       `SELECT id, "fileName", "fileUrl", "fileType", "fileSize", "taskId", "createdAt", "thumbnailUrl"
        FROM attachments WHERE "taskId" IN (${taskPlaceholders})`,
-      taskIds
+      taskIds,
+      this.db
     );
     interface AttachmentRow {
       id: string;
@@ -412,7 +420,8 @@ export class TaskService extends BaseService<
        FROM "task_tags" tt
        JOIN tags t ON t.id = tt."tagId"
        WHERE tt."taskId" IN (${taskPlaceholders})`,
-      taskIds
+      taskIds,
+      this.db
     );
     interface TagRow {
       taskId: string;
@@ -466,8 +475,14 @@ export class TaskService extends BaseService<
       this.log('findAll', { filters }, context);
       const { sql, params } = this.buildWhereClause(filters, context);
       const order = this.buildOrderByClause(filters);
+      // Hard guardrail: findAll powers findByTaskList/search/findOverdue/
+      // findByScheduledDate, none of which pass a LIMIT. Cap the row count so a
+      // heavy account can't materialize (and enrich) its entire task history in
+      // one request. The bound is generous enough not to truncate real views;
+      // paginated reads go through findPaginated.
+      params.push(MAX_FIND_ALL_ROWS);
       const res = await query<TaskRow>(
-        `SELECT * FROM tasks ${sql} ${order}`,
+        `SELECT * FROM tasks ${sql} ${order} LIMIT $${params.length}`,
         params,
         this.db
       );
@@ -645,15 +660,14 @@ export class TaskService extends BaseService<
         if (data.tags && data.tags.length > 0) {
           for (const tagData of data.tags) {
             const name = tagData.name.trim().toLowerCase();
-            await query(
-              `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
-               ON CONFLICT (name) DO NOTHING`,
-              [name, tagData.type, tagData.color ?? null],
-              client
-            );
+            // Upsert and read the id in one round-trip. DO UPDATE (not DO
+            // NOTHING) so RETURNING yields the row's id even on conflict,
+            // removing the follow-up SELECT.
             const tagRow = await query<{ id: string }>(
-              `SELECT id FROM tags WHERE name = $1`,
-              [name],
+              `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
+               ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+               RETURNING id`,
+              [name, tagData.type, tagData.color ?? null],
               client
             );
             const tagId = tagRow.rows[0].id;
@@ -775,15 +789,12 @@ export class TaskService extends BaseService<
           const name = (tagData.name ?? tagData.value).trim().toLowerCase();
           if (!name) continue;
           const type = String(tagData.type).toUpperCase();
-          await query(
-            `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
-             ON CONFLICT (name) DO NOTHING`,
-            [name, type, tagData.color ?? null],
-            client
-          );
+          // Upsert + read the id in one round-trip (see create()).
           const tagRow = await query<{ id: string }>(
-            `SELECT id FROM tags WHERE name = $1`,
-            [name],
+            `INSERT INTO tags (id, name, type, color) VALUES (gen_random_uuid()::text, $1, $2, $3)
+             ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id`,
+            [name, type, tagData.color ?? null],
             client
           );
           const tagId = tagRow.rows[0].id;
@@ -876,38 +887,32 @@ export class TaskService extends BaseService<
       this.log('toggleCompletion', { id }, context);
       await this.ensureStatusColumnExists();
 
+      // Flip completion atomically in a single owner-scoped statement. This
+      // removes the lost-update race of the old read-then-write (two concurrent
+      // toggles no longer clobber each other) and the redundant ownership +
+      // current-value SELECTs on the app's most frequent write. Column refs on
+      // the right-hand side of SET see the pre-update row, so `NOT completed`
+      // flips the flag and the CASEs derive status/completedAt from the old
+      // value. Zero rows means not-found-or-not-owned.
+      const params: unknown[] = [id];
+      let where = 'WHERE id = $1';
       if (context?.userId) {
-        const hasAccess = await this.checkOwnership(id, context.userId);
-        if (!hasAccess) {
-          throw new Error('AUTHORIZATION_ERROR: Access denied');
-        }
+        params.push(context.userId);
+        where += ` AND "userId" = $${params.length}`;
       }
-
-      const currentRes = await query<{ completed: boolean }>(
-        `SELECT completed FROM tasks WHERE id = $1`,
-        [id],
-        this.db
-      );
-      if (currentRes.rowCount === 0)
-        throw new Error('NOT_FOUND: Task not found');
-      const current = currentRes.rows[0].completed;
-      const nowCompleted = !current;
       const updatedRes = await query<TaskRow>(
         `UPDATE tasks
-         SET completed = $1,
-             status = $2,
-             "completedAt" = $3,
+         SET completed = NOT completed,
+             status = CASE WHEN completed THEN 'NOT_STARTED' ELSE 'DONE' END,
+             "completedAt" = CASE WHEN completed THEN NULL ELSE NOW() END,
              "updatedAt" = NOW()
-         WHERE id = $4
+         ${where}
          RETURNING *`,
-        [
-          nowCompleted,
-          nowCompleted ? 'DONE' : 'NOT_STARTED',
-          nowCompleted ? new Date() : null,
-          id,
-        ],
+        params,
         this.db
       );
+      if (updatedRes.rowCount === 0)
+        throw new Error('NOT_FOUND: Task not found');
       const base = this.transformEntity(updatedRes.rows[0]);
       const [enriched] = await this.enrichEntities([base], context);
       this.log(
@@ -986,6 +991,7 @@ export class TaskService extends BaseService<
   ): Promise<TaskEntity[]> {
     try {
       this.log('bulkUpdate', { ids, updates }, context);
+      await this.ensureStatusColumnExists();
 
       // Validate all tasks belong to user
       if (context?.userId) {
@@ -1011,8 +1017,15 @@ export class TaskService extends BaseService<
         setClauses.push(`title = $${params.length}`);
       }
       if (updates.completed !== undefined) {
+        // Keep completed/status/completedAt consistent the way single-row
+        // update() does, so bulk-completed tasks don't drift out of sync (stats
+        // and status-based UI key off completedAt/status).
         params.push(updates.completed);
         setClauses.push(`completed = $${params.length}`);
+        params.push(updates.completed ? new Date() : null);
+        setClauses.push(`"completedAt" = $${params.length}`);
+        params.push(updates.completed ? 'DONE' : 'NOT_STARTED');
+        setClauses.push(`status = $${params.length}`);
       }
       if (updates.scheduledDate !== undefined) {
         params.push(updates.scheduledDate);
@@ -1056,7 +1069,10 @@ export class TaskService extends BaseService<
       const updatedTasks = await this.enrichEntities(base, context);
 
       this.log('bulkUpdate:success', { count: updatedTasks.length }, context);
-      return updatedTasks.map((task) => this.transformEntity(task));
+      // enrichEntities already returns fully-formed, transformed entities with
+      // relations attached. Re-running transformEntity here would strip
+      // taskList/tags/attachments, so return the enriched list directly.
+      return updatedTasks;
     } catch (error) {
       this.log(
         'bulkUpdate:error',
@@ -1131,55 +1147,39 @@ export class TaskService extends BaseService<
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [
-      totalRes,
-      completedRes,
-      overdueRes,
-      completedTodayRes,
-      completedThisWeekRes,
-      completedThisMonthRes,
-    ] = await Promise.all([
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1',
-        [context.userId!],
-        this.db
-      ),
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true',
-        [context.userId!],
-        this.db
-      ),
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = false AND "scheduledDate" < NOW()',
-        [context.userId!],
-        this.db
-      ),
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2',
-        [context.userId!, startOfDay],
-        this.db
-      ),
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2',
-        [context.userId!, startOfWeek],
-        this.db
-      ),
-      query<{ count: string }>(
-        'SELECT COUNT(*)::bigint AS count FROM tasks WHERE "userId" = $1 AND completed = true AND "completedAt" >= $2',
-        [context.userId!, startOfMonth],
-        this.db
-      ),
-    ]);
+    // One aggregate over a single table scan instead of six separate COUNT
+    // round-trips (each consuming a pool connection) on every dashboard load.
+    const statsRes = await query<{
+      total: string;
+      completed: string;
+      overdue: string;
+      today: string;
+      week: string;
+      month: string;
+    }>(
+      `SELECT
+         COUNT(*)::bigint AS total,
+         COUNT(*) FILTER (WHERE completed)::bigint AS completed,
+         COUNT(*) FILTER (WHERE NOT completed AND "scheduledDate" < NOW())::bigint AS overdue,
+         COUNT(*) FILTER (WHERE completed AND "completedAt" >= $2)::bigint AS today,
+         COUNT(*) FILTER (WHERE completed AND "completedAt" >= $3)::bigint AS week,
+         COUNT(*) FILTER (WHERE completed AND "completedAt" >= $4)::bigint AS month
+       FROM tasks WHERE "userId" = $1`,
+      [context.userId!, startOfDay, startOfWeek, startOfMonth],
+      this.db
+    );
+    const row = statsRes.rows[0];
+    const total = Number(row.total);
+    const completed = Number(row.completed);
 
     return {
-      total: Number(totalRes.rows[0].count),
-      completed: Number(completedRes.rows[0].count),
-      pending:
-        Number(totalRes.rows[0].count) - Number(completedRes.rows[0].count),
-      overdue: Number(overdueRes.rows[0].count),
-      completedToday: Number(completedTodayRes.rows[0].count),
-      completedThisWeek: Number(completedThisWeekRes.rows[0].count),
-      completedThisMonth: Number(completedThisMonthRes.rows[0].count),
+      total,
+      completed,
+      pending: total - completed,
+      overdue: Number(row.overdue),
+      completedToday: Number(row.today),
+      completedThisWeek: Number(row.week),
+      completedThisMonth: Number(row.month),
     };
   }
 
@@ -1202,6 +1202,11 @@ export class TaskService extends BaseService<
       [userId],
       this.db
     );
+    // The task-list cache (keyed by user) may have been warmed before this
+    // auto-created default existed. Invalidate it — the same call the
+    // TaskListService write paths make — so enrichEntities doesn't return the
+    // new list's tasks with taskList: undefined until the TTL expires.
+    taskListCache.invalidate(createCacheKey('task-lists', userId));
     return created.rows[0];
   }
 }

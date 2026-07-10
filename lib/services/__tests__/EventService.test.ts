@@ -503,16 +503,12 @@ describe('EventService', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
-        if (lower.includes('select "userid" from events')) {
-          return createQueryResult([{ userId: mockUserId }]);
-        }
-        if (
-          lower.includes('select start') &&
-          lower.includes('"end"') &&
-          lower.includes('"allday"')
-        ) {
+        // validateUpdate fetches owner + current times in ONE query now:
+        // SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1
+        if (lower.includes('select "userid", start')) {
           return createQueryResult([
             {
+              userId: mockUserId,
               start: eventFixtures.meeting.start,
               end: eventFixtures.meeting.end,
               allDay: eventFixtures.meeting.allDay,
@@ -549,16 +545,12 @@ describe('EventService', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
-        if (lower.includes('select "userid" from events')) {
-          return createQueryResult([{ userId: mockUserId }]);
-        }
-        if (
-          lower.includes('select start') &&
-          lower.includes('"end"') &&
-          lower.includes('"allday"')
-        ) {
+        // validateUpdate fetches owner + current times in ONE query now:
+        // SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1
+        if (lower.includes('select "userid", start')) {
           return createQueryResult([
             {
+              userId: mockUserId,
               start: eventFixtures.meeting.start,
               end: eventFixtures.meeting.end,
               allDay: eventFixtures.meeting.allDay,
@@ -594,16 +586,12 @@ describe('EventService', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
-        if (lower.includes('select "userid" from events')) {
-          return createQueryResult([{ userId: mockUserId }]);
-        }
-        if (
-          lower.includes('select start') &&
-          lower.includes('"end"') &&
-          lower.includes('"allday"')
-        ) {
+        // validateUpdate fetches owner + current times in ONE query now:
+        // SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1
+        if (lower.includes('select "userid", start')) {
           return createQueryResult([
             {
+              userId: mockUserId,
               start: eventFixtures.recurring.start,
               end: eventFixtures.recurring.end,
               allDay: eventFixtures.recurring.allDay,
@@ -1008,16 +996,12 @@ describe('EventService', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
-        if (lower.includes('select "userid" from events')) {
-          return createQueryResult([{ userId: mockUserId }]);
-        }
-        if (
-          lower.includes('select start') &&
-          lower.includes('"end"') &&
-          lower.includes('"allday"')
-        ) {
+        // validateUpdate fetches owner + current times in ONE query now:
+        // SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1
+        if (lower.includes('select "userid", start')) {
           return createQueryResult([
             {
+              userId: mockUserId,
               start: eventFixtures.recurring.start,
               end: eventFixtures.recurring.end,
               allDay: eventFixtures.recurring.allDay,
@@ -1053,16 +1037,12 @@ describe('EventService', () => {
 
       mockedQuery.mockImplementation(async (sql: string) => {
         const lower = sql.toLowerCase();
-        if (lower.includes('select "userid" from events')) {
-          return createQueryResult([{ userId: mockUserId }]);
-        }
-        if (
-          lower.includes('select start') &&
-          lower.includes('"end"') &&
-          lower.includes('"allday"')
-        ) {
+        // validateUpdate fetches owner + current times in ONE query now:
+        // SELECT "userId", start, "end", "allDay" FROM events WHERE id = $1
+        if (lower.includes('select "userid", start')) {
           return createQueryResult([
             {
+              userId: mockUserId,
               start: eventFixtures.recurring.start,
               end: eventFixtures.recurring.end,
               allDay: eventFixtures.recurring.allDay,

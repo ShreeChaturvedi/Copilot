@@ -107,10 +107,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/tags error:', error);
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to fetch tags')
-      );
+      sendError(res, new InternalServerError('Failed to fetch tags'));
     }
   },
 
@@ -177,10 +174,7 @@ export default createCrudHandler({
         );
       }
 
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to create tag')
-      );
+      sendError(res, new InternalServerError('Failed to create tag'));
     }
   },
 

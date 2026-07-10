@@ -75,10 +75,7 @@ export default createCrudHandler({
       sendSuccess(res, result);
     } catch (error) {
       console.error('GET /api/events error:', error);
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to fetch events')
-      );
+      sendError(res, new InternalServerError('Failed to fetch events'));
     }
   },
 
@@ -186,8 +183,11 @@ export default createCrudHandler({
           if (exact) {
             eventData.calendarId = exact.id as unknown as string;
           }
-        } catch {
-          // ignore and let validation below handle missing calendarId
+        } catch (lookupError) {
+          // Don't mask a real DB failure as a silent validation miss; log it so
+          // it's diagnosable. The 'Calendar ID is required' 400 below still
+          // handles the genuinely-unresolvable case.
+          console.error('Calendar name resolution failed:', lookupError);
         }
       }
 
@@ -224,10 +224,7 @@ export default createCrudHandler({
         );
       }
 
-      sendError(
-        res,
-        new InternalServerError(error.message || 'Failed to create event')
-      );
+      sendError(res, new InternalServerError('Failed to create event'));
     }
   },
 

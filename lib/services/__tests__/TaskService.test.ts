@@ -500,28 +500,33 @@ describe('TaskService', () => {
 
   describe('getStats', () => {
     it('should return task statistics', async () => {
-      // Mock total count
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '100' }]));
-      // Mock completed count
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '45' }]));
-      // Mock pending count
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '55' }]));
-      // Mock overdue count
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '5' }]));
-      // Mock today count
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '10' }]));
-      // Mock this week
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '25' }]));
-      // Mock completed this week
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '8' }]));
-      // Mock completed this month
-      mockedQuery.mockResolvedValueOnce(createQueryResult([{ count: '30' }]));
+      // getStats now collapses the six COUNTs into one aggregate query that
+      // returns a single row with the new column aliases.
+      mockedQuery.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            total: '100',
+            completed: '45',
+            overdue: '5',
+            today: '10',
+            week: '25',
+            month: '30',
+          },
+        ])
+      );
 
       const result = await taskService.getStats(mockContext);
 
       expect(result.total).toBe(100);
       expect(result.completed).toBe(45);
+      // pending is derived in memory as total - completed.
       expect(result.pending).toBe(55);
+      expect(result.overdue).toBe(5);
+      expect(result.completedToday).toBe(10);
+      expect(result.completedThisWeek).toBe(25);
+      expect(result.completedThisMonth).toBe(30);
+      // A single round-trip, not six.
+      expect(mockedQuery).toHaveBeenCalledTimes(1);
     });
   });
 });
