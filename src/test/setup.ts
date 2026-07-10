@@ -1,8 +1,16 @@
 import '@testing-library/jest-dom';
-import { expect, vi } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
+import { cleanup } from '@testing-library/react';
 
 expect.extend(matchers);
+
+// Unmount every rendered React tree after each test. Without this the jsdom
+// DOM (plus each tree's React fibers and framer-motion / recharts state) piles
+// up across a file, leaking hundreds of MB and OOMing the test worker (#112).
+afterEach(() => {
+  cleanup();
+});
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
