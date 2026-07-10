@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Bell, BellRing } from 'lucide-react';
+import { Calendar, AlertTriangle } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -73,7 +73,6 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
     const mm = String(date.getMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
   });
-  const [remind, setRemind] = useState<string>('none');
 
   // Global date display preference
   const dateDisplayMode = useSettingsStore((s) => s.dateDisplayMode);
@@ -139,23 +138,43 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
     }
   };
 
+  const proximity = getDueProximity(selectedDate);
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        // Closing without Save (click-outside/Escape) must not leave the
+        // trigger showing an unsaved date — restore from the `date` prop.
+        if (!next) {
+          setSelectedDate(date);
+          setIncludeTime(
+            date ? !(date.getHours() === 0 && date.getMinutes() === 0) : false
+          );
+          setTimeValue(
+            date
+              ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+              : '12:00'
+          );
+        }
+        setOpen(next);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
           className="ti-due"
-          data-proximity={getDueProximity(selectedDate)}
-          aria-label="Edit due date"
+          data-proximity={proximity}
+          aria-label={
+            selectedDate
+              ? `Due ${formatDisplay(selectedDate)}${proximity === 'overdue' ? ', overdue' : ''}`
+              : emptyLabel
+          }
           data-testid="due-date-badge"
         >
-          {(() => {
-            const hasReminder = remind !== 'none';
-            const overdue = getDueProximity(selectedDate) === 'overdue';
-            if (hasReminder && overdue) return <BellRing />;
-            if (hasReminder) return <Bell />;
-            return <Calendar />;
-          })()}
+          {/* Overdue carries a distinct icon (AlertTriangle), not just the
+              --destructive tint, so the state survives grayscale (§a11y). */}
+          {proximity === 'overdue' ? <AlertTriangle /> : <Calendar />}
           {formatDisplay(selectedDate)}
         </button>
       </PopoverTrigger>
@@ -225,24 +244,6 @@ export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
               <SelectContent>
                 <SelectItem value="relative">Relative</SelectItem>
                 <SelectItem value="absolute">Absolute</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Remind dropdown - UI only */}
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Remind</Label>
-            <Select value={remind} onValueChange={setRemind}>
-              <SelectTrigger size="sm" className="min-w-[150px]">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="at-time">At time of due date</SelectItem>
-                <SelectItem value="5m">5 minutes before</SelectItem>
-                <SelectItem value="15m">15 minutes before</SelectItem>
-                <SelectItem value="30m">30 minutes before</SelectItem>
-                <SelectItem value="1h">1 hour before</SelectItem>
               </SelectContent>
             </Select>
           </div>

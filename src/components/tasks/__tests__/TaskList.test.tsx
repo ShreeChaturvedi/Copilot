@@ -119,9 +119,11 @@ describe('TaskList Component', () => {
   it('renders empty state when no tasks exist', () => {
     renderTaskList({ tasks: [] });
 
-    const emptyMessage = screen.getByText(/Your tasks will appear here/i);
+    const emptyMessage = screen.getByText(/Nothing on the list yet/i);
     expect(emptyMessage).toBeInTheDocument();
-    expect(emptyMessage).toHaveTextContent(/once you add them/i);
+    expect(
+      screen.getByText(/Add a task above to get started/i)
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('task-item')).not.toBeInTheDocument();
   });
 

@@ -133,8 +133,15 @@ function filterTasksForPane(
         break;
       }
       case 'dueDate': {
-        const aDate = a.scheduledDate?.getTime() || 0;
-        const bDate = b.scheduledDate?.getTime() || 0;
+        // Undated tasks sort to the far end (not the top): in ascending order
+        // the soonest real due dates should surface first, with no-date tasks
+        // trailing behind them.
+        const aDate = a.scheduledDate
+          ? a.scheduledDate.getTime()
+          : Number.POSITIVE_INFINITY;
+        const bDate = b.scheduledDate
+          ? b.scheduledDate.getTime()
+          : Number.POSITIVE_INFINITY;
         comparison = aDate - bDate;
         break;
       }
@@ -276,7 +283,10 @@ const TaskPane: React.FC<TaskPaneProps> = ({
                 {paneData.title}
               </h3>
             )}
-            <Badge variant="outline" className="text-xs h-5 tabular-nums">
+            <Badge
+              variant="outline"
+              className="text-xs h-5 font-mono tabular-nums"
+            >
               {paneData.tasks.length}
             </Badge>
 
@@ -328,48 +338,107 @@ const TaskPane: React.FC<TaskPaneProps> = ({
       </div>
 
       {/* Pane Content */}
-      <div className="flex-1 overflow-auto px-4">
+      <div
+        className="flex-1 overflow-auto px-4"
+        aria-busy={taskManagement.tasksLoading || undefined}
+      >
         {taskManagement.tasksLoading ? (
-          <div className="pt-2" aria-hidden="true">
-            {SKELETON_ROW_WIDTHS.map((width, i) => (
-              <div key={i} className="flex items-center gap-3 min-h-10 px-1">
-                <Skeleton className="h-4 w-4 rounded-full shrink-0" />
-                <Skeleton className={cn('h-3.5', width)} />
-              </div>
-            ))}
+          <>
+            {/* Visually-hidden live region so the pending state is perceivable
+                to assistive tech; the skeleton itself stays decorative. */}
+            <div role="status" className="sr-only">
+              Loading tasks…
+            </div>
+            <div className="pt-2" aria-hidden="true">
+              {SKELETON_ROW_WIDTHS.map((width, i) => (
+                <div key={i} className="flex items-center gap-3 min-h-10 px-1">
+                  <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+                  <Skeleton className={cn('h-3.5', width)} />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : taskManagement.tasksError ? (
+          // A failed fetch must not masquerade as an empty state (finding #5/#13):
+          // show an inline error with a real retry.
+          <div className="pane-empty flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center h-full justify-center">
+            <p className="font-serif text-base leading-[1.3] text-ink">
+              Couldn&rsquo;t load your tasks.
+            </p>
+            <p className="text-xs leading-[18px] text-ink-muted max-w-[26ch]">
+              Something went wrong reaching the server.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1.5"
+              onClick={() => taskManagement.refetchTasks()}
+            >
+              Try again
+            </Button>
           </div>
         ) : paneData.isEmpty ? (
-          <div className="pane-empty flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center h-full justify-center">
-            <div
-              className="flex flex-col gap-2 w-[120px] mb-1"
-              aria-hidden="true"
-            >
-              <span className="block h-4 w-full rounded-md border border-dashed border-etch-strong" />
-              <span className="block h-4 w-[68%] rounded-md border border-dashed border-etch-strong" />
-            </div>
-            <p className="font-serif text-base leading-[1.3] text-ink">
-              Nothing matches.
-            </p>
-            {searchValue?.trim() ? (
-              <p className="text-xs leading-[18px] text-ink-muted max-w-[26ch]">
-                No tasks match &ldquo;{searchValue}&rdquo;.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs leading-[18px] text-ink-muted max-w-[24ch]">
-                  No tasks fit the current filters.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-1.5"
-                  onClick={() => onClearFilters(paneConfig.id)}
+          (() => {
+            const hasActiveFilter =
+              Boolean(searchValue?.trim()) ||
+              Boolean(paneConfig.filterValue) ||
+              paneConfig.showCompleted === false;
+            const accountIsEmpty = taskManagement.tasks.length === 0;
+            // Genuinely-empty account (no filter, no tasks): first-run guidance,
+            // not a filter-miss with a no-op "Clear filters" (finding #23/#27).
+            if (!hasActiveFilter && accountIsEmpty) {
+              return (
+                <div className="pane-empty flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center h-full justify-center">
+                  <div
+                    className="flex flex-col gap-2 w-[120px] mb-1"
+                    aria-hidden="true"
+                  >
+                    <span className="block h-4 w-full rounded-md border border-dashed border-etch-strong" />
+                    <span className="block h-4 w-[68%] rounded-md border border-dashed border-etch-strong" />
+                  </div>
+                  <p className="font-serif text-base leading-[1.3] text-ink">
+                    Nothing on the list yet.
+                  </p>
+                  <p className="text-xs leading-[18px] text-ink-muted max-w-[24ch]">
+                    Add a task above to get started.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="pane-empty flex flex-col items-center gap-1.5 pt-7 px-4 pb-5 text-center h-full justify-center">
+                <div
+                  className="flex flex-col gap-2 w-[120px] mb-1"
+                  aria-hidden="true"
                 >
-                  Clear filters
-                </Button>
-              </>
-            )}
-          </div>
+                  <span className="block h-4 w-full rounded-md border border-dashed border-etch-strong" />
+                  <span className="block h-4 w-[68%] rounded-md border border-dashed border-etch-strong" />
+                </div>
+                <p className="font-serif text-base leading-[1.3] text-ink">
+                  Nothing matches.
+                </p>
+                {searchValue?.trim() ? (
+                  <p className="text-xs leading-[18px] text-ink-muted max-w-[26ch]">
+                    No tasks match &ldquo;{searchValue}&rdquo;.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs leading-[18px] text-ink-muted max-w-[24ch]">
+                      No tasks fit the current filters.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1.5"
+                      onClick={() => onClearFilters(paneConfig.id)}
+                    >
+                      Clear filters
+                    </Button>
+                  </>
+                )}
+              </div>
+            );
+          })()
         ) : (
           <TaskList
             tasks={paneData.tasks}

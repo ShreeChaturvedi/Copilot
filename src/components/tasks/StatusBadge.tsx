@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Flag, PlayCircle, Circle } from 'lucide-react';
+import { Check, PlayCircle, Circle } from 'lucide-react';
 import type { Task } from '@shared/types';
 
 export type SimpleStatus = 'not_started' | 'in_progress' | 'done';
@@ -34,7 +34,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         ? 'Done'
         : 'Not started';
   const Icon =
-    status === 'in_progress' ? PlayCircle : status === 'done' ? Flag : Circle;
+    status === 'in_progress' ? PlayCircle : status === 'done' ? Check : Circle;
   // Status tone re-based onto tokens (design-brief §2.3): quiet-chip film —
   // same-hue background tint instead of a neutral bordered box, matching
   // .ti-tag's chip species. in-progress = the sanctioned amber --warning,
@@ -106,7 +106,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             status === 'done' && 'bg-accent text-accent-foreground'
           )}
         >
-          <Flag className="w-3 h-3" /> Done
+          <Check className="w-3 h-3" /> Done
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -49,7 +49,7 @@ function CustomPieTooltip({
 
   const name = String(data.name ?? '');
   const value = Number(data.value ?? 0);
-  const color = String(data.color ?? '#999');
+  const color = String(data.color ?? 'var(--faint)');
   const percent = total > 0 ? (value / total) * 100 : 0;
 
   return (
@@ -234,7 +234,7 @@ function TaskAnalyticsSummaryComponent() {
         role="region"
         aria-label="Task analytics summary"
         aria-describedby="analytics-description"
-        className="rounded-card border bg-card text-card-foreground px-3 py-2 hover:bg-surface-hover transition-colors duration-200 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 cursor-pointer"
+        className="rounded-card border bg-card text-card-foreground px-3 py-2 hover:bg-surface-hover transition-colors duration-[var(--dur-3)] outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1 cursor-pointer"
         tabIndex={0}
         onClick={() => {
           setAnalyticsDialogOpen(true);

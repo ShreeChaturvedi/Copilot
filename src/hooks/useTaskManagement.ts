@@ -7,6 +7,7 @@ import { UseMutationResult } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { toUserMessage } from '@/utils/errorMessages';
+import { DEFAULT_PRESET_COLOR } from '@/constants/colors';
 
 interface CreateTaskData {
   title: string;
@@ -44,6 +45,8 @@ interface TaskManagementWithOperations {
   // Task operations
   tasks: Task[];
   tasksLoading: boolean;
+  tasksError: unknown;
+  refetchTasks: () => void;
   addTask: UseMutationResult<Task, Error, CreateTaskData>;
   handleAddTask: (
     title: string,
@@ -53,7 +56,7 @@ interface TaskManagementWithOperations {
   handleToggleTask: (id: string) => void;
   handleEditTask: (id: string, title: string) => void;
   handleDeleteTask: (id: string) => void;
-  handleScheduleTask: (id: string) => void;
+  handleScheduleTask: (id: string, scheduledDate?: Date) => void;
   handleRemoveTag: (taskId: string, tagId: string) => void;
 
   // Task group state and operations
@@ -121,6 +124,8 @@ export function useTaskManagement(
   const {
     data: tasks = [],
     isLoading: tasksLoading,
+    error: tasksError,
+    refetch: refetchTasks,
     addTask,
     updateTask,
     deleteTask,
@@ -133,7 +138,7 @@ export function useTaskManagement(
       id: 'default',
       name: 'Tasks',
       emoji: '📋',
-      color: '#3b82f6',
+      color: DEFAULT_PRESET_COLOR,
       description: 'Default task group',
       isDefault: true,
     },
@@ -183,7 +188,7 @@ export function useTaskManagement(
           id: String(item.id),
           name: String(item.name ?? 'Tasks'),
           emoji: String(item.icon ?? '📁'),
-          color: String(item.color ?? '#3b82f6'),
+          color: String(item.color ?? DEFAULT_PRESET_COLOR),
           description: String(item.description ?? ''),
         })
       );
@@ -256,10 +261,24 @@ export function useTaskManagement(
     ? (id: string) => {
         const task = tasks.find((t) => t.id === id);
         if (task) {
-          updateTask.mutate({
-            id,
-            updates: { completed: !task.completed },
-          });
+          // Drive status alongside completed so the kanban board (keyed on
+          // status) and the list (keyed on completed) never disagree. Marking
+          // complete -> 'done'; un-completing a done task -> 'not_started';
+          // un-completing a task with another status preserves it (no status
+          // sent).
+          if (!task.completed) {
+            updateTask.mutate({
+              id,
+              updates: { completed: true, status: 'done' },
+            });
+          } else if (task.status === 'done') {
+            updateTask.mutate({
+              id,
+              updates: { completed: false, status: 'not_started' },
+            });
+          } else {
+            updateTask.mutate({ id, updates: { completed: false } });
+          }
         }
       }
     : undefined;
@@ -280,7 +299,12 @@ export function useTaskManagement(
     : undefined;
 
   const handleScheduleTask = includeTaskOperations
-    ? (id: string, scheduledDate: Date) => {
+    ? (id: string, scheduledDate?: Date) => {
+        // Never call the mutation without a real date: a dateless "schedule"
+        // used to clear the task's due date and no-op on the server. The
+        // list/sidebar now open a date picker (TaskItem's ScheduleTaskDialog)
+        // and schedule via updateTask, so this only fires with an explicit date.
+        if (!scheduledDate) return;
         scheduleTask.mutate({ id, scheduledDate });
       }
     : undefined;
@@ -611,6 +635,8 @@ export function useTaskManagement(
       // Task operations
       tasks,
       tasksLoading,
+      tasksError,
+      refetchTasks,
       addTask,
       handleAddTask: handleAddTask!,
       handleToggleTask: handleToggleTask!,

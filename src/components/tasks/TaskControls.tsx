@@ -163,6 +163,17 @@ const VIEW_MODE_OPTIONS: ToggleOption<TaskViewMode>[] = [
 ];
 
 /**
+ * Direction badge label per sort field: A-Z/Z-A only makes sense for a title
+ * sort; dates and priority need direction words that read correctly.
+ */
+const SORT_ORDER_LABELS: Record<SortBy, { asc: string; desc: string }> = {
+  title: { asc: 'A-Z', desc: 'Z-A' },
+  dueDate: { asc: 'Soon', desc: 'Late' },
+  createdAt: { asc: 'Old', desc: 'New' },
+  priority: { asc: 'Low', desc: 'High' },
+};
+
+/**
  * Get sort icon based on current sort and order
  */
 function getSortIcon(
@@ -200,14 +211,20 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcuts effect
+  // Keyboard shortcut: "/" focuses task search (the common pattern), instead
+  // of hijacking Cmd/Ctrl+F and clobbering the browser's native find-in-page
+  // for the whole app. Ignored while typing in an input/textarea/contenteditable
+  // so it never eats a literal slash the user is typing.
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + F to activate search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        handleSearchClick();
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) {
+        return;
       }
+      e.preventDefault();
+      handleSearchClick();
     };
 
     document.addEventListener('keydown', handleGlobalKeyDown);
@@ -249,7 +266,7 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
             size="sm"
             className="h-7 w-7 p-0"
             onClick={isExpanded ? undefined : handleSearchClick}
-            title={isExpanded ? undefined : 'Search tasks (Ctrl+F)'}
+            title={isExpanded ? undefined : 'Search tasks (/)'}
             aria-label={isExpanded ? undefined : 'Open search input'}
             aria-expanded={isExpanded}
           >
@@ -282,7 +299,7 @@ const AnimatedSearch: React.FC<AnimatedSearchProps> = ({ value, onChange }) => {
               />
               {/* Screen reader helper text */}
               <div id="search-help" className="sr-only">
-                Press Escape to close search, or use Ctrl+F to open
+                Press Escape to close search, or press / to open
               </div>
               {/* Close button */}
               <Button
@@ -436,18 +453,28 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
       <div className="flex items-center gap-1 justify-self-end max-md:[grid-area:right]">
         {/* Grouped Action Buttons */}
         <div className="flex items-center gap-1 bg-surface-2 rounded-btn p-1">
-          {/* Animated Search */}
-          <AnimatedSearch
-            value={searchValue}
-            onChange={onSearchChange || (() => {})}
-          />
+          {/* Animated Search — only in list mode, the one view that applies the
+              search term. On the board and folder views the field is inert
+              (search isn't threaded through them), so hiding it keeps every
+              rendered control meaningful. */}
+          {taskViewMode === 'list' && (
+            <AnimatedSearch
+              value={searchValue}
+              onChange={onSearchChange || (() => {})}
+            />
+          )}
 
           {/* Sort Button */}
           <Tooltip>
             <DropdownMenu>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    aria-label="Sort tasks"
+                  >
                     {React.createElement(getMainSortIcon(), {
                       className: 'w-3.5 h-3.5',
                     })}
@@ -481,7 +508,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                             size="sm"
                             className="ml-auto tabular-nums"
                           >
-                            {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+                            {SORT_ORDER_LABELS[option.value][sortOrder]}
                           </Badge>
                         )}
                       </DropdownMenuItem>
@@ -503,12 +530,13 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
                 size="sm"
                 className="h-7 w-7 p-0"
                 disabled // Disabled for now
+                aria-label="Filter tasks (coming soon)"
               >
                 <Filter className="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Filter tasks</p>
+              <p>Filtering coming soon</p>
             </TooltipContent>
           </Tooltip>
 
@@ -552,7 +580,7 @@ export const TaskControls: React.FC<TaskControlsProps> = ({
             {completedCount > 0 && (
               <Badge
                 variant="secondary"
-                className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-medium tabular-nums"
+                className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-mono font-medium tabular-nums"
               >
                 {completedCount > 99 ? '99+' : completedCount}
               </Badge>

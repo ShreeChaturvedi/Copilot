@@ -6,7 +6,6 @@ import React, {
   useEffect,
 } from 'react';
 import { Folder, Plus } from 'lucide-react';
-import { getIconByName } from '@/components/ui/icons';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -74,7 +73,9 @@ interface FolderItemProps {
 
 const FolderItem: React.FC<FolderItemProps> = React.memo(
   ({ folder, onClick }) => {
-    const IconComponent = getIconByName(folder.iconId, Folder);
+    // iconId carries the list's chosen emoji (see createTaskFolders). Render it
+    // directly like the sidebar/list header do; a lucide lookup would never
+    // match an emoji string and always fell back to the generic Folder glyph.
     const [opening, setOpening] = useState(false);
     const openTimeout = useRef<number | undefined>(undefined);
 
@@ -109,7 +110,16 @@ const FolderItem: React.FC<FolderItemProps> = React.memo(
               fade in, so only one layer is ever exposed (closes #53). */}
           <span className="folder-card-default" aria-hidden="true">
             <span className="folder-card-icon">
-              <IconComponent className="folder-card-glyph" />
+              {folder.iconId ? (
+                <span
+                  className="folder-card-glyph"
+                  style={{ fontSize: '18px', lineHeight: 1 }}
+                >
+                  {folder.iconId}
+                </span>
+              ) : (
+                <Folder className="folder-card-glyph" />
+              )}
             </span>
           </span>
 

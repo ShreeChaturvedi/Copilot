@@ -2,6 +2,7 @@
  * Custom hooks for task management with React Query integration
  */
 
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Task } from '@shared/types';
 import {
@@ -206,8 +207,9 @@ export const useTasks = (filters: TaskFilters = {}) => {
       toast.error(toUserMessage(error, 'Failed to update task'));
     },
     onSettled: () => {
+      // Prefix-based invalidation of ['tasks'] already matches ['tasks','list'];
+      // a separate lists() invalidate is pure overhead.
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 
@@ -231,8 +233,8 @@ export const useTasks = (filters: TaskFilters = {}) => {
       toast.error(toUserMessage(error, 'Failed to delete task'));
     },
     onSettled: () => {
+      // ['tasks'] invalidation is prefix-based and already covers ['tasks','list'].
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 
@@ -261,14 +263,29 @@ export const useTasks = (filters: TaskFilters = {}) => {
       toast.error(toUserMessage(error, 'Failed to schedule task'));
     },
     onSettled: () => {
+      // ['tasks'] invalidation is prefix-based and already covers ['tasks','list'].
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 
+  // Memoize the filtered/sorted list so it isn't recomputed (clone + O(n log n)
+  // sort) on every render of every consumer. Key on the primitive filter fields
+  // rather than the `filters` object, which callers pass as a fresh literal and
+  // would otherwise bust the memo on each render.
+  const data = useMemo(
+    () => filterTasks(tasksQuery.data || [], filters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      tasksQuery.data,
+      filters.showCompleted,
+      filters.scheduledOnly,
+      filters.search,
+    ]
+  );
+
   // Return data and mutations in the format LeftPane expects
   return {
-    data: filterTasks(tasksQuery.data || [], filters),
+    data,
     isLoading: tasksQuery.isLoading,
     isSuccess: tasksQuery.isSuccess,
     isPending: tasksQuery.isPending,
@@ -362,10 +379,11 @@ export const useCreateTask = () => {
       );
       return { previousTasks, tempId };
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
+      toast.error(toUserMessage(error, 'Failed to create task'));
     },
     onSuccess: (newTask, _variables, context) => {
       queryClient.setQueriesData(
@@ -420,14 +438,15 @@ export const useUpdateTask = () => {
       );
       return { previousTasks };
     },
-    onError: (_error, _vars, context) => {
+    onError: (error, _vars, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
+      toast.error(toUserMessage(error, 'Failed to update task'));
     },
     onSettled: () => {
+      // ['tasks'] invalidation is prefix-based and already covers ['tasks','list'].
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };
@@ -450,14 +469,15 @@ export const useDeleteTask = () => {
       );
       return { previousTasks };
     },
-    onError: (_error, _deletedId, context) => {
+    onError: (error, _deletedId, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
+      toast.error(toUserMessage(error, 'Failed to delete task'));
     },
     onSettled: () => {
+      // ['tasks'] invalidation is prefix-based and already covers ['tasks','list'].
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };
@@ -501,7 +521,10 @@ export const useToggleTask = () => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
-      console.error('Failed to toggle task:', error);
+      // Surface the failure: the global MutationCache handler suppresses its
+      // own toast whenever a mutation defines onError, so without this a failed
+      // toggle would roll back silently.
+      toast.error(toUserMessage(error, 'Failed to update task'));
     },
     onSettled: () => {
       // Always refetch after error or success
@@ -533,14 +556,15 @@ export const useScheduleTask = () => {
       );
       return { previousTasks };
     },
-    onError: (_error, _vars, context) => {
+    onError: (error, _vars, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(taskQueryKeys.all, context.previousTasks);
       }
+      toast.error(toUserMessage(error, 'Failed to schedule task'));
     },
     onSettled: () => {
+      // ['tasks'] invalidation is prefix-based and already covers ['tasks','list'].
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.lists() });
     },
   });
 };

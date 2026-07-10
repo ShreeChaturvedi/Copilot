@@ -35,6 +35,8 @@ import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { taskQueryKeys } from '@/hooks/useTasks';
+import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 
 // Reuse the compact file preview UI from EnhancedTaskInput
 import { DefaultPreview } from '@/components/smart-input/components/previews/DefaultPreview';
@@ -222,6 +224,11 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
       const a = document.createElement('a');
       a.href = att.url;
       a.download = att.name || 'download';
+      // The `download` attribute is ignored for cross-origin URLs (the common
+      // case once files live on remote/CDN storage), so open in a new tab
+      // instead of navigating the SPA away and losing app state.
+      a.target = '_blank';
+      a.rel = 'noopener';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -231,33 +238,63 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
   }, []);
 
   const handleDeleteAttachment = useCallback(
-    async (att: FileAttachment) => {
-      try {
-        queryClient.setQueriesData(
-          { queryKey: taskQueryKeys.all },
-          (oldData: Task[] | undefined) => {
-            if (!oldData) return oldData;
-            return oldData.map((t) =>
-              t.id === task.id
-                ? {
-                    ...t,
-                    attachments: (t.attachments || []).filter(
-                      (a) => a.id !== att.id
-                    ),
-                  }
-                : t
-            );
-          }
-        );
+    (att: FileAttachment) => {
+      // Snapshot every task cache so we can roll back on failure or undo.
+      const previous = queryClient.getQueriesData<Task[]>({
+        queryKey: taskQueryKeys.all,
+      });
+      const restore = () => {
+        previous.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      };
 
-        await attachmentsApi.delete(att.id);
+      // Optimistically strip the attachment from every task cache.
+      queryClient.setQueriesData(
+        { queryKey: taskQueryKeys.all },
+        (oldData: Task[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map((t) =>
+            t.id === task.id
+              ? {
+                  ...t,
+                  attachments: (t.attachments || []).filter(
+                    (a) => a.id !== att.id
+                  ),
+                }
+              : t
+          );
+        }
+      );
+      setPreviewOpen(false);
+      setActiveAttachment(null);
 
-        setPreviewOpen(false);
-        setActiveAttachment(null);
-        queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
-      } catch (e) {
-        console.error('Delete attachment failed', e);
-      }
+      // Defer the irreversible server delete behind an undo window so an
+      // accidental click (the row X reveals on hover / is dimmed on touch)
+      // is recoverable, and reconcile against the server afterwards.
+      let undone = false;
+      const commit = async () => {
+        if (undone) return;
+        try {
+          await attachmentsApi.delete(att.id);
+          queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+        } catch (e) {
+          // Roll back the optimistic removal so the UI matches the server
+          // instead of silently claiming the file was deleted.
+          restore();
+          toast.error(toUserMessage(e, 'Failed to remove attachment'));
+        }
+      };
+      const timer = setTimeout(() => void commit(), 5000);
+      toast(`Removed ${att.name}`, {
+        duration: 5000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            undone = true;
+            clearTimeout(timer);
+            restore();
+          },
+        },
+      });
     },
     [task.id, queryClient]
   );
@@ -372,9 +409,11 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     [task.tags, replaceTags]
   );
 
-  const descriptionText = String(
-    task.description || task.parsedMetadata?.originalInput || ''
-  );
+  // Only the real description — never fall back to the raw smart-input string
+  // (parsedMetadata.originalInput), which still contains the tokens already
+  // extracted into schedule/tags/priority and would be promoted to a real
+  // description the first time the user touches the field.
+  const descriptionText = String(task.description || '');
 
   const startEditingDescription = useCallback(() => {
     setDescriptionDraft(descriptionText);
@@ -386,14 +425,14 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
     if (!descriptionEditActiveRef.current) return;
     descriptionEditActiveRef.current = false;
     setIsEditingDescription(false);
-    setDescriptionDraft((draft) => {
-      const next = draft.trim();
-      if (next !== descriptionText) {
-        updateTask.mutate({ id: task.id, updates: { description: next } });
-      }
-      return draft;
-    });
-  }, [descriptionText, task.id, updateTask]);
+    // Read the draft directly (it's in deps) rather than firing the mutation
+    // from inside a setState updater — updaters must be pure, and StrictMode
+    // invokes them twice, which would double-POST the description patch.
+    const next = descriptionDraft.trim();
+    if (next !== descriptionText) {
+      updateTask.mutate({ id: task.id, updates: { description: next } });
+    }
+  }, [descriptionDraft, descriptionText, task.id, updateTask]);
 
   const cancelEditingDescription = useCallback(() => {
     descriptionEditActiveRef.current = false;
@@ -725,46 +764,51 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
 
         {/* Content rows: render only when data exists */}
         <div className="space-y-5 mt-6 border-t border-hairline pt-5">
-          {/* Description — click to edit, the one primary field this sheet
-              can't otherwise edit inline. */}
-          {task.description || task.parsedMetadata?.originalInput ? (
-            <div className="flex items-start gap-3">
-              <div className="text-ink-muted flex-shrink-0 mt-1">
-                <FileText className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                {isEditingDescription ? (
-                  <Textarea
-                    autoFocus
-                    value={descriptionDraft}
-                    onChange={(e) => setDescriptionDraft(e.target.value)}
-                    onBlur={saveDescription}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        e.preventDefault();
-                        cancelEditingDescription();
-                      } else if (
-                        (e.metaKey || e.ctrlKey) &&
-                        e.key === 'Enter'
-                      ) {
-                        e.preventDefault();
-                        saveDescription();
-                      }
-                    }}
-                    placeholder="Add a description…"
-                    className="min-h-20 text-sm"
-                  />
-                ) : (
-                  <div
-                    className="text-sm whitespace-pre-wrap cursor-pointer hover:bg-surface-hover rounded-md -mx-2 px-2 py-1 transition-colors"
-                    onClick={startEditingDescription}
-                  >
-                    {descriptionText}
-                  </div>
-                )}
-              </div>
+          {/* Description — always drawn (§2.5: unset is drawn, not hidden), so
+              a task created without one can still get a description here.
+              Click/keyboard to edit. */}
+          <div className="flex items-start gap-3">
+            <div className="text-ink-muted flex-shrink-0 mt-1">
+              <FileText className="h-4 w-4" />
             </div>
-          ) : null}
+            <div className="flex-1 min-w-0">
+              {isEditingDescription ? (
+                <Textarea
+                  autoFocus
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  onBlur={saveDescription}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelEditingDescription();
+                    } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      saveDescription();
+                    }
+                  }}
+                  placeholder="Add a description…"
+                  className="min-h-20 text-sm"
+                />
+              ) : descriptionText ? (
+                <button
+                  type="button"
+                  onClick={startEditingDescription}
+                  className="w-full text-left text-sm whitespace-pre-wrap cursor-pointer hover:bg-surface-hover rounded-md -mx-2 px-2 py-1 transition-colors outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1"
+                >
+                  {descriptionText}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEditingDescription}
+                  className={ghostTriggerClass}
+                >
+                  Add a description
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Location */}
           {locationTag && (
@@ -792,39 +836,41 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                     type: att.type || 'application/octet-stream',
                   });
                   return (
-                    <div
-                      key={att.id}
-                      className="tds-attachment-row flex items-center gap-2 px-2 py-1.5 rounded-md border border-hairline bg-surface-1 cursor-pointer hover:bg-surface-hover transition-colors"
-                      onClick={() => openAttachment(att)}
-                      title={`Preview ${att.name}`}
-                    >
-                      {isImage ? (
-                        <img
-                          src={att.thumbnailUrl || att.url}
-                          alt={att.name}
-                          className="w-8 h-8 object-cover rounded"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <DefaultPreview
-                          file={fileLike}
-                          size="sm"
-                          className="w-8 h-8"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-ink max-w-[180px] truncate">
-                          {att.name}
+                    // Positioning context for the absolutely-placed delete
+                    // affordance, kept a sibling of the preview button so we
+                    // don't nest interactive elements (invalid a11y).
+                    <div key={att.id} className="tds-attachment-row relative">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-2 py-1.5 rounded-md border border-hairline bg-surface-1 cursor-pointer hover:bg-surface-hover transition-colors text-left outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-1"
+                        onClick={() => openAttachment(att)}
+                        aria-label={`Preview ${att.name}`}
+                      >
+                        {isImage ? (
+                          <img
+                            src={att.thumbnailUrl || att.url}
+                            alt={att.name}
+                            className="w-8 h-8 object-cover rounded"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <DefaultPreview
+                            file={fileLike}
+                            size="sm"
+                            className="w-8 h-8"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-ink max-w-[180px] truncate">
+                            {att.name}
+                          </div>
                         </div>
-                      </div>
+                      </button>
                       <button
                         type="button"
                         aria-label={`Remove ${att.name}`}
                         className="tds-attachment-delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleDeleteAttachment(att);
-                        }}
+                        onClick={() => handleDeleteAttachment(att)}
                       >
                         <X className="h-3 w-3" />
                       </button>

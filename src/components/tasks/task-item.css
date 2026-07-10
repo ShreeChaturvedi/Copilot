@@ -16,7 +16,7 @@
 }
 .ti-shell[data-collapsed='true'] {
   grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms var(--ease-settle);
+  transition: grid-template-rows var(--dur-3) var(--ease-settle);
 }
 .ti-clip {
   min-height: 0;
@@ -29,7 +29,7 @@
 .ti-row {
   min-height: 40px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-chip);
   /* hover: instant on, 150ms off (§5) */
   transition: background-color var(--dur-2) var(--ease-out);
 }
@@ -431,7 +431,7 @@
   flex: 1;
   height: 8px;
   border: 1px dashed var(--etch-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* --- "List cleared" celebration (§1.6 rule 5, the one reserved loud-aqua

@@ -201,7 +201,7 @@ export const AttachmentPreviewDialog: React.FC<
                 src={attachment.thumbnailUrl || attachment.url}
                 alt={attachment.name}
                 className={cn(
-                  'object-contain rounded-card transition-opacity duration-200',
+                  'object-contain rounded-card transition-opacity duration-[var(--dur-3)]',
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 )}
                 style={{

@@ -36,6 +36,7 @@ import { taskQueryKeys } from '@/hooks/useTasks';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { DueDateBadge } from './DueDateBadge';
+import { ScheduleTaskDialog } from './ScheduleTaskDialog';
 import { TaskActionMenuItems } from './TaskActionMenuItems';
 import AttachmentPreviewDialog from './AttachmentPreviewDialog';
 import { attachmentsApi } from '@/services/api';
@@ -259,6 +260,11 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   }, [task.id, onDelete]);
 
   const [detailOpen, setDetailOpen] = useState(false);
+  // Schedule flow (fixes the list/sidebar "Schedule" action, which previously
+  // fired onSchedule(id) with no date — clearing the due date and no-op'ing on
+  // the server). Open a real date picker instead, mirroring the kanban board.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const openScheduleDialog = useCallback(() => setScheduleOpen(true), []);
   const handleEditStart = useCallback(() => {
     if (calendarMode) {
       setUiState((prev) => ({
@@ -272,7 +278,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     setDetailOpen(true);
   }, [task.title, calendarMode]);
 
+  // Guards the Enter->save + blur->save double-fire: pressing Enter unmounts
+  // the input, whose onBlur would otherwise call handleEditSave a second time
+  // and dispatch a duplicate PATCH.
+  const editCommittedRef = useRef(false);
   const handleEditSave = useCallback(() => {
+    if (editCommittedRef.current) return;
+    editCommittedRef.current = true;
     const trimmedTitle = uiState.editTitle.trim();
     if (trimmedTitle && trimmedTitle !== task.title) {
       onEdit(task.id, trimmedTitle);
@@ -322,6 +334,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   useEffect(() => {
     if (uiState.isEditing && inputRef.current) {
+      // Fresh edit session: re-arm the save guard.
+      editCommittedRef.current = false;
       inputRef.current.focus();
       inputRef.current.select();
     }
@@ -329,6 +343,12 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   // Pure FullCalendar drag setup - no conflicts
   const dragElementRef = useRef<HTMLDivElement>(null);
+  // Always-current task, read when building eventData. Keeping the full `task`
+  // object out of the effect deps stops the Draggable from being torn down and
+  // rebuilt on every ['tasks'] cache write (any mutation gives `task` a new
+  // reference); only the granular fields below actually affect eventData.
+  const taskRef = useRef(task);
+  taskRef.current = task;
 
   useEffect(() => {
     if (
@@ -356,7 +376,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           extendedProps: {
             taskId: task.id,
             isFromTask: true,
-            originalTask: task,
+            originalTask: taskRef.current,
           },
         },
       });
@@ -384,7 +404,6 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     task.title,
     uiState.isEditing,
     groupColor,
-    task,
     calendars,
   ]);
 
@@ -434,7 +453,6 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           )}
           data-in-card={hideCheckbox || undefined}
           data-selected={selected || undefined}
-          tabIndex={hideCheckbox ? undefined : 0}
           style={
             calendarMode
               ? {
@@ -503,6 +521,19 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 ) : (
                   <div
                     onClick={handleEditStart}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleEditStart();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={
+                      calendarMode
+                        ? `Edit "${task.title}"`
+                        : `Open "${task.title}" details`
+                    }
                     className="cursor-pointer flex items-center w-full min-w-0"
                   >
                     <span
@@ -564,7 +595,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                     aria-label={`Schedule "${task.title}"`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSchedule?.(task.id);
+                      openScheduleDialog();
                     }}
                   >
                     <CalendarPlus className="w-3.5 h-3.5" />
@@ -590,7 +621,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                       <TaskActionMenuItems
                         taskId={task.id}
                         taskCompleted={task.completed}
-                        onSchedule={onSchedule}
+                        onSchedule={onSchedule ? openScheduleDialog : undefined}
                         onDelete={handleDelete}
                       />
                     </DropdownMenuContent>
@@ -731,7 +762,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
               <TaskActionMenuItems
                 taskId={task.id}
                 taskCompleted={task.completed}
-                onSchedule={onSchedule}
+                onSchedule={onSchedule ? openScheduleDialog : undefined}
                 onDelete={handleDelete}
                 showScheduleTooltip={false}
               />
@@ -739,6 +770,17 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </DropdownMenu>
         </div>
       )}
+
+      {/* Schedule dialog: gives the list/sidebar the same date picker as the
+          board, instead of firing a dateless mutation. */}
+      <ScheduleTaskDialog
+        task={task}
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        onPlace={(id, scheduledDate) =>
+          updateTask.mutate({ id, updates: { scheduledDate } })
+        }
+      />
 
       {/* Attachment Preview Dialog */}
       <AttachmentPreviewDialog

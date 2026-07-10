@@ -327,8 +327,17 @@ const TaskListComponent: React.FC<TaskListProps> = ({
       };
     }
 
-    // In calendar mode, filter to only show active tasks (no completed)
-    const tasksForCalendar = activeTasks.slice(0, maxTasks);
+    // In calendar mode, show the soonest-due active tasks. Sort by scheduled
+    // date ascending (overdue/soonest first, undated last) BEFORE truncating,
+    // so the sidebar surfaces what's coming up rather than the newest-created
+    // tasks (React Query's default order), which could hide a task due tomorrow.
+    const tasksForCalendar = [...activeTasks]
+      .sort(
+        (a, b) =>
+          (a.scheduledDate?.getTime() ?? Infinity) -
+          (b.scheduledDate?.getTime() ?? Infinity)
+      )
+      .slice(0, maxTasks);
     const totalCount = activeTasks.length;
 
     // Group tasks by scheduled date (canonical due date for tasks)
@@ -605,7 +614,7 @@ const TaskListComponent: React.FC<TaskListProps> = ({
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-xs h-5 tabular-nums"
+                      className="text-xs h-5 font-mono tabular-nums"
                     >
                       {groupedAllTotals[dayKey] ?? groupedTasks[dayKey].length}
                     </Badge>

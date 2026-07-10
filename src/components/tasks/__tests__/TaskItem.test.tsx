@@ -3,12 +3,38 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TaskItem } from '../TaskItem';
+import { taskApi } from '@/services/api';
 import type { Task } from '@shared/types';
+
+// The list/sidebar Schedule action now routes through updateTask.mutate (which
+// calls taskApi.updateTask) instead of the old dateless onSchedule(id). Spy on
+// the service layer so we can assert the real scheduledDate that gets committed.
+vi.mock('@/services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api')>();
+  return {
+    ...actual,
+    taskApi: {
+      ...actual.taskApi,
+      updateTask: vi.fn(
+        async (id: string, updates: Record<string, unknown>) => ({
+          id,
+          ...updates,
+        })
+      ),
+    },
+  };
+});
 
 vi.mock('../AttachmentPreviewDialog', () => ({
   default: ({
@@ -304,21 +330,50 @@ describe('TaskItem Component', () => {
       expect(screen.queryByText('Schedule')).not.toBeInTheDocument();
     });
 
-    it('should call onSchedule when schedule option is clicked', async () => {
+    it('opens the schedule date picker (no dateless mutation) and commits the chosen date on Place', async () => {
       const user = userEvent.setup();
       const onSchedule = vi.fn();
+      vi.mocked(taskApi.updateTask).mockClear();
 
       renderTaskItem(mockTask, { onSchedule });
 
-      // Open the dropdown menu
+      // Open the dropdown menu and click Schedule
       const menuTrigger = screen.getByLabelText('Task options for "Test Task"');
       await user.click(menuTrigger);
+      await user.click(screen.getByText('Schedule'));
 
-      // Click schedule option
-      const scheduleOption = screen.getByText('Schedule');
-      await user.click(scheduleOption);
+      // NEW behavior: clicking Schedule opens the ScheduleTaskDialog date picker
+      // rather than immediately firing onSchedule(id) with no date (the old bug
+      // that cleared the due date). The dialog and its Place action must appear.
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Schedule task')).toBeInTheDocument();
+      const placeButton = within(dialog).getByRole('button', { name: 'Place' });
+      expect(placeButton).toBeInTheDocument();
 
-      expect(onSchedule).toHaveBeenCalledWith('test-task-1');
+      // The regression contract: nothing is scheduled just by opening the picker.
+      expect(onSchedule).not.toHaveBeenCalled();
+      expect(vi.mocked(taskApi.updateTask)).not.toHaveBeenCalled();
+
+      // Choose an explicit day (the 20th of the shown month), then Place.
+      const dayButton = within(dialog)
+        .getAllByRole('button')
+        .find((b) => (b.textContent ?? '').trim() === '20');
+      expect(dayButton).toBeDefined();
+      await user.click(dayButton!);
+      await user.click(placeButton);
+
+      // A real Date is committed (via updateTask -> taskApi.updateTask), not a
+      // dateless call. The picked calendar day (20th) is preserved.
+      await waitFor(() =>
+        expect(vi.mocked(taskApi.updateTask)).toHaveBeenCalledWith(
+          'test-task-1',
+          expect.objectContaining({ scheduledDate: expect.any(Date) })
+        )
+      );
+      const [, updates] = vi.mocked(taskApi.updateTask).mock.calls[0];
+      expect((updates as { scheduledDate: Date }).scheduledDate.getDate()).toBe(
+        20
+      );
     });
 
     it('should show info icon with proper accessibility', async () => {

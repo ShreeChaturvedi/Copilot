@@ -14,7 +14,7 @@ import type { Task } from '@shared/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { format, isSameDay, differenceInCalendarDays } from 'date-fns';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { AlertTriangle, MoreHorizontal, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -185,11 +185,19 @@ const CardBody: React.FC<CardBodyProps> = ({ task, menu }) => {
         <div className="kanban-card-footer">
           {due && (
             <span
-              className={cn('kanban-due uppercase', {
-                'kanban-due--today': due.tone === 'today',
-                'kanban-due--overdue': due.tone === 'overdue',
-              })}
+              className={cn(
+                'kanban-due uppercase inline-flex items-center gap-1',
+                {
+                  'kanban-due--today': due.tone === 'today',
+                  'kanban-due--overdue': due.tone === 'overdue',
+                }
+              )}
             >
+              {/* Overdue gets an icon, not just --destructive tint, so the
+                  state survives grayscale (a11y). */}
+              {due.tone === 'overdue' && (
+                <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+              )}
               {due.label}
             </span>
           )}
@@ -207,7 +215,7 @@ export const TaskKanbanBoard: React.FC = () => {
       includeTaskOperations: true,
     });
   const { updateTask, deleteTask, scheduleTask } = useTasks();
-  const { selectedKanbanTaskListId } = useUIStore();
+  const { selectedKanbanTaskListId, sortBy, sortOrder } = useUIStore();
   const setEnhancedInputVisible = useSettingsStore(
     (s) => s.setEnhancedInputVisible
   );
@@ -263,16 +271,46 @@ export const TaskKanbanBoard: React.FC = () => {
       }
       result[moves[t.id] ?? getTaskStatus(t)].push(t);
     }
-    (Object.keys(result) as ColumnKey[]).forEach((k) => {
-      result[k].sort((a, b) => {
-        if (a.completed === b.completed) {
-          return b.createdAt.getTime() - a.createdAt.getTime();
+    // Honor the toolbar's sort field/order within each column (same comparator
+    // semantics as the list's filterTasksForPane) so the sort control isn't
+    // inert on the board.
+    const priorityOrder = { high: 3, medium: 2, low: 1 } as const;
+    const comparator = (a: Task, b: Task) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'dueDate': {
+          const aDate = a.scheduledDate
+            ? a.scheduledDate.getTime()
+            : Number.POSITIVE_INFINITY;
+          const bDate = b.scheduledDate
+            ? b.scheduledDate.getTime()
+            : Number.POSITIVE_INFINITY;
+          comparison = aDate - bDate;
+          break;
         }
-        return a.completed ? 1 : -1;
-      });
+        case 'priority': {
+          const aP =
+            priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          const bP =
+            priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          comparison = bP - aP;
+          break;
+        }
+        case 'createdAt':
+        default:
+          comparison = b.createdAt.getTime() - a.createdAt.getTime();
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    };
+    (Object.keys(result) as ColumnKey[]).forEach((k) => {
+      result[k].sort(comparator);
     });
     return result;
-  }, [tasks, selectedListId, moves]);
+  }, [tasks, selectedListId, moves, sortBy, sortOrder]);
 
   /* All 3 columns empty at once (e.g. a freshly created list): the whole-
      board Scene message takes over from the 3x redundant per-column
@@ -498,7 +536,7 @@ export const TaskKanbanBoard: React.FC = () => {
             variant="ghost"
             size="sm"
             className="kanban-col-add h-6 w-6 p-0 text-muted-foreground"
-            aria-label={`New task in ${COLUMN_LABELS[keyId]}`}
+            aria-label="New task"
             onClick={handleNewTask}
           >
             <Plus className="h-3.5 w-3.5" />

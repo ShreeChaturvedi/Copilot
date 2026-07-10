@@ -111,7 +111,7 @@
   position: absolute;
   top: 5px;
   right: 5px;
-  border-radius: 6px;
+  border-radius: var(--radius-chip);
   background: color-mix(in oklab, var(--surface-1) 90%, transparent);
   opacity: 0;
   transition: opacity var(--dur-2) var(--ease-out);
@@ -190,7 +190,7 @@
 .kanban-gap {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms var(--ease-settle);
+  transition: grid-template-rows var(--dur-3) var(--ease-settle);
 }
 .kanban-gap--open {
   grid-template-rows: 1fr;
