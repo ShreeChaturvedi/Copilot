@@ -8,6 +8,7 @@ import {
   buildAttachmentPreview,
   compressImageIfNeeded,
   readAsDataUrl,
+  resolveAttachmentDataUrl,
 } from '../lib/attachmentPreview';
 
 function makeFile(
@@ -145,5 +146,35 @@ describe('readAsDataUrl', () => {
     const file = makeFile('a.txt', 'text/plain', 8, 'hello');
     const dataUrl = await readAsDataUrl(file);
     expect(dataUrl).toMatch(/^data:text\/plain;base64,/);
+  });
+});
+
+describe('resolveAttachmentDataUrl (submit path after #104)', () => {
+  it('prefers an existing data: preview without re-reading the File', async () => {
+    const readSpy = vi.spyOn(FileReader.prototype, 'readAsDataURL');
+    const file = makeFile('shot.png', 'image/png', 8, 'png');
+    const url = await resolveAttachmentDataUrl({
+      preview: 'data:image/png;base64,abc',
+      file,
+      name: 'shot.png',
+    });
+    expect(url).toBe('data:image/png;base64,abc');
+    expect(readSpy).not.toHaveBeenCalled();
+  });
+
+  it('reads the File when preview is skipped (non-image)', async () => {
+    const file = makeFile('note.txt', 'text/plain', 5, 'hello');
+    const url = await resolveAttachmentDataUrl({
+      preview: undefined,
+      file,
+      name: 'note.txt',
+    });
+    expect(url).toMatch(/^data:text\/plain;base64,/);
+  });
+
+  it('throws when neither preview nor File is available', async () => {
+    await expect(
+      resolveAttachmentDataUrl({ name: 'missing.bin' })
+    ).rejects.toThrow(/no uploadable content/);
   });
 });

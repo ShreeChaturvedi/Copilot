@@ -80,3 +80,21 @@ export async function buildAttachmentPreview(
   if (!file.type.startsWith('image/')) return undefined;
   return readAsDataUrl(file);
 }
+
+/**
+ * Resolve the data URL used for /api/upload. Preview is only populated for
+ * image/* in the composer; non-images keep their File and are base64-encoded
+ * here at submit time so upload still hits the blob endpoint (and surfaces
+ * 503 when BLOB_READ_WRITE_TOKEN is missing).
+ */
+export async function resolveAttachmentDataUrl(file: {
+  preview?: string;
+  file?: File;
+  name?: string;
+}): Promise<string> {
+  if (file.preview?.startsWith('data:')) return file.preview;
+  if (file.file) return readAsDataUrl(file.file);
+  throw new Error(
+    `Attachment "${file.name || 'file'}" has no uploadable content`
+  );
+}
