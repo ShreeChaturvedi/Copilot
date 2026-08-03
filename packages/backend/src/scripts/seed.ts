@@ -61,7 +61,7 @@ async function main() {
   const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  
+
   const nextWeek = new Date(now);
   nextWeek.setDate(nextWeek.getDate() + 7);
 
