@@ -67,15 +67,18 @@ export function createApiHandler(
         requestLogger(),
       ];
 
+      // Authenticate before rate-limiting when the route requires auth so the
+      // limiter's default keyGenerator can key on req.user.id. Shared-NAT users
+      // then each get their own bucket instead of one IP-wide budget (issue #89).
+      // Public/auth tiers stay IP-keyed because no JWT runs first.
+      if (route.requireAuth) {
+        middlewares.push(authenticateJWT());
+      }
+
       // Rate limiting: select the configured tier (default 'api'). This is what
       // makes the strict `auth`/`upload` presets reachable instead of every
       // route sharing the 100/15min `api` bucket.
       middlewares.push(selectRateLimit(options.rateLimit));
-
-      // Add authentication if required
-      if (route.requireAuth) {
-        middlewares.push(authenticateJWT());
-      }
 
       // Add validation if configured
       const validationConfig: ValidationConfig = {};
@@ -132,17 +135,23 @@ export function createMethodHandler(
       // so public endpoints (health, register, login, ...) are unchanged. devAuth
       // (dev only) mirrors createApiHandler and is placed before the logger so
       // logs carry the userId in development.
+      //
+      // Rate limit runs AFTER authenticateJWT on requireAuth routes so the
+      // bucket keys on req.user.id (issue #89). Public routes keep IP-keyed
+      // limiting because they never authenticate first.
       const middlewares = [corsMiddleware(), requestIdMiddleware()];
 
       if (options.requireAuth && process.env.NODE_ENV !== 'production') {
         middlewares.push(devAuth());
       }
 
-      middlewares.push(requestLogger(), selectRateLimit(options.rateLimit));
+      middlewares.push(requestLogger());
 
       if (options.requireAuth) {
         middlewares.push(authenticateJWT());
       }
+
+      middlewares.push(selectRateLimit(options.rateLimit));
 
       await composeMiddleware(...middlewares)(req, res, async () => {
         await handler(req, res);
