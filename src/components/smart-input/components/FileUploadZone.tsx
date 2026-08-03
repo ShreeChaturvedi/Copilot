@@ -69,21 +69,6 @@ export interface FileUploadZoneProps {
 }
 
 /**
- * Legacy compatibility - use shared getFileDisplayInfo but return old format
- * TODO: Update consumers to use getFileDisplayInfo directly
- */
-// function getFileTypeInfo(file: File) {
-//   const displayInfo = getFileDisplayInfo(file);
-//
-//   // Return format compatible with old FilePreview component expectations
-//   return {
-//     icon: File, // Default icon, will be replaced by FilePreviewProvider
-//     color: displayInfo.color,
-//     maxSize: displayInfo.config?.maxSize || 10 * 1024 * 1024,
-//   };
-// }
-
-/**
  * Individual file preview component
  */
 interface FilePreviewProps {
