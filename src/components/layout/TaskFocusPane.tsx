@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { EASE_SETTLE, EASE_OUT, DUR_3_S } from '@/lib/motion';
 import { EnhancedTaskInput } from '@/components/smart-input/EnhancedTaskInput';
 import type { UploadedFile } from '@/components/smart-input/components/FileUploadZone';
+import { resolveAttachmentDataUrl } from '@/components/smart-input/lib/attachmentPreview';
 import { TaskControls } from '@/components/tasks/TaskControls';
 import { TaskFolderGrid } from '@/components/tasks/TaskFolderGrid';
 import { TaskPaneContainer } from '@/components/tasks/TaskPaneContainer';
@@ -12,6 +13,8 @@ import { cn } from '@/lib/utils';
 import type { SmartTaskData } from '@/components/smart-input/SmartTaskInput';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCommandBarStore } from '@/stores/commandBarStore';
+import { toast } from 'sonner';
+import { toUserMessage } from '@/utils/errorMessages';
 
 // Floating layers the quick-add panel should never fight with: Radix
 // popover/dropdown/select portals (all share this wrapper attribute) plus
@@ -50,8 +53,10 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
     handleSelectTaskGroup,
   } = useTaskManagement({ includeTaskOperations: true });
 
-  // Wrapper to pass attached files to backend via taskApi
-  const handleAddTaskWithFiles = (
+  // Wrapper to pass attached files to backend via taskApi.
+  // Preview is only set for image/* (issue #104); non-images still carry File
+  // and are resolved to a data URL at submit for /api/upload.
+  const handleAddTaskWithFiles = async (
     title: string,
     _groupId?: string,
     smartData?: {
@@ -75,6 +80,26 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
       _groupId && _groupId !== 'default' && _groupId !== 'all'
         ? _groupId
         : undefined;
+
+    let attachments:
+      | Array<{ name: string; type: string; size: number; url: string }>
+      | undefined;
+    if (files && files.length > 0) {
+      try {
+        attachments = await Promise.all(
+          files.map(async (f) => ({
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            url: await resolveAttachmentDataUrl(f),
+          }))
+        );
+      } catch (e) {
+        toast.error(toUserMessage(e, 'Failed to prepare attachments'));
+        return;
+      }
+    }
+
     addTask.mutate({
       title,
       description: smartData?.description,
@@ -104,12 +129,7 @@ export const TaskFocusPane: React.FC<TaskFocusPaneProps> = ({ className }) => {
               cleanTitle: smartData.title,
             }
           : undefined,
-      attachments: files?.map((f) => ({
-        name: f.name,
-        type: f.type,
-        size: f.size,
-        url: f.preview || '',
-      })),
+      attachments,
     });
   };
 

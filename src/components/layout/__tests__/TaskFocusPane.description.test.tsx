@@ -6,7 +6,7 @@
  * path and asserts the created task carries its description. Reverting the fix
  * makes `description` undefined and this test fails.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskFocusPane } from '../TaskFocusPane';
@@ -99,7 +99,8 @@ describe('TaskFocusPane — #71 description threading', () => {
     render(<TaskFocusPane />);
     await userEvent.click(screen.getByTestId('submit-with-desc'));
 
-    expect(mutate).toHaveBeenCalledTimes(1);
+    // handleAddTaskWithFiles is async (attachment data-URL resolve).
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Buy milk',
