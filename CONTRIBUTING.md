@@ -1,6 +1,6 @@
 # Contributing to Taskflow Calendar
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing. This document covers setup, code standards, and how to open a pull request.
 
 ## Development Setup
 
@@ -32,7 +32,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### TypeScript
 
-- Use strict TypeScript - no `any` types unless absolutely necessary
+- Use strict TypeScript; avoid `any` unless there is no practical alternative
 - Define interfaces for all data structures
 - Use proper type imports: `import type { Foo } from './types'`
 
