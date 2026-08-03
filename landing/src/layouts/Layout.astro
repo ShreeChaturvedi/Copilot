@@ -7,8 +7,12 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+// Prefix public/ assets so project Pages (base=/taskflow-calendar) and
+// Vercel root (base=/) both resolve. Normalize trailing slash: Astro's
+// BASE_URL usually ends with /, but join paths as if it may not.
+const assetBase = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const canonical = new URL(Astro.url.pathname, Astro.site);
-const ogImage = new URL('/og.png', Astro.site);
+const ogImage = new URL(`${assetBase}og.png`, Astro.site);
 const imageAlt =
   'Taskflow: a week grid with task chips settled into their time slots under the headline Everything has a time.';
 
@@ -38,8 +42,8 @@ const schema = {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="icon" type="image/svg+xml" href={`${assetBase}favicon.svg`} />
+    <link rel="sitemap" href={`${assetBase}sitemap-index.xml`} />
     <meta name="theme-color" content="#080d0e" />
     <meta name="generator" content={Astro.generator} />
 
@@ -62,28 +66,28 @@ const schema = {
 
     <link
       rel="preload"
-      href="/fonts/sentient-300.woff2"
+      href={`${assetBase}fonts/sentient-300.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
     />
     <link
       rel="preload"
-      href="/fonts/sentient-400.woff2"
+      href={`${assetBase}fonts/sentient-400.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
     />
     <link
       rel="preload"
-      href="/fonts/inter-latin.woff2"
+      href={`${assetBase}fonts/inter-latin.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
     />
     <link
       rel="preload"
-      href="/fonts/spline-sans-mono-latin.woff2"
+      href={`${assetBase}fonts/spline-sans-mono-latin.woff2`}
       as="font"
       type="font/woff2"
       crossorigin

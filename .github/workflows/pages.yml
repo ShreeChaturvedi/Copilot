@@ -1,0 +1,68 @@
+# Deploy the Astro landing (landing/) to GitHub Pages.
+# Vercel remains the primary app + landing host; this is a static mirror
+# of the marketing site only (no SPA, no API).
+#
+# Do NOT use actions/jekyll-build-pages — the monorepo root is not a
+# Jekyll site and previously choked on *.astro under landing/.
+
+name: Deploy GitHub Pages (landing)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'landing/**'
+      - '.github/workflows/pages.yml'
+      - 'package-lock.json'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build landing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Astro landing for GitHub Pages
+        env:
+          # Project Pages URL: https://shreechaturvedi.github.io/taskflow-calendar/
+          PUBLIC_SITE_URL: https://shreechaturvedi.github.io
+          PUBLIC_BASE_PATH: /taskflow-calendar
+          # CTAs point at the live Vercel app (Pages has no /app SPA).
+          PUBLIC_APP_URL: https://taskflow-calendar.vercel.app
+        run: npm run build:landing
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
