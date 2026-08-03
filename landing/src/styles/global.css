@@ -10,28 +10,28 @@
   font-style: normal;
   font-weight: 400 600;
   font-display: swap;
-  src: url('/fonts/inter-latin.woff2') format('woff2');
+  src: url('fonts/inter-latin.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Spline Sans Mono';
   font-style: normal;
   font-weight: 400 500;
   font-display: swap;
-  src: url('/fonts/spline-sans-mono-latin.woff2') format('woff2');
+  src: url('fonts/spline-sans-mono-latin.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Sentient';
   font-style: normal;
   font-weight: 300;
   font-display: swap;
-  src: url('/fonts/sentient-300.woff2') format('woff2');
+  src: url('fonts/sentient-300.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Sentient';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/sentient-400.woff2') format('woff2');
+  src: url('fonts/sentient-400.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Sentient-fallback';

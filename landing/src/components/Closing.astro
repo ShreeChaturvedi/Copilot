@@ -15,6 +15,9 @@
 // because on a natural single-load visit the drag happens AFTER this parse-
 // time read already ran (the visitor drags the hero idler, then scrolls
 // down to closing), so only the second read can catch it.
+
+const appBase = import.meta.env.PUBLIC_APP_URL ?? '';
+const signupHref = `${appBase}/app/signup`;
 ---
 
 <section class="section closing" id="closing">
@@ -74,7 +77,7 @@
       })();
     </script>
     <div class="cta-stack" data-reveal>
-      <a class="btn btn-primary" href="/app/signup">Start free</a>
+      <a class="btn btn-primary" href={signupHref}>Start free</a>
       <p class="mono-line">NO CARD REQUIRED</p>
     </div>
   </div>

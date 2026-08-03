@@ -6,6 +6,9 @@
 // chips and a graduating idler). See docs/design-research/specs-v2/
 // hero.md and _synthesis.md (c) Hero for the full spec this implements.
 
+const appBase = import.meta.env.PUBLIC_APP_URL ?? '';
+const signupHref = `${appBase}/app/signup`;
+
 const DAY_START = 8 * 60; // grid runs 08:00-18:00
 const DAY_SPAN = 10 * 60;
 
@@ -99,7 +102,7 @@ const hourLabels = [
       a time, and your week fills in.
     </p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="/app/signup">Start free</a>
+      <a class="btn btn-primary" href={signupHref}>Start free</a>
     </div>
     <p class="hero-trust mono-line" aria-hidden="true">FREE. NO CARD REQUIRED.</p>
 
